@@ -1,33 +1,38 @@
-Model.FileInfo testFileInfo = new()
-                {
-                    Encoding = EncodingEnum.UTF8,
-                    FileBinary = attachmentInfo.ContentBytes,
-                    FileType = FileType.EXCEL,
-                    Delimiter = "",
-                    ValidateHeader = false,
-                    ValidateHeaderContainsFields = [],
-                    HeaderRowNumber = 0,
-                    SkipRowStrings = [],
-                    Columns = [
-                        new()
-                        {
-                            CustomDataValidation = [new() {InjestFilePropertyId = 1}],
-                            ColumnNumber = 8,
-                            StartRowNumber = 1,
-                            FindFromHeader = false,
-                            HeaderColumnName = "",
-                            ReadEndCondition = ReadEndCondition.FILE_END,
-                            ReadEndConditionValue = "",
-                        },
-                        new()
-                        {
-                            CustomDataValidation = [new() {InjestFilePropertyId = 1}],
-                            ColumnNumber = 6,
-                            StartRowNumber = 1,
-                            FindFromHeader = false,
-                            HeaderColumnName = "",
-                            ReadEndCondition = ReadEndCondition.FILE_END,
-                            ReadEndConditionValue = ""
-                        },
-                    ]
-                };
+{
+  "Encoding": "UTF8",
+  "FileBinary": "BASE64_ENCODED_CONTENT_HERE",
+  "FileType": "EXCEL",
+  "Delimiter": "",
+  "ValidateHeader": false,
+  "ValidateHeaderContainsFields": [],
+  "HeaderRowNumber": 0,
+  "SkipRowStrings": [],
+  "Columns": [
+    {
+      "CustomDataValidation": [
+        {
+          "InjestFilePropertyId": 1
+        }
+      ],
+      "ColumnNumber": 8,
+      "StartRowNumber": 1,
+      "FindFromHeader": false,
+      "HeaderColumnName": "",
+      "ReadEndCondition": "FILE_END",
+      "ReadEndConditionValue": ""
+    },
+    {
+      "CustomDataValidation": [
+        {
+          "InjestFilePropertyId": 1
+        }
+      ],
+      "ColumnNumber": 6,
+      "StartRowNumber": 1,
+      "FindFromHeader": false,
+      "HeaderColumnName": "",
+      "ReadEndCondition": "FILE_END",
+      "ReadEndConditionValue": ""
+    }
+  ]
+}
