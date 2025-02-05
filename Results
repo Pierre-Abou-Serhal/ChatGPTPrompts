@@ -1,0 +1,37 @@
+CREATE PROCEDURE Count_Decimal_Values
+    @InputString NVARCHAR(MAX)
+AS
+BEGIN
+    -- Table to store split values
+    DECLARE @Numbers TABLE (Value NVARCHAR(50))
+
+    -- Splitting the string into individual values
+    DECLARE @Pos INT = 1, @NextPos INT, @Value NVARCHAR(50)
+    
+    WHILE @Pos > 0
+    BEGIN
+        SET @NextPos = CHARINDEX(',', @InputString, @Pos)
+        
+        SET @Value = LTRIM(RTRIM(
+            CASE 
+                WHEN @NextPos > 0 THEN SUBSTRING(@InputString, @Pos, @NextPos - @Pos)
+                ELSE SUBSTRING(@InputString, @Pos, LEN(@InputString) - @Pos + 1)
+            END
+        ))
+
+        -- Insert into table if it's not empty
+        IF @Value <> ''
+            INSERT INTO @Numbers (Value) VALUES (@Value)
+
+        -- Move to next position
+        SET @Pos = CASE WHEN @NextPos > 0 THEN @NextPos + 1 ELSE 0 END
+    END
+
+    -- Count numbers with more than 2 decimal places using DECIMAL casting
+    SELECT 
+        COUNT(*) AS DecimalCount
+    FROM @Numbers
+    WHERE 
+        TRY_CAST(Value AS DECIMAL(18,10)) IS NOT NULL -- Ensure it's a valid number
+        AND ABS(TRY_CAST(Value AS DECIMAL(18,10)) - TRY_CAST(Value AS DECIMAL(18,2))) > 0 -- Check for extra decimal places
+END
