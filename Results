@@ -1,17 +1,142 @@
-public bool ValidateObjects(IEnumerable<MyObject> objects)
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+public class SalDomClient
 {
-    if (objects == null || !objects.Any())
+    public int Index { get; set; }
+    public string Account { get; set; }
+    public string Amount { get; set; }
+}
+
+public class ParsedData
+{
+    public int ColumnIndex { get; set; }
+    public string ColumnName { get; set; }
+    public List<string> Data { get; set; }
+}
+
+public class File
+{
+    public List<FileColumn> FileColumns { get; set; }
+}
+
+public class FileColumn
+{
+    public int Column { get; set; }
+    public string ColumnName { get; set; }
+}
+
+public class Example
+{
+    /// <summary>
+    /// Builds a list of SalDomClient from the parsed data and file configuration.
+    /// Assumes that the configuration has one column named "Account" and one column named "Amount".
+    /// </summary>
+    public List<SalDomClient> BuildSalDomClients(List<ParsedData> parsedData, File fileConfig)
     {
-        throw new ArgumentException("The collection of objects cannot be null or empty.");
+        if (parsedData == null || fileConfig == null)
+        {
+            throw new ArgumentNullException("parsedData or fileConfig is null");
+        }
+
+        // Find the file configuration entries for Account and Amount.
+        // Here we assume the configuration identifies the columns by name.
+        var accountFileColumn = fileConfig.FileColumns
+            .FirstOrDefault(fc => fc.ColumnName.Equals("Account", StringComparison.OrdinalIgnoreCase));
+        var amountFileColumn = fileConfig.FileColumns
+            .FirstOrDefault(fc => fc.ColumnName.Equals("Amount", StringComparison.OrdinalIgnoreCase));
+
+        if (accountFileColumn == null || amountFileColumn == null)
+        {
+            throw new Exception("File configuration must contain both an 'Account' and an 'Amount' column.");
+        }
+
+        // Locate the corresponding ParsedData objects using the column number (or index).
+        // Depending on your design you could also match by name.
+        var accountParsedData = parsedData
+            .FirstOrDefault(pd => pd.ColumnIndex == accountFileColumn.Column);
+        var amountParsedData = parsedData
+            .FirstOrDefault(pd => pd.ColumnIndex == amountFileColumn.Column);
+
+        if (accountParsedData == null || amountParsedData == null)
+        {
+            throw new Exception("Could not find parsed data for Account or Amount column.");
+        }
+
+        // Ensure both columns have the same number of rows.
+        int rowCount = accountParsedData.Data.Count;
+        if (amountParsedData.Data.Count != rowCount)
+        {
+            throw new Exception("The Account and Amount columns have a different number of rows.");
+        }
+
+        var salDomClients = new List<SalDomClient>();
+
+        // Loop through the rows using a simple for loop (which gives you an index)
+        for (int i = 0; i < rowCount; i++)
+        {
+            // Optional: You can also check here if either string is null or empty.
+            string accountValue = accountParsedData.Data[i];
+            string amountValue = amountParsedData.Data[i];
+
+            if (string.IsNullOrEmpty(accountValue) || string.IsNullOrEmpty(amountValue))
+            {
+                // You can choose how to handle empty strings.
+                // For example, you might throw an exception, skip the row, or log a warning.
+                throw new Exception($"Row {i} contains an empty value.");
+            }
+
+            var client = new SalDomClient
+            {
+                Index = i,
+                Account = accountValue,
+                Amount = amountValue
+            };
+
+            salDomClients.Add(client);
+        }
+
+        return salDomClients;
     }
-    
-    // Ensure all arrays have the same length as the first array.
-    bool sameLength = objects.Select(o => o.Data.Length)
-                               .Distinct()
-                               .Count() == 1;
-    
-    // Ensure no string in any array is null or empty.
-    bool noEmptyStrings = objects.All(o => o.Data.All(s => !string.IsNullOrEmpty(s)));
-    
-    return sameLength && noEmptyStrings;
+
+    // Example usage:
+    public static void Main()
+    {
+        // Example file configuration:
+        var fileConfig = new File
+        {
+            FileColumns = new List<FileColumn>
+            {
+                new FileColumn { Column = 1, ColumnName = "Account" },
+                new FileColumn { Column = 2, ColumnName = "Amount" }
+            }
+        };
+
+        // Example parsed data: imagine each ParsedData represents a column
+        var parsedData = new List<ParsedData>
+        {
+            new ParsedData
+            {
+                ColumnIndex = 1,
+                ColumnName = "Account",
+                Data = new List<string> { "Account1", "Account2", "Account3" }
+            },
+            new ParsedData
+            {
+                ColumnIndex = 2,
+                ColumnName = "Amount",
+                Data = new List<string> { "100", "200", "300" }
+            }
+        };
+
+        var example = new Example();
+        List<SalDomClient> clients = example.BuildSalDomClients(parsedData, fileConfig);
+
+        // Print the results
+        foreach (var client in clients)
+        {
+            Console.WriteLine($"Index: {client.Index}, Account: {client.Account}, Amount: {client.Amount}");
+        }
+    }
 }
