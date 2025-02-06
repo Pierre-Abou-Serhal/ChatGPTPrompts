@@ -25,35 +25,35 @@ public class FileColumn
 {
     public int Column { get; set; }
     public string ColumnName { get; set; }
+    // The ColTypeCode property indicates the type of the column, e.g., "account" or "amount"
+    public string ColTypeCode { get; set; }
 }
 
-public class Example
+public class DataProcessor
 {
     /// <summary>
-    /// Builds a list of SalDomClient from the parsed data and file configuration.
-    /// Assumes that the configuration has one column named "Account" and one column named "Amount".
+    /// Builds a list of SalDomClient objects from parsed data and a file configuration.
+    /// The File configuration uses ColTypeCode to indicate the account and amount columns.
     /// </summary>
     public List<SalDomClient> BuildSalDomClients(List<ParsedData> parsedData, File fileConfig)
     {
-        if (parsedData == null || fileConfig == null)
-        {
-            throw new ArgumentNullException("parsedData or fileConfig is null");
-        }
+        if (parsedData == null)
+            throw new ArgumentNullException(nameof(parsedData));
+        if (fileConfig == null)
+            throw new ArgumentNullException(nameof(fileConfig));
 
-        // Find the file configuration entries for Account and Amount.
-        // Here we assume the configuration identifies the columns by name.
+        // Identify the file columns for account and amount using ColTypeCode.
         var accountFileColumn = fileConfig.FileColumns
-            .FirstOrDefault(fc => fc.ColumnName.Equals("Account", StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(fc => fc.ColTypeCode.Equals("account", StringComparison.OrdinalIgnoreCase));
         var amountFileColumn = fileConfig.FileColumns
-            .FirstOrDefault(fc => fc.ColumnName.Equals("Amount", StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(fc => fc.ColTypeCode.Equals("amount", StringComparison.OrdinalIgnoreCase));
 
         if (accountFileColumn == null || amountFileColumn == null)
         {
-            throw new Exception("File configuration must contain both an 'Account' and an 'Amount' column.");
+            throw new Exception("File configuration must contain both an account and an amount column based on ColTypeCode.");
         }
 
-        // Locate the corresponding ParsedData objects using the column number (or index).
-        // Depending on your design you could also match by name.
+        // Locate the corresponding ParsedData objects based on the column index.
         var accountParsedData = parsedData
             .FirstOrDefault(pd => pd.ColumnIndex == accountFileColumn.Column);
         var amountParsedData = parsedData
@@ -61,30 +61,28 @@ public class Example
 
         if (accountParsedData == null || amountParsedData == null)
         {
-            throw new Exception("Could not find parsed data for Account or Amount column.");
+            throw new Exception("Could not find parsed data for the account or amount column.");
         }
 
         // Ensure both columns have the same number of rows.
         int rowCount = accountParsedData.Data.Count;
         if (amountParsedData.Data.Count != rowCount)
         {
-            throw new Exception("The Account and Amount columns have a different number of rows.");
+            throw new Exception("The account and amount columns have a different number of rows.");
         }
 
         var salDomClients = new List<SalDomClient>();
 
-        // Loop through the rows using a simple for loop (which gives you an index)
+        // Create a SalDomClient for each row in the parsed data.
         for (int i = 0; i < rowCount; i++)
         {
-            // Optional: You can also check here if either string is null or empty.
             string accountValue = accountParsedData.Data[i];
             string amountValue = amountParsedData.Data[i];
 
+            // Optionally, check if the values are null or empty.
             if (string.IsNullOrEmpty(accountValue) || string.IsNullOrEmpty(amountValue))
             {
-                // You can choose how to handle empty strings.
-                // For example, you might throw an exception, skip the row, or log a warning.
-                throw new Exception($"Row {i} contains an empty value.");
+                throw new Exception($"Row {i} contains an empty or null value.");
             }
 
             var client = new SalDomClient
@@ -100,40 +98,40 @@ public class Example
         return salDomClients;
     }
 
-    // Example usage:
+    // Example usage
     public static void Main()
     {
-        // Example file configuration:
+        // Example file configuration with ColTypeCode.
         var fileConfig = new File
         {
             FileColumns = new List<FileColumn>
             {
-                new FileColumn { Column = 1, ColumnName = "Account" },
-                new FileColumn { Column = 2, ColumnName = "Amount" }
+                new FileColumn { Column = 1, ColumnName = "Acc", ColTypeCode = "account" },
+                new FileColumn { Column = 2, ColumnName = "Amt", ColTypeCode = "amount" }
             }
         };
 
-        // Example parsed data: imagine each ParsedData represents a column
+        // Example parsed data. Each ParsedData object represents a column.
         var parsedData = new List<ParsedData>
         {
             new ParsedData
             {
                 ColumnIndex = 1,
-                ColumnName = "Account",
+                ColumnName = "Acc",
                 Data = new List<string> { "Account1", "Account2", "Account3" }
             },
             new ParsedData
             {
                 ColumnIndex = 2,
-                ColumnName = "Amount",
+                ColumnName = "Amt",
                 Data = new List<string> { "100", "200", "300" }
             }
         };
 
-        var example = new Example();
-        List<SalDomClient> clients = example.BuildSalDomClients(parsedData, fileConfig);
+        var processor = new DataProcessor();
+        List<SalDomClient> clients = processor.BuildSalDomClients(parsedData, fileConfig);
 
-        // Print the results
+        // Print the results.
         foreach (var client in clients)
         {
             Console.WriteLine($"Index: {client.Index}, Account: {client.Account}, Amount: {client.Amount}");
