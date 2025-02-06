@@ -1,38 +1,269 @@
-{
-  "Encoding": "UTF8",
-  "FileBinary": "BASE64_ENCODED_CONTENT_HERE",
-  "FileType": "EXCEL",
-  "Delimiter": "",
-  "ValidateHeader": false,
-  "ValidateHeaderContainsFields": [],
-  "HeaderRowNumber": 0,
-  "SkipRowStrings": [],
-  "Columns": [
-    {
-      "CustomDataValidation": [
-        {
-          "InjestFilePropertyId": 1
-        }
-      ],
-      "ColumnNumber": 8,
-      "StartRowNumber": 1,
-      "FindFromHeader": false,
-      "HeaderColumnName": "",
-      "ReadEndCondition": "FILE_END",
-      "ReadEndConditionValue": ""
-    },
-    {
-      "CustomDataValidation": [
-        {
-          "InjestFilePropertyId": 1
-        }
-      ],
-      "ColumnNumber": 6,
-      "StartRowNumber": 1,
-      "FindFromHeader": false,
-      "HeaderColumnName": "",
-      "ReadEndCondition": "FILE_END",
-      "ReadEndConditionValue": ""
-    }
-  ]
-}
+
+                    using MemoryStream excelMemoryStream = new MemoryStream(fileBytes);
+                    using XLWorkbook workbook = new XLWorkbook(excelMemoryStream);
+                    var worksheet = workbook.Worksheet(1);
+
+                    // Parsed Data List that will be returned to client
+                    List<ParsedData> parsedDataList = [];
+
+                    foreach (Column column in req.FileInfo.Columns)
+                    {
+                        List<Int32> injestFilePropertyIds = [];
+                        List<String> columnData = [];
+
+                        ParsedData parsedData = new();
+                        parsedData.ColumnIndex = column.ColumnNumber;
+
+                        // ClosedXML does not read colum names, only column letters, so we used index instead
+                        Int32 headerNameColumnIndex = 0;
+
+                        // Read End Condition Variables
+                        Int32 whiteLineCount = 0;
+
+                        foreach (var row in worksheet.RowsUsed())
+                        {
+                            // Checking if End Condition is reached
+                            List<String> rowValues = row.Cells().Select(i => i.Value.ToString()).ToList();
+
+                            if (IsReadEndConditionReached(
+                                    column.ReadEndCondition,
+                                    rowValues,
+                                    whiteLineCount,
+                                    row.RowNumber(),
+                                    column.ReadEndConditionValue))
+                            {
+                                return res;
+                            }
+
+                            // Extracting Header Data
+                            if (req.FileInfo.ValidateHeader &&
+                                row.RowNumber() == req.FileInfo.HeaderRowNumber)
+                            {
+                                foreach (var cell in row.Cells())
+                                {
+                                    if (cell.Value.ToString().Equals(column.HeaderColumnName))
+                                    {
+                                        headerNameColumnIndex = cell.Address.ColumnNumber;
+                                        parsedData.ColumnName = column.HeaderColumnName; // Header Name Was Found
+                                    }
+
+                                    headerList.Add(cell.Value.ToString());
+                                }
+
+                                // Check if header contains the values in "ValidateHeaderContainsFields" array
+                                OnCheckHeaderEvent?.Invoke(headerList,
+                                    req.FileInfo.ValidateHeaderContainsFields, ref res);
+
+                                // Header did not pass checking event
+                                if (res.WebResp.Errors.Count > 0)
+                                {
+                                    throw new SGBLBadRequestException("Invalid Header Fields");
+                                }
+                            }
+
+                            // Extracting Row Data
+                            if (row.RowNumber() < column.StartRowNumber)
+                            {
+                                continue;
+                            }
+
+                            // Checking if a value in a row match any skip string value
+                            Boolean skipRow = false;
+
+                            foreach (SkipRowString skipRowString in req.FileInfo.SkipRowStrings)
+                            {
+                                foreach (var cell in row.Cells())
+                                {
+                                    if (skipRowString.IsRegExp)
+                                    {
+                                        if (Regex.IsMatch(cell.Value.ToString(), skipRowString.SkipString))
+                                        {
+                                            skipRow = true;
+                                            break;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (cell.Value.ToString().Contains(skipRowString.SkipString))
+                                        {
+                                            skipRow = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (skipRow)
+                            {
+                                continue;
+                            }
+
+                            String cellValue = column.FindFromHeader
+                                ? row.Cell(headerNameColumnIndex).Value.ToString()
+                                : row.Cell(column.ColumnNumber).Value.ToString();
+
+                            injestFilePropertyIds =
+                                column.CustomDataValidation.Select(i => i.InjestFilePropertyId).ToList();
+
+                            columnData.Add(cellValue);
+
+                            if (rowValues.All(String.IsNullOrWhiteSpace))
+                            {
+                                whiteLineCount++;
+                            }
+                        }
+
+                        OnCheckRowsDataEvent?.Invoke(injestFilePropertyIds, columnData, ref res);
+                        
+                        if (res.WebResp.Errors.Count > 0)
+                        {
+                            throw new SGBLBadRequestException($"Invalid Column {column.ColumnNumber} Fields");
+                        }
+                        
+                        parsedData.Data = columnData;
+                        parsedDataList.Add(parsedData);
+                    }
+                    
+                    res.ParsedDataList = parsedDataList;
+                    
+                    break;
+
+
+
+
+
+/////// CSV -------------------------------
+
+foreach (Column column in req.FileInfo.Columns)
+                    {
+                        // CSV Reader read column in zero-based pattern. csv.GetField<String>(0), csv.GetField<String>(1), ...
+                        column.ColumnNumber =
+                            column.ColumnNumber > 0
+                                ? column.ColumnNumber - 1
+                                : column.ColumnNumber;
+
+                        using MemoryStream csvMemoryStream = new MemoryStream(fileBytes);
+                        using StreamReader reader =
+                            new StreamReader(csvMemoryStream, req.FileInfo.Encoding.GetEncoding());
+
+                        CsvConfiguration? config = new CsvConfiguration(CultureInfo.InvariantCulture)
+                        {
+                            Delimiter = req.FileInfo.Delimiter,
+                            HasHeaderRecord = req.FileInfo.ValidateHeader,
+                        };
+
+                        using CsvReader? csv = new CsvReader(reader, config);
+
+                        Dictionary<Int32, List<String>> columnData = new();
+
+                        // Read End Condition Variables
+                        Int32 whiteLineCount = 0;
+
+                        Int32 rowNumber = 1;
+
+                        while (csv.Read())
+                        {
+                            // Checking if End Condition is reached
+                            List<String> rowValues = [];
+
+                            for (Int32 i = 0; i < csv.ColumnCount; i++)
+                            {
+                                rowValues.Add(csv.GetField(i) ?? String.Empty);
+                            }
+
+                            if (IsReadEndConditionReached(
+                                    column.ReadEndCondition,
+                                    rowValues,
+                                    whiteLineCount,
+                                    rowNumber,
+                                    column.ReadEndConditionValue))
+                            {
+                                return res;
+                            }
+
+                            // Extracting Header Data
+                            if (req.FileInfo.ValidateHeader &&
+                                rowNumber == req.FileInfo.HeaderRowNumber)
+                            {
+                                csv.ReadHeader();
+                                headerList = csv.HeaderRecord?.ToList() ?? [];
+
+                                // Check if header contains the values in "ValidateHeaderContainsFields" array
+                                OnCheckHeaderEvent?.Invoke(headerList,
+                                    req.FileInfo.ValidateHeaderContainsFields, ref res);
+
+                                // Header did not pass checking event
+                                if (res.WebResp.Errors.Count > 0)
+                                {
+                                    throw new SGBLBadRequestException("Invalid Header Fields");
+                                }
+                            }
+
+                            // Extracting Row Data
+                            if (rowNumber < column.StartRowNumber)
+                            {
+                                rowNumber++;
+                                continue;
+                            }
+
+                            // Checking if a value in a row match any skip string value
+                            Boolean skipRow = false;
+
+                            foreach (SkipRowString skipRowString in req.FileInfo.SkipRowStrings)
+                            {
+                                foreach (var cell in rowValues)
+                                {
+                                    if (skipRowString.IsRegExp)
+                                    {
+                                        if (Regex.IsMatch(cell, skipRowString.SkipString))
+                                        {
+                                            skipRow = true;
+                                            break;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (cell.Contains(skipRowString.SkipString))
+                                        {
+                                            skipRow = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (skipRow)
+                            {
+                                continue;
+                            }
+
+                            String cellValue = column.FindFromHeader
+                                ? csv.GetField<String>(column.HeaderColumnName) ??
+                                  String.Empty
+                                : csv.GetField<String>(column.ColumnNumber) ?? String.Empty;
+
+                            foreach (CustomDataValidation customDataValidation in column.CustomDataValidation)
+                            {
+                                if (!columnData.ContainsKey(customDataValidation.InjestFilePropertyId))
+                                {
+                                    columnData.Add(customDataValidation.InjestFilePropertyId, []);
+                                }
+
+                                columnData[customDataValidation.InjestFilePropertyId].Add(cellValue);
+                            }
+
+                            if (rowValues.All(String.IsNullOrWhiteSpace))
+                            {
+                                whiteLineCount++;
+                            }
+
+                            rowNumber++;
+                        }
+
+                        OnCheckRowsDataEvent?.Invoke(columnData, ref res);
+
+                        if (res.WebResp.Errors.Count > 0)
+                        {
+                            throw new SGBLBadRequestException($"Invalid Column {column.ColumnNumber} Fields");
+                        }
+                    }
