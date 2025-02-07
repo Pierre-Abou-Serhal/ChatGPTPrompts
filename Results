@@ -1,18 +1,15 @@
-  validateT24AccNumber(accNumber: string, propName: string): [boolean, string] {
-    if (!accNumber?.trim()) {
-      return [false, `${propName} is required`];
-    }
-    if (accNumber?.trim().length !== 15) {
-      return [false, 'make sure account number is in the correct format'];
-    }
+if (string.IsNullOrWhiteSpace(accNumber))
+        return false;
 
-    if (accNumber?.trim().substring(0, 2) !== '01') {
-      return [false, 'account number should start with 01'];
-    }
+    accNumber = accNumber.Trim();
 
-    if (accNumber?.trim().match(/^\d+$/) == null) {
-      return [false, 'account number should be formed of numbers'];
-    }
+    if (accNumber.Length != 15)
+        return false;
 
-    return [true, ''];
-  }
+    if (!accNumber.StartsWith("01"))
+        return false;
+
+    if (!accNumber.All(char.IsDigit))
+        return false;
+
+    return true;
