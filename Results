@@ -1,15 +1,6 @@
-if (string.IsNullOrWhiteSpace(accNumber))
-        return false;
+            List<FileImportContent> fileImportContents = [];
+            
+            // First Step -> Check Dictionary
+            List<Dictionary> dictionaryList = QueryDictionary(salDomClients.Select(i => i.Account).ToList(), fileConfig.ProductCode);
 
-    accNumber = accNumber.Trim();
-
-    if (accNumber.Length != 15)
-        return false;
-
-    if (!accNumber.StartsWith("01"))
-        return false;
-
-    if (!accNumber.All(char.IsDigit))
-        return false;
-
-    return true;
+            List<String> AltAccsNotFoundInDictionary = salDomClients.Where(i => !dictionaryList.);
