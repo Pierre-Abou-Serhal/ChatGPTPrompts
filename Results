@@ -1,6 +1,8 @@
-            List<FileImportContent> fileImportContents = [];
-            
-            // First Step -> Check Dictionary
-            List<Dictionary> dictionaryList = QueryDictionary(salDomClients.Select(i => i.Account).ToList(), fileConfig.ProductCode);
-
-            List<String> AltAccsNotFoundInDictionary = salDomClients.Where(i => !dictionaryList.);
+MERGE INTO Accounts AS Target
+USING @AccountTVP AS Source
+ON Target.AccountId = Source.AccountId
+WHEN MATCHED THEN
+    UPDATE SET Target.AccountName = Source.AccountName
+WHEN NOT MATCHED THEN
+    INSERT (AccountId, AccountName)
+    VALUES (Source.AccountId, Source.AccountName);
