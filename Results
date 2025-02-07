@@ -1,140 +1,18 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
-public class SalDomClient
-{
-    public int Index { get; set; }
-    public string Account { get; set; }
-    public string Amount { get; set; }
-}
-
-public class ParsedData
-{
-    public int ColumnIndex { get; set; }
-    public string ColumnName { get; set; }
-    public List<string> Data { get; set; }
-}
-
-public class File
-{
-    public List<FileColumn> FileColumns { get; set; }
-}
-
-public class FileColumn
-{
-    public int Column { get; set; }
-    public string ColumnName { get; set; }
-    // The ColTypeCode property indicates the type of the column, e.g., "account" or "amount"
-    public string ColTypeCode { get; set; }
-}
-
-public class DataProcessor
-{
-    /// <summary>
-    /// Builds a list of SalDomClient objects from parsed data and a file configuration.
-    /// The File configuration uses ColTypeCode to indicate the account and amount columns.
-    /// </summary>
-    public List<SalDomClient> BuildSalDomClients(List<ParsedData> parsedData, File fileConfig)
-    {
-        if (parsedData == null)
-            throw new ArgumentNullException(nameof(parsedData));
-        if (fileConfig == null)
-            throw new ArgumentNullException(nameof(fileConfig));
-
-        // Identify the file columns for account and amount using ColTypeCode.
-        var accountFileColumn = fileConfig.FileColumns
-            .FirstOrDefault(fc => fc.ColTypeCode.Equals("account", StringComparison.OrdinalIgnoreCase));
-        var amountFileColumn = fileConfig.FileColumns
-            .FirstOrDefault(fc => fc.ColTypeCode.Equals("amount", StringComparison.OrdinalIgnoreCase));
-
-        if (accountFileColumn == null || amountFileColumn == null)
-        {
-            throw new Exception("File configuration must contain both an account and an amount column based on ColTypeCode.");
-        }
-
-        // Locate the corresponding ParsedData objects based on the column index.
-        var accountParsedData = parsedData
-            .FirstOrDefault(pd => pd.ColumnIndex == accountFileColumn.Column);
-        var amountParsedData = parsedData
-            .FirstOrDefault(pd => pd.ColumnIndex == amountFileColumn.Column);
-
-        if (accountParsedData == null || amountParsedData == null)
-        {
-            throw new Exception("Could not find parsed data for the account or amount column.");
-        }
-
-        // Ensure both columns have the same number of rows.
-        int rowCount = accountParsedData.Data.Count;
-        if (amountParsedData.Data.Count != rowCount)
-        {
-            throw new Exception("The account and amount columns have a different number of rows.");
-        }
-
-        var salDomClients = new List<SalDomClient>();
-
-        // Create a SalDomClient for each row in the parsed data.
-        for (int i = 0; i < rowCount; i++)
-        {
-            string accountValue = accountParsedData.Data[i];
-            string amountValue = amountParsedData.Data[i];
-
-            // Optionally, check if the values are null or empty.
-            if (string.IsNullOrEmpty(accountValue) || string.IsNullOrEmpty(amountValue))
-            {
-                throw new Exception($"Row {i} contains an empty or null value.");
-            }
-
-            var client = new SalDomClient
-            {
-                Index = i,
-                Account = accountValue,
-                Amount = amountValue
-            };
-
-            salDomClients.Add(client);
-        }
-
-        return salDomClients;
+  validateT24AccNumber(accNumber: string, propName: string): [boolean, string] {
+    if (!accNumber?.trim()) {
+      return [false, `${propName} is required`];
+    }
+    if (accNumber?.trim().length !== 15) {
+      return [false, 'make sure account number is in the correct format'];
     }
 
-    // Example usage
-    public static void Main()
-    {
-        // Example file configuration with ColTypeCode.
-        var fileConfig = new File
-        {
-            FileColumns = new List<FileColumn>
-            {
-                new FileColumn { Column = 1, ColumnName = "Acc", ColTypeCode = "account" },
-                new FileColumn { Column = 2, ColumnName = "Amt", ColTypeCode = "amount" }
-            }
-        };
-
-        // Example parsed data. Each ParsedData object represents a column.
-        var parsedData = new List<ParsedData>
-        {
-            new ParsedData
-            {
-                ColumnIndex = 1,
-                ColumnName = "Acc",
-                Data = new List<string> { "Account1", "Account2", "Account3" }
-            },
-            new ParsedData
-            {
-                ColumnIndex = 2,
-                ColumnName = "Amt",
-                Data = new List<string> { "100", "200", "300" }
-            }
-        };
-
-        var processor = new DataProcessor();
-        List<SalDomClient> clients = processor.BuildSalDomClients(parsedData, fileConfig);
-
-        // Print the results.
-        foreach (var client in clients)
-        {
-            Console.WriteLine($"Index: {client.Index}, Account: {client.Account}, Amount: {client.Amount}");
-        }
+    if (accNumber?.trim().substring(0, 2) !== '01') {
+      return [false, 'account number should start with 01'];
     }
-}
+
+    if (accNumber?.trim().match(/^\d+$/) == null) {
+      return [false, 'account number should be formed of numbers'];
+    }
+
+    return [true, ''];
+  }
