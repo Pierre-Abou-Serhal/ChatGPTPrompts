@@ -1,8 +1,80 @@
-MERGE INTO Accounts AS Target
-USING @AccountTVP AS Source
-ON Target.AccountId = Source.AccountId
-WHEN MATCHED THEN
-    UPDATE SET Target.AccountName = Source.AccountName
-WHEN NOT MATCHED THEN
-    INSERT (AccountId, AccountName)
-    VALUES (Source.AccountId, Source.AccountName);
+<table class="table table-striped table-bordered table-sm">
+            <thead>
+            <tr>
+              <th>Name</th>
+              <th *ngIf="currentTab === inProgressTabName">Institution</th>
+              <th *ngIf="currentTab === inProgressTabName">File Type</th>
+              <th>Status</th>
+              <th class="text-center">Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr *ngFor="let attachment of selectedEmail.attachments"
+                [class.table-danger]="attachmentIsRejected(attachment)">
+              <td>{{ attachment.name }}</td>
+              <td *ngIf="currentTab === inProgressTabName">
+                <select class="form-select" (change)="onInstitutionChange(attachment, $event)"
+                        [disabled]="attachment.statusValue === AttachmentStatus.DISCARDED || attachment.statusValue === AttachmentStatus.VALIDATION_ACCEPTED || attachment.statusValue === AttachmentStatus.SENT_FOR_VALIDATION">
+                  <option value="">Select Institution</option>
+                  <option *ngFor="let institution of institutionsList" [value]="institution.id"
+                          [selected]="institution.id === attachment.assignedInstitutionId">
+                    {{ institution.description }}
+                  </option>
+                </select>
+              </td>
+
+              <td *ngIf="currentTab === inProgressTabName">
+
+                <select class="form-select"
+                        [disabled]="!selectedFiles.has(attachment.id) || attachment.statusValue === AttachmentStatus.DISCARDED || attachment.statusValue === AttachmentStatus.VALIDATION_ACCEPTED || attachment.statusValue === AttachmentStatus.SENT_FOR_VALIDATION">
+                  <option value="">Select File Type</option>
+
+                  <!-- Show loading animation -->
+                  <option *ngIf="loadingFiles.get(attachment.id)" disabled>
+                    <div class="spinner-border text-secondary" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </option>
+
+                  <option *ngFor="let fileType of selectedFiles.get(attachment.id)" [value]="fileType.id"
+                          [selected]="fileType.id === attachment.assignedFileId">
+                    {{ fileType.description }}
+                  </option>
+                </select>
+              </td>
+
+
+              <td>{{ attachment.statusValue }}</td>
+              <td class="text-center">
+                <button *ngIf="attachmentCanBeValidated(attachment)" class="btn btn-primary btn-sm me-1"
+                        (click)="sendEmailAttachmentForValidation(attachment)" placement="bottom"
+                        ngbTooltip="Send For Validation" [disabled]="isAttachmentActionLoading(attachment, 'validate')">
+                  <i *ngIf="!isAttachmentActionLoading(attachment, 'validate')" class="bi bi-send-fill"></i>
+                  <div *ngIf="isAttachmentActionLoading(attachment, 'validate')"
+                       class="spinner-border spinner-border-sm text-light"></div>
+                </button>
+                <button class="btn btn-warning btn-sm me-1" (click)="getEmailAttachmentByEmailUniqueId(attachment)"
+                        placement="bottom" ngbTooltip="Download"
+                        [disabled]="isAttachmentActionLoading(attachment, 'download')">
+                  <i *ngIf="!isAttachmentActionLoading(attachment, 'download')" class="bi bi-download"></i>
+                  <div *ngIf="isAttachmentActionLoading(attachment, 'download')"
+                       class="spinner-border spinner-border-sm text-light"></div>
+                </button>
+                <button *ngIf="attachmentCanBeDiscarded(attachment)" class="btn btn-danger btn-sm me-1"
+                        (click)="discardAttachment(attachment)" placement="bottom" ngbTooltip="Discard"
+                        [disabled]="isAttachmentActionLoading(attachment, 'discard')">
+                  <i *ngIf="!isAttachmentActionLoading(attachment, 'discard')" class="bi bi-file-x-fill"></i>
+                  <div *ngIf="isAttachmentActionLoading(attachment, 'discard')"
+                       class="spinner-border spinner-border-sm text-light"></div>
+                </button>
+                <button *ngIf="attachmentCanBeRestored(attachment)" class="btn btn-secondary btn-sm"
+                        (click)="restoreAttachment(attachment)" placement="bottom" ngbTooltip="Restore"
+                        [disabled]="isAttachmentActionLoading(attachment, 'restore')">
+                  <i *ngIf="!isAttachmentActionLoading(attachment, 'restore')" class="bi bi-arrow-counterclockwise"></i>
+                  <div *ngIf="isAttachmentActionLoading(attachment, 'restore')"
+                       class="spinner-border spinner-border-sm text-light"></div>
+                </button>
+              </td>
+            </tr>
+            </tbody>
+          </table>
