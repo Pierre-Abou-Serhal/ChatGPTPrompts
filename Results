@@ -1,80 +1,53 @@
-<table class="table table-striped table-bordered table-sm">
-            <thead>
-            <tr>
-              <th>Name</th>
-              <th *ngIf="currentTab === inProgressTabName">Institution</th>
-              <th *ngIf="currentTab === inProgressTabName">File Type</th>
-              <th>Status</th>
-              <th class="text-center">Actions</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr *ngFor="let attachment of selectedEmail.attachments"
-                [class.table-danger]="attachmentIsRejected(attachment)">
-              <td>{{ attachment.name }}</td>
-              <td *ngIf="currentTab === inProgressTabName">
-                <select class="form-select" (change)="onInstitutionChange(attachment, $event)"
-                        [disabled]="attachment.statusValue === AttachmentStatus.DISCARDED || attachment.statusValue === AttachmentStatus.VALIDATION_ACCEPTED || attachment.statusValue === AttachmentStatus.SENT_FOR_VALIDATION">
-                  <option value="">Select Institution</option>
-                  <option *ngFor="let institution of institutionsList" [value]="institution.id"
-                          [selected]="institution.id === attachment.assignedInstitutionId">
-                    {{ institution.description }}
-                  </option>
-                </select>
-              </td>
-
-              <td *ngIf="currentTab === inProgressTabName">
-
-                <select class="form-select"
-                        [disabled]="!selectedFiles.has(attachment.id) || attachment.statusValue === AttachmentStatus.DISCARDED || attachment.statusValue === AttachmentStatus.VALIDATION_ACCEPTED || attachment.statusValue === AttachmentStatus.SENT_FOR_VALIDATION">
-                  <option value="">Select File Type</option>
-
-                  <!-- Show loading animation -->
-                  <option *ngIf="loadingFiles.get(attachment.id)" disabled>
-                    <div class="spinner-border text-secondary" role="status">
-                      <span class="visually-hidden">Loading...</span>
-                    </div>
-                  </option>
-
-                  <option *ngFor="let fileType of selectedFiles.get(attachment.id)" [value]="fileType.id"
-                          [selected]="fileType.id === attachment.assignedFileId">
-                    {{ fileType.description }}
-                  </option>
-                </select>
-              </td>
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+xmlns:nxsd="http://xmlns.oracle.com/pcbpel/nxsd"
+xmlns:tns="http://www.SGBL.com.lb/schemas/cvs.readDomicSalaireP"
+targetNamespace="http://www.SGBL.com.lb/schemas/cvs.readDomicSalaireP"
+elementFormDefault="qualified" attributeFormDefault="unqualified" nxsd:version="NXSD" nxsd:stream="chars"
+nxsd:fieldValidation="true">
 
 
-              <td>{{ attachment.statusValue }}</td>
-              <td class="text-center">
-                <button *ngIf="attachmentCanBeValidated(attachment)" class="btn btn-primary btn-sm me-1"
-                        (click)="sendEmailAttachmentForValidation(attachment)" placement="bottom"
-                        ngbTooltip="Send For Validation" [disabled]="isAttachmentActionLoading(attachment, 'validate')">
-                  <i *ngIf="!isAttachmentActionLoading(attachment, 'validate')" class="bi bi-send-fill"></i>
-                  <div *ngIf="isAttachmentActionLoading(attachment, 'validate')"
-                       class="spinner-border spinner-border-sm text-light"></div>
-                </button>
-                <button class="btn btn-warning btn-sm me-1" (click)="getEmailAttachmentByEmailUniqueId(attachment)"
-                        placement="bottom" ngbTooltip="Download"
-                        [disabled]="isAttachmentActionLoading(attachment, 'download')">
-                  <i *ngIf="!isAttachmentActionLoading(attachment, 'download')" class="bi bi-download"></i>
-                  <div *ngIf="isAttachmentActionLoading(attachment, 'download')"
-                       class="spinner-border spinner-border-sm text-light"></div>
-                </button>
-                <button *ngIf="attachmentCanBeDiscarded(attachment)" class="btn btn-danger btn-sm me-1"
-                        (click)="discardAttachment(attachment)" placement="bottom" ngbTooltip="Discard"
-                        [disabled]="isAttachmentActionLoading(attachment, 'discard')">
-                  <i *ngIf="!isAttachmentActionLoading(attachment, 'discard')" class="bi bi-file-x-fill"></i>
-                  <div *ngIf="isAttachmentActionLoading(attachment, 'discard')"
-                       class="spinner-border spinner-border-sm text-light"></div>
-                </button>
-                <button *ngIf="attachmentCanBeRestored(attachment)" class="btn btn-secondary btn-sm"
-                        (click)="restoreAttachment(attachment)" placement="bottom" ngbTooltip="Restore"
-                        [disabled]="isAttachmentActionLoading(attachment, 'restore')">
-                  <i *ngIf="!isAttachmentActionLoading(attachment, 'restore')" class="bi bi-arrow-counterclockwise"></i>
-                  <div *ngIf="isAttachmentActionLoading(attachment, 'restore')"
-                       class="spinner-border spinner-border-sm text-light"></div>
-                </button>
-              </td>
-            </tr>
-            </tbody>
-          </table>
+  <xsd:element name="SalaireP">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="SalairePrec" minOccurs="1" maxOccurs="unbounded" nxsd:style="array" >
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element name="EMPLOYEE_SGBL_ACCOUNT_NUMBER" type="xsd:string" nxsd:style="fixedLength" nxsd:length="18" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="YEAR" type="xsd:string" nxsd:style="fixedLength" nxsd:length="2" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="JULIAN_VALUE_DATE" type="xsd:string" nxsd:style="fixedLength" nxsd:length="3" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="BENEFICIARY_NUMBER" type="xsd:string" nxsd:style="fixedLength" nxsd:length="5" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="MULTIPLE_SALARY" type="xsd:double" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="PREPARATION_DATE" type="xsd:int" nxsd:style="fixedLength" nxsd:length="8" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="TRANSFER_AMOUNT" type="xsd:string" nxsd:style="fixedLength" nxsd:length="15" nxsd:padStyle="head" nxsd:paddedBy="0"/>
+              <xsd:element name="BENEFICIARY_EXPOSURE_DATE" type="xsd:int" nxsd:style="fixedLength" nxsd:length="8" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="CHARGE1" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="CHARGE2" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="CHARGE3" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="CHARGE4" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="BENEFICIARY_INDICATOR" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="PAYMENT_DESCRIPTION1" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="PAYMENT_DESCRIPTION2" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="PAYMENT_DESCRIPTION3" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="BENEFICIARY_SGBL_ACCOUNT_NUMBER" type="xsd:string" nxsd:style="fixedLength" nxsd:length="18" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="BENEFICIARY_ACCOUNT_NUMBER" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="BENEFICIARY_BANK_CODE" type="xsd:string" nxsd:style="fixedLength" nxsd:length="7" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="BENEFICIARY_BRANCH_CODE" type="xsd:string" nxsd:style="fixedLength" nxsd:length="5" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="BENEFICIARY_NAME" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="BENEFICIARY_ADDRESS" type="xsd:string" nxsd:style="fixedLength" nxsd:length="105" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="COUNTRY_CODE" type="xsd:string" nxsd:style="fixedLength" nxsd:length="2" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="BENEFICIARY_BANK_NAME_ADDRESS" type="xsd:string" nxsd:style="fixedLength" nxsd:length="140" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="TRANSFER_CURRENCY" type="xsd:string" nxsd:style="fixedLength" nxsd:length="3" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
+              <xsd:element name="padding" type="xsd:string" minOccurs="0" nxsd:padStyle="tail" nxsd:paddedBy=" " nxsd:style="terminated" nxsd:terminatedBy="${eol}"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:sequence>
+    </xsd:complexType>
+  </xsd:element>
+
+<xsd:annotation>
+      <xsd:appinfo>NXSDSAMPLE=/C:/Oracle/Documentation/OSB_DOMIC/SalaireP.txt</xsd:appinfo>
+      <xsd:appinfo>USEHEADER=false</xsd:appinfo>
+   </xsd:annotation>
+</xsd:schema>
