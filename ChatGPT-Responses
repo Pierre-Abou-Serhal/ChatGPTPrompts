@@ -1,1 +1,26 @@
-010208318005422   241520000112024053100000973900000020240531    1Salary April    ,2024                                                                                    010081486008422                                                  MalhaméHarfoucheNicole                                                                                                                                                                                                                                                                       
+Field Name	Length	Value	Explanation
+EMPLOYEE_SGBL_ACCOUNT_NUMBER	18	010208318005422	Employee's account number (ends with spaces)
+YEAR	2	24	Year (2024)
+JULIAN_VALUE_DATE	3	152	Julian date (152nd day of the year)
+BENEFICIARY_NUMBER	5	00001	Beneficiary identifier
+MULTIPLE_SALARY	1	1	Indicates if multiple salaries exist
+PREPARATION_DATE	8	20240531	Date of preparation (YYYYMMDD format: May 31, 2024)
+TRANSFER_AMOUNT	15	000000973900000	Transfer amount (padded with zeros)
+BENEFICIARY_EXPOSURE_DATE	8	20240531	Exposure date (May 31, 2024)
+CHARGE1	1	(empty space)	First charge (not filled)
+CHARGE2	1	(empty space)	Second charge (not filled)
+CHARGE3	1	(empty space)	Third charge (not filled)
+CHARGE4	1	(empty space)	Fourth charge (not filled)
+BENEFICIARY_INDICATOR	1	1	Indicates beneficiary type
+PAYMENT_DESCRIPTION1	35	Salary April ,2024	Description of payment (salary for April 2024)
+PAYMENT_DESCRIPTION2	35	(empty)	Second payment description (not used)
+PAYMENT_DESCRIPTION3	35	(empty)	Third payment description (not used)
+BENEFICIARY_SGBL_ACCOUNT_NUMBER	18	010081486008422	Beneficiary's account number
+BENEFICIARY_ACCOUNT_NUMBER	35	(empty)	Beneficiary's external account number (not used)
+BENEFICIARY_BANK_CODE	7	(empty)	Bank code of beneficiary (not used)
+BENEFICIARY_BRANCH_CODE	5	(empty)	Branch code of beneficiary (not used)
+BENEFICIARY_NAME	35	MalhaméHarfoucheNicole	Beneficiary's full name
+BENEFICIARY_ADDRESS	105	(empty)	Beneficiary's address (not used)
+COUNTRY_CODE	2	(empty)	Country code of the beneficiary (not used)
+BENEFICIARY_BANK_NAME_ADDRESS	140	(empty)	Bank name and address (not used)
+TRANSFER_CURRENCY	3	(empty)	Currency of transfer (not used)
