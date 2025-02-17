@@ -1,81 +1,16 @@
-Field Name	Length	Value	Explanation
-EMPLOYEE_SGBL_ACCOUNT_NUMBER	18	010208318005422	Employee's account number (ends with spaces)
-YEAR	2	24	Year (2024)
-JULIAN_VALUE_DATE	3	152	Julian date (152nd day of the year)
-BENEFICIARY_NUMBER	5	00001	Beneficiary identifier
-MULTIPLE_SALARY	1	1	Indicates if multiple salaries exist
-PREPARATION_DATE	8	20240531	Date of preparation (YYYYMMDD format: May 31, 2024)
-TRANSFER_AMOUNT	15	000000973900000	Transfer amount (padded with zeros)
-BENEFICIARY_EXPOSURE_DATE	8	20240531	Exposure date (May 31, 2024)
-CHARGE1	1	(empty space)	First charge (not filled)
-CHARGE2	1	(empty space)	Second charge (not filled)
-CHARGE3	1	(empty space)	Third charge (not filled)
-CHARGE4	1	(empty space)	Fourth charge (not filled)
-BENEFICIARY_INDICATOR	1	1	Indicates beneficiary type
-PAYMENT_DESCRIPTION1	35	Salary April ,2024	Description of payment (salary for April 2024)
-PAYMENT_DESCRIPTION2	35	(empty)	Second payment description (not used)
-PAYMENT_DESCRIPTION3	35	(empty)	Third payment description (not used)
-BENEFICIARY_SGBL_ACCOUNT_NUMBER	18	010081486008422	Beneficiary's account number
-BENEFICIARY_ACCOUNT_NUMBER	35	(empty)	Beneficiary's external account number (not used)
-BENEFICIARY_BANK_CODE	7	(empty)	Bank code of beneficiary (not used)
-BENEFICIARY_BRANCH_CODE	5	(empty)	Branch code of beneficiary (not used)
-BENEFICIARY_NAME	35	MalhaméHarfoucheNicole	Beneficiary's full name
-BENEFICIARY_ADDRESS	105	(empty)	Beneficiary's address (not used)
-COUNTRY_CODE	2	(empty)	Country code of the beneficiary (not used)
-BENEFICIARY_BANK_NAME_ADDRESS	140	(empty)	Bank name and address (not used)
-TRANSFER_CURRENCY	3	(empty)	Currency of transfer (not used)
+this.emailService.GetEmailAttachmentByEmailUniqueId(getEmailAttachmentByEmailUniqueIdRequest).subscribe({
+      next: (response: Blob) => {
 
+        const url = window.URL.createObjectURL(response);
+        const a = document.createElement('a');
+        a.href = url;
 
-<?xml version = '1.0' encoding = 'UTF-8'?>
-<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-xmlns:nxsd="http://xmlns.oracle.com/pcbpel/nxsd"
-xmlns:tns="http://www.SGBL.com.lb/schemas/cvs.readDomicSalaireP"
-targetNamespace="http://www.SGBL.com.lb/schemas/cvs.readDomicSalaireP"
-elementFormDefault="qualified" attributeFormDefault="unqualified" nxsd:version="NXSD" nxsd:stream="chars"
-nxsd:fieldValidation="true">
+        // Provide a default file name (or get it from Content-Disposition header)
+        a.download = `${this.getFormattedCurrentDateTime()}-${attachment.name}` || 'attachment';
 
+        a.click();
+        window.URL.revokeObjectURL(url); // Clean up the URL
 
-  <xsd:element name="SalaireP">
-    <xsd:complexType>
-      <xsd:sequence>
-        <xsd:element name="SalairePrec" minOccurs="1" maxOccurs="unbounded" nxsd:style="array" >
-          <xsd:complexType>
-            <xsd:sequence>
-              <xsd:element name="EMPLOYEE_SGBL_ACCOUNT_NUMBER" type="xsd:string" nxsd:style="fixedLength" nxsd:length="18" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="YEAR" type="xsd:string" nxsd:style="fixedLength" nxsd:length="2" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="JULIAN_VALUE_DATE" type="xsd:string" nxsd:style="fixedLength" nxsd:length="3" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="BENEFICIARY_NUMBER" type="xsd:string" nxsd:style="fixedLength" nxsd:length="5" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="MULTIPLE_SALARY" type="xsd:double" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="PREPARATION_DATE" type="xsd:int" nxsd:style="fixedLength" nxsd:length="8" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="TRANSFER_AMOUNT" type="xsd:string" nxsd:style="fixedLength" nxsd:length="15" nxsd:padStyle="head" nxsd:paddedBy="0"/>
-              <xsd:element name="BENEFICIARY_EXPOSURE_DATE" type="xsd:int" nxsd:style="fixedLength" nxsd:length="8" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="CHARGE1" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="CHARGE2" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="CHARGE3" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="CHARGE4" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="BENEFICIARY_INDICATOR" type="xsd:string" nxsd:style="fixedLength" nxsd:length="1" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="PAYMENT_DESCRIPTION1" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="PAYMENT_DESCRIPTION2" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="PAYMENT_DESCRIPTION3" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="BENEFICIARY_SGBL_ACCOUNT_NUMBER" type="xsd:string" nxsd:style="fixedLength" nxsd:length="18" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="BENEFICIARY_ACCOUNT_NUMBER" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="BENEFICIARY_BANK_CODE" type="xsd:string" nxsd:style="fixedLength" nxsd:length="7" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="BENEFICIARY_BRANCH_CODE" type="xsd:string" nxsd:style="fixedLength" nxsd:length="5" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="BENEFICIARY_NAME" type="xsd:string" nxsd:style="fixedLength" nxsd:length="35" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="BENEFICIARY_ADDRESS" type="xsd:string" nxsd:style="fixedLength" nxsd:length="105" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="COUNTRY_CODE" type="xsd:string" nxsd:style="fixedLength" nxsd:length="2" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="BENEFICIARY_BANK_NAME_ADDRESS" type="xsd:string" nxsd:style="fixedLength" nxsd:length="140" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="TRANSFER_CURRENCY" type="xsd:string" nxsd:style="fixedLength" nxsd:length="3" nxsd:padStyle="tail" nxsd:paddedBy=" "/>
-              <xsd:element name="padding" type="xsd:string" minOccurs="0" nxsd:padStyle="tail" nxsd:paddedBy=" " nxsd:style="terminated" nxsd:terminatedBy="${eol}"/>
-            </xsd:sequence>
-          </xsd:complexType>
-        </xsd:element>
-      </xsd:sequence>
-    </xsd:complexType>
-  </xsd:element>
-
-<xsd:annotation>
-      <xsd:appinfo>NXSDSAMPLE=/C:/Oracle/Documentation/OSB_DOMIC/SalaireP.txt</xsd:appinfo>
-      <xsd:appinfo>USEHEADER=false</xsd:appinfo>
-   </xsd:annotation>
-</xsd:schema>
+        this.loadingAttachmentActions.delete(attachment.id);
+      },
+    });
