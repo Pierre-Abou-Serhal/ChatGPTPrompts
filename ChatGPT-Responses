@@ -1,1 +1,12 @@
-NameTxt = Path1 + RsPrm("PrmTxtOrigin") + "-" + jnow() + "-" + PadL(ReturnSeconds(TimeStamp), 5, "0") + "_TSAL.txt"
+public static int GetJulianDate()
+{
+    return DateTime.Now.DayOfYear; // Returns the day number in the year
+}
+
+public static string GetPaddedSeconds()
+{
+    int seconds = (int)(DateTime.Now.TimeOfDay.TotalSeconds);
+    return seconds.ToString().PadLeft(5, '0'); // Ensures 5-digit format with leading zeros
+}
+
+string NameTxt = Path.Combine(Path1, $"{PrmTxtOrigin}-{GetJulianDate()}-{GetPaddedSeconds()}_TSAL.txt");
