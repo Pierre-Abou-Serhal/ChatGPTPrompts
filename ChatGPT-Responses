@@ -1,12 +1,52 @@
-public static int GetJulianDate()
+using System;
+using System.IO;
+using Renci.SshNet;
+
+class Program
 {
-    return DateTime.Now.DayOfYear; // Returns the day number in the year
+    static void Main()
+    {
+        string host = "your-sftp-host";
+        string username = "your-username";
+        string password = "your-password";
+        string remoteFilePath = "/remote/path/to/file.txt";
+        string localFilePath = "C:\\local\\file.txt";
+
+        using (var sftp = new SftpClient(host, username, password))
+        {
+            try
+            {
+                sftp.Connect();
+                Console.WriteLine("Connected to SFTP!");
+
+                // Download file
+                using (Stream fileStream = File.Create(localFilePath))
+                {
+                    sftp.DownloadFile(remoteFilePath, fileStream);
+                }
+
+                Console.WriteLine("File downloaded successfully!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+            finally
+            {
+                sftp.Disconnect();
+            }
+        }
+    }
 }
 
-public static string GetPaddedSeconds()
-{
-    int seconds = (int)(DateTime.Now.TimeOfDay.TotalSeconds);
-    return seconds.ToString().PadLeft(5, '0'); // Ensures 5-digit format with leading zeros
-}
 
-string NameTxt = Path.Combine(Path1, $"{PrmTxtOrigin}-{GetJulianDate()}-{GetPaddedSeconds()}_TSAL.txt");
+using (var sftp = new SftpClient(host, username, password))
+{
+    sftp.Connect();
+    using (var fileStream = File.OpenRead("C:\\local\\file.txt"))
+    {
+        sftp.UploadFile(fileStream, "/remote/path/to/file.txt");
+    }
+    Console.WriteLine("File uploaded successfully!");
+    sftp.Disconnect();
+}
