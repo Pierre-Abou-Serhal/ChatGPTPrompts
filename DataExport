@@ -1,136 +1,334 @@
-***************************************** AppSettings *****************************************
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Data;
+using System.Net;
 using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using ExcelDataReader;
 
-namespace BLL
+// Entry Point
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+const String filePath = @"D:\Test.xlsx";
+
+ValidateFileRes res = ReadExcelFile(File.ReadAllBytes(filePath));
+
+Console.WriteLine(JsonSerializer.Serialize(res.ParsedDataList));
+
+return;
+
+// Logic
+static ValidateFileRes ReadExcelFile(Byte[] fileBytes)
 {
-    public class AppSettings
-    {
-        public String DataExportConnectionString { get; set; } = String.Empty;
-        public Boolean IsSwaggerEnabled { get; set; } = false;
-        public Boolean IsHttps { get; set; } = false;
-        public String[] Cors { get; set; } = [];
-        public FTPConfigurations FTPConfigurations { get; set; } = new();
-        public String MQURL { get; set; } = string.Empty;
-    }
-
-    public class FTPConfigurations
-    {
-        public String FtpAddress { get; set; } = String.Empty;
-        public String FtpUserName { get; set; } = String.Empty;
-        public String FtpPassword { get; set; } = String.Empty;
-    }
-}
-
-***************************************** CustomExceptions *****************************************
-namespace BLL
-{
-    [Serializable]
-    public partial class SGBLBadRequestException : Exception
-    {
-        public SGBLBadRequestException() { }
-
-        public SGBLBadRequestException(String? message) : base(message) { }
-
-        public SGBLBadRequestException(String? message, Exception inner) : base(message, inner) { }
-    }
-
-    [Serializable]
-    public partial class SGBLNotFoundException : Exception
-    {
-        public SGBLNotFoundException() { }
-
-        public SGBLNotFoundException(String? message) : base(message) { }
-
-        public SGBLNotFoundException(String? message, Exception inner) : base(message, inner) { }
-    }
-
-    [Serializable]
-    public partial class SGBLInternalServerException : Exception
-    {
-        public SGBLInternalServerException() { }
-
-        public SGBLInternalServerException(String? message) : base(message) { }
-
-        public SGBLInternalServerException(String? message, Exception inner) : base(message, inner) { }
-    }
-}
-
-***************************************** DataGuard *****************************************
-namespace BLL;
-
-public partial class ExtractionBLL
-{
-    private Boolean IsInvalidCorrelationId(String correlationId) => String.IsNullOrEmpty(correlationId);
-    private Boolean IsInvalidFileType(FileType fileType) => !Enum.IsDefined(typeof(FileType), fileType);
-    private Boolean IsInvalidEncoding(EncodingEnum encodingEnum) => !Enum.IsDefined(typeof(EncodingEnum), encodingEnum);
-    private Boolean IsInvalidDelimiter(String delimiter) => String.IsNullOrWhiteSpace(delimiter);
-    private Boolean IsInvalidColumnsOrRows(List<Column> list) =>list.Any(i => i.ColumnNumber <= 0 || i.StartRowNumber <= 0);
-    private Boolean IsInvalidReadEndCondition(List<Column> list) => list.Any(i => !Enum.IsDefined(typeof(ReadEndCondition), i.ReadEndCondition));
+    String correlationId = Guid.NewGuid().ToString();
     
-    public void DataIntegrityCheck(Dictionary<DataIntegrityCheckFunctions, dynamic> dataGuardDict)
+    ValidateFileReq req = new()
+    {
+        CorrelationId = correlationId,
+        FileInfo = new()
         {
-            foreach (KeyValuePair<DataIntegrityCheckFunctions, dynamic> dataValidation in dataGuardDict)
-            {
-                switch (dataValidation.Key)
+            ValidateHeader = false,
+            Encoding = EncodingEnum.UTF8,
+            Delimiter = "",
+            FileBinary = BitConverter.ToString(fileBytes).Replace("-", ""),
+            FileType = FileType.EXCEL,
+            HeaderRowNumber = 1,
+            ValidateHeaderContainsFields = [],
+            SkipRowStrings = [new SkipRowString {SkipString = "Georges", IsRegExp = false}],
+            Columns = [
+                new()
                 {
-                    case DataIntegrityCheckFunctions.IS_INVALID_CORRELATION_ID:
-                        if (IsInvalidCorrelationId(dataValidation.Value))
-                        {
-                            throw new SGBLBadRequestException($"{dataValidation.Key}: Correlation ID is empty");
-                        }
-                        break;
+                    ColumnNumber = 1,
+                    FindFromHeader = false,
+                    HeaderColumnName = "",
+                    StartRowNumber = 2,
+                    ReadEndCondition = ReadEndCondition.FILE_END,
+                    ReadEndConditionValue = "",
+                    CustomDataValidation = [
+                        new (){InjestFilePropertyId = 1}
+                    ]
+                },
+                new()
+                {
+                    ColumnNumber = 3,
+                    FindFromHeader = false,
+                    HeaderColumnName = "",
+                    StartRowNumber = 2,
+                    ReadEndCondition = ReadEndCondition.FILE_END,
+                    ReadEndConditionValue = "",
+                    CustomDataValidation = [
+                        new (){InjestFilePropertyId = 1}
+                    ]
+                }
+            ]
+        }
+    };
+    
+    ValidateFileRes res = new()
+    {
+        WebResp = new()
+        {
+            CorrelationId = correlationId
+        }
+    };
+    
+    using MemoryStream excelMemoryStream = new (fileBytes);
+    
+    using IExcelDataReader? reader = ExcelReaderFactory.CreateReader(excelMemoryStream);
+    DataSet? result = reader.AsDataSet(new ExcelDataSetConfiguration
+    {
+        ConfigureDataTable = (_) => new ExcelDataTableConfiguration
+        {
+            UseHeaderRow = false // Read raw data first
+        }
+    });
 
-                    case DataIntegrityCheckFunctions.IS_INVALID_FILE_TYPE:
-                        if (IsInvalidFileType(dataValidation.Value))
-                        {
-                            throw new SGBLBadRequestException($"{dataValidation.Key}: Invalid File Type In Request Object");
-                        }
-                        break;
+    DataTable table = result.Tables[0]; // First Sheet
 
-                    case DataIntegrityCheckFunctions.IS_INVALID_ENCODING:
-                        if (IsInvalidEncoding(dataValidation.Value))
-                        {
-                            throw new SGBLBadRequestException($"{dataValidation.Key}: Invalid Encoding In Request Object");
-                        }
-                        break;
+    // Parsed Data List that will be returned to client
+    List<ParsedData> parsedDataList = [];
+    List<String> headerList = [];
+    
+    foreach (Column column in req.FileInfo.Columns)
+    {
+        List<Int32> injestFilePropertyIds = [];
+        List<String> columnData = [];
 
-                    case DataIntegrityCheckFunctions.IS_INVALID_DELIMITER:
-                        if (IsInvalidDelimiter(dataValidation.Value))
-                        {
-                            throw new SGBLBadRequestException($"{dataValidation.Key}: Invalid Delimiter In Request Object");
-                        }
-                        break;
+        ParsedData parsedData = new()
+        {
+            ColumnIndex = column.ColumnNumber
+        };
 
-                    case DataIntegrityCheckFunctions.IS_INVALID_COLUMNS_OR_ROWS:
-                        if (IsInvalidColumnsOrRows(dataValidation.Value))
-                        {
-                            throw new SGBLBadRequestException($"{dataValidation.Key}: Column and StartRow must be greater than 0");
-                        }
-                        break;
+        // Read End Condition Variables
+        Int32 whiteLineCount = 0;
 
-                    case DataIntegrityCheckFunctions.IS_INVALID_READ_END_CONDITION:
-                        if (IsInvalidReadEndCondition(dataValidation.Value))
-                        {
-                            throw new SGBLBadRequestException($"{dataValidation.Key}: Invalid ReadEndCondition In Request Object");
-                        }
-                        break;
+        foreach (DataRow row in table.Rows)
+        {
+            Int32 rowNumber = table.Rows.IndexOf(row) + 1; // IndexOf(row) is zero based
+            
+            // Checking if End Condition is reached
+            List<String> rowValues = row.ItemArray.Select(cell => cell?.ToString()?.Trim() ?? String.Empty).ToList();
 
-                    default:
-                        throw new SGBLInternalServerException(dataValidation.Key + ": Invalid Validation function name was given!");
+            if (IsReadEndConditionReached(
+                    column.ReadEndCondition,
+                    rowValues,
+                    whiteLineCount,
+                    rowNumber, 
+                    column.ReadEndConditionValue))
+            {
+                return res;
+            }
+
+            // Extracting Header Data
+            if (req.FileInfo.ValidateHeader &&
+                rowNumber == req.FileInfo.HeaderRowNumber)
+            {
+                foreach (String cell in rowValues)
+                {
+                    if (cell.Equals(column.HeaderColumnName))
+                    {
+                        parsedData.ColumnName = column.HeaderColumnName; // Header Name Was Found
+                    }
+
+                    headerList.Add(cell);
+                }
+
+                // Check if header contains the values in "ValidateHeaderContainsFields" array
+                ExtractionBLL_CheckHeaderEvent(headerList,
+                    req.FileInfo.ValidateHeaderContainsFields, ref res);
+
+                // Header did not pass checking event
+                if (res.WebResp.Errors.Count > 0)
+                {
+                    throw new SGBLBadRequestException("Invalid Header Fields");
                 }
             }
+
+            // Extracting Row Data
+            if (rowNumber < column.StartRowNumber)
+            {
+                continue;
+            }
+
+            // Checking if a value in a row match any skip string value
+            Boolean skipRow = false;
+
+            foreach (SkipRowString skipRowString in req.FileInfo.SkipRowStrings)
+            {
+                foreach (String cell in rowValues)
+                {
+                    if (skipRowString.IsRegExp)
+                    {
+                        if (Regex.IsMatch(cell, skipRowString.SkipString))
+                        {
+                            skipRow = true;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        if (cell.Contains(skipRowString.SkipString))
+                        {
+                            skipRow = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (skipRow)
+            {
+                continue;
+            }
+
+            String cellValue = column.FindFromHeader
+                ? row[column.HeaderColumnName].ToString() ?? String.Empty
+                : row[column.ColumnNumber == 0 ? column.ColumnNumber : column.ColumnNumber - 1 ].ToString() ?? String.Empty;
+
+            injestFilePropertyIds =
+                column.CustomDataValidation.Select(i => i.InjestFilePropertyId).ToList();
+
+            if (!String.IsNullOrWhiteSpace(cellValue))
+            {
+                columnData.Add(cellValue);
+            }
+
+            if (rowValues.All(String.IsNullOrWhiteSpace))
+            {
+                whiteLineCount++;
+            }
         }
+
+        //OnCheckRowsDataEvent?.Invoke(injestFilePropertyIds, columnData, ref res);
+
+        if (res.WebResp.Errors.Count > 0)
+        {
+            throw new SGBLBadRequestException($"Invalid Column {column.ColumnNumber} Fields");
+        }
+
+        parsedData.Data = columnData;
+        parsedDataList.Add(parsedData);
+    }
+
+    res.ParsedDataList = parsedDataList;
+
+    return res;
 }
 
-***************************************** Enums *****************************************
-using System.Text;
+static Boolean IsReadEndConditionReached(
+    ReadEndCondition condition,
+    List<String> row,
+    Int32 whiteLineCount,
+    Int32 rowNumber,
+    String conditionValue)
+{
+    Boolean isReached = false;
 
-namespace BLL;
+    Int32.TryParse(conditionValue, out Int32 conditionValueInt);
 
+    switch (condition)
+    {
+        case ReadEndCondition.WHITE_LINE_COUNT:
+            isReached = whiteLineCount >= conditionValueInt;
+            break;
+
+        case ReadEndCondition.FILE_END:
+            isReached = false;
+            break;
+
+        case ReadEndCondition.ROW_NUMBER:
+            isReached = rowNumber >= conditionValueInt;
+            break;
+
+        case ReadEndCondition.ROW_CONTAINS:
+            isReached = row.Contains(conditionValue);
+            break;
+    }
+
+    return isReached;
+}
+
+static void ExtractionBLL_CheckHeaderEvent(List<String> headerList, List<String> mustContainList, ref ValidateFileRes result)
+{
+    foreach (String headerName in mustContainList)
+    {
+        if (!headerList.Contains(headerName))
+        {
+            result.WebResp.Errors.Add($"Header Name: {headerName} Is Missing From The Header");
+        }
+    }
+}
+
+#region Models
+ public class FileInfo
+    {
+        public String FileBinary { get; set; } = String.Empty;
+        public FileType FileType { get; set; }
+        public String Delimiter { get; set; } = String.Empty;
+        public EncodingEnum Encoding { get; set; }
+        public Boolean ValidateHeader { get; set; }
+        public Int32 HeaderRowNumber { get; set; }
+        public List<String> ValidateHeaderContainsFields { get; set; } = [];
+        public List<SkipRowString> SkipRowStrings { get; set; } = [];
+        public List<Column> Columns { get; set; } = [];
+    }
+    
+    public class SkipRowString
+    {
+        public String SkipString { get; set; } = String.Empty;
+        public Boolean IsRegExp { get; set; }
+    }
+
+    public class Column
+    {
+        public Boolean FindFromHeader { get; set; }
+        public String HeaderColumnName { get; set; } = String.Empty;
+        public Int32 ColumnNumber { get; set; }
+        public Int32 StartRowNumber { get; set; }
+        public ReadEndCondition ReadEndCondition { get; set; }
+        public String ReadEndConditionValue { get; set; } = String.Empty;
+        public List<CustomDataValidation> CustomDataValidation { get; set; } = [];
+    }
+    
+    public class CustomDataValidation
+    {
+        public Int32 InjestFilePropertyId { get; set; }
+    }
+
+    public class FileValidationStep
+    {
+        public Int32 InjestFilePropertyId { get; set; }
+        public String ApplicationOwner { get; set; } = String.Empty;
+        public String ValidationWorkflowName { get; set; } = String.Empty;
+        public String InjestFileDescription { get; set; } = String.Empty;
+        public Int32 ValidationStepId { get; set; }
+        public String ValidationStepName { get; set; } = String.Empty;
+        public Boolean ContinueIfFail { get; set; }
+        public Int32 ChunkSize { get; set; }
+        public Int32 ProcedureId { get; set; }
+        public String ProcedureName { get; set; } = String.Empty;
+        public String ProcedureDescription { get; set; } = String.Empty;
+        public Boolean IsTVP { get; set; }
+        public String InputName { get; set; } = String.Empty;
+        public String TVPMap { get; set; } = String.Empty;
+    }
+
+    public class InjestFileProperty
+    {
+        public Int32 Id { get; set; }
+        public String ApplicationOwner { get; set; } = String.Empty;
+        public String ValidationWorkflowName { get; set; } = String.Empty;
+        public String Description { get; set; } = String.Empty;
+    }
+
+    public class ParsedData
+    {
+        public Int32 ColumnIndex { get; set; }
+        public String ColumnName { get; set; } = String.Empty;
+        public List<String> Data { get; set; } = [];
+    }
+#endregion
+
+#region Enums
 public enum FileType
 {
     EXCEL = 1,
@@ -200,766 +398,81 @@ public enum DataIntegrityCheckFunctions
     IS_INVALID_READ_END_CONDITION = 5
 }
 
-***************************************** Events *****************************************
-using System.Data;
-using Dapper;
+#endregion
 
-namespace BLL;
 
-public partial class ExtractionBLL
+#region Requests
+public partial class ValidateFileReq
 {
-    #region Check Header Event
-    public delegate void CheckHeaderEvent(List<String> headerList, List<String> mustContainList, ref ValidateFileRes result);
-    public event CheckHeaderEvent? OnCheckHeaderEvent;
+    public required String CorrelationId { get; set; }
+    public required FileInfo FileInfo { get; set; }
+}
     
-    private void ExtractionBLL_CheckHeaderEvent(List<String> headerList, List<String> mustContainList, ref ValidateFileRes result)
-    {
-        foreach (String headerName in mustContainList)
-        {
-            if (!headerList.Contains(headerName))
-            {
-                result.WebResp.Errors.Add($"Header Name: {headerName} Is Missing From The Header");
-            }
-        }
-    }
-    #endregion
-    
-    #region Check Row Data Event
-    public delegate void CheckRowsDataEvent(
-        List<Int32> injestFilePropertyIds, 
-        List<String> columnData, 
-        ref ValidateFileRes result);
-    public event CheckRowsDataEvent? OnCheckRowsDataEvent;
-    
-    private void ExtractionBLL_CheckRowsDataEvent(
-        List<Int32> injestFilePropertyIds, 
-        List<String> columnData, 
-        ref ValidateFileRes result)
-    {
-        DAL.DAL iDAL = new(_appSettings.DataExportConnectionString);
-        
-        foreach(Int32 injestFilePropertyId in injestFilePropertyIds)
-        {
-            DynamicParameters param = new();
-            param.Add("InjestFilePropertyId", injestFilePropertyId);
-        
-            List<FileValidationStep> injestFileProperties = iDAL.ExecuteQuery<FileValidationStep>("usp_GetFileValidationSteps", param, CommandType.StoredProcedure,
-                DAL.DAL.CommandDirection.Select);
+public partial class GetInjestFilePropertyDetailsByApplicationOwnerReq
+{
+    public required String CorrelationId { get; set; }
+    public required String ApplicationOwner { get; set; }
+}
+#endregion
 
-            foreach (FileValidationStep fileProp in injestFileProperties)
-            {
-                DynamicParameters filePropParam = new();
-                
-                filePropParam.Add(fileProp.InputName, String.Join(",", columnData));
-            
-                String errorMsg = iDAL.ExecuteQuery<String>(fileProp.ProcedureName, filePropParam, CommandType.StoredProcedure,
-                    DAL.DAL.CommandDirection.Select).FirstOrDefault(String.Empty);
-
-                if (!String.IsNullOrWhiteSpace(errorMsg))
-                {
-                    result.WebResp.Errors.Add(errorMsg);
-                }
-            }
-        }
-    }
-    #endregion
-
-    private void InitialiseEvents()
-    {
-        OnCheckHeaderEvent += ExtractionBLL_CheckHeaderEvent;
-        OnCheckRowsDataEvent += ExtractionBLL_CheckRowsDataEvent;
-    }
+#region Response
+#region Base Response
     
+public class BaseResponse
+{
+    public String CorrelationId { get; set; } = String.Empty;
+    public HttpStatusCode StatusCode { get; set; } = HttpStatusCode.OK;
+    public List<String> Errors { get; set; } = [];
+}
+#endregion
+
+#region ValidateFile Response
+
+public class ValidateFileRes
+{
+    public BaseResponse WebResp { get; set; } = new();
+    public List<ParsedData> ParsedDataList { get; set; } = [];
+}
+#endregion
+
+#region GetInjestFilePropertyDetailsRes
+public class GetInjestFilePropertyDetailsByApplicationOwnerRes
+{
+    public BaseResponse WebResp { get; set; } = new();
+    public required GetInjestFilePropertyDetailsByApplicationOwnerReq Req { get; set; }
+    public List<InjestFileProperty> InjestFileProperties { get; set; } = [];
+}
+#endregion
+#endregion
+
+#region Exception
+[Serializable]
+public partial class SGBLBadRequestException : Exception
+{
+    public SGBLBadRequestException() { }
+
+    public SGBLBadRequestException(String? message) : base(message) { }
+
+    public SGBLBadRequestException(String? message, Exception inner) : base(message, inner) { }
 }
 
-***************************************** ExtractionBLL *****************************************
-using System.Data;
-using System.Globalization;
-using System.Net;
-using System.Text.RegularExpressions;
-using ClosedXML.Excel;
-using Microsoft.Extensions.Options;
-using CsvHelper;
-using CsvHelper.Configuration;
-using Dapper;
-
-namespace BLL;
-
-using static NLog.NLogUtil;
-
-public partial class ExtractionBLL
+[Serializable]
+public partial class SGBLNotFoundException : Exception
 {
-    private readonly AppSettings _appSettings;
+    public SGBLNotFoundException() { }
 
-    public ExtractionBLL(IOptionsMonitor<AppSettings> appSettings)
-    {
-        InitialiseEvents();
-        _appSettings = appSettings.CurrentValue;
-    }
+    public SGBLNotFoundException(String? message) : base(message) { }
 
-    public ValidateFileRes ValidateFile(ValidateFileReq req)
-    {
-        CorrelationInfo correlationInfo = new()
-        {
-            CorrelationId = req.CorrelationId,
-            RequestURL = "ExtractionService.ValidateFile",
-        };
-
-        ValidateFileRes res = new()
-        {
-            WebResp = new()
-            {
-                CorrelationId = correlationInfo.CorrelationId
-            }
-        };
-
-        correlationInfo.Reserved = "ValidateFile Has been called with the following Request";
-        LogInfoJson(req, correlationInfo);
-
-        correlationInfo.RDirection = RequestDirection.Processing;
-
-        try
-        {
-            #region DataGuard
-
-            Dictionary<DataIntegrityCheckFunctions, dynamic> DataGuardDictionnary = new()
-            {
-                { DataIntegrityCheckFunctions.IS_INVALID_CORRELATION_ID, req.CorrelationId },
-                { DataIntegrityCheckFunctions.IS_INVALID_FILE_TYPE, req.FileInfo.FileType },
-                { DataIntegrityCheckFunctions.IS_INVALID_COLUMNS_OR_ROWS, req.FileInfo.Columns },
-                { DataIntegrityCheckFunctions.IS_INVALID_READ_END_CONDITION, req.FileInfo.Columns },
-            };
-
-            if (req.FileInfo.FileType == FileType.CSV)
-            {
-                DataGuardDictionnary.Add(DataIntegrityCheckFunctions.IS_INVALID_ENCODING, req.FileInfo.Encoding);
-                DataGuardDictionnary.Add(DataIntegrityCheckFunctions.IS_INVALID_DELIMITER, req.FileInfo.Delimiter);
-            }
-
-            DataIntegrityCheck(DataGuardDictionnary);
-
-            #endregion
-
-            List<String> headerList = [];
-
-            Byte[] fileBytes = HexStringToByteArray(req.FileInfo.FileBinary);
-
-            switch (req.FileInfo.FileType)
-            {
-                case FileType.EXCEL:
-                {
-                    using MemoryStream excelMemoryStream = new MemoryStream(fileBytes);
-                    using XLWorkbook workbook = new XLWorkbook(excelMemoryStream);
-                    var worksheet = workbook.Worksheet(1);
-
-                    // Parsed Data List that will be returned to client
-                    List<ParsedData> parsedDataList = [];
-
-                    foreach (Column column in req.FileInfo.Columns)
-                    {
-                        List<Int32> injestFilePropertyIds = [];
-                        List<String> columnData = [];
-
-                        ParsedData parsedData = new();
-                        parsedData.ColumnIndex = column.ColumnNumber;
-
-                        // ClosedXML does not read colum names, only column letters, so we used index instead
-                        Int32 headerNameColumnIndex = 0;
-
-                        // Read End Condition Variables
-                        Int32 whiteLineCount = 0;
-
-                        foreach (var row in worksheet.RowsUsed())
-                        {
-                            // Checking if End Condition is reached
-                            List<String> rowValues = row.Cells().Select(i => i.Value.ToString()).ToList();
-
-                            if (IsReadEndConditionReached(
-                                    column.ReadEndCondition,
-                                    rowValues,
-                                    whiteLineCount,
-                                    row.RowNumber(),
-                                    column.ReadEndConditionValue))
-                            {
-                                return res;
-                            }
-
-                            // Extracting Header Data
-                            if (req.FileInfo.ValidateHeader &&
-                                row.RowNumber() == req.FileInfo.HeaderRowNumber)
-                            {
-                                foreach (var cell in row.Cells())
-                                {
-                                    if (cell.Value.ToString().Equals(column.HeaderColumnName))
-                                    {
-                                        headerNameColumnIndex = cell.Address.ColumnNumber;
-                                        parsedData.ColumnName = column.HeaderColumnName; // Header Name Was Found
-                                    }
-
-                                    headerList.Add(cell.Value.ToString());
-                                }
-
-                                // Check if header contains the values in "ValidateHeaderContainsFields" array
-                                OnCheckHeaderEvent?.Invoke(headerList,
-                                    req.FileInfo.ValidateHeaderContainsFields, ref res);
-
-                                // Header did not pass checking event
-                                if (res.WebResp.Errors.Count > 0)
-                                {
-                                    throw new SGBLBadRequestException("Invalid Header Fields");
-                                }
-                            }
-
-                            // Extracting Row Data
-                            if (row.RowNumber() < column.StartRowNumber)
-                            {
-                                continue;
-                            }
-
-                            // Checking if a value in a row match any skip string value
-                            Boolean skipRow = false;
-
-                            foreach (SkipRowString skipRowString in req.FileInfo.SkipRowStrings)
-                            {
-                                foreach (var cell in row.Cells())
-                                {
-                                    if (skipRowString.IsRegExp)
-                                    {
-                                        if (Regex.IsMatch(cell.Value.ToString(), skipRowString.SkipString))
-                                        {
-                                            skipRow = true;
-                                            break;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if (cell.Value.ToString().Contains(skipRowString.SkipString))
-                                        {
-                                            skipRow = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (skipRow)
-                            {
-                                continue;
-                            }
-
-                            String cellValue = column.FindFromHeader
-                                ? row.Cell(headerNameColumnIndex).Value.ToString()
-                                : row.Cell(column.ColumnNumber).Value.ToString();
-
-                            injestFilePropertyIds =
-                                column.CustomDataValidation.Select(i => i.InjestFilePropertyId).ToList();
-
-                            columnData.Add(cellValue);
-
-                            if (rowValues.All(String.IsNullOrWhiteSpace))
-                            {
-                                whiteLineCount++;
-                            }
-                        }
-
-                        OnCheckRowsDataEvent?.Invoke(injestFilePropertyIds, columnData, ref res);
-                        
-                        if (res.WebResp.Errors.Count > 0)
-                        {
-                            throw new SGBLBadRequestException($"Invalid Column {column.ColumnNumber} Fields");
-                        }
-                        
-                        parsedData.Data = columnData;
-                        parsedDataList.Add(parsedData);
-                    }
-                    
-                    res.ParsedDataList = parsedDataList;
-                    
-                    break;
-                }
-                case FileType.CSV:
-                {
-                    List<ParsedData> parsedDataList = [];
-                    
-                    foreach (Column column in req.FileInfo.Columns)
-                    {
-                        List<Int32> injestFilePropertyIds = [];
-                        List<String> columnData = [];
-
-                        ParsedData parsedData = new();
-                        
-                        // CSV Reader read column in zero-based pattern. csv.GetField<String>(0), csv.GetField<String>(1), ...
-                        column.ColumnNumber =
-                            column.ColumnNumber > 0
-                                ? column.ColumnNumber - 1
-                                : column.ColumnNumber;
-
-                        parsedData.ColumnIndex = column.ColumnNumber;
-                        
-                        using MemoryStream csvMemoryStream = new MemoryStream(fileBytes);
-                        using StreamReader reader =
-                            new StreamReader(csvMemoryStream, req.FileInfo.Encoding.GetEncoding());
-
-                        CsvConfiguration? config = new CsvConfiguration(CultureInfo.InvariantCulture)
-                        {
-                            Delimiter = req.FileInfo.Delimiter,
-                            HasHeaderRecord = req.FileInfo.ValidateHeader,
-                        };
-
-                        using CsvReader? csv = new CsvReader(reader, config);
-                        
-                        // Read End Condition Variables
-                        Int32 whiteLineCount = 0;
-
-                        Int32 rowNumber = 1;
-
-                        while (csv.Read())
-                        {
-                            // Checking if End Condition is reached
-                            List<String> rowValues = [];
-
-                            for (Int32 i = 0; i < csv.ColumnCount; i++)
-                            {
-                                rowValues.Add(csv.GetField(i) ?? String.Empty);
-                            }
-
-                            if (IsReadEndConditionReached(
-                                    column.ReadEndCondition,
-                                    rowValues,
-                                    whiteLineCount,
-                                    rowNumber,
-                                    column.ReadEndConditionValue))
-                            {
-                                return res;
-                            }
-
-                            // Extracting Header Data
-                            if (req.FileInfo.ValidateHeader &&
-                                rowNumber == req.FileInfo.HeaderRowNumber)
-                            {
-                                csv.ReadHeader();
-                                headerList = csv.HeaderRecord?.ToList() ?? [];
-
-                                // Check if header contains the values in "ValidateHeaderContainsFields" array
-                                OnCheckHeaderEvent?.Invoke(headerList,
-                                    req.FileInfo.ValidateHeaderContainsFields, ref res);
-
-                                parsedData.ColumnName = column.HeaderColumnName; // Header Name Was Found
-                                
-                                // Header did not pass checking event
-                                if (res.WebResp.Errors.Count > 0)
-                                {
-                                    throw new SGBLBadRequestException("Invalid Header Fields");
-                                }
-                            }
-
-                            // Extracting Row Data
-                            if (rowNumber < column.StartRowNumber)
-                            {
-                                rowNumber++;
-                                continue;
-                            }
-
-                            // Checking if a value in a row match any skip string value
-                            Boolean skipRow = false;
-
-                            foreach (SkipRowString skipRowString in req.FileInfo.SkipRowStrings)
-                            {
-                                foreach (var cell in rowValues)
-                                {
-                                    if (skipRowString.IsRegExp)
-                                    {
-                                        if (Regex.IsMatch(cell, skipRowString.SkipString))
-                                        {
-                                            skipRow = true;
-                                            break;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if (cell.Contains(skipRowString.SkipString))
-                                        {
-                                            skipRow = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (skipRow)
-                            {
-                                continue;
-                            }
-
-                            String cellValue = column.FindFromHeader
-                                ? csv.GetField<String>(column.HeaderColumnName) ??
-                                  String.Empty
-                                : csv.GetField<String>(column.ColumnNumber) ?? String.Empty;
-
-                            injestFilePropertyIds =
-                                column.CustomDataValidation.Select(i => i.InjestFilePropertyId).ToList();
-
-                            columnData.Add(cellValue);
-
-                            if (rowValues.All(String.IsNullOrWhiteSpace))
-                            {
-                                whiteLineCount++;
-                            }
-
-                            rowNumber++;
-                        }
-
-                        OnCheckRowsDataEvent?.Invoke(injestFilePropertyIds, columnData, ref res);
-
-                        if (res.WebResp.Errors.Count > 0)
-                        {
-                            throw new SGBLBadRequestException($"Invalid Column {column.ColumnNumber} Fields");
-                        }
-                        
-                        parsedData.Data = columnData;
-                        parsedDataList.Add(parsedData);
-                    }
-                    
-                    res.ParsedDataList = parsedDataList;
-                    
-                    break;
-                }
-            }
-        }
-        catch (SGBLBadRequestException ex)
-        {
-            res.WebResp.CorrelationId = String.IsNullOrWhiteSpace(res.WebResp.CorrelationId)
-                ? Guid.NewGuid().ToString()
-                : res.WebResp.CorrelationId;
-
-            // No errors from events
-            if (res.WebResp.Errors.Count == 0)
-            {
-                res.WebResp.Errors.Add(ex.Message);
-            }
-
-            res.WebResp.StatusCode = HttpStatusCode.BadRequest;
-
-            res.ParsedDataList = [];
-            
-            correlationInfo.Reserved = "ValidateFile Responded With The Following Error";
-            correlationInfo.RDirection = RequestDirection.Response;
-            correlationInfo.StatusCode = HttpStatusCode.BadRequest;
-
-            LogErrorJson(res, correlationInfo, ex);
-
-            return res;
-        }
-        catch (Exception ex)
-        {
-            res.WebResp.Errors.Add(ex.ToString());
-            res.WebResp.StatusCode = HttpStatusCode.InternalServerError;
-
-            res.ParsedDataList = [];
-            
-            correlationInfo.Reserved = "ValidateFile Responded With The Following Error";
-            correlationInfo.RDirection = RequestDirection.Response;
-            correlationInfo.StatusCode = HttpStatusCode.InternalServerError;
-
-            LogErrorJson(res, correlationInfo, ex);
-        }
-
-        correlationInfo.Reserved = "ValidateFile Responded With The Following Response";
-        correlationInfo.RDirection = RequestDirection.Response;
-
-        LogInfoJson(res, correlationInfo);
-
-        return res;
-    }
-
-
-    public GetInjestFilePropertyDetailsByApplicationOwnerRes GetInjestFilePropertyDetailsByApplicationOwner(
-        GetInjestFilePropertyDetailsByApplicationOwnerReq req)
-    {
-        CorrelationInfo correlationInfo = new()
-        {
-            CorrelationId = req.CorrelationId,
-            RequestURL = "ExtractionService.GetInjestFilePropertyDetailsByApplicationOwner",
-        };
-
-        GetInjestFilePropertyDetailsByApplicationOwnerRes res = new()
-        {
-            Req = req,
-            WebResp = new()
-            {
-                CorrelationId = correlationInfo.CorrelationId
-            }
-        };
-
-        correlationInfo.Reserved =
-            "GetInjestFilePropertyDetailsByApplicationOwner Has been called with the following Request";
-        LogInfoJson(req, correlationInfo);
-
-        correlationInfo.RDirection = RequestDirection.Processing;
-
-        try
-        {
-            #region DataGuard
-
-            Dictionary<DataIntegrityCheckFunctions, dynamic> DataGuardDictionnary = new()
-            {
-                { DataIntegrityCheckFunctions.IS_INVALID_CORRELATION_ID, req.CorrelationId }
-            };
-
-            DataIntegrityCheck(DataGuardDictionnary);
-
-            #endregion
-
-            DAL.DAL iDAL = new(_appSettings.DataExportConnectionString);
-
-            DynamicParameters param = new();
-            param.Add("ApplicationOwner", req.ApplicationOwner);
-
-            List<InjestFileProperty> injestFileProperties = iDAL.ExecuteQuery<InjestFileProperty>(
-                "usp_GetInjestFilePropertyDetailsByApplicationOwner", param, CommandType.StoredProcedure,
-                DAL.DAL.CommandDirection.Select);
-
-            res.InjestFileProperties = injestFileProperties;
-        }
-        catch (SGBLBadRequestException ex)
-        {
-            res.WebResp.CorrelationId = String.IsNullOrWhiteSpace(res.WebResp.CorrelationId)
-                ? Guid.NewGuid().ToString()
-                : res.WebResp.CorrelationId;
-
-            // No errors from events
-            if (res.WebResp.Errors.Count == 0)
-            {
-                res.WebResp.Errors.Add(ex.Message);
-            }
-
-            res.WebResp.StatusCode = HttpStatusCode.BadRequest;
-
-            correlationInfo.Reserved =
-                "GetInjestFilePropertyDetailsByApplicationOwner Responded With The Following Error";
-            correlationInfo.RDirection = RequestDirection.Response;
-            correlationInfo.StatusCode = HttpStatusCode.BadRequest;
-
-            LogErrorJson(res, correlationInfo, ex);
-
-            return res;
-        }
-        catch (Exception ex)
-        {
-            res.WebResp.Errors.Add(ex.ToString());
-            res.WebResp.StatusCode = HttpStatusCode.InternalServerError;
-
-            correlationInfo.Reserved =
-                "GetInjestFilePropertyDetailsByApplicationOwner Responded With The Following Error";
-            correlationInfo.RDirection = RequestDirection.Response;
-            correlationInfo.StatusCode = HttpStatusCode.InternalServerError;
-
-            LogErrorJson(res, correlationInfo, ex);
-        }
-
-        correlationInfo.Reserved =
-            "GetInjestFilePropertyDetailsByApplicationOwner Responded With The Following Response";
-        correlationInfo.RDirection = RequestDirection.Response;
-
-        LogInfoJson(res, correlationInfo);
-
-        return res;
-    }
-
-    #region Utility Functions
-
-    private Byte[] HexStringToByteArray(string hex)
-    {
-        // Remove any hyphens or spaces, if present
-        hex = hex.Replace("-", "");
-
-        // Ensure the length of the string is even
-        if (hex.Length % 2 != 0)
-        {
-            throw new ArgumentException("Invalid length of hex string");
-        }
-
-        // Convert the hex string to a byte array
-        return Enumerable.Range(0, hex.Length / 2)
-            .Select(x => Convert.ToByte(hex.Substring(x * 2, 2), 16))
-            .ToArray();
-    }
-
-    private Boolean IsReadEndConditionReached(
-        ReadEndCondition condition,
-        List<String> row,
-        Int32 whiteLineCount,
-        Int32 rowNumber,
-        String conditionValue)
-    {
-        Boolean isReached = false;
-
-        Int32.TryParse(conditionValue, out Int32 conditionValueInt);
-
-        switch (condition)
-        {
-            case ReadEndCondition.WHITE_LINE_COUNT:
-                isReached = whiteLineCount >= conditionValueInt;
-                break;
-
-            case ReadEndCondition.FILE_END:
-                isReached = false;
-                break;
-
-            case ReadEndCondition.ROW_NUMBER:
-                isReached = rowNumber >= conditionValueInt;
-                break;
-
-            case ReadEndCondition.ROW_CONTAINS:
-                isReached = row.Contains(conditionValue);
-                break;
-        }
-
-        return isReached;
-    }
-
-    #endregion
+    public SGBLNotFoundException(String? message, Exception inner) : base(message, inner) { }
 }
 
-***************************************** Models *****************************************
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace BLL
+[Serializable]
+public partial class SGBLInternalServerException : Exception
 {
-    public class FileInfo
-    {
-        public String FileBinary { get; set; } = String.Empty;
-        public FileType FileType { get; set; }
-        public String Delimiter { get; set; } = String.Empty;
-        public EncodingEnum Encoding { get; set; }
-        public Boolean ValidateHeader { get; set; }
-        public Int32 HeaderRowNumber { get; set; }
-        public List<String> ValidateHeaderContainsFields { get; set; } = [];
-        public List<SkipRowString> SkipRowStrings { get; set; } = [];
-        public List<Column> Columns { get; set; } = [];
-    }
-    
-    public class SkipRowString
-    {
-        public String SkipString { get; set; } = String.Empty;
-        public Boolean IsRegExp { get; set; }
-    }
+    public SGBLInternalServerException() { }
 
-    public class Column
-    {
-        public Boolean FindFromHeader { get; set; }
-        public String HeaderColumnName { get; set; } = String.Empty;
-        public Int32 ColumnNumber { get; set; }
-        public Int32 StartRowNumber { get; set; }
-        public ReadEndCondition ReadEndCondition { get; set; }
-        public String ReadEndConditionValue { get; set; } = String.Empty;
-        public List<CustomDataValidation> CustomDataValidation { get; set; } = [];
-    }
-    
-    public class CustomDataValidation
-    {
-        public Int32 InjestFilePropertyId { get; set; }
-    }
+    public SGBLInternalServerException(String? message) : base(message) { }
 
-    public class FileValidationStep
-    {
-        public Int32 InjestFilePropertyId { get; set; }
-        public String ApplicationOwner { get; set; } = String.Empty;
-        public String ValidationWorkflowName { get; set; } = String.Empty;
-        public String InjestFileDescription { get; set; } = String.Empty;
-        public Int32 ValidationStepId { get; set; }
-        public String ValidationStepName { get; set; } = String.Empty;
-        public Boolean ContinueIfFail { get; set; }
-        public Int32 ChunkSize { get; set; }
-        public Int32 ProcedureId { get; set; }
-        public String ProcedureName { get; set; } = String.Empty;
-        public String ProcedureDescription { get; set; } = String.Empty;
-        public Boolean IsTVP { get; set; }
-        public String InputName { get; set; } = String.Empty;
-        public String TVPMap { get; set; } = String.Empty;
-    }
-
-    public class InjestFileProperty
-    {
-        public Int32 Id { get; set; }
-        public String ApplicationOwner { get; set; } = String.Empty;
-        public String ValidationWorkflowName { get; set; } = String.Empty;
-        public String Description { get; set; } = String.Empty;
-    }
-
-    public class ParsedData
-    {
-        public Int32 ColumnIndex { get; set; }
-        public String ColumnName { get; set; } = String.Empty;
-        public List<String> Data { get; set; } = [];
-    }
+    public SGBLInternalServerException(String? message, Exception inner) : base(message, inner) { }
 }
-
-***************************************** ParamReq *****************************************
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace BLL
-{
-    public partial class ValidateFileReq
-    {
-        public required String CorrelationId { get; set; }
-        public required FileInfo FileInfo { get; set; }
-    }
-    
-    public partial class GetInjestFilePropertyDetailsByApplicationOwnerReq
-    {
-        public required String CorrelationId { get; set; }
-        public required String ApplicationOwner { get; set; }
-    }
-}
-
-
-***************************************** ParamRes *****************************************
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml;
-
-namespace BLL
-{
-    #region Base Response
-    
-    public class BaseResponse
-    {
-        public String CorrelationId { get; set; } = String.Empty;
-        public HttpStatusCode StatusCode { get; set; } = HttpStatusCode.OK;
-        public List<String> Errors { get; set; } = [];
-    }
-    #endregion
-
-    #region ValidateFile Response
-
-    public class ValidateFileRes
-    {
-        public BaseResponse WebResp { get; set; } = new();
-        public List<ParsedData> ParsedDataList { get; set; } = [];
-    }
-    #endregion
-
-    #region GetInjestFilePropertyDetailsRes
-    public class GetInjestFilePropertyDetailsByApplicationOwnerRes
-    {
-        public BaseResponse WebResp { get; set; } = new();
-        public required GetInjestFilePropertyDetailsByApplicationOwnerReq Req { get; set; }
-        public List<InjestFileProperty> InjestFileProperties { get; set; } = [];
-    }
-    #endregion
-
-}
+#endregion
