@@ -1,16 +1,29 @@
-this.emailService.GetEmailAttachmentByEmailUniqueId(getEmailAttachmentByEmailUniqueIdRequest).subscribe({
-      next: (response: Blob) => {
+using System.IO.Compression;
+using Microsoft.AspNetCore.Mvc;
 
-        const url = window.URL.createObjectURL(response);
-        const a = document.createElement('a');
-        a.href = url;
+[HttpGet("download-multiple-files")]
+public IActionResult DownloadMultipleFiles()
+{
+    var files = new List<(byte[], string)>
+    {
+        (System.IO.File.ReadAllBytes("path/to/firstFile.pdf"), "FirstFile.pdf"),
+        (System.IO.File.ReadAllBytes("path/to/secondFile.docx"), "SecondFile.docx")
+    };
 
-        // Provide a default file name (or get it from Content-Disposition header)
-        a.download = `${this.getFormattedCurrentDateTime()}-${attachment.name}` || 'attachment';
+    using (var memoryStream = new MemoryStream())
+    {
+        using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
+        {
+            foreach (var (fileBytes, fileName) in files)
+            {
+                var entry = archive.CreateEntry(fileName, CompressionLevel.Fastest);
+                using (var entryStream = entry.Open())
+                {
+                    entryStream.Write(fileBytes, 0, fileBytes.Length);
+                }
+            }
+        }
 
-        a.click();
-        window.URL.revokeObjectURL(url); // Clean up the URL
-
-        this.loadingAttachmentActions.delete(attachment.id);
-      },
-    });
+        return File(memoryStream.ToArray(), "application/zip", "attachments.zip");
+    }
+}
