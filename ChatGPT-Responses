@@ -1,52 +1,86 @@
 using System;
+using System.Data;
 using System.IO;
-using Renci.SshNet;
+using System.Linq;
+using System.Text;
+using ExcelDataReader;
 
 class Program
 {
     static void Main()
     {
-        string host = "your-sftp-host";
-        string username = "your-username";
-        string password = "your-password";
-        string remoteFilePath = "/remote/path/to/file.txt";
-        string localFilePath = "C:\\local\\file.txt";
+        // ✅ Fix for encoding issues
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-        using (var sftp = new SftpClient(host, username, password))
+        string filePath = "C:\\path\\to\\your\\file.xlsx";
+
+        using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read))
         {
-            try
+            using (var reader = ExcelReaderFactory.CreateReader(stream))
             {
-                sftp.Connect();
-                Console.WriteLine("Connected to SFTP!");
-
-                // Download file
-                using (Stream fileStream = File.Create(localFilePath))
+                // ✅ Read everything into memory in one go
+                var result = reader.AsDataSet(new ExcelDataSetConfiguration
                 {
-                    sftp.DownloadFile(remoteFilePath, fileStream);
+                    ConfigureDataTable = (_) => new ExcelDataTableConfiguration
+                    {
+                        UseHeaderRow = false // Read raw data
+                    }
+                });
+
+                // ✅ Get the first sheet
+                DataTable table = result.Tables[0];
+
+                // ✅ Detect header row dynamically
+                int headerRowIndex = FindHeaderRow(table, "Name", "Age", "Grade");
+
+                if (headerRowIndex == -1)
+                {
+                    Console.WriteLine("Headers not found!");
+                    return;
                 }
 
-                Console.WriteLine("File downloaded successfully!");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
-            }
-            finally
-            {
-                sftp.Disconnect();
+                // ✅ Extract header names
+                DataRow headerRow = table.Rows[headerRowIndex];
+                var columnNames = headerRow.ItemArray.Select(cell => cell.ToString().Trim()).ToArray();
+
+                // ✅ Remove rows before the detected header row
+                for (int i = headerRowIndex; i >= 0; i--)
+                {
+                    table.Rows.RemoveAt(0);
+                }
+
+                // ✅ Assign new column names
+                for (int i = 0; i < columnNames.Length; i++)
+                {
+                    table.Columns[i].ColumnName = columnNames[i];
+                }
+
+                // ✅ Process data using column names
+                foreach (DataRow row in table.Rows)
+                {
+                    string name = row["Name"].ToString();
+                    int age = Convert.ToInt32(row["Age"]);
+                    double grade = Convert.ToDouble(row["Grade"]);
+
+                    Console.WriteLine($"Name: {name}, Age: {age}, Grade: {grade}");
+                }
             }
         }
     }
-}
 
-
-using (var sftp = new SftpClient(host, username, password))
-{
-    sftp.Connect();
-    using (var fileStream = File.OpenRead("C:\\local\\file.txt"))
+    // ✅ Detects the header row dynamically
+    static int FindHeaderRow(DataTable table, params string[] expectedHeaders)
     {
-        sftp.UploadFile(fileStream, "/remote/path/to/file.txt");
+        for (int i = 0; i < table.Rows.Count; i++)
+        {
+            var rowValues = table.Rows[i].ItemArray.Select(cell => cell.ToString().Trim()).ToList();
+
+            // ✅ If row contains all expected headers, return the row index
+            if (expectedHeaders.All(header => rowValues.Contains(header)))
+            {
+                return i;
+            }
+        }
+        return -1; // No valid header found
     }
-    Console.WriteLine("File uploaded successfully!");
-    sftp.Disconnect();
 }
