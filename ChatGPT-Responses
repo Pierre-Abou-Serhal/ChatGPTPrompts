@@ -9,78 +9,57 @@ class Program
 {
     static void Main()
     {
-        // ✅ Fix for encoding issues
+        // Fix encoding for older Excel files
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-        string filePath = "C:\\path\\to\\your\\file.xlsx";
+        string filePath = @"D:\Test.xlsx";
 
-        using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read))
+        using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read);
+        using var reader = ExcelReaderFactory.CreateReader(stream);
+
+        var result = reader.AsDataSet(new ExcelDataSetConfiguration
         {
-            using (var reader = ExcelReaderFactory.CreateReader(stream))
+            ConfigureDataTable = (_) => new ExcelDataTableConfiguration
             {
-                // ✅ Read everything into memory in one go
-                var result = reader.AsDataSet(new ExcelDataSetConfiguration
-                {
-                    ConfigureDataTable = (_) => new ExcelDataTableConfiguration
-                    {
-                        UseHeaderRow = false // Read raw data
-                    }
-                });
+                UseHeaderRow = false // We will manually assign headers
+            }
+        });
 
-                // ✅ Get the first sheet
-                DataTable table = result.Tables[0];
+        DataTable table = result.Tables[0]; // Get the first sheet
 
-                // ✅ Detect header row dynamically
-                int headerRowIndex = FindHeaderRow(table, "Name", "Age", "Grade");
+        if (table.Rows.Count == 0)
+        {
+            Console.WriteLine("Excel file is empty.");
+            return;
+        }
 
-                if (headerRowIndex == -1)
-                {
-                    Console.WriteLine("Headers not found!");
-                    return;
-                }
+        // ✅ Step 1: Select a row as the header row (Example: First row)
+        DataRow headerRow = table.Rows[0];
 
-                // ✅ Extract header names
-                DataRow headerRow = table.Rows[headerRowIndex];
-                var columnNames = headerRow.ItemArray.Select(cell => cell.ToString().Trim()).ToArray();
+        // ✅ Step 2: Create a dictionary to map column names to indexes
+        Dictionary<string, int> headerIndexMap = new();
+        for (int i = 0; i < table.Columns.Count; i++)
+        {
+            string columnName = headerRow[i].ToString().Trim();
+            table.Columns[i].ColumnName = columnName; // Rename the columns
+            headerIndexMap[columnName] = i;
+        }
 
-                // ✅ Remove rows before the detected header row
-                for (int i = headerRowIndex; i >= 0; i--)
-                {
-                    table.Rows.RemoveAt(0);
-                }
+        // ✅ Step 3: Remove the first row (header row) from the data
+        table.Rows.RemoveAt(0);
 
-                // ✅ Assign new column names
-                for (int i = 0; i < columnNames.Length; i++)
-                {
-                    table.Columns[i].ColumnName = columnNames[i];
-                }
-
-                // ✅ Process data using column names
-                foreach (DataRow row in table.Rows)
-                {
-                    string name = row["Name"].ToString();
-                    int age = Convert.ToInt32(row["Age"]);
-                    double grade = Convert.ToDouble(row["Grade"]);
-
-                    Console.WriteLine($"Name: {name}, Age: {age}, Grade: {grade}");
-                }
+        // ✅ Step 4: Access data using column name dynamically
+        if (headerIndexMap.TryGetValue("Age", out int ageIndex)) // Example: Find the "Age" column index
+        {
+            foreach (DataRow row in table.Rows)
+            {
+                string ageValue = row[ageIndex].ToString();
+                Console.WriteLine($"Age: {ageValue}");
             }
         }
-    }
-
-    // ✅ Detects the header row dynamically
-    static int FindHeaderRow(DataTable table, params string[] expectedHeaders)
-    {
-        for (int i = 0; i < table.Rows.Count; i++)
+        else
         {
-            var rowValues = table.Rows[i].ItemArray.Select(cell => cell.ToString().Trim()).ToList();
-
-            // ✅ If row contains all expected headers, return the row index
-            if (expectedHeaders.All(header => rowValues.Contains(header)))
-            {
-                return i;
-            }
+            Console.WriteLine("Column 'Age' not found.");
         }
-        return -1; // No valid header found
     }
 }
