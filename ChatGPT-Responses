@@ -1,65 +1,10 @@
-using System;
-using System.Data;
-using System.IO;
-using System.Linq;
-using System.Text;
-using ExcelDataReader;
+Dear Shadi,
 
-class Program
-{
-    static void Main()
-    {
-        // Fix encoding for older Excel files
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+After the discussion with Walid regarding the Excel Sheet issue, we have the following two options:
+1-	Leave the application as is and the change will be done in another phase of the project
+2-	Working on the change but it will require us 8 to 10 working days. 
 
-        string filePath = @"D:\Test.xlsx";
+Can you please coordinate with Toni Tabet in order to choose between these two options ?
 
-        using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read);
-        using var reader = ExcelReaderFactory.CreateReader(stream);
-
-        var result = reader.AsDataSet(new ExcelDataSetConfiguration
-        {
-            ConfigureDataTable = (_) => new ExcelDataTableConfiguration
-            {
-                UseHeaderRow = false // We will manually assign headers
-            }
-        });
-
-        DataTable table = result.Tables[0]; // Get the first sheet
-
-        if (table.Rows.Count == 0)
-        {
-            Console.WriteLine("Excel file is empty.");
-            return;
-        }
-
-        // ✅ Step 1: Select a row as the header row (Example: First row)
-        DataRow headerRow = table.Rows[0];
-
-        // ✅ Step 2: Create a dictionary to map column names to indexes
-        Dictionary<string, int> headerIndexMap = new();
-        for (int i = 0; i < table.Columns.Count; i++)
-        {
-            string columnName = headerRow[i].ToString().Trim();
-            table.Columns[i].ColumnName = columnName; // Rename the columns
-            headerIndexMap[columnName] = i;
-        }
-
-        // ✅ Step 3: Remove the first row (header row) from the data
-        table.Rows.RemoveAt(0);
-
-        // ✅ Step 4: Access data using column name dynamically
-        if (headerIndexMap.TryGetValue("Age", out int ageIndex)) // Example: Find the "Age" column index
-        {
-            foreach (DataRow row in table.Rows)
-            {
-                string ageValue = row[ageIndex].ToString();
-                Console.WriteLine($"Age: {ageValue}");
-            }
-        }
-        else
-        {
-            Console.WriteLine("Column 'Age' not found.");
-        }
-    }
-}
+Best regards,
+Pierre ABOU-SERHAL
