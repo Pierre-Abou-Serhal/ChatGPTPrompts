@@ -1,478 +1,251 @@
+using System;
+using System.Collections.Generic;
 using System.Data;
-using System.Net;
-using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
+using System.IO;
+using System.Linq;
 using ExcelDataReader;
 
-// Entry Point
-Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
-const String filePath = @"D:\Test.xlsx";
-
-ValidateFileRes res = ReadExcelFile(File.ReadAllBytes(filePath));
-
-Console.WriteLine(JsonSerializer.Serialize(res.ParsedDataList));
-
-return;
-
-// Logic
-static ValidateFileRes ReadExcelFile(Byte[] fileBytes)
+namespace ExcelValidationUsingDataReader
 {
-    String correlationId = Guid.NewGuid().ToString();
-    
-    ValidateFileReq req = new()
+    public enum EncodingEnum { UTF8 }
+    public enum FileType { EXCEL }
+    public enum ReadEndCondition { FILE_END }
+
+    public class ValidateFileReq
     {
-        CorrelationId = correlationId,
-        FileInfo = new()
-        {
-            ValidateHeader = false,
-            Encoding = EncodingEnum.UTF8,
-            Delimiter = "",
-            FileBinary = BitConverter.ToString(fileBytes).Replace("-", ""),
-            FileType = FileType.EXCEL,
-            HeaderRowNumber = 1,
-            ValidateHeaderContainsFields = [],
-            SkipRowStrings = [new SkipRowString {SkipString = "Georges", IsRegExp = false}],
-            Columns = [
-                new()
-                {
-                    ColumnNumber = 1,
-                    FindFromHeader = false,
-                    HeaderColumnName = "",
-                    StartRowNumber = 2,
-                    ReadEndCondition = ReadEndCondition.FILE_END,
-                    ReadEndConditionValue = "",
-                    CustomDataValidation = [
-                        new (){InjestFilePropertyId = 1}
-                    ]
-                },
-                new()
-                {
-                    ColumnNumber = 3,
-                    FindFromHeader = false,
-                    HeaderColumnName = "",
-                    StartRowNumber = 2,
-                    ReadEndCondition = ReadEndCondition.FILE_END,
-                    ReadEndConditionValue = "",
-                    CustomDataValidation = [
-                        new (){InjestFilePropertyId = 1}
-                    ]
-                }
-            ]
-        }
-    };
-    
-    ValidateFileRes res = new()
-    {
-        WebResp = new()
-        {
-            CorrelationId = correlationId
-        }
-    };
-    
-    using MemoryStream excelMemoryStream = new (fileBytes);
-    
-    using IExcelDataReader? reader = ExcelReaderFactory.CreateReader(excelMemoryStream);
-    DataSet? result = reader.AsDataSet(new ExcelDataSetConfiguration
-    {
-        ConfigureDataTable = (_) => new ExcelDataTableConfiguration
-        {
-            UseHeaderRow = false // Read raw data first
-        }
-    });
-
-    DataTable table = result.Tables[0]; // First Sheet
-
-    // Parsed Data List that will be returned to client
-    List<ParsedData> parsedDataList = [];
-    List<String> headerList = [];
-    
-    foreach (Column column in req.FileInfo.Columns)
-    {
-        List<Int32> injestFilePropertyIds = [];
-        List<String> columnData = [];
-
-        ParsedData parsedData = new()
-        {
-            ColumnIndex = column.ColumnNumber
-        };
-
-        // Read End Condition Variables
-        Int32 whiteLineCount = 0;
-
-        foreach (DataRow row in table.Rows)
-        {
-            Int32 rowNumber = table.Rows.IndexOf(row) + 1; // IndexOf(row) is zero based
-            
-            // Checking if End Condition is reached
-            List<String> rowValues = row.ItemArray.Select(cell => cell?.ToString()?.Trim() ?? String.Empty).ToList();
-
-            if (IsReadEndConditionReached(
-                    column.ReadEndCondition,
-                    rowValues,
-                    whiteLineCount,
-                    rowNumber, 
-                    column.ReadEndConditionValue))
-            {
-                return res;
-            }
-
-            // Extracting Header Data
-            if (req.FileInfo.ValidateHeader &&
-                rowNumber == req.FileInfo.HeaderRowNumber)
-            {
-                foreach (String cell in rowValues)
-                {
-                    if (cell.Equals(column.HeaderColumnName))
-                    {
-                        parsedData.ColumnName = column.HeaderColumnName; // Header Name Was Found
-                    }
-
-                    headerList.Add(cell);
-                }
-
-                // Check if header contains the values in "ValidateHeaderContainsFields" array
-                ExtractionBLL_CheckHeaderEvent(headerList,
-                    req.FileInfo.ValidateHeaderContainsFields, ref res);
-
-                // Header did not pass checking event
-                if (res.WebResp.Errors.Count > 0)
-                {
-                    throw new SGBLBadRequestException("Invalid Header Fields");
-                }
-            }
-
-            // Extracting Row Data
-            if (rowNumber < column.StartRowNumber)
-            {
-                continue;
-            }
-
-            // Checking if a value in a row match any skip string value
-            Boolean skipRow = false;
-
-            foreach (SkipRowString skipRowString in req.FileInfo.SkipRowStrings)
-            {
-                foreach (String cell in rowValues)
-                {
-                    if (skipRowString.IsRegExp)
-                    {
-                        if (Regex.IsMatch(cell, skipRowString.SkipString))
-                        {
-                            skipRow = true;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        if (cell.Contains(skipRowString.SkipString))
-                        {
-                            skipRow = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (skipRow)
-            {
-                continue;
-            }
-
-            String cellValue = column.FindFromHeader
-                ? row[column.HeaderColumnName].ToString() ?? String.Empty
-                : row[column.ColumnNumber == 0 ? column.ColumnNumber : column.ColumnNumber - 1 ].ToString() ?? String.Empty;
-
-            injestFilePropertyIds =
-                column.CustomDataValidation.Select(i => i.InjestFilePropertyId).ToList();
-
-            if (!String.IsNullOrWhiteSpace(cellValue))
-            {
-                columnData.Add(cellValue);
-            }
-
-            if (rowValues.All(String.IsNullOrWhiteSpace))
-            {
-                whiteLineCount++;
-            }
-        }
-
-        //OnCheckRowsDataEvent?.Invoke(injestFilePropertyIds, columnData, ref res);
-
-        if (res.WebResp.Errors.Count > 0)
-        {
-            throw new SGBLBadRequestException($"Invalid Column {column.ColumnNumber} Fields");
-        }
-
-        parsedData.Data = columnData;
-        parsedDataList.Add(parsedData);
+        public String CorrelationId { get; set; }
+        public FileInfoConfig FileInfo { get; set; }
     }
 
-    res.ParsedDataList = parsedDataList;
-
-    return res;
-}
-
-static Boolean IsReadEndConditionReached(
-    ReadEndCondition condition,
-    List<String> row,
-    Int32 whiteLineCount,
-    Int32 rowNumber,
-    String conditionValue)
-{
-    Boolean isReached = false;
-
-    Int32.TryParse(conditionValue, out Int32 conditionValueInt);
-
-    switch (condition)
+    public class FileInfoConfig
     {
-        case ReadEndCondition.WHITE_LINE_COUNT:
-            isReached = whiteLineCount >= conditionValueInt;
-            break;
-
-        case ReadEndCondition.FILE_END:
-            isReached = false;
-            break;
-
-        case ReadEndCondition.ROW_NUMBER:
-            isReached = rowNumber >= conditionValueInt;
-            break;
-
-        case ReadEndCondition.ROW_CONTAINS:
-            isReached = row.Contains(conditionValue);
-            break;
-    }
-
-    return isReached;
-}
-
-static void ExtractionBLL_CheckHeaderEvent(List<String> headerList, List<String> mustContainList, ref ValidateFileRes result)
-{
-    foreach (String headerName in mustContainList)
-    {
-        if (!headerList.Contains(headerName))
-        {
-            result.WebResp.Errors.Add($"Header Name: {headerName} Is Missing From The Header");
-        }
-    }
-}
-
-#region Models
- public class FileInfo
-    {
-        public String FileBinary { get; set; } = String.Empty;
-        public FileType FileType { get; set; }
-        public String Delimiter { get; set; } = String.Empty;
-        public EncodingEnum Encoding { get; set; }
         public Boolean ValidateHeader { get; set; }
+        public EncodingEnum Encoding { get; set; }
+        public String Delimiter { get; set; }
+        public String FileBinary { get; set; } // Hex string representation
+        public FileType FileType { get; set; }
         public Int32 HeaderRowNumber { get; set; }
-        public List<String> ValidateHeaderContainsFields { get; set; } = [];
-        public List<SkipRowString> SkipRowStrings { get; set; } = [];
-        public List<Column> Columns { get; set; } = [];
-    }
-    
-    public class SkipRowString
-    {
-        public String SkipString { get; set; } = String.Empty;
-        public Boolean IsRegExp { get; set; }
+        public List<String> ValidateHeaderContainsFields { get; set; }
+        public List<SkipRowString> SkipRowStrings { get; set; }
+        public List<ColumnConfig> Columns { get; set; }
     }
 
-    public class Column
+    public class SkipRowString { }
+
+    public class ColumnConfig
     {
-        public Boolean FindFromHeader { get; set; }
-        public String HeaderColumnName { get; set; } = String.Empty;
         public Int32 ColumnNumber { get; set; }
-        public Int32 StartRowNumber { get; set; }
+        public Boolean FindFromHeader { get; set; }
+        public String HeaderColumnName { get; set; }
+        public Int32 StartRowNumber { get; set; } // Expected start row for data
         public ReadEndCondition ReadEndCondition { get; set; }
-        public String ReadEndConditionValue { get; set; } = String.Empty;
-        public List<CustomDataValidation> CustomDataValidation { get; set; } = [];
+        public String ReadEndConditionValue { get; set; }
+        public List<CustomDataValidation> CustomDataValidation { get; set; }
     }
-    
+
     public class CustomDataValidation
     {
         public Int32 InjestFilePropertyId { get; set; }
     }
 
-    public class FileValidationStep
+    public class ExcelValidator
     {
-        public Int32 InjestFilePropertyId { get; set; }
-        public String ApplicationOwner { get; set; } = String.Empty;
-        public String ValidationWorkflowName { get; set; } = String.Empty;
-        public String InjestFileDescription { get; set; } = String.Empty;
-        public Int32 ValidationStepId { get; set; }
-        public String ValidationStepName { get; set; } = String.Empty;
-        public Boolean ContinueIfFail { get; set; }
-        public Int32 ChunkSize { get; set; }
-        public Int32 ProcedureId { get; set; }
-        public String ProcedureName { get; set; } = String.Empty;
-        public String ProcedureDescription { get; set; } = String.Empty;
-        public Boolean IsTVP { get; set; }
-        public String InputName { get; set; } = String.Empty;
-        public String TVPMap { get; set; } = String.Empty;
-    }
-
-    public class InjestFileProperty
-    {
-        public Int32 Id { get; set; }
-        public String ApplicationOwner { get; set; } = String.Empty;
-        public String ValidationWorkflowName { get; set; } = String.Empty;
-        public String Description { get; set; } = String.Empty;
-    }
-
-    public class ParsedData
-    {
-        public Int32 ColumnIndex { get; set; }
-        public String ColumnName { get; set; } = String.Empty;
-        public List<String> Data { get; set; } = [];
-    }
-#endregion
-
-#region Enums
-public enum FileType
-{
-    EXCEL = 1,
-    CSV = 2,
-}
-
-public enum ReadEndCondition
-{
-    FILE_END = 1,
-    WHITE_LINE_COUNT = 2,
-    ROW_NUMBER = 3,
-    ROW_CONTAINS = 4
-}
-
-public enum EncodingEnum
-{
-    UTF8 = 1,
-    LATIN1 = 2,
-    UNICODE = 3,
-    BIGENDIANUNICODE = 4,
-    UTF32 = 5,
-    ASCII = 6,
-    WINDOWS1256 = 7
-}
-
-public static class EncodingEnumExtensions
-{
-    public static Encoding GetEncoding(this EncodingEnum encodingEnum)
-    {
-        switch (encodingEnum)
+        public List<String> Validate(ValidateFileReq request)
         {
-            case EncodingEnum.UTF8:
-                return Encoding.UTF8;
+            List<String> errors = [];
+
+            // Convert hex string to byte array
+            Byte[] fileBytes = HexStringToByteArray(request.FileInfo.FileBinary);
+
+            // ExcelDataReader requires the codepages provider registration for certain encodings.
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
+            using MemoryStream stream = new (fileBytes);
+            using IExcelDataReader? reader = ExcelReaderFactory.CreateReader(stream);
+            // Convert the excel file to a DataSet
+            DataSet? dataSet = reader.AsDataSet();
+            if (dataSet.Tables.Count == 0)
+            {
+                errors.Add("No worksheet found in the Excel file.");
+                return errors;
+            }
+
+            DataTable table = dataSet.Tables[0];
+
+            // Validate header if required
+            if (request.FileInfo.ValidateHeader)
+            {
+                Int32 headerRowIndex = request.FileInfo.HeaderRowNumber - 1; // Convert to 0-based index
+                if (headerRowIndex < 0 || headerRowIndex >= table.Rows.Count)
+                {
+                    errors.Add("Configured header row number is out of range.");
+                }
+                else
+                {
+                    DataRow headerRow = table.Rows[headerRowIndex];
+                    List<String> headersFound = [];
+                    // Assuming headers are in consecutive columns starting from index 0
+                    for (int col = 0; col < table.Columns.Count; col++)
+                    {
+                        Object cellValue = headerRow[col];
+                        if (!String.IsNullOrWhiteSpace(cellValue.ToString()))
+                        {
+                            headersFound.Add(cellValue.ToString() ?? String.Empty);
+                        }
+                        else
+                        {
+                            // Stop reading headers once an empty cell is encountered.
+                            break;
+                        }
+                    }
+                    foreach (String requiredHeader in request.FileInfo.ValidateHeaderContainsFields)
+                    {
+                        if (!headersFound.Contains(requiredHeader))
+                        {
+                            errors.Add($"Header validation failed. Required header '{requiredHeader}' not found in row {request.FileInfo.HeaderRowNumber}.");
+                        }
+                    }
+                }
+            }
+
+            // Validate each column's configuration regarding the starting row of data
+            foreach (ColumnConfig colConfig in request.FileInfo.Columns)
+            {
+                Int32 expectedStartRow = colConfig.StartRowNumber;
+                Int32 dataStartRowIndex = -1; // will be set when first non-empty cell is found
+
+                Int32 columnIndex = colConfig.ColumnNumber - 1; // Default to configured column number (0-based)
+                    
+                // If configured to locate the column by header name, find its actual column index.
+                if (colConfig.FindFromHeader)
+                {
+                    Int32 headerRowIndex = request.FileInfo.HeaderRowNumber - 1;
+                    if (headerRowIndex < 0 || headerRowIndex >= table.Rows.Count)
+                    {
+                        errors.Add("Configured header row number is out of range when searching for header column.");
+                        continue;
+                    }
+                    DataRow headerRow = table.Rows[headerRowIndex];
+                    Boolean found = false;
+                    for (Int32 col = 0; col < table.Columns.Count; col++)
+                    {
+                        Object cellValue = headerRow[col];
+                        if (cellValue.ToString()?.Equals(colConfig.HeaderColumnName, StringComparison.OrdinalIgnoreCase) ?? false)
+                        {
+                            columnIndex = col;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        errors.Add($"Column header '{colConfig.HeaderColumnName}' not found in header row {request.FileInfo.HeaderRowNumber}.");
+                        continue;
+                    }
+                }
+
+                // Look for the first non-empty cell in the column after the header row.
+                // Data is expected to start after the header row.
+                for (Int32 r = request.FileInfo.HeaderRowNumber; r < table.Rows.Count; r++)
+                {
+                    Object cellValue = table.Rows[r][columnIndex];
+                    if (!String.IsNullOrWhiteSpace(cellValue.ToString()))
+                    {
+                        dataStartRowIndex = r;
+                        break;
+                    }
+                }
+
+                if (dataStartRowIndex == -1)
+                {
+                    errors.Add($"No data found in column '{colConfig.HeaderColumnName}' (Column {(columnIndex + 1)}).");
+                }
+                else
+                {
+                    // Convert the 0-based row index back to 1-based row number for comparison
+                    Int32 detectedStartRow = dataStartRowIndex + 1;
+                    if (detectedStartRow != expectedStartRow)
+                    {
+                        errors.Add($"Mismatch for column '{colConfig.HeaderColumnName}' (Column {(columnIndex + 1)}): Expected data to start at row {expectedStartRow}, but detected at row {detectedStartRow}.");
+                    }
+                }
+            }
+
+            return errors;
+        }
+
+        private Byte[] HexStringToByteArray(string hex)
+        {
+            Int32 numberChars = hex.Length;
+            Byte[] bytes = new Byte[numberChars / 2];
+            for (Int32 i = 0; i < numberChars; i += 2)
+                bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
+            return bytes;
+        }
+    }
+
+    class Program
+    {
+        static void Main(String[] args)
+        {
+            const String filePath = "D:\\Test.xlsx";
             
-            case EncodingEnum.LATIN1:
-                return Encoding.Latin1;
-            
-            case EncodingEnum.UNICODE:
-                return Encoding.Unicode;
-            
-            case EncodingEnum.BIGENDIANUNICODE:
-                return Encoding.BigEndianUnicode;
-            
-            case EncodingEnum.UTF32:
-                return Encoding.UTF32;
-            
-            case EncodingEnum.ASCII:
-                return Encoding.ASCII;
-            
-            case EncodingEnum.WINDOWS1256:
-                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-                return Encoding.GetEncoding(1256);
-            
-            default:
-                return Encoding.Default;
+            // Example configuration
+            ValidateFileReq configuredFileConfig = new()
+            {
+                CorrelationId = "abc123",
+                FileInfo = new FileInfoConfig
+                {
+                    ValidateHeader = false,
+                    Encoding = EncodingEnum.UTF8,
+                    Delimiter = "",
+                    FileBinary = BitConverter.ToString(File.ReadAllBytes(filePath)).Replace("-", ""), // Replace with your hex string representation of the file
+                    FileType = FileType.EXCEL,
+                    HeaderRowNumber = 0,
+                    ValidateHeaderContainsFields = [],
+                    SkipRowStrings = [],
+                    Columns =
+                    [
+                        new ColumnConfig
+                        {
+                            ColumnNumber = 1,
+                            FindFromHeader = false,
+                            HeaderColumnName = "",
+                            StartRowNumber = 3, // Expected start row for data in this column
+                            ReadEndCondition = ReadEndCondition.FILE_END,
+                            ReadEndConditionValue = "",
+                            CustomDataValidation = [new() { InjestFilePropertyId = 1 }]
+                        },
+
+                        new ColumnConfig
+                        {
+                            ColumnNumber = 2,
+                            FindFromHeader = false,
+                            HeaderColumnName = "",
+                            StartRowNumber = 3, // Expected start row for data in this column
+                            ReadEndCondition = ReadEndCondition.FILE_END,
+                            ReadEndConditionValue = "",
+                            CustomDataValidation = [new() { InjestFilePropertyId = 1 }]
+                        }
+                    ]
+                }
+            };
+
+            ExcelValidator validator = new ExcelValidator();
+            List<String> errors = validator.Validate(configuredFileConfig);
+
+            if (errors.Count != 0)
+            {
+                Console.WriteLine("Validation errors found:");
+                foreach (String error in errors)
+                {
+                    Console.WriteLine(error);
+                }
+            }
+            else
+            {
+                Console.WriteLine("Excel file configuration matches the sent configuration.");
+            }
         }
     }
 }
-
-public enum DataIntegrityCheckFunctions
-{
-    IS_INVALID_CORRELATION_ID = 0,
-    IS_INVALID_FILE_TYPE = 1,
-    IS_INVALID_ENCODING = 2,
-    IS_INVALID_DELIMITER = 3,
-    IS_INVALID_COLUMNS_OR_ROWS = 4,
-    IS_INVALID_READ_END_CONDITION = 5
-}
-
-#endregion
-
-
-#region Requests
-public partial class ValidateFileReq
-{
-    public required String CorrelationId { get; set; }
-    public required FileInfo FileInfo { get; set; }
-}
-    
-public partial class GetInjestFilePropertyDetailsByApplicationOwnerReq
-{
-    public required String CorrelationId { get; set; }
-    public required String ApplicationOwner { get; set; }
-}
-#endregion
-
-#region Response
-#region Base Response
-    
-public class BaseResponse
-{
-    public String CorrelationId { get; set; } = String.Empty;
-    public HttpStatusCode StatusCode { get; set; } = HttpStatusCode.OK;
-    public List<String> Errors { get; set; } = [];
-}
-#endregion
-
-#region ValidateFile Response
-
-public class ValidateFileRes
-{
-    public BaseResponse WebResp { get; set; } = new();
-    public List<ParsedData> ParsedDataList { get; set; } = [];
-}
-#endregion
-
-#region GetInjestFilePropertyDetailsRes
-public class GetInjestFilePropertyDetailsByApplicationOwnerRes
-{
-    public BaseResponse WebResp { get; set; } = new();
-    public required GetInjestFilePropertyDetailsByApplicationOwnerReq Req { get; set; }
-    public List<InjestFileProperty> InjestFileProperties { get; set; } = [];
-}
-#endregion
-#endregion
-
-#region Exception
-[Serializable]
-public partial class SGBLBadRequestException : Exception
-{
-    public SGBLBadRequestException() { }
-
-    public SGBLBadRequestException(String? message) : base(message) { }
-
-    public SGBLBadRequestException(String? message, Exception inner) : base(message, inner) { }
-}
-
-[Serializable]
-public partial class SGBLNotFoundException : Exception
-{
-    public SGBLNotFoundException() { }
-
-    public SGBLNotFoundException(String? message) : base(message) { }
-
-    public SGBLNotFoundException(String? message, Exception inner) : base(message, inner) { }
-}
-
-[Serializable]
-public partial class SGBLInternalServerException : Exception
-{
-    public SGBLInternalServerException() { }
-
-    public SGBLInternalServerException(String? message) : base(message) { }
-
-    public SGBLInternalServerException(String? message, Exception inner) : base(message, inner) { }
-}
-#endregion
