@@ -1,27 +1,40 @@
 using System;
 using System.IO;
-using System.Text;
 
 class Program
 {
     static void Main()
     {
-        string filePath = "path_to_your_large_file.txt";
-        int bufferSize = 1024 * 1024; // 1MB buffer
+        string filePath = "path_to_your_large_file.txt"; // Input file
+        string outputFilePath = "filtered_output.txt";   // Output file
+        string searchKeyword = "Timestamp: 2025-01-28";  // Keyword to start reading after
+
+        bool startReading = false;
 
         try
         {
-            using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize, FileOptions.SequentialScan))
-            using (StreamReader reader = new StreamReader(fs, Encoding.UTF8, true, bufferSize))
+            using (StreamReader reader = new StreamReader(filePath))
+            using (StreamWriter writer = new StreamWriter(outputFilePath, false)) // Overwrites existing file
             {
-                char[] buffer = new char[bufferSize];
-                int bytesRead;
-
-                while ((bytesRead = reader.Read(buffer, 0, buffer.Length)) > 0)
+                string line;
+                while ((line = reader.ReadLine()) != null)
                 {
-                    Console.Write(new string(buffer, 0, bytesRead)); // Process chunk
+                    // Check if we should start collecting lines
+                    if (!startReading && line.StartsWith(searchKeyword))
+                    {
+                        startReading = true;
+                        continue; // Skip this line and start from the next one
+                    }
+
+                    // If we have started reading, write the line to the output file
+                    if (startReading)
+                    {
+                        writer.WriteLine(line);
+                    }
                 }
             }
+
+            Console.WriteLine($"Filtered content written to: {outputFilePath}");
         }
         catch (Exception ex)
         {
