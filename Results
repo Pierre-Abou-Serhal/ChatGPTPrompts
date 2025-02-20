@@ -1,53 +1,12 @@
-using System;
-using System.Linq;
+     // If not an Excel file, assume it is a CSV and check the delimiter in the first line
+        string fileContent = Encoding.UTF8.GetString(fileBytes);
+        string firstLine = fileContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).FirstOrDefault();
 
-public class ExcelFileChecker
-{
-    public static bool IsExcelFile(string hexString)
-    {
-        byte[] fileBytes = HexStringToByteArray(hexString);
-
-        // Check if file is too small to be valid
-        if (fileBytes.Length < 8)
-            return false;
-
-        // Check for XLS header: D0 CF 11 E0 A1 B1 1A E1
-        byte[] xlsHeader = new byte[] { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 };
-        if (fileBytes.Take(xlsHeader.Length).SequenceEqual(xlsHeader))
-            return true;
-
-        // Check for XLSX header (ZIP file signature): common ZIP header is 50 4B 03 04
-        byte[] zipHeader = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
-        if (fileBytes.Take(zipHeader.Length).SequenceEqual(zipHeader))
-            return true;
-
-        // If needed, add checks for alternate ZIP signatures:
-        // byte[] altZipHeader1 = new byte[] { 0x50, 0x4B, 0x05, 0x06 };
-        // byte[] altZipHeader2 = new byte[] { 0x50, 0x4B, 0x07, 0x08 };
-        // ...
-
-        return false;
-    }
-
-    private static byte[] HexStringToByteArray(string hex)
-    {
-        int numberChars = hex.Length;
-        byte[] bytes = new byte[numberChars / 2];
-        for (int i = 0; i < numberChars; i += 2)
+        if (firstLine == null || !firstLine.Contains(configuredDelimiter))
         {
-            bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
+            return $"File format mismatch: The uploaded file was expected to be an Excel file but does not match the required Excel format. " +
+                   $"Assuming it is a CSV file, the first line must contain the configured delimiter '{configuredDelimiter}', but it was not found. " +
+                   $"Please ensure that you are uploading a properly formatted CSV file.";
         }
-        return bytes;
-    }
-}
 
-class Program
-{
-    static void Main(string[] args)
-    {
-        // Replace with your hex string representation of an Excel file.
-        string hexString = "D0CF11E0A1B11AE1..."; // For XLS, or a ZIP header for XLSX
-        bool isExcel = ExcelFileChecker.IsExcelFile(hexString);
-        Console.WriteLine(isExcel ? "File is an Excel format." : "File is NOT an Excel format.");
-    }
-}
+        return "File is a valid CSV file.";
