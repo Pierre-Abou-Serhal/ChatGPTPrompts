@@ -1,128 +1,134 @@
-// Convert hex string to byte array
-                Byte[] fileBytes = CustomCodes.HexStringToByteArray(req.FileInfo.FileBinary);
+public class CSVValidator
+    {
+        public List<string> Validate(ValidateFileReq req)
+        {
+            List<string> errors = new List<string>();
 
-                // ExcelDataReader requires the codepages provider registration for certain encodings.
-                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            // Convert hex string to byte array and then to CSV string (assuming UTF8)
+            byte[] fileBytes = HexStringToByteArray(req.FileInfo.FileBinary);
+            string csvContent = Encoding.UTF8.GetString(fileBytes);
 
-                using MemoryStream stream = new(fileBytes);
-                using IExcelDataReader? reader = ExcelReaderFactory.CreateReader(stream);
+            // Read CSV file using CsvHelper
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                Delimiter = req.FileInfo.Delimiter,
+                // If ValidateHeader is true, assume the first row is the header
+                HasHeaderRecord = req.FileInfo.ValidateHeader
+            };
 
-                // Convert the Excel file to a DataSet
-                DataSet? dataSet = reader.AsDataSet();
-
-                if (dataSet.Tables.Count == 0)
+            // We'll read all rows into a list of string arrays.
+            List<string[]> rows = new List<string[]>();
+            using (var reader = new StringReader(csvContent))
+            using (var csv = new CsvReader(reader, config))
+            {
+                while (csv.Read())
                 {
-                    res.WebResp.Errors.Add("No worksheet found in the Excel file.");
-
-                    throw new SGBLBadRequestException("No worksheet found in the Excel file.");
+                    // Get the row as an array of strings
+                    var row = new List<string>();
+                    for (int i = 0; csv.TryGetField<string>(i, out string field); i++)
+                    {
+                        row.Add(field);
+                    }
+                    rows.Add(row.ToArray());
                 }
+            }
 
-                DataTable table = dataSet.Tables[0];
+            if (rows.Count == 0)
+            {
+                errors.Add("No data found in the CSV file.");
+                return errors;
+            }
 
-                // Validate header if required
-                if (req.FileInfo.ValidateHeader)
+            // Validate header if configured
+            int headerRowIndex = -1;
+            if (req.FileInfo.ValidateHeader)
+            {
+                // Convert the 1-based header row number to a 0-based index
+                headerRowIndex = req.FileInfo.HeaderRowNumber - 1;
+                if (headerRowIndex < 0 || headerRowIndex >= rows.Count)
                 {
-                    Int32 headerRowIndex = req.FileInfo.HeaderRowNumber - 1; // Convert to 0-based index
-                    if (headerRowIndex < 0 || headerRowIndex >= table.Rows.Count)
+                    errors.Add("Configured header row number is out of range.");
+                }
+                else
+                {
+                    string[] headerRow = rows[headerRowIndex];
+                    List<string> headersFound = headerRow.Where(h => !string.IsNullOrWhiteSpace(h)).Select(h => h.Trim()).ToList();
+                    foreach (string requiredHeader in req.FileInfo.ValidateHeaderContainsFields)
                     {
-                        res.WebResp.Errors.Add("Configured header row number is out of range.");
-                    }
-                    else
-                    {
-                        DataRow headerRow = table.Rows[headerRowIndex];
-                        List<String> headersFound = [];
-                        // Assuming headers are in consecutive columns starting from index 0
-                        for (int col = 0; col < table.Columns.Count; col++)
+                        if (!headersFound.Any(h => h.Equals(requiredHeader, StringComparison.OrdinalIgnoreCase)))
                         {
-                            Object cellValue = headerRow[col];
-                            if (!String.IsNullOrWhiteSpace(cellValue.ToString()))
-                            {
-                                headersFound.Add(cellValue.ToString() ?? String.Empty);
-                            }
-                            else
-                            {
-                                // Stop reading headers once an empty cell is encountered.
-                                break;
-                            }
-                        }
-
-                        foreach (String requiredHeader in req.FileInfo.ValidateHeaderContainsFields)
-                        {
-                            if (!headersFound.Contains(requiredHeader))
-                            {
-                                res.WebResp.Errors.Add(
-                                    $"Header validation failed. Required header '{requiredHeader}' not found in row {req.FileInfo.HeaderRowNumber}.");
-                            }
+                            errors.Add($"Header validation failed. Required header '{requiredHeader}' not found in row {req.FileInfo.HeaderRowNumber}.");
                         }
                     }
                 }
+            }
+            else
+            {
+                // If not configured to validate header, assume there is no header row.
+                headerRowIndex = -1;
+            }
 
-                // Validate each column's configuration regarding the starting row of data
-                foreach (Column column in req.FileInfo.Columns)
+            // For each column configuration, check that data starts on the expected row.
+            // For CSV, data rows start right after the header row (if present), or from row 0 if no header.
+            int dataStartIndex = req.FileInfo.ValidateHeader ? headerRowIndex + 1 : 0;
+            foreach (var column in req.FileInfo.Columns)
+            {
+                int expectedStartRow = column.StartRowNumber;
+                int dataDetectedRowIndex = -1;
+                int columnIndex = column.ColumnNumber - 1; // default to configuration if not found by header
+
+                // If the configuration uses header lookup, find the column index by header name.
+                if (column.FindFromHeader && headerRowIndex >= 0)
                 {
-                    Int32 expectedStartRow = column.StartRowNumber;
-                    Int32 dataStartRowIndex = -1; // will be set when first non-empty cell is found
-
-                    Int32 columnIndex = column.ColumnNumber - 1; // Default to configured column number (0-based)
-
-                    // If configured to locate the column by header name, find its actual column index.
-                    if (column.FindFromHeader)
+                    string[] headerRow = rows[headerRowIndex];
+                    bool found = false;
+                    for (int i = 0; i < headerRow.Length; i++)
                     {
-                        Int32 headerRowIndex = req.FileInfo.HeaderRowNumber - 1;
-                        if (headerRowIndex < 0 || headerRowIndex >= table.Rows.Count)
+                        if (!string.IsNullOrWhiteSpace(headerRow[i]) &&
+                            headerRow[i].Trim().Equals(column.HeaderColumnName, StringComparison.OrdinalIgnoreCase))
                         {
-                            res.WebResp.Errors.Add(
-                                "Configured header row number is out of range when searching for header column.");
-                            continue;
-                        }
-
-                        DataRow headerRow = table.Rows[headerRowIndex];
-                        Boolean found = false;
-                        for (Int32 col = 0; col < table.Columns.Count; col++)
-                        {
-                            Object cellValue = headerRow[col];
-                            if (cellValue.ToString()
-                                    ?.Equals(column.HeaderColumnName, StringComparison.OrdinalIgnoreCase) ?? false)
-                            {
-                                columnIndex = col;
-                                found = true;
-                                break;
-                            }
-                        }
-
-                        if (!found)
-                        {
-                            res.WebResp.Errors.Add(
-                                $"Column header '{column.HeaderColumnName}' not found in header row {req.FileInfo.HeaderRowNumber}.");
-                            continue;
-                        }
-                    }
-
-                    // Look for the first non-empty cell in the column after the header row.
-                    // Data is expected to start after the header row.
-                    for (Int32 r = req.FileInfo.HeaderRowNumber; r < table.Rows.Count; r++)
-                    {
-                        Object cellValue = table.Rows[r][columnIndex];
-                        if (!String.IsNullOrWhiteSpace(cellValue.ToString()))
-                        {
-                            dataStartRowIndex = r;
+                            columnIndex = i;
+                            found = true;
                             break;
                         }
                     }
-
-                    if (dataStartRowIndex == -1)
+                    if (!found)
                     {
-                        res.WebResp.Errors.Add(
-                            $"No data found in column '{column.HeaderColumnName}' (Column {(columnIndex + 1)}).");
-                    }
-                    else
-                    {
-                        // Convert the 0-based row index back to 1-based row number for comparison
-                        Int32 detectedStartRow = dataStartRowIndex + 1;
-                        if (detectedStartRow != expectedStartRow)
-                        {
-                            res.WebResp.Errors.Add(
-                                $"Mismatch for column '{column.HeaderColumnName}' (Column {(columnIndex + 1)}): Expected data to start at row {expectedStartRow}, but detected at row {detectedStartRow}.");
-                        }
+                        errors.Add($"Column header '{column.HeaderColumnName}' not found in header row {req.FileInfo.HeaderRowNumber}.");
+                        continue;
                     }
                 }
+
+                // Find the first non-empty cell in the column from the data rows.
+                for (int r = dataStartIndex; r < rows.Count; r++)
+                {
+                    string[] row = rows[r];
+                    // If the row doesn't have enough columns, treat it as empty
+                    if (columnIndex >= row.Length)
+                        continue;
+
+                    string cellValue = row[columnIndex];
+                    if (!string.IsNullOrWhiteSpace(cellValue))
+                    {
+                        dataDetectedRowIndex = r;
+                        break;
+                    }
+                }
+
+                if (dataDetectedRowIndex == -1)
+                {
+                    errors.Add($"No data found in column '{column.HeaderColumnName}' (Column {column.ColumnNumber}).");
+                }
+                else
+                {
+                    // Convert the 0-based row index to a 1-based row number.
+                    int detectedStartRow = dataDetectedRowIndex + 1;
+                    if (detectedStartRow != expectedStartRow)
+                    {
+                        errors.Add($"Mismatch for column '{column.HeaderColumnName}' (Column {column.ColumnNumber}): Expected data to start at row {expectedStartRow}, but detected at row {detectedStartRow}.");
+                    }
+                }
+            }
+
+            return errors;
+        }
