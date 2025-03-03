@@ -1,7 +1,11 @@
-            // Step 5: Check Which accountsWithT24Formats Are NOT Found In Dictionary -> Then Take The Corresponding Alternative Account
-            List<String> accountsWithT24FormatsNotInDict =
-                accountsWithT24Formats.Where(account => dictionaryList.Any(y => !y.AlternativeAccountId.Equals(account))).ToList();
-            
-            // Step 6: Check Which accountsWithNonT24Formats Are NOT Found In Dictionary -> Then Take The Corresponding Alternative Account
-            List<String> accountsWithNonT24FormatsNotInDict = 
-                accountsWithNonT24Formats.Where(account => dictionaryList.Any(y => !y.AlternativeAccountId.Equals(account))).ToList();
+// Step 5: Check Which accountsWithT24Formats Are NOT Found In Dictionary -> Then Take The Corresponding Alternative Account
+List<String> accountsWithT24FormatsNotInDict =
+    accountsWithT24Formats.Where(account => 
+        !dictionaryList.Any(y => y.AlternativeAccountId.Equals(account))
+    ).ToList();
+
+// Step 6: Check Which accountsWithNonT24Formats Are NOT Found In Dictionary -> Then Take The Corresponding Alternative Account
+List<String> accountsWithNonT24FormatsNotInDict = 
+    accountsWithNonT24Formats.Where(account => 
+        !dictionaryList.Any(y => y.AlternativeAccountId.Equals(account))
+    ).ToList();
