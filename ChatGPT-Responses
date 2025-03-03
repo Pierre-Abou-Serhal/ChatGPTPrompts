@@ -1,44 +1,7 @@
-using System;
-using System.IO;
-
-class Program
-{
-    static void Main()
-    {
-        string filePath = "path_to_your_large_file.txt"; // Input file
-        string outputFilePath = "filtered_output.txt";   // Output file
-        string searchKeyword = "Timestamp: 2025-01-28";  // Keyword to start reading after
-
-        bool startReading = false;
-
-        try
-        {
-            using (StreamReader reader = new StreamReader(filePath))
-            using (StreamWriter writer = new StreamWriter(outputFilePath, false)) // Overwrites existing file
-            {
-                string line;
-                while ((line = reader.ReadLine()) != null)
-                {
-                    // Check if we should start collecting lines
-                    if (!startReading && line.StartsWith(searchKeyword))
-                    {
-                        startReading = true;
-                        continue; // Skip this line and start from the next one
-                    }
-
-                    // If we have started reading, write the line to the output file
-                    if (startReading)
-                    {
-                        writer.WriteLine(line);
-                    }
-                }
-            }
-
-            Console.WriteLine($"Filtered content written to: {outputFilePath}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Error: " + ex.Message);
-        }
-    }
-}
+            // Step 5: Check Which accountsWithT24Formats Are NOT Found In Dictionary -> Then Take The Corresponding Alternative Account
+            List<String> accountsWithT24FormatsNotInDict =
+                accountsWithT24Formats.Where(account => dictionaryList.Any(y => !y.AlternativeAccountId.Equals(account))).ToList();
+            
+            // Step 6: Check Which accountsWithNonT24Formats Are NOT Found In Dictionary -> Then Take The Corresponding Alternative Account
+            List<String> accountsWithNonT24FormatsNotInDict = 
+                accountsWithNonT24Formats.Where(account => dictionaryList.Any(y => !y.AlternativeAccountId.Equals(account))).ToList();
