@@ -9,6 +9,18 @@
 
 Total request timeout resilience strategy must have a greater timeout than the attempt resilience strategy. Total Request Timeout: 30s, Attempt Timeout: 900s; The sampling duration of circuit breaker strategy needs to be at least double of an attempt timeout strategy’s timeout interval, in order to be effective. Sampling Duration: 30s,Attempt Timeout: 900s
 
+// Register IHttpClientFactory
+builder.Services.AddHttpClient("GeneralHttpClient", option =>
+{
+    option.Timeout = TimeSpan.FromMinutes(16); // Total request timeout should be greater than attempt timeout
+})
+.AddStandardResilienceHandler(options =>
+{
+    options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(15); // Attempt timeout
+    options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(16); // Must be greater than attempt timeout
+    options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(30); // At least 2x the Attempt Timeout
+});
+
 Program.cs:
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
