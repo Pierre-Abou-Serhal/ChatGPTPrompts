@@ -1,240 +1,84 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-
-namespace MiddleWareApi
-{
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
-
-            builder.Host.UseWindowsService();
-            // Configure logging
-            builder.Logging.ClearProviders();
-            builder.Logging.AddConsole();
-
-            // Register IHttpClientFactory with extended timeout configuration
-            builder.Services.AddHttpClient("GeneralHttpClient", client =>
-            {
-                client.Timeout = TimeSpan.FromMinutes(15);
-            })
-            .AddStandardResilienceHandler(options =>
-            {
-                options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(15);
-                options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(16); // Must be greater than attempt timeout
-                options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(30); // At least double the attempt timeout
-            });
-
-            // Add other services if needed
-            builder.AddServiceDefaults();
-            builder.Services.AddProblemDetails();
-
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy("DefaultCors", policyBuilder => policyBuilder
-                        .AllowAnyOrigin()
-                        .AllowAnyHeader()
-                        .AllowAnyMethod());
-            });
-            
-            var app = builder.Build();
-
-            app.UseCors("DefaultCors");
-            
-            // Use the proxy middleware
-            app.UseMiddleware<ProxyMiddleware>();
-
-            app.Run();
-        }
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Extensions;
-using Microsoft.Extensions.Logging;
-using System;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
-
-namespace MiddleWareApi
-{
-    public class ProxyMiddleware
-    {
-        private readonly RequestDelegate _next;
-
-        public ProxyMiddleware(RequestDelegate next)
-        {
-            _next = next;
-        }
-
-        public async Task InvokeAsync(
-            HttpContext context,
-            IHttpClientFactory httpClientFactory,
-            ILogger<ProxyMiddleware> logger)
-        {
-            // Create the client using the correct named client ("GeneralHttpClient")
-            var httpClient = httpClientFactory.CreateClient("GeneralHttpClient");
-            // Log the configured timeout
-            logger.LogInformation("HttpClient.Timeout is set to {Timeout}", httpClient.Timeout);
-
-            try
-            {
-                string? endpoint = null;
-                string? requestBodyContent = null;
-
-                // Try to get the endpoint from query parameter
-                endpoint = context.Request.Query["endpoint"].FirstOrDefault();
-
-                if (string.IsNullOrEmpty(endpoint))
-                {
-                    // If endpoint is not in query parameter and request has a body
-                    if (context.Request.ContentLength > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
-                    {
-                        context.Request.EnableBuffering();
-                        context.Request.Body.Position = 0;
-
-                        using (var reader = new StreamReader(context.Request.Body, Encoding.UTF8, leaveOpen: true))
-                        {
-                            var bodyText = await reader.ReadToEndAsync();
-                            context.Request.Body.Position = 0;
-
-                            // Parse the bodyText as JSON
-                            var json = JsonDocument.Parse(bodyText);
-
-                            // Try to get "EndPoint" and "RequestBody" from the JSON
-                            if (json.RootElement.TryGetProperty("EndPoint", out var endpointProperty))
-                            {
-                                endpoint = endpointProperty.GetString();
-                            }
-
-                            if (json.RootElement.TryGetProperty("RequestBody", out var requestBodyProperty))
-                            {
-                                requestBodyContent = requestBodyProperty.GetString();
-                            }
-                        }
-
-                        if (string.IsNullOrEmpty(endpoint))
-                        {
-                            throw new InvalidOperationException("Endpoint is missing in both query parameter and request body.");
-                        }
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("Endpoint is missing in both query parameter and request body.");
-                    }
-                }
-
-                // Validate the endpoint URI
-                if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var backendUri))
-                {
-                    throw new InvalidOperationException("Invalid endpoint URL.");
-                }
-
-                // Log the incoming and outgoing URLs
-                logger.LogInformation("Incoming Request URL: {Method} {Url}", context.Request.Method, context.Request.GetDisplayUrl());
-                logger.LogInformation("Outgoing Request URL: {BackendUri}", backendUri);
-
-                // Create the outgoing request message
-                var requestMessage = new HttpRequestMessage
-                {
-                    Method = new HttpMethod(context.Request.Method),
-                    RequestUri = backendUri
-                };
-
-                // Copy all request headers
-                foreach (var header in context.Request.Headers)
-                {
-                    if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
-                    {
-                        if (requestMessage.Content == null)
-                        {
-                            requestMessage.Content = new StreamContent(Stream.Null);
-                        }
-                        requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-                    }
-                }
-
-                // Set the request content if applicable
-                if (string.Equals(context.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(context.Request.Method, "PUT", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(context.Request.Method, "PATCH", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(context.Request.Method, "DELETE", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!string.IsNullOrEmpty(requestBodyContent))
-                    {
-                        // Use the requestBody extracted from the JSON
-                        requestMessage.Content = new StringContent(requestBodyContent, Encoding.UTF8, "application/json");
-                    }
-                    else
-                    {
-                        // If no requestBody extracted, copy the original request body
-                        context.Request.EnableBuffering();
-                        context.Request.Body.Position = 0;
-                        requestMessage.Content = new StreamContent(context.Request.Body);
-                        if (context.Request.ContentType != null)
-                        {
-                            requestMessage.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
-                        }
-                    }
-                }
-
-                // Log cancellation token status before sending the request
-                logger.LogInformation("Before SendAsync: context.RequestAborted.IsCancellationRequested: {IsCancelled}", context.RequestAborted.IsCancellationRequested);
-
-                // Send the request and get the response
-                using var responseMessage = await httpClient.SendAsync(
-                    requestMessage, 
-                    HttpCompletionOption.ResponseHeadersRead, 
-                    context.RequestAborted);
-
-                // Log after successful SendAsync call
-                logger.LogInformation("Response received with status code: {StatusCode}", responseMessage.StatusCode);
-
-                // Copy the status code
-                context.Response.StatusCode = (int)responseMessage.StatusCode;
-
-                // Copy response headers
-                foreach (var header in responseMessage.Headers)
-                {
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-                }
-                foreach (var header in responseMessage.Content.Headers)
-                {
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-                }
-                context.Response.Headers.Remove("transfer-encoding");
-
-                // Copy the response body
-                await responseMessage.Content.CopyToAsync(context.Response.Body);
-            }
-            catch (Exception ex)
-            {
-                // Log detailed exception information including HttpClient.Timeout and cancellation status
-                logger.LogError(ex, "An error occurred while processing the request. HttpClient.Timeout: {Timeout}, RequestAborted: {IsCancelled}",
-                    httpClient.Timeout, context.RequestAborted.IsCancellationRequested);
-
-                // Return an error response
-                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-                await context.Response.WriteAsync("An error occurred while processing your request.");
-            }
-        }
-    }
-}
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://10.0.40.38:9053
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Alterna Backend Services\Angular-MiddleWare
+info: MiddleWareApi.ProxyMiddleware[0]
+      HttpClient.Timeout is set to 00:15:00
+info: MiddleWareApi.ProxyMiddleware[0]
+      Incoming Request URL: POST http://10.0.40.38:9053/
+info: MiddleWareApi.ProxyMiddleware[0]
+      Outgoing Request URL: http://10.0.40.41:8061/api/Saldom/GetFileImportById
+info: MiddleWareApi.ProxyMiddleware[0]
+      Before SendAsync: context.RequestAborted.IsCancellationRequested: False
+info: System.Net.Http.HttpClient.GeneralHttpClient.LogicalHandler[100]
+      Start processing HTTP request POST http://10.0.40.41:8061/api/Saldom/GetFileImportById
+info: System.Net.Http.HttpClient.GeneralHttpClient.ClientHandler[100]
+      Sending HTTP request POST http://10.0.40.41:8061/api/Saldom/GetFileImportById
+info: System.Net.Http.HttpClient.GeneralHttpClient.ClientHandler[101]
+      Received HTTP response headers after 875.4678ms - 200
+info: Polly[3]
+      Execution attempt. Source: 'GeneralHttpClient-standard//Standard-Retry', Operation Key: '', Result: '200', Handled: 'False', Attempt: '0', Execution Time: 918.5564ms
+info: Polly[3]
+      Execution attempt. Source: '-standard//Standard-Retry', Operation Key: '', Result: '200', Handled: 'False', Attempt: '0', Execution Time: 1020.1382ms
+info: System.Net.Http.HttpClient.GeneralHttpClient.LogicalHandler[101]
+      End processing HTTP request after 1109.2738ms - 200
+info: MiddleWareApi.ProxyMiddleware[0]
+      Response received with status code: OK
+info: MiddleWareApi.ProxyMiddleware[0]
+      HttpClient.Timeout is set to 00:15:00
+info: MiddleWareApi.ProxyMiddleware[0]
+      Incoming Request URL: POST http://10.0.40.38:9053/
+info: MiddleWareApi.ProxyMiddleware[0]
+      Outgoing Request URL: http://10.0.40.41:8061/api/Saldom/GenerateT24File
+info: MiddleWareApi.ProxyMiddleware[0]
+      Before SendAsync: context.RequestAborted.IsCancellationRequested: False
+info: System.Net.Http.HttpClient.GeneralHttpClient.LogicalHandler[100]
+      Start processing HTTP request POST http://10.0.40.41:8061/api/Saldom/GenerateT24File
+info: System.Net.Http.HttpClient.GeneralHttpClient.ClientHandler[100]
+      Sending HTTP request POST http://10.0.40.41:8061/api/Saldom/GenerateT24File
+info: Polly[3]
+      Execution attempt. Source: 'GeneralHttpClient-standard//Standard-Retry', Operation Key: '', Result: 'The operation was canceled.', Handled: 'False', Attempt: '0', Execution Time: 9996.2856ms
+      System.Threading.Tasks.TaskCanceledException: The operation was canceled.
+       ---> System.IO.IOException: Unable to read data from the transport connection: The I/O operation has been aborted because of either a thread exit or an application request..
+       ---> System.Net.Sockets.SocketException (995): The I/O operation has been aborted because of either a thread exit or an application request.
+         --- End of inner exception stack trace ---
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+         at System.Net.Http.HttpConnection.<EnsureReadAheadTaskHasStarted>g__ReadAheadWithZeroByteReadAsync|40_0()
+         at System.Net.Http.HttpConnection.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         --- End of inner exception stack trace ---
+         at System.Net.Http.HttpConnection.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken)
+         at System.Net.Http.DiagnosticsHandler.SendAsyncCore(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Logging.LoggingHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Resilience.ResilienceHandler.<>c.<<SendAsync>b__3_0>d.MoveNext()
+fail: Polly[0]
+      Resilience event occurred. EventName: 'OnTimeout', Source: '-standard//Standard-AttemptTimeout', Operation Key: '', Result: ''
+warn: Polly[3]
+      Execution attempt. Source: '-standard//Standard-Retry', Operation Key: '', Result: 'The operation didn't complete within the allowed timeout of '00:00:10'.', Handled: 'True', Attempt: '0', Execution Time: 10063.47ms
+      Polly.Timeout.TimeoutRejectedException: The operation didn't complete within the allowed timeout of '00:00:10'.
+       ---> System.Threading.Tasks.TaskCanceledException: The operation was canceled.
+       ---> System.IO.IOException: Unable to read data from the transport connection: The I/O operation has been aborted because of either a thread exit or an application request..
+       ---> System.Net.Sockets.SocketException (995): The I/O operation has been aborted because of either a thread exit or an application request.
+         --- End of inner exception stack trace ---
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+         at System.Net.Http.HttpConnection.<EnsureReadAheadTaskHasStarted>g__ReadAheadWithZeroByteReadAsync|40_0()
+         at System.Net.Http.HttpConnection.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         --- End of inner exception stack trace ---
+         at System.Net.Http.HttpConnection.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken)
+         at System.Net.Http.DiagnosticsHandler.SendAsyncCore(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Logging.LoggingHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Resilience.ResilienceHandler.<>c.<<SendAsync>b__3_0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Outcome`1.ThrowIfException()
+         at Microsoft.Extensions.Http.Resilience.ResilienceHandler.SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+         at Microsoft.Extensions.ServiceDiscovery.Http.ResolvingHttpDelegatingHandler.SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) in /_/src/Microsoft.Extensions.ServiceDiscovery/Http/ResolvingHttpDelegatingHandler.cs:line 53
+         at Microsoft.Extensions.Http.Resilience.ResilienceHandler.<>c.<<SendAsync>b__3_0>d.MoveNext()
