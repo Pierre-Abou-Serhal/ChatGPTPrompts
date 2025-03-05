@@ -1,4 +1,12 @@
- // Register IHttpClientFactory
+"Kestrel": {
+  "Limits": {
+    "KeepAliveTimeout": "00:02:00",
+    "RequestHeadersTimeout": "00:02:00"
+  }
+}
+
+
+// Register IHttpClientFactory
             builder.Services.AddHttpClient("GeneralHttpClient", option =>
             {
                 option.Timeout = TimeSpan.FromMinutes(15);
