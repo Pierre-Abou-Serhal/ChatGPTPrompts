@@ -1,3 +1,9 @@
+    // Send the request and get the response
+                using var responseMessage = await httpClient.SendAsync(
+                    requestMessage, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+
+
+
 "Kestrel": {
   "Limits": {
     "KeepAliveTimeout": "00:02:00",
