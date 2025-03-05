@@ -1,134 +1,240 @@
-public class CSVValidator
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+namespace MiddleWareApi
+{
+    public class Program
     {
-        public List<string> Validate(ValidateFileReq req)
+        public static void Main(string[] args)
         {
-            List<string> errors = new List<string>();
+            var builder = WebApplication.CreateBuilder(args);
 
-            // Convert hex string to byte array and then to CSV string (assuming UTF8)
-            byte[] fileBytes = HexStringToByteArray(req.FileInfo.FileBinary);
-            string csvContent = Encoding.UTF8.GetString(fileBytes);
+            builder.Host.UseWindowsService();
+            // Configure logging
+            builder.Logging.ClearProviders();
+            builder.Logging.AddConsole();
 
-            // Read CSV file using CsvHelper
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            // Register IHttpClientFactory with extended timeout configuration
+            builder.Services.AddHttpClient("GeneralHttpClient", client =>
             {
-                Delimiter = req.FileInfo.Delimiter,
-                // If ValidateHeader is true, assume the first row is the header
-                HasHeaderRecord = req.FileInfo.ValidateHeader
-            };
-
-            // We'll read all rows into a list of string arrays.
-            List<string[]> rows = new List<string[]>();
-            using (var reader = new StringReader(csvContent))
-            using (var csv = new CsvReader(reader, config))
+                client.Timeout = TimeSpan.FromMinutes(15);
+            })
+            .AddStandardResilienceHandler(options =>
             {
-                while (csv.Read())
-                {
-                    // Get the row as an array of strings
-                    var row = new List<string>();
-                    for (int i = 0; csv.TryGetField<string>(i, out string field); i++)
-                    {
-                        row.Add(field);
-                    }
-                    rows.Add(row.ToArray());
-                }
-            }
+                options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(15);
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(16); // Must be greater than attempt timeout
+                options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(30); // At least double the attempt timeout
+            });
 
-            if (rows.Count == 0)
+            // Add other services if needed
+            builder.AddServiceDefaults();
+            builder.Services.AddProblemDetails();
+
+            builder.Services.AddCors(options =>
             {
-                errors.Add("No data found in the CSV file.");
-                return errors;
-            }
+                options.AddPolicy("DefaultCors", policyBuilder => policyBuilder
+                        .AllowAnyOrigin()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod());
+            });
+            
+            var app = builder.Build();
 
-            // Validate header if configured
-            int headerRowIndex = -1;
-            if (req.FileInfo.ValidateHeader)
-            {
-                // Convert the 1-based header row number to a 0-based index
-                headerRowIndex = req.FileInfo.HeaderRowNumber - 1;
-                if (headerRowIndex < 0 || headerRowIndex >= rows.Count)
-                {
-                    errors.Add("Configured header row number is out of range.");
-                }
-                else
-                {
-                    string[] headerRow = rows[headerRowIndex];
-                    List<string> headersFound = headerRow.Where(h => !string.IsNullOrWhiteSpace(h)).Select(h => h.Trim()).ToList();
-                    foreach (string requiredHeader in req.FileInfo.ValidateHeaderContainsFields)
-                    {
-                        if (!headersFound.Any(h => h.Equals(requiredHeader, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            errors.Add($"Header validation failed. Required header '{requiredHeader}' not found in row {req.FileInfo.HeaderRowNumber}.");
-                        }
-                    }
-                }
-            }
-            else
-            {
-                // If not configured to validate header, assume there is no header row.
-                headerRowIndex = -1;
-            }
+            app.UseCors("DefaultCors");
+            
+            // Use the proxy middleware
+            app.UseMiddleware<ProxyMiddleware>();
 
-            // For each column configuration, check that data starts on the expected row.
-            // For CSV, data rows start right after the header row (if present), or from row 0 if no header.
-            int dataStartIndex = req.FileInfo.ValidateHeader ? headerRowIndex + 1 : 0;
-            foreach (var column in req.FileInfo.Columns)
-            {
-                int expectedStartRow = column.StartRowNumber;
-                int dataDetectedRowIndex = -1;
-                int columnIndex = column.ColumnNumber - 1; // default to configuration if not found by header
-
-                // If the configuration uses header lookup, find the column index by header name.
-                if (column.FindFromHeader && headerRowIndex >= 0)
-                {
-                    string[] headerRow = rows[headerRowIndex];
-                    bool found = false;
-                    for (int i = 0; i < headerRow.Length; i++)
-                    {
-                        if (!string.IsNullOrWhiteSpace(headerRow[i]) &&
-                            headerRow[i].Trim().Equals(column.HeaderColumnName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            columnIndex = i;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found)
-                    {
-                        errors.Add($"Column header '{column.HeaderColumnName}' not found in header row {req.FileInfo.HeaderRowNumber}.");
-                        continue;
-                    }
-                }
-
-                // Find the first non-empty cell in the column from the data rows.
-                for (int r = dataStartIndex; r < rows.Count; r++)
-                {
-                    string[] row = rows[r];
-                    // If the row doesn't have enough columns, treat it as empty
-                    if (columnIndex >= row.Length)
-                        continue;
-
-                    string cellValue = row[columnIndex];
-                    if (!string.IsNullOrWhiteSpace(cellValue))
-                    {
-                        dataDetectedRowIndex = r;
-                        break;
-                    }
-                }
-
-                if (dataDetectedRowIndex == -1)
-                {
-                    errors.Add($"No data found in column '{column.HeaderColumnName}' (Column {column.ColumnNumber}).");
-                }
-                else
-                {
-                    // Convert the 0-based row index to a 1-based row number.
-                    int detectedStartRow = dataDetectedRowIndex + 1;
-                    if (detectedStartRow != expectedStartRow)
-                    {
-                        errors.Add($"Mismatch for column '{column.HeaderColumnName}' (Column {column.ColumnNumber}): Expected data to start at row {expectedStartRow}, but detected at row {detectedStartRow}.");
-                    }
-                }
-            }
-
-            return errors;
+            app.Run();
         }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.Extensions.Logging;
+using System;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+namespace MiddleWareApi
+{
+    public class ProxyMiddleware
+    {
+        private readonly RequestDelegate _next;
+
+        public ProxyMiddleware(RequestDelegate next)
+        {
+            _next = next;
+        }
+
+        public async Task InvokeAsync(
+            HttpContext context,
+            IHttpClientFactory httpClientFactory,
+            ILogger<ProxyMiddleware> logger)
+        {
+            // Create the client using the correct named client ("GeneralHttpClient")
+            var httpClient = httpClientFactory.CreateClient("GeneralHttpClient");
+            // Log the configured timeout
+            logger.LogInformation("HttpClient.Timeout is set to {Timeout}", httpClient.Timeout);
+
+            try
+            {
+                string? endpoint = null;
+                string? requestBodyContent = null;
+
+                // Try to get the endpoint from query parameter
+                endpoint = context.Request.Query["endpoint"].FirstOrDefault();
+
+                if (string.IsNullOrEmpty(endpoint))
+                {
+                    // If endpoint is not in query parameter and request has a body
+                    if (context.Request.ContentLength > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+                    {
+                        context.Request.EnableBuffering();
+                        context.Request.Body.Position = 0;
+
+                        using (var reader = new StreamReader(context.Request.Body, Encoding.UTF8, leaveOpen: true))
+                        {
+                            var bodyText = await reader.ReadToEndAsync();
+                            context.Request.Body.Position = 0;
+
+                            // Parse the bodyText as JSON
+                            var json = JsonDocument.Parse(bodyText);
+
+                            // Try to get "EndPoint" and "RequestBody" from the JSON
+                            if (json.RootElement.TryGetProperty("EndPoint", out var endpointProperty))
+                            {
+                                endpoint = endpointProperty.GetString();
+                            }
+
+                            if (json.RootElement.TryGetProperty("RequestBody", out var requestBodyProperty))
+                            {
+                                requestBodyContent = requestBodyProperty.GetString();
+                            }
+                        }
+
+                        if (string.IsNullOrEmpty(endpoint))
+                        {
+                            throw new InvalidOperationException("Endpoint is missing in both query parameter and request body.");
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Endpoint is missing in both query parameter and request body.");
+                    }
+                }
+
+                // Validate the endpoint URI
+                if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var backendUri))
+                {
+                    throw new InvalidOperationException("Invalid endpoint URL.");
+                }
+
+                // Log the incoming and outgoing URLs
+                logger.LogInformation("Incoming Request URL: {Method} {Url}", context.Request.Method, context.Request.GetDisplayUrl());
+                logger.LogInformation("Outgoing Request URL: {BackendUri}", backendUri);
+
+                // Create the outgoing request message
+                var requestMessage = new HttpRequestMessage
+                {
+                    Method = new HttpMethod(context.Request.Method),
+                    RequestUri = backendUri
+                };
+
+                // Copy all request headers
+                foreach (var header in context.Request.Headers)
+                {
+                    if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
+                    {
+                        if (requestMessage.Content == null)
+                        {
+                            requestMessage.Content = new StreamContent(Stream.Null);
+                        }
+                        requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+                    }
+                }
+
+                // Set the request content if applicable
+                if (string.Equals(context.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(context.Request.Method, "PUT", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(context.Request.Method, "PATCH", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(context.Request.Method, "DELETE", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrEmpty(requestBodyContent))
+                    {
+                        // Use the requestBody extracted from the JSON
+                        requestMessage.Content = new StringContent(requestBodyContent, Encoding.UTF8, "application/json");
+                    }
+                    else
+                    {
+                        // If no requestBody extracted, copy the original request body
+                        context.Request.EnableBuffering();
+                        context.Request.Body.Position = 0;
+                        requestMessage.Content = new StreamContent(context.Request.Body);
+                        if (context.Request.ContentType != null)
+                        {
+                            requestMessage.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
+                        }
+                    }
+                }
+
+                // Log cancellation token status before sending the request
+                logger.LogInformation("Before SendAsync: context.RequestAborted.IsCancellationRequested: {IsCancelled}", context.RequestAborted.IsCancellationRequested);
+
+                // Send the request and get the response
+                using var responseMessage = await httpClient.SendAsync(
+                    requestMessage, 
+                    HttpCompletionOption.ResponseHeadersRead, 
+                    context.RequestAborted);
+
+                // Log after successful SendAsync call
+                logger.LogInformation("Response received with status code: {StatusCode}", responseMessage.StatusCode);
+
+                // Copy the status code
+                context.Response.StatusCode = (int)responseMessage.StatusCode;
+
+                // Copy response headers
+                foreach (var header in responseMessage.Headers)
+                {
+                    context.Response.Headers[header.Key] = header.Value.ToArray();
+                }
+                foreach (var header in responseMessage.Content.Headers)
+                {
+                    context.Response.Headers[header.Key] = header.Value.ToArray();
+                }
+                context.Response.Headers.Remove("transfer-encoding");
+
+                // Copy the response body
+                await responseMessage.Content.CopyToAsync(context.Response.Body);
+            }
+            catch (Exception ex)
+            {
+                // Log detailed exception information including HttpClient.Timeout and cancellation status
+                logger.LogError(ex, "An error occurred while processing the request. HttpClient.Timeout: {Timeout}, RequestAborted: {IsCancelled}",
+                    httpClient.Timeout, context.RequestAborted.IsCancellationRequested);
+
+                // Return an error response
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                await context.Response.WriteAsync("An error occurred while processing your request.");
+            }
+        }
+    }
+}
