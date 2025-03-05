@@ -21,6 +21,22 @@ builder.Services.AddHttpClient("GeneralHttpClient", option =>
     options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(30); // At least 2x the Attempt Timeout
 });
 
+
+
+
+ MiddleWareApi.ProxyMiddleware[0]
+      An error occurred while processing the request.
+      System.InvalidOperationException: Endpoint is missing in both query parameter and request body.
+         at MiddleWareApi.ProxyMiddleware.InvokeAsync(HttpContext context, IHttpClientFactory httpClientFactory, ILogger`1 logger) in D:\@Workspace\deve-repo\Alterna-Middleware\Alterna-Middleware\MiddleWare\MiddleWareApi\Controllers\AppController.cs:line 74
+fail: MiddleWareApi.ProxyMiddleware[0]
+      An error occurred while processing the request.
+      System.InvalidOperationException: Endpoint is missing in both query parameter and request body.
+         at MiddleWareApi.ProxyMiddleware.InvokeAsync(HttpContext context, IHttpClientFactory httpClientFactory, ILogger`1 logger) in D:\@Workspace\deve-repo\Alterna-Middleware\Alterna-Middleware\MiddleWare\MiddleWareApi\Controllers\AppController.cs:line 74
+
+
+
+
+
 Program.cs:
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
