@@ -1,15 +1,11 @@
-System.Net.Http.HttpClient.GeneralHttpClient.ClientHandler[100]
-      Sending HTTP request POST http://10.0.40.41:8061/api/Saldom/GenerateT24File
-fail: Polly[0]
-      Resilience event occurred. EventName: 'OnTimeout', Source: '-standard//Standard-AttemptTimeout', Operation Key: '', Result: ''
-warn: Polly[3]
-      Execution attempt. Source: '-standard//Standard-Retry', Operation Key: '', Result: 'The operation didn't complete within the allowed timeout of '00:00:10'.', Handled: 'True', Attempt: '0', Execution Time: 10056.498ms
-      Polly.Timeout.TimeoutRejectedException: The operation didn't complete within the allowed timeout of '00:00:10'.
-       ---> System.Threading.Tasks.TaskCanceledException: The operation was canceled.
-       ---> System.IO.IOException: Unable to read data from the transport connection: The I/O operation has been aborted because of either a thread exit or an application request..
-       ---> System.Net.Sockets.SocketException (995): The I/O operation has been aborted because of either a thread exit or an application request.
-         --- End of inner exception stack trace ---
-
+ // Register IHttpClientFactory
+            builder.Services.AddHttpClient("GeneralHttpClient", option =>
+            {
+                option.Timeout = TimeSpan.FromMinutes(15);
+            }).AddStandardResilienceHandler(options =>
+            {
+                options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(15);
+            });;
 
 Program.cs:
 using Microsoft.AspNetCore.Builder;
