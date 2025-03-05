@@ -1,67 +1,3 @@
-    // Send the request and get the response
-                using var responseMessage = await httpClient.SendAsync(
-                    requestMessage, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
-
-
-
-"Kestrel": {
-  "Limits": {
-    "KeepAliveTimeout": "00:02:00",
-    "RequestHeadersTimeout": "00:02:00"
-  }
-}
-
-
-
-builder.WebHost.ConfigureKestrel(serverOptions =>
-{
-    serverOptions.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(2);
-    serverOptions.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(2);
-});
-
-
-
-
-
-// Register IHttpClientFactory
-            builder.Services.AddHttpClient("GeneralHttpClient", option =>
-            {
-                option.Timeout = TimeSpan.FromMinutes(15);
-            }).AddStandardResilienceHandler(options =>
-            {
-                options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(15);
-            });;
-
-Total request timeout resilience strategy must have a greater timeout than the attempt resilience strategy. Total Request Timeout: 30s, Attempt Timeout: 900s; The sampling duration of circuit breaker strategy needs to be at least double of an attempt timeout strategy’s timeout interval, in order to be effective. Sampling Duration: 30s,Attempt Timeout: 900s
-
-// Register IHttpClientFactory
-builder.Services.AddHttpClient("GeneralHttpClient", option =>
-{
-    option.Timeout = TimeSpan.FromMinutes(16); // Total request timeout should be greater than attempt timeout
-})
-.AddStandardResilienceHandler(options =>
-{
-    options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(15); // Attempt timeout
-    options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(16); // Must be greater than attempt timeout
-    options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(30); // At least 2x the Attempt Timeout
-});
-
-
-
-
- MiddleWareApi.ProxyMiddleware[0]
-      An error occurred while processing the request.
-      System.InvalidOperationException: Endpoint is missing in both query parameter and request body.
-         at MiddleWareApi.ProxyMiddleware.InvokeAsync(HttpContext context, IHttpClientFactory httpClientFactory, ILogger`1 logger) in D:\@Workspace\deve-repo\Alterna-Middleware\Alterna-Middleware\MiddleWare\MiddleWareApi\Controllers\AppController.cs:line 74
-fail: MiddleWareApi.ProxyMiddleware[0]
-      An error occurred while processing the request.
-      System.InvalidOperationException: Endpoint is missing in both query parameter and request body.
-         at MiddleWareApi.ProxyMiddleware.InvokeAsync(HttpContext context, IHttpClientFactory httpClientFactory, ILogger`1 logger) in D:\@Workspace\deve-repo\Alterna-Middleware\Alterna-Middleware\MiddleWare\MiddleWareApi\Controllers\AppController.cs:line 74
-
-
-
-
-
 Program.cs:
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -81,10 +17,8 @@ namespace MiddleWareApi
             builder.Logging.AddConsole();
 
             // Register IHttpClientFactory
-            builder.Services.AddHttpClient("GeneralHttpClient", option =>
-            {
-                option.Timeout = TimeSpan.FromMinutes(15);
-            });
+            builder.Services.AddHttpClient("Test")
+                ;
 
             // Add other services if needed
             builder.AddServiceDefaults();
@@ -113,13 +47,7 @@ namespace MiddleWareApi
 
 
 
-
-
-
-
-
-
-AppController:
+AppController.cs:
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Logging;
@@ -148,7 +76,7 @@ namespace MiddleWareApi
             IHttpClientFactory httpClientFactory,
             ILogger<ProxyMiddleware> logger)
         {
-            var httpClient = httpClientFactory.CreateClient("GeneralHttpClient");
+            var httpClient = httpClientFactory.CreateClient();
 
             try
             {
@@ -251,9 +179,18 @@ namespace MiddleWareApi
                     }
                 }
 
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
+                
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, context.RequestAborted);
+                
+                
+                
                 // Send the request and get the response
                 using var responseMessage = await httpClient.SendAsync(
-                    requestMessage, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+                    requestMessage, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
+
+                // Copy the status code
+                context.Response.StatusCode = (int) responseMessage.StatusCode;
 
                 // Copy the status code
                 context.Response.StatusCode = (int) responseMessage.StatusCode;
