@@ -1,223 +1,115 @@
-Program.cs:
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+USE [Alterna.BRef]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_GetAccountInfo_By_AltaccountId_List]    Script Date: 3/6/2025 11:47:53 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER   PROCEDURE [dbo].[usp_GetAccountInfo_By_AltaccountId_List]
+(
+    @P__AltaccountId_List NVARCHAR(MAX)
+)
+AS
+BEGIN
+    SET NOCOUNT ON;  -- optional, to reduce "rows affected" messages
 
-namespace MiddleWareApi
-{
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
+    --------------------------------------------------------------------------------
+    -- 1) Split the CSV tokens into #Tokens
+    --------------------------------------------------------------------------------
+    IF OBJECT_ID('tempdb..#Tokens') IS NOT NULL
+        DROP TABLE #Tokens;
 
-            builder.Host.UseWindowsService();
-            // Configure logging
-            builder.Logging.ClearProviders();
-            builder.Logging.AddConsole();
+    CREATE TABLE #Tokens
+    (
+        TokenId INT IDENTITY(1,1) PRIMARY KEY,
+        Token NVARCHAR(200)
+    );
 
-            // Register IHttpClientFactory
-            builder.Services.AddHttpClient("Test")
-                ;
+    INSERT INTO #Tokens(Token)
+    SELECT PART_VALUE
+    FROM UDFG_SPLIT(',', @P__AltaccountId_List);
 
-            // Add other services if needed
-            builder.AddServiceDefaults();
-            builder.Services.AddProblemDetails();
+    --------------------------------------------------------------------------------
+    -- 2) Create a temp table #Results to hold intermediate matches
+    --------------------------------------------------------------------------------
+    IF OBJECT_ID('tempdb..#Results') IS NOT NULL
+        DROP TABLE #Results;
 
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy("DefaultCors", builder => builder
-                        .AllowAnyOrigin()
-                        .AllowAnyHeader()
-                        .AllowAnyMethod());
-            });
-            
-            var app = builder.Build();
+    CREATE TABLE #Results
+    (
+        InputedId      NVARCHAR(200),   -- which token matched
+        T24AccountId   NVARCHAR(19),
+        Product        NVARCHAR(30),
+        ArrangementId  NVARCHAR(17),
+        ProdEffDate    NVARCHAR(8)      -- 'yyyyMMdd'
+    );
 
-            app.UseCors("DefaultCors");
-            
-            // Use the proxy middleware
-            app.UseMiddleware<ProxyMiddleware>();
+    --------------------------------------------------------------------------------
+    -- 3) Cursor over each token to do a single small CONTAINS() query
+    --------------------------------------------------------------------------------
+    DECLARE @ThisToken NVARCHAR(200);
+    DECLARE @Sql       NVARCHAR(MAX);
 
-            app.Run();
-        }
-    }
-}
+    DECLARE TokenCursor CURSOR FAST_FORWARD FOR
+        SELECT Token
+        FROM #Tokens
+        ORDER BY TokenId;
 
+    OPEN TokenCursor;
+    FETCH NEXT FROM TokenCursor INTO @ThisToken;
 
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        ----------------------------------------------------------------------------
+        -- Build a small dynamic SQL that searches for THIS token
+        ----------------------------------------------------------------------------
+        SET @Sql = N'
+        INSERT INTO #Results
+        SELECT 
+            ''' + REPLACE(@ThisToken, '''', '''''') + ''' AS InputedId,
+            ACCOUNT.[Id]          AS T24AccountId,
+            ARRANGEMENT.Product   AS Product,
+            ACCOUNT.ArrangementId AS ArrangementId,
+            ARRANGEMENT.ProdEffDate
+        FROM t_AccountV2 AS ACCOUNT
+        LEFT JOIN t_Arrangement_T24 AS ARRANGEMENT
+                ON ARRANGEMENT.Id = ACCOUNT.ArrangementId
+        WHERE ACCOUNT.[Id] LIKE ''01%'' AND LEN(ACCOUNT.[Id])=15 AND ARRANGEMENT.ProductStatus=''CURRENT'' AND CONTAINS(AltAcctIdSpaces, ''"'
+            + REPLACE(@ThisToken, '"', '""') + '"' + N''');';
 
+        EXEC sp_executesql @Sql;
 
-AppController.cs:
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Extensions;
-using Microsoft.Extensions.Logging;
+        FETCH NEXT FROM TokenCursor INTO @ThisToken;
+    END
 
-using System;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+    CLOSE TokenCursor;
+    DEALLOCATE TokenCursor;
 
-namespace MiddleWareApi
-{
-    public class ProxyMiddleware
-    {
-        private readonly RequestDelegate _next;
+    --------------------------------------------------------------------------------
+    -- 4) For each (InputedId + T24AccountId), pick only the row with 
+    --    the MOST RECENT ProdEffDate
+    --------------------------------------------------------------------------------
+    WITH CTE AS
+    (
+        SELECT
+            R.InputedId,
+            R.T24AccountId,
+            R.Product,
+            R.ArrangementId,
+            R.ProdEffDate,
+            ROW_NUMBER() OVER (
+                PARTITION BY R.InputedId, R.T24AccountId
+                ORDER BY R.ProdEffDate DESC
+            ) AS rn
+        FROM #Results AS R
+    )
+    SELECT
+        InputedId,
+        T24AccountId,
+        Product AS ProductCode
+    FROM CTE
+    WHERE rn = 1
+    ORDER BY T24AccountId, InputedId;
 
-        public ProxyMiddleware(RequestDelegate next)
-        {
-            _next = next;
-        }
-
-        public async Task InvokeAsync(
-            HttpContext context,
-            IHttpClientFactory httpClientFactory,
-            ILogger<ProxyMiddleware> logger)
-        {
-            var httpClient = httpClientFactory.CreateClient();
-
-            try
-            {
-                string? endpoint = null;
-                string? requestBodyContent = null;
-
-                // Try to get the endpoint from query parameter
-                endpoint = context.Request.Query["endpoint"].FirstOrDefault();
-
-                if (string.IsNullOrEmpty(endpoint))
-                {
-                    // If endpoint is not in query parameter, and request has a body
-                    if (context.Request.ContentLength > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
-                    {
-                        context.Request.EnableBuffering();
-                        context.Request.Body.Position = 0;
-
-                        using (var reader = new StreamReader(context.Request.Body, Encoding.UTF8, leaveOpen: true))
-                        {
-                            var bodyText = await reader.ReadToEndAsync();
-                            context.Request.Body.Position = 0;
-
-                            // Parse the bodyText as JSON
-                            var json = JsonDocument.Parse(bodyText);
-
-                            // Try to get "EndPoint" and "RequestBody" from the JSON
-                            if (json.RootElement.TryGetProperty("EndPoint", out var endpointProperty))
-                            {
-                                endpoint = endpointProperty.GetString();
-                            }
-
-                            if (json.RootElement.TryGetProperty("RequestBody", out var requestBodyProperty))
-                            {
-                                requestBodyContent = requestBodyProperty.GetString();
-                            }
-                        }
-
-                        if (string.IsNullOrEmpty(endpoint))
-                        {
-                            throw new InvalidOperationException("Endpoint is missing in both query parameter and request body.");
-                        }
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("Endpoint is missing in both query parameter and request body.");
-                    }
-                }
-
-                // Validate the endpoint URI
-                if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var backendUri))
-                {
-                    throw new InvalidOperationException("Invalid endpoint URL.");
-                }
-
-                // Log the incoming and outgoing URLs
-                logger.LogInformation($"Incoming Request URL: {context.Request.Method} {context.Request.GetDisplayUrl()}");
-                logger.LogInformation($"Outgoing Request URL: {backendUri}");
-
-                // Create the outgoing request message
-                var requestMessage = new HttpRequestMessage
-                {
-                    Method = new HttpMethod(context.Request.Method),
-                    RequestUri = backendUri
-                };
-
-                // Copy all request headers
-                foreach (var header in context.Request.Headers)
-                {
-                    if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
-                    {
-                        if (requestMessage.Content == null)
-                        {
-                            requestMessage.Content = new StreamContent(Stream.Null);
-                        }
-                        requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-                    }
-                }
-
-                // Set the request content
-                if (string.Equals(context.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(context.Request.Method, "PUT", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(context.Request.Method, "PATCH", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(context.Request.Method, "DELETE", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!string.IsNullOrEmpty(requestBodyContent))
-                    {
-                        // Use the requestBody extracted from the JSON
-                        requestMessage.Content = new StringContent(requestBodyContent, Encoding.UTF8, "application/json");
-                    }
-                    else
-                    {
-                        // If no requestBody extracted, copy the original request body
-                        context.Request.EnableBuffering();
-                        context.Request.Body.Position = 0;
-                        requestMessage.Content = new StreamContent(context.Request.Body);
-                        if (context.Request.ContentType != null)
-                        {
-                            requestMessage.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
-                        }
-                    }
-                }
-
-                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(15));
-                
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, context.RequestAborted);
-                
-                
-                
-                // Send the request and get the response
-                using var responseMessage = await httpClient.SendAsync(
-                    requestMessage, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
-
-                // Copy the status code
-                context.Response.StatusCode = (int) responseMessage.StatusCode;
-
-                // Copy the status code
-                context.Response.StatusCode = (int) responseMessage.StatusCode;
-
-                // Copy response headers
-                foreach (var header in responseMessage.Headers)
-                {
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-                }
-                foreach (var header in responseMessage.Content.Headers)
-                {
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-                }
-                context.Response.Headers.Remove("transfer-encoding");
-
-                // Copy the response body
-                await responseMessage.Content.CopyToAsync(context.Response.Body);
-            }
-            catch (Exception ex)
-            {
-                // Log the exception details
-                logger.LogError(ex, "An error occurred while processing the request.");
-
-                // Return an appropriate error response
-                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-                await context.Response.WriteAsync("An error occurred while processing your request.");
-            }
-        }
-    }
-}
+    SET NOCOUNT OFF;
+END
