@@ -1,107 +1,64 @@
-USE [Alterna.BRef]
-GO
-/****** Object:  StoredProcedure [dbo].[usp_GetAccountInfo_By_AltaccountId_List]    Script Date: 3/6/2025 11:47:53 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-ALTER   PROCEDURE [dbo].[usp_GetAccountInfo_By_AltaccountId_List]
+ALTER PROCEDURE [dbo].[usp_GetAccountInfo_By_AltaccountId_List]
 (
     @P__AltaccountId_List NVARCHAR(MAX)
 )
 AS
 BEGIN
-    SET NOCOUNT ON;  -- optional, to reduce "rows affected" messages
+    SET NOCOUNT ON;
 
-    --------------------------------------------------------------------------------
-    -- 1) Split the CSV tokens into #Tokens
-    --------------------------------------------------------------------------------
-    IF OBJECT_ID('tempdb..#Tokens') IS NOT NULL
-        DROP TABLE #Tokens;
+    -- 1. Split the CSV string into a table variable (using STRING_SPLIT)
+    DECLARE @Tokens TABLE (Token NVARCHAR(200));
+    INSERT INTO @Tokens(Token)
+    SELECT TRIM(value)
+    FROM STRING_SPLIT(@P__AltaccountId_List, ',');
 
-    CREATE TABLE #Tokens
-    (
-        TokenId INT IDENTITY(1,1) PRIMARY KEY,
-        Token NVARCHAR(200)
-    );
+    -- 2. Build a combined full-text search condition
+    DECLARE @SearchCondition NVARCHAR(MAX);
+    SELECT @SearchCondition = STRING_AGG('"' + REPLACE(Token, '"', '""') + '"', ' OR ')
+    FROM @Tokens;
 
-    INSERT INTO #Tokens(Token)
-    SELECT PART_VALUE
-    FROM UDFG_SPLIT(',', @P__AltaccountId_List);
+    -- 3. Retrieve candidate rows using the combined full-text search
+    SELECT 
+        a.[Id] AS T24AccountId,
+        arr.Product,
+        a.ArrangementId,
+        arr.ProdEffDate,
+        a.AltAcctIdSpaces
+    INTO #Candidate
+    FROM t_AccountV2 a
+    JOIN t_Arrangement_T24 arr
+      ON arr.Id = a.ArrangementId
+    WHERE a.[Id] LIKE '01%' 
+      AND LEN(a.[Id]) = 15 
+      AND arr.ProductStatus = 'CURRENT'
+      AND CONTAINS(a.AltAcctIdSpaces, @SearchCondition);
 
-    --------------------------------------------------------------------------------
-    -- 2) Create a temp table #Results to hold intermediate matches
-    --------------------------------------------------------------------------------
-    IF OBJECT_ID('tempdb..#Results') IS NOT NULL
-        DROP TABLE #Results;
+    -- 4. Join the candidate rows with tokens using CHARINDEX to identify actual matches
+    SELECT 
+        t.Token AS InputedId,
+        c.T24AccountId,
+        c.Product,
+        c.ArrangementId,
+        c.ProdEffDate
+    INTO #Results
+    FROM #Candidate c
+    JOIN @Tokens t
+      ON CHARINDEX(t.Token, c.AltAcctIdSpaces) > 0;
 
-    CREATE TABLE #Results
-    (
-        InputedId      NVARCHAR(200),   -- which token matched
-        T24AccountId   NVARCHAR(19),
-        Product        NVARCHAR(30),
-        ArrangementId  NVARCHAR(17),
-        ProdEffDate    NVARCHAR(8)      -- 'yyyyMMdd'
-    );
-
-    --------------------------------------------------------------------------------
-    -- 3) Cursor over each token to do a single small CONTAINS() query
-    --------------------------------------------------------------------------------
-    DECLARE @ThisToken NVARCHAR(200);
-    DECLARE @Sql       NVARCHAR(MAX);
-
-    DECLARE TokenCursor CURSOR FAST_FORWARD FOR
-        SELECT Token
-        FROM #Tokens
-        ORDER BY TokenId;
-
-    OPEN TokenCursor;
-    FETCH NEXT FROM TokenCursor INTO @ThisToken;
-
-    WHILE @@FETCH_STATUS = 0
-    BEGIN
-        ----------------------------------------------------------------------------
-        -- Build a small dynamic SQL that searches for THIS token
-        ----------------------------------------------------------------------------
-        SET @Sql = N'
-        INSERT INTO #Results
-        SELECT 
-            ''' + REPLACE(@ThisToken, '''', '''''') + ''' AS InputedId,
-            ACCOUNT.[Id]          AS T24AccountId,
-            ARRANGEMENT.Product   AS Product,
-            ACCOUNT.ArrangementId AS ArrangementId,
-            ARRANGEMENT.ProdEffDate
-        FROM t_AccountV2 AS ACCOUNT
-        LEFT JOIN t_Arrangement_T24 AS ARRANGEMENT
-                ON ARRANGEMENT.Id = ACCOUNT.ArrangementId
-        WHERE ACCOUNT.[Id] LIKE ''01%'' AND LEN(ACCOUNT.[Id])=15 AND ARRANGEMENT.ProductStatus=''CURRENT'' AND CONTAINS(AltAcctIdSpaces, ''"'
-            + REPLACE(@ThisToken, '"', '""') + '"' + N''');';
-
-        EXEC sp_executesql @Sql;
-
-        FETCH NEXT FROM TokenCursor INTO @ThisToken;
-    END
-
-    CLOSE TokenCursor;
-    DEALLOCATE TokenCursor;
-
-    --------------------------------------------------------------------------------
-    -- 4) For each (InputedId + T24AccountId), pick only the row with 
-    --    the MOST RECENT ProdEffDate
-    --------------------------------------------------------------------------------
-    WITH CTE AS
+    -- 5. Deduplicate: for each (InputedId, T24AccountId), keep the row with the latest ProdEffDate
+    ;WITH CTE AS
     (
         SELECT
-            R.InputedId,
-            R.T24AccountId,
-            R.Product,
-            R.ArrangementId,
-            R.ProdEffDate,
+            r.InputedId,
+            r.T24AccountId,
+            r.Product,
+            r.ArrangementId,
+            r.ProdEffDate,
             ROW_NUMBER() OVER (
-                PARTITION BY R.InputedId, R.T24AccountId
-                ORDER BY R.ProdEffDate DESC
+                PARTITION BY r.InputedId, r.T24AccountId
+                ORDER BY r.ProdEffDate DESC
             ) AS rn
-        FROM #Results AS R
+        FROM #Results r
     )
     SELECT
         InputedId,
