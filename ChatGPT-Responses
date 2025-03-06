@@ -6,18 +6,21 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- 1. Split the CSV string into a table variable (using STRING_SPLIT)
+    -- 1. Split the CSV string into a table variable using your existing UDFG_SPLIT function
     DECLARE @Tokens TABLE (Token NVARCHAR(200));
     INSERT INTO @Tokens(Token)
-    SELECT TRIM(value)
-    FROM STRING_SPLIT(@P__AltaccountId_List, ',');
+    SELECT LTRIM(RTRIM(PART_VALUE))
+    FROM UDFG_SPLIT(',', @P__AltaccountId_List);
 
-    -- 2. Build a combined full-text search condition
+    -- 2. Build a combined full-text search condition using FOR XML PATH to simulate STRING_AGG
     DECLARE @SearchCondition NVARCHAR(MAX);
-    SELECT @SearchCondition = STRING_AGG('"' + REPLACE(Token, '"', '""') + '"', ' OR ')
-    FROM @Tokens;
+    SELECT @SearchCondition = STUFF((
+        SELECT ' OR "' + REPLACE(Token, '"', '""') + '"'
+        FROM @Tokens
+        FOR XML PATH(''), TYPE
+    ).value('.', 'NVARCHAR(MAX)'), 1, 4, '');
 
-    -- 3. Retrieve candidate rows using the combined full-text search
+    -- 3. Retrieve candidate rows using the combined full-text search condition
     SELECT 
         a.[Id] AS T24AccountId,
         arr.Product,
@@ -33,7 +36,7 @@ BEGIN
       AND arr.ProductStatus = 'CURRENT'
       AND CONTAINS(a.AltAcctIdSpaces, @SearchCondition);
 
-    -- 4. Join the candidate rows with tokens using CHARINDEX to identify actual matches
+    -- 4. Join the candidate rows with tokens using CHARINDEX to identify actual token matches
     SELECT 
         t.Token AS InputedId,
         c.T24AccountId,
@@ -45,7 +48,7 @@ BEGIN
     JOIN @Tokens t
       ON CHARINDEX(t.Token, c.AltAcctIdSpaces) > 0;
 
-    -- 5. Deduplicate: for each (InputedId, T24AccountId), keep the row with the latest ProdEffDate
+    -- 5. Deduplicate: for each (InputedId, T24AccountId), keep only the row with the most recent ProdEffDate
     ;WITH CTE AS
     (
         SELECT
