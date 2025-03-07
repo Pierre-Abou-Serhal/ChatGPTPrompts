@@ -1,75 +1,68 @@
-ALTER PROCEDURE [dbo].[usp_GetAccountInfo_By_AltaccountId_List]
-(
-    @P__AltaccountId_List NVARCHAR(MAX)
-)
-AS
-BEGIN
-    SET NOCOUNT ON;
+interface Attachment {
+  id: string;
+  name: string;
+  status: string;
+}
 
-    -- 1. Split the CSV string into a table variable using your existing UDFG_SPLIT function
-    DECLARE @Tokens TABLE (Token NVARCHAR(200));
-    INSERT INTO @Tokens(Token)
-    SELECT LTRIM(RTRIM(PART_VALUE))
-    FROM UDFG_SPLIT(',', @P__AltaccountId_List);
+interface Email {
+  id: string;
+  subject: string;
+  attachments: Attachment[];
+}
 
-    -- 2. Build a combined full-text search condition using FOR XML PATH to simulate STRING_AGG
-    DECLARE @SearchCondition NVARCHAR(MAX);
-    SELECT @SearchCondition = STUFF((
-        SELECT ' OR "' + REPLACE(Token, '"', '""') + '"'
-        FROM @Tokens
-        FOR XML PATH(''), TYPE
-    ).value('.', 'NVARCHAR(MAX)'), 1, 4, '');
+// Function to update the attachment status in both selectedEmail and emailList
+function updateAttachmentStatus(
+  selectedEmail: Email,
+  emailList: Email[],
+  attachmentId: string,
+  newStatus: string
+): void {
+  // Update the attachment in selectedEmail
+  const attachmentInSelectedEmail = selectedEmail.attachments.find(att => att.id === attachmentId);
+  if (attachmentInSelectedEmail) {
+    attachmentInSelectedEmail.status = newStatus;
+  }
 
-    -- 3. Retrieve candidate rows using the combined full-text search condition
-    SELECT 
-        a.[Id] AS T24AccountId,
-        arr.Product,
-        a.ArrangementId,
-        arr.ProdEffDate,
-        a.AltAcctIdSpaces
-    INTO #Candidate
-    FROM t_AccountV2 a
-    JOIN t_Arrangement_T24 arr
-      ON arr.Id = a.ArrangementId
-    WHERE a.[Id] LIKE '01%' 
-      AND LEN(a.[Id]) = 15 
-      AND arr.ProductStatus = 'CURRENT'
-      AND CONTAINS(a.AltAcctIdSpaces, @SearchCondition);
+  // Update the attachment in emailList
+  for (const email of emailList) {
+    const attachmentInEmail = email.attachments.find(att => att.id === attachmentId);
+    if (attachmentInEmail) {
+      attachmentInEmail.status = newStatus;
+    }
+  }
+}
 
-    -- 4. Join the candidate rows with tokens using CHARINDEX to identify actual token matches
-    SELECT 
-        t.Token AS InputedId,
-        c.T24AccountId,
-        c.Product,
-        c.ArrangementId,
-        c.ProdEffDate
-    INTO #Results
-    FROM #Candidate c
-    JOIN @Tokens t
-      ON CHARINDEX(t.Token, c.AltAcctIdSpaces) > 0;
+// Example Data
+let selectedEmail: Email = {
+  id: "1",
+  subject: "Hello",
+  attachments: [
+    { id: "a1", name: "file1.pdf", status: "pending" },
+    { id: "a2", name: "file2.docx", status: "pending" }
+  ]
+};
 
-    -- 5. Deduplicate: for each (InputedId, T24AccountId), keep only the row with the most recent ProdEffDate
-    ;WITH CTE AS
-    (
-        SELECT
-            r.InputedId,
-            r.T24AccountId,
-            r.Product,
-            r.ArrangementId,
-            r.ProdEffDate,
-            ROW_NUMBER() OVER (
-                PARTITION BY r.InputedId, r.T24AccountId
-                ORDER BY r.ProdEffDate DESC
-            ) AS rn
-        FROM #Results r
-    )
-    SELECT
-        InputedId,
-        T24AccountId,
-        Product AS ProductCode
-    FROM CTE
-    WHERE rn = 1
-    ORDER BY T24AccountId, InputedId;
+let emailList: Email[] = [
+  {
+    id: "1",
+    subject: "Hello",
+    attachments: [
+      { id: "a1", name: "file1.pdf", status: "pending" },
+      { id: "a2", name: "file2.docx", status: "pending" }
+    ]
+  },
+  {
+    id: "2",
+    subject: "World",
+    attachments: [
+      { id: "a3", name: "file3.png", status: "pending" },
+      { id: "a4", name: "file4.txt", status: "pending" }
+    ]
+  }
+];
 
-    SET NOCOUNT OFF;
-END
+// Update status for attachment "a1"
+updateAttachmentStatus(selectedEmail, emailList, "a1", "completed");
+
+console.log(selectedEmail);
+console.log(emailList);
