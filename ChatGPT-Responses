@@ -1,68 +1,206 @@
-interface Attachment {
-  id: string;
-  name: string;
-  status: string;
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table TransactionLimits  {
+  Id integer [primary key, increment]
+  PeriodType varchar  [not null]
+  LimitAmount decimal(18,4) [not null]
+  EffectiveFrom date [not null]
+  EffectiveTo date [null]   //  NULL indicates no expiration
+  CreatedBy varchar [not null, default: `AlternaSystem`]
+  CreatedDate date [not null, default: `now()`]
+  LastModifiedBy varchar [not null, default: `AlternaSystem`]
+  LastModifiedDate date [not null, default: `now()`]
 }
 
-interface Email {
-  id: string;
-  subject: string;
-  attachments: Attachment[];
+Table TransactionAccruals {
+  Id integer [primary key, increment]
+  CustomerId varchar [not null]
+  PeriodType varchar [not null]
+  PeriodStart date [not null]
+  PeriodEnd date [not null] // Constraint => PeriodStart <= PeriodEnd
+  CumulativeAmount decimal(18,4) [not null, default: 0]
+  CreatedBy varchar [not null, default: `AlternaSystem`]
+  CreatedDate date [not null, default: `now()`]
+  LastModifiedBy varchar [not null, default: `AlternaSystem`]
+  LastModifiedDate date [not null, default: `now()`]
 }
 
-// Function to update the attachment status in both selectedEmail and emailList
-function updateAttachmentStatus(
-  selectedEmail: Email,
-  emailList: Email[],
-  attachmentId: string,
-  newStatus: string
-): void {
-  // Update the attachment in selectedEmail
-  const attachmentInSelectedEmail = selectedEmail.attachments.find(att => att.id === attachmentId);
-  if (attachmentInSelectedEmail) {
-    attachmentInSelectedEmail.status = newStatus;
-  }
 
-  // Update the attachment in emailList
-  for (const email of emailList) {
-    const attachmentInEmail = email.attachments.find(att => att.id === attachmentId);
-    if (attachmentInEmail) {
-      attachmentInEmail.status = newStatus;
-    }
-  }
-}
+// CREATE PROCEDURE sp_CreateTransactionLimit
+//     @PeriodType VARCHAR(50),
+//     @LimitAmount DECIMAL(18,4),
+//     @EffectiveFrom DATE,
+//     @EffectiveTo DATE = NULL
+// AS
+// BEGIN
+//     SET NOCOUNT ON;
 
-// Example Data
-let selectedEmail: Email = {
-  id: "1",
-  subject: "Hello",
-  attachments: [
-    { id: "a1", name: "file1.pdf", status: "pending" },
-    { id: "a2", name: "file2.docx", status: "pending" }
-  ]
-};
+//     INSERT INTO TransactionLimits (PeriodType, LimitAmount, EffectiveFrom, EffectiveTo)
+//     VALUES (@PeriodType, @LimitAmount, @EffectiveFrom, @EffectiveTo);
 
-let emailList: Email[] = [
-  {
-    id: "1",
-    subject: "Hello",
-    attachments: [
-      { id: "a1", name: "file1.pdf", status: "pending" },
-      { id: "a2", name: "file2.docx", status: "pending" }
-    ]
-  },
-  {
-    id: "2",
-    subject: "World",
-    attachments: [
-      { id: "a3", name: "file3.png", status: "pending" },
-      { id: "a4", name: "file4.txt", status: "pending" }
-    ]
-  }
-];
+//     SELECT SCOPE_IDENTITY() AS NewLimitId;
+// END
+// GO
 
-// Update status for attachment "a1"
-updateAttachmentStatus(selectedEmail, emailList, "a1", "completed");
 
-console.log(selectedEmail);
-console.log(emailList);
+// CREATE PROCEDURE sp_UpdateTransactionLimit
+//     @PeriodType VARCHAR(50),
+//     @LimitAmount DECIMAL(18,4),
+//     @EffectiveFrom DATE = NULL,
+//     @EffectiveTo DATE = NULL
+// AS
+// BEGIN
+//     SET NOCOUNT ON;
+
+//     UPDATE TransactionLimits
+//     SET 
+//         LimitAmount = @LimitAmount,
+//         EffectiveFrom = CASE WHEN @EffectiveFrom IS NOT NULL THEN @EffectiveFrom ELSE EffectiveFrom END,
+//         EffectiveTo   = CASE WHEN @EffectiveTo IS NOT NULL THEN @EffectiveTo ELSE EffectiveTo END
+//     WHERE PeriodType = @PeriodType;
+    
+//     IF @@ROWCOUNT = 0
+//     BEGIN
+//         RAISERROR('Transaction limit record not found for the specified period type.', 16, 1);
+//     END
+// END
+// GO
+
+// CREATE PROCEDURE sp_CheckTransactionLimit
+//     @CustomerId INT,
+//     @TransactionAmount DECIMAL(18,4),
+//     @PeriodType VARCHAR(50)  -- 'daily', 'weekly', 'monthly'
+// AS
+// BEGIN
+//     SET NOCOUNT ON;
+
+//     DECLARE @PeriodStart DATE, @PeriodEnd DATE;
+
+//     -- Determine period boundaries based on period type.
+//     IF @PeriodType = 'daily'
+//     BEGIN
+//         SET @PeriodStart = CAST(GETDATE() AS DATE);
+//         SET @PeriodEnd = CAST(GETDATE() AS DATE);
+//     END
+//     ELSE IF @PeriodType = 'weekly'
+//     BEGIN
+//         -- Example: Assume week starts on Sunday and ends on Saturday.
+//         DECLARE @Today DATE = CAST(GETDATE() AS DATE);
+//         SET @PeriodStart = DATEADD(DAY, - (DATEPART(WEEKDAY, @Today) - 1), @Today);
+//         SET @PeriodEnd = DATEADD(DAY, 6, @PeriodStart);
+//     END
+//     ELSE IF @PeriodType = 'monthly'
+//     BEGIN
+//         SET @PeriodStart = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
+//         SET @PeriodEnd = EOMONTH(GETDATE());
+//     END
+//     ELSE
+//     BEGIN
+//         RAISERROR('Unsupported period type.', 16, 1);
+//         RETURN;
+//     END
+
+//     -- Get current cumulative amount from accruals.
+//     DECLARE @CurrentAccrued DECIMAL(18,4) = 0;
+//     SELECT @CurrentAccrued = CumulativeAmount
+//     FROM TransactionAccruals
+//     WHERE CustomerId = @CustomerId
+//       AND PeriodType = @PeriodType
+//       AND PeriodStart = @PeriodStart
+//       AND PeriodEnd = @PeriodEnd;
+
+//     DECLARE @NewTotal DECIMAL(18,4) = @CurrentAccrued + @TransactionAmount;
+
+//     -- Get the active limit from the TransactionLimits table.
+//     DECLARE @LimitAmount DECIMAL(18,4);
+//     SELECT TOP 1 @LimitAmount = LimitAmount
+//     FROM TransactionLimits
+//     WHERE PeriodType = @PeriodType
+//       AND GETDATE() >= EffectiveFrom
+//       AND (EffectiveTo IS NULL OR GETDATE() <= EffectiveTo)
+//     ORDER BY EffectiveFrom DESC;
+
+//     IF (@LimitAmount IS NULL)
+//     BEGIN
+//         RAISERROR('No limit defined for this period type.', 16, 1);
+//         RETURN;
+//     END
+
+//     -- Compare the new total to the allowed limit.
+//     IF (@NewTotal > @LimitAmount)
+//     BEGIN
+//         SELECT 0 AS IsWithinLimit, 
+//                @NewTotal AS NewTotal, 
+//                @LimitAmount AS LimitAmount, 
+//                'Limit Exceeded' AS Message;
+//     END
+//     ELSE
+//     BEGIN
+//         SELECT 1 AS IsWithinLimit, 
+//                @NewTotal AS NewTotal, 
+//                @LimitAmount AS LimitAmount, 
+//                'Within Limit' AS Message;
+//     END
+// END
+// GO
+
+
+// CREATE PROCEDURE sp_UpdateTransactionAccrual
+//     @CustomerId INT,
+//     @TransactionAmount DECIMAL(18,4),
+//     @PeriodType VARCHAR(50)  -- 'daily', 'weekly', 'monthly'
+// AS
+// BEGIN
+//     SET NOCOUNT ON;
+
+//     DECLARE @PeriodStart DATETIME, @PeriodEnd DATETIME;
+
+//     -- Determine the period boundaries based on the period type.
+//     IF @PeriodType = 'daily'
+//     BEGIN
+//         SET @PeriodStart = CAST(GETDATE() AS DATE);
+//         SET @PeriodEnd = DATEADD(SECOND, -1, DATEADD(DAY, 1, @PeriodStart));
+//     END
+//     ELSE IF @PeriodType = 'weekly'
+//     BEGIN
+//         -- Example: week starting on Monday. Adjust DATEPART logic if needed.
+//         SET @PeriodStart = DATEADD(DAY, 1 - (DATEPART(WEEKDAY, GETDATE()) + @@DATEFIRST - 2) % 7, CAST(GETDATE() AS DATE));
+//         SET @PeriodEnd = DATEADD(SECOND, -1, DATEADD(DAY, 7, @PeriodStart));
+//     END
+//     ELSE IF @PeriodType = 'monthly'
+//     BEGIN
+//         SET @PeriodStart = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
+//         SET @PeriodEnd = EOMONTH(GETDATE());
+//     END
+//     ELSE
+//     BEGIN
+//         RAISERROR('Unsupported period type.', 16, 1);
+//         RETURN;
+//     END
+
+//     -- If an accrual record exists for this customer and period, update it; otherwise, insert a new one.
+//     IF EXISTS (SELECT 1 
+//                FROM TransactionAccruals
+//                WHERE CustomerId = @CustomerId
+//                  AND PeriodType = @PeriodType
+//                  AND PeriodStart = @PeriodStart
+//                  AND PeriodEnd = @PeriodEnd)
+//     BEGIN
+//         UPDATE TransactionAccruals
+//         SET CumulativeAmount = CumulativeAmount + @TransactionAmount,
+//             LastUpdated = GETDATE()
+//         WHERE CustomerId = @CustomerId
+//           AND PeriodType = @PeriodType
+//           AND PeriodStart = @PeriodStart
+//           AND PeriodEnd = @PeriodEnd;
+//     END
+//     ELSE
+//     BEGIN
+//         INSERT INTO TransactionAccruals
+//             (CustomerId, PeriodType, PeriodStart, PeriodEnd, CumulativeAmount, LastUpdated)
+//         VALUES
+//             (@CustomerId, @PeriodType, @PeriodStart, @PeriodEnd, @TransactionAmount, GETDATE());
+//     END
+// END
+// GO
