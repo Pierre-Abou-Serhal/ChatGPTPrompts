@@ -1,7 +1,7 @@
 // Use DBML to define your database structure
 // Docs: https://dbml.dbdiagram.io/docs
 
-Table TransactionLimits  {
+Table t_TransactionLimits  {
   Id integer [primary key, increment]
   PeriodType varchar  [not null]
   LimitAmount decimal(18,4) [not null]
@@ -13,9 +13,9 @@ Table TransactionLimits  {
   LastModifiedDate date [not null, default: `now()`]
 }
 
-Table TransactionAccruals {
+Table t_TransactionAccruals {
   Id integer [primary key, increment]
-  CustomerId varchar [not null]
+  CustomerId integer [not null]
   PeriodType varchar [not null]
   PeriodStart date [not null]
   PeriodEnd date [not null] // Constraint => PeriodStart <= PeriodEnd
@@ -26,6 +26,19 @@ Table TransactionAccruals {
   LastModifiedDate date [not null, default: `now()`]
 }
 
+Table t_AuditTransactionAccruals {
+  Id integer [primary key, increment]
+  AccrualId integer [not null]
+  CustomerId  integer [not null]
+  PeriodType  varchar(50) [not null]
+  Amount decimal(18,4) [not null]
+  CreatedBy varchar [not null, default: `AlternaSystem`]
+  CreatedDate date [not null, default: `now()`]
+  LastModifiedBy varchar [not null, default: `AlternaSystem`]
+  LastModifiedDate date [not null, default: `now()`]
+}
+
+Ref: t_TransactionAccruals.Id < t_AuditTransactionAccruals.AccrualId
 
 // CREATE PROCEDURE sp_CreateTransactionLimit
 //     @PeriodType VARCHAR(50),
