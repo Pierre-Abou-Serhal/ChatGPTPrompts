@@ -1,263 +1,432 @@
-// Use DBML to define your database structure
-// Docs: https://dbml.dbdiagram.io/docs
+-- DB Shema
+CREATE TABLE [t_TransactionLimits] (
+  [Id] integer PRIMARY KEY IDENTITY(1, 1),
+  [GroupId] integer NOT NULL,
+  [PeriodType] nvarchar(255) NOT NULL CHECK ([PeriodType] IN('daily', 'weekly', 'monthly', 'yearly')),
+  [LimitAmount] decimal(18,4) NOT NULL,
+  [EffectiveFrom] date NOT NULL,
+  [EffectiveTo] date,
+  [CreatedBy] nvarchar(255) NOT NULL DEFAULT ('AlternaSystem'),
+  [CreatedDate] datetime2(0) NOT NULL DEFAULT (GETDATE()),
+  [LastModifiedBy] nvarchar(255) NOT NULL DEFAULT ('AlternaSystem'),
+  [LastModifiedDate] datetime2(0) NOT NULL DEFAULT (GETDATE())
+)
+GO
 
-Table t_TransactionLimits  {
-  Id integer [primary key, increment]
-  GroupId integer [not null]
-  PeriodType varchar  [not null]
-  LimitAmount decimal(18,4) [not null]
-  EffectiveFrom date [not null]
-  EffectiveTo date [null]   //  NULL indicates no expiration
-  CreatedBy varchar [not null, default: `AlternaSystem`]
-  CreatedDate date [not null, default: `now()`]
-  LastModifiedBy varchar [not null, default: `AlternaSystem`]
-  LastModifiedDate date [not null, default: `now()`]
-}
+CREATE TABLE [t_TransactionLimitGroup] (
+  [Id] integer PRIMARY KEY IDENTITY(1, 1),
+  [GroupName] nvarchar(255) NOT NULL,
+  [GroupDescription] nvarchar(255),
+  [CreatedBy] nvarchar(255) NOT NULL DEFAULT ('AlternaSystem'),
+  [CreatedDate] datetime2(0) NOT NULL DEFAULT (GETDATE()),
+  [LastModifiedBy] nvarchar(255) NOT NULL DEFAULT ('AlternaSystem'),
+  [LastModifiedDate] datetime2(0) NOT NULL DEFAULT (GETDATE())
+)
+GO
 
-Table t_TransactionLimitGroup {
-  Id integer [primary key, increment]
-  GroupName varchar  [not null]
-  GroupDescription varchar [null]
-  CreatedBy varchar [not null, default: `AlternaSystem`]
-  CreatedDate date [not null, default: `now()`]
-  LastModifiedBy varchar [not null, default: `AlternaSystem`]
-  LastModifiedDate date [not null, default: `now()`]
-}
+CREATE TABLE [t_CustomerGroup] (
+  [CustomerId] integer PRIMARY KEY,
+  [GroupId] integer NOT NULL
+)
+GO
 
-Table t_CustomerGroup {
-  CustomerId interger [not null]
-  GroupId integer
-}
+CREATE TABLE [t_TransactionAccruals] (
+  [Id] integer PRIMARY KEY IDENTITY(1, 1),
+  [CustomerId] integer NOT NULL,
+  [PeriodType] nvarchar(255) NOT NULL CHECK ([PeriodType] IN('daily', 'weekly', 'monthly', 'yearly')),
+  [PeriodStart] date NOT NULL,
+  [PeriodEnd] date NOT NULL,
+  [CumulativeAmount] decimal(18,4) NOT NULL DEFAULT (0),
+  [CreatedBy] nvarchar(255) NOT NULL DEFAULT ('AlternaSystem'),
+  [CreatedDate] datetime2(0) NOT NULL DEFAULT (GETDATE()),
+  [LastModifiedBy] nvarchar(255) NOT NULL DEFAULT ('AlternaSystem'),
+  [LastModifiedDate] datetime2(0) NOT NULL DEFAULT (GETDATE())
+)
+GO
 
-Table t_TransactionAccruals {
-  Id integer [primary key, increment]
-  CustomerId integer [not null]
-  PeriodType varchar [not null]
-  PeriodStart date [not null]
-  PeriodEnd date [not null] // Constraint => PeriodStart <= PeriodEnd
-  CumulativeAmount decimal(18,4) [not null, default: 0]
-  CreatedBy varchar [not null, default: `AlternaSystem`]
-  CreatedDate date [not null, default: `now()`]
-  LastModifiedBy varchar [not null, default: `AlternaSystem`]
-  LastModifiedDate date [not null, default: `now()`]
-}
+CREATE TABLE [t_AuditTransactionAccruals] (
+  [Id] integer PRIMARY KEY IDENTITY(1, 1),
+  [AccrualId] integer NOT NULL,
+  [CustomerId] integer NOT NULL,
+  [PeriodType] varchar(50) NOT NULL,
+  [Amount] decimal(18,4) NOT NULL,
+  [CreatedBy] nvarchar(255) NOT NULL DEFAULT ('AlternaSystem'),
+  [CreatedDate] datetime2(0) NOT NULL DEFAULT (GETDATE()),
+  [LastModifiedBy] nvarchar(255) NOT NULL DEFAULT ('AlternaSystem'),
+  [LastModifiedDate] datetime2(0) NOT NULL DEFAULT (GETDATE())
+)
+GO
 
-Table t_AuditTransactionAccruals {
-  Id integer [primary key, increment]
-  AccrualId integer [not null]
-  CustomerId  integer [not null]
-  PeriodType  varchar(50) [not null]
-  Amount decimal(18,4) [not null]
-  CreatedBy varchar [not null, default: `AlternaSystem`]
-  CreatedDate date [not null, default: `now()`]
-  LastModifiedBy varchar [not null, default: `AlternaSystem`]
-  LastModifiedDate date [not null, default: `now()`]
-}
+ALTER TABLE [t_AuditTransactionAccruals] ADD FOREIGN KEY ([AccrualId]) REFERENCES [t_TransactionAccruals] ([Id])
+GO
 
-Table t_CurrencyRate {
-  CurrencyRateId integer [increment]
-  FromCurrencyId integer [not null]
-  ToCurrencyId integer [not null]
-  RateDate datetime [not null]
-  Rate decimal(18,4) [not null]
-  CreatedBy varchar [not null, default: `AlternaSystem`]
-  CreatedDate date [not null, default: `now()`]
-  LastModifiedBy varchar [not null, default: `AlternaSystem`]
-  LastModifiedDate date [not null, default: `now()`]
-}
+ALTER TABLE [t_TransactionLimits] ADD FOREIGN KEY ([GroupId]) REFERENCES [t_TransactionLimitGroup] ([Id])
+GO
 
-Table t_Currency {
-  CurrencyId integer [increment, not null] 
-  CurrencyCode varchar [not null] 
-  CurrencyName varchar [not null]
-  CurrencyDescription varchar [not null]
-  IsDefault bit [not null]
-  CreatedBy varchar [not null, default: `AlternaSystem`]
-  CreatedDate date [not null, default: `now()`]
-  LastModifiedBy varchar [not null, default: `AlternaSystem`]
-  LastModifiedDate date [not null, default: `now()`]
-}
+ALTER TABLE [t_CustomerGroup] ADD FOREIGN KEY ([GroupId]) REFERENCES [t_TransactionLimitGroup] ([Id])
+GO
 
+-- Stored Procedures
+CREATE OR ALTER PROCEDURE usp_UpdateTransactionLimit
+	@Id INT,
+    @GroupId INT,
+    @PeriodType VARCHAR(50),
+    @LimitAmount DECIMAL(18,4),
+    @EffectiveFrom DATE,
+    @EffectiveTo DATE = NULL,
+	@Error NVARCHAR(MAX) OUT
+AS
+BEGIN
+    SET NOCOUNT ON;
 
+	SET @Error = '';
 
-Ref: t_TransactionAccruals.Id < t_AuditTransactionAccruals.AccrualId
-Ref: t_TransactionLimits.GroupId > t_TransactionLimitGroup.Id
+	IF @Id = -1 
+	BEGIN
+		INSERT INTO t_TransactionLimits 
+			(
+				GroupId, 
+				PeriodType, 
+				LimitAmount, 
+				EffectiveFrom, 
+				EffectiveTo
+			)
+			VALUES 
+			(
+				@GroupId, 
+				@PeriodType, 
+				@LimitAmount, 
+				@EffectiveFrom, 
+				@EffectiveTo
+			);
 
+		SET @Id = SCOPE_IDENTITY();
+	END
+	ELSE
+	BEGIN
+		UPDATE t_TransactionLimits SET 
+			GroupId = @GroupId, 
+			PeriodType = @PeriodType, 
+			LimitAmount = @LimitAmount, 
+			EffectiveFrom = @EffectiveFrom, 
+			EffectiveTo = @EffectiveTo,
+			LastModifiedDate = GETDATE()
+		WHERE Id = @Id;
 
-// CREATE PROCEDURE sp_CreateTransactionLimit
-//     @PeriodType VARCHAR(50),
-//     @LimitAmount DECIMAL(18,4),
-//     @EffectiveFrom DATE,
-//     @EffectiveTo DATE = NULL
-// AS
-// BEGIN
-//     SET NOCOUNT ON;
+		IF @@ROWCOUNT = 0
+		BEGIN
+			SET @Error = 'Transaction limit record not found for the specified transaction limit id.'
+		END
+	END
 
-//     INSERT INTO TransactionLimits (PeriodType, LimitAmount, EffectiveFrom, EffectiveTo)
-//     VALUES (@PeriodType, @LimitAmount, @EffectiveFrom, @EffectiveTo);
+    SELECT * FROM t_TransactionLimits WHERE Id = @Id;
+END
+GO
 
-//     SELECT SCOPE_IDENTITY() AS NewLimitId;
-// END
-// GO
+CREATE OR ALTER PROCEDURE usp_ValidateAllTransactionLimits
+    @CustomerId INT,
+    @TransactionAmount DECIMAL(18,4),
+	@Error NVARCHAR(MAX) OUT
+AS
+BEGIN
+    SET NOCOUNT ON;
 
+	SET @Error = '';
 
-// CREATE PROCEDURE sp_UpdateTransactionLimit
-//     @PeriodType VARCHAR(50),
-//     @LimitAmount DECIMAL(18,4),
-//     @EffectiveFrom DATE = NULL,
-//     @EffectiveTo DATE = NULL
-// AS
-// BEGIN
-//     SET NOCOUNT ON;
-
-//     UPDATE TransactionLimits
-//     SET 
-//         LimitAmount = @LimitAmount,
-//         EffectiveFrom = CASE WHEN @EffectiveFrom IS NOT NULL THEN @EffectiveFrom ELSE EffectiveFrom END,
-//         EffectiveTo   = CASE WHEN @EffectiveTo IS NOT NULL THEN @EffectiveTo ELSE EffectiveTo END
-//     WHERE PeriodType = @PeriodType;
+    -- Get the customer's group.
+    DECLARE @GroupId INT;
+    SELECT @GroupId = GroupId
+    FROM t_CustomerGroup
+    WHERE CustomerId = @CustomerId;
     
-//     IF @@ROWCOUNT = 0
-//     BEGIN
-//         RAISERROR('Transaction limit record not found for the specified period type.', 16, 1);
-//     END
-// END
-// GO
+    IF (@GroupId IS NULL)
+    BEGIN
+        SET @Error = 'Customer group not found for the specified customer.';
+        RETURN;
+    END
 
-// CREATE PROCEDURE sp_CheckTransactionLimit
-//     @CustomerId INT,
-//     @TransactionAmount DECIMAL(18,4),
-//     @PeriodType VARCHAR(50)  -- 'daily', 'weekly', 'monthly'
-// AS
-// BEGIN
-//     SET NOCOUNT ON;
-
-//     DECLARE @PeriodStart DATE, @PeriodEnd DATE;
-
-//     -- Determine period boundaries based on period type.
-//     IF @PeriodType = 'daily'
-//     BEGIN
-//         SET @PeriodStart = CAST(GETDATE() AS DATE);
-//         SET @PeriodEnd = CAST(GETDATE() AS DATE);
-//     END
-//     ELSE IF @PeriodType = 'weekly'
-//     BEGIN
-//         -- Example: Assume week starts on Sunday and ends on Saturday.
-//         DECLARE @Today DATE = CAST(GETDATE() AS DATE);
-//         SET @PeriodStart = DATEADD(DAY, - (DATEPART(WEEKDAY, @Today) - 1), @Today);
-//         SET @PeriodEnd = DATEADD(DAY, 6, @PeriodStart);
-//     END
-//     ELSE IF @PeriodType = 'monthly'
-//     BEGIN
-//         SET @PeriodStart = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
-//         SET @PeriodEnd = EOMONTH(GETDATE());
-//     END
-//     ELSE
-//     BEGIN
-//         RAISERROR('Unsupported period type.', 16, 1);
-//         RETURN;
-//     END
-
-//     -- Get current cumulative amount from accruals.
-//     DECLARE @CurrentAccrued DECIMAL(18,4) = 0;
-//     SELECT @CurrentAccrued = CumulativeAmount
-//     FROM TransactionAccruals
-//     WHERE CustomerId = @CustomerId
-//       AND PeriodType = @PeriodType
-//       AND PeriodStart = @PeriodStart
-//       AND PeriodEnd = @PeriodEnd;
-
-//     DECLARE @NewTotal DECIMAL(18,4) = @CurrentAccrued + @TransactionAmount;
-
-//     -- Get the active limit from the TransactionLimits table.
-//     DECLARE @LimitAmount DECIMAL(18,4);
-//     SELECT TOP 1 @LimitAmount = LimitAmount
-//     FROM TransactionLimits
-//     WHERE PeriodType = @PeriodType
-//       AND GETDATE() >= EffectiveFrom
-//       AND (EffectiveTo IS NULL OR GETDATE() <= EffectiveTo)
-//     ORDER BY EffectiveFrom DESC;
-
-//     IF (@LimitAmount IS NULL)
-//     BEGIN
-//         RAISERROR('No limit defined for this period type.', 16, 1);
-//         RETURN;
-//     END
-
-//     -- Compare the new total to the allowed limit.
-//     IF (@NewTotal > @LimitAmount)
-//     BEGIN
-//         SELECT 0 AS IsWithinLimit, 
-//                @NewTotal AS NewTotal, 
-//                @LimitAmount AS LimitAmount, 
-//                'Limit Exceeded' AS Message;
-//     END
-//     ELSE
-//     BEGIN
-//         SELECT 1 AS IsWithinLimit, 
-//                @NewTotal AS NewTotal, 
-//                @LimitAmount AS LimitAmount, 
-//                'Within Limit' AS Message;
-//     END
-// END
-// GO
+	-- Retrieve the active limit amount for the customer's group.
+	IF NOT EXISTS(
+        SELECT TOP 1 LimitAmount
+        FROM t_TransactionLimits
+        WHERE GroupId = @GroupId
+          AND GETDATE() >= EffectiveFrom
+          AND (EffectiveTo IS NULL OR GETDATE() <= EffectiveTo)
+       )
+	BEGIN
+		SET @Error = 'No active transaction limits found for customer group.';
+		RETURN;
+	END
 
 
-// CREATE PROCEDURE sp_UpdateTransactionAccrual
-//     @CustomerId INT,
-//     @TransactionAmount DECIMAL(18,4),
-//     @PeriodType VARCHAR(50)  -- 'daily', 'weekly', 'monthly'
-// AS
-// BEGIN
-//     SET NOCOUNT ON;
+    ;WITH ActivePeriods AS
+    (
+        -- Retrieve distinct active period types for the customer's group.
+        SELECT DISTINCT PeriodType
+        FROM t_TransactionLimits
+        WHERE GroupId = @GroupId
+          AND GETDATE() >= EffectiveFrom
+          AND (EffectiveTo IS NULL OR GETDATE() <= EffectiveTo)
+    )
+    SELECT 
+        ap.PeriodType,
+        Boundaries.PeriodStart,
+        Boundaries.PeriodEnd,
+        ISNULL(ta.CumulativeAmount, 0) AS CurrentAccrued,
+        ISNULL(ta.CumulativeAmount, 0) + @TransactionAmount AS NewTotal,
+        al.LimitAmount,
+        CASE 
+            WHEN ISNULL(ta.CumulativeAmount, 0) + @TransactionAmount > al.LimitAmount THEN 0 
+            ELSE 1 
+        END AS IsWithinLimit,
+        CASE 
+            WHEN ISNULL(ta.CumulativeAmount, 0) + @TransactionAmount > al.LimitAmount THEN 'Limit Exceeded' 
+            ELSE 'Within Limit' 
+        END AS Message
+    FROM ActivePeriods ap
+    CROSS APPLY 
+    (
+        -- Compute period boundaries based on the period type.
+        SELECT 
+            CASE ap.PeriodType
+                WHEN 'daily' THEN CAST(GETDATE() AS DATE)
+                WHEN 'weekly' THEN DATEADD(DAY, - (DATEPART(WEEKDAY, CAST(GETDATE() AS DATE)) - 1), CAST(GETDATE() AS DATE))
+                WHEN 'monthly' THEN DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
+                WHEN 'yearly' THEN DATEFROMPARTS(YEAR(GETDATE()), 1, 1)
+                ELSE NULL
+            END AS PeriodStart,
+            CASE ap.PeriodType
+                WHEN 'daily' THEN CAST(GETDATE() AS DATE)
+                WHEN 'weekly' THEN DATEADD(DAY, 6, DATEADD(DAY, - (DATEPART(WEEKDAY, CAST(GETDATE() AS DATE)) - 1), CAST(GETDATE() AS DATE)))
+                WHEN 'monthly' THEN EOMONTH(GETDATE())
+                WHEN 'yearly' THEN DATEFROMPARTS(YEAR(GETDATE()), 12, 31)
+                ELSE NULL
+            END AS PeriodEnd
+    ) Boundaries
+    LEFT JOIN t_TransactionAccruals ta 
+         ON ta.CustomerId = @CustomerId 
+         AND ta.PeriodType = ap.PeriodType 
+         AND ta.PeriodStart = Boundaries.PeriodStart 
+         AND ta.PeriodEnd = Boundaries.PeriodEnd
+    CROSS APPLY
+    (
+        -- Retrieve the active limit amount for this period type from the customer's group.
+        SELECT TOP 1 LimitAmount
+        FROM t_TransactionLimits
+        WHERE GroupId = @GroupId
+          AND PeriodType = ap.PeriodType
+          AND GETDATE() >= EffectiveFrom
+          AND (EffectiveTo IS NULL OR GETDATE() <= EffectiveTo)
+        ORDER BY EffectiveFrom DESC
+    ) al;
+END
+GO
 
-//     DECLARE @PeriodStart DATETIME, @PeriodEnd DATETIME;
 
-//     -- Determine the period boundaries based on the period type.
-//     IF @PeriodType = 'daily'
-//     BEGIN
-//         SET @PeriodStart = CAST(GETDATE() AS DATE);
-//         SET @PeriodEnd = DATEADD(SECOND, -1, DATEADD(DAY, 1, @PeriodStart));
-//     END
-//     ELSE IF @PeriodType = 'weekly'
-//     BEGIN
-//         -- Example: week starting on Monday. Adjust DATEPART logic if needed.
-//         SET @PeriodStart = DATEADD(DAY, 1 - (DATEPART(WEEKDAY, GETDATE()) + @@DATEFIRST - 2) % 7, CAST(GETDATE() AS DATE));
-//         SET @PeriodEnd = DATEADD(SECOND, -1, DATEADD(DAY, 7, @PeriodStart));
-//     END
-//     ELSE IF @PeriodType = 'monthly'
-//     BEGIN
-//         SET @PeriodStart = DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1);
-//         SET @PeriodEnd = EOMONTH(GETDATE());
-//     END
-//     ELSE
-//     BEGIN
-//         RAISERROR('Unsupported period type.', 16, 1);
-//         RETURN;
-//     END
+CREATE OR ALTER PROCEDURE usp_UpdateTransactionAccruals
+    @CustomerId INT,
+    @TransactionAmount DECIMAL(18,4),
+    @Error NVARCHAR(MAX) OUT
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-//     -- If an accrual record exists for this customer and period, update it; otherwise, insert a new one.
-//     IF EXISTS (SELECT 1 
-//                FROM TransactionAccruals
-//                WHERE CustomerId = @CustomerId
-//                  AND PeriodType = @PeriodType
-//                  AND PeriodStart = @PeriodStart
-//                  AND PeriodEnd = @PeriodEnd)
-//     BEGIN
-//         UPDATE TransactionAccruals
-//         SET CumulativeAmount = CumulativeAmount + @TransactionAmount,
-//             LastUpdated = GETDATE()
-//         WHERE CustomerId = @CustomerId
-//           AND PeriodType = @PeriodType
-//           AND PeriodStart = @PeriodStart
-//           AND PeriodEnd = @PeriodEnd;
-//     END
-//     ELSE
-//     BEGIN
-//         INSERT INTO TransactionAccruals
-//             (CustomerId, PeriodType, PeriodStart, PeriodEnd, CumulativeAmount, LastUpdated)
-//         VALUES
-//             (@CustomerId, @PeriodType, @PeriodStart, @PeriodEnd, @TransactionAmount, GETDATE());
-//     END
-// END
-// GO
+    -- Look up the customer's group.
+    DECLARE @GroupId INT;
+    SELECT @GroupId = GroupId
+    FROM t_CustomerGroup
+    WHERE CustomerId = @CustomerId;
+
+    IF (@GroupId IS NULL)
+    BEGIN
+        SET @Error = 'Customer group not found for the specified customer.';
+        RETURN;
+    END
+
+    -- Build a table variable with the applicable period types.
+    DECLARE @PeriodTypes TABLE (PeriodType VARCHAR(50));
+    INSERT INTO @PeriodTypes (PeriodType)
+    SELECT DISTINCT PeriodType
+    FROM t_TransactionLimits
+    WHERE GroupId = @GroupId
+      AND GETDATE() >= EffectiveFrom
+      AND (EffectiveTo IS NULL OR GETDATE() <= EffectiveTo);
+
+    -- If no active period types are found, return an error.
+    IF NOT EXISTS(SELECT 1 FROM @PeriodTypes)
+    BEGIN
+        SET @Error = 'No active period types were found in the limits configuration for the specified group.';
+        RETURN;
+    END
+
+    DECLARE @Today DATE = CAST(GETDATE() AS DATE);
+
+	-- Declare a table variable to capture OUTPUT data.
+    DECLARE @AuditOutput TABLE
+    (
+        AccrualId INT,
+        CustomerId INT,
+        PeriodType VARCHAR(50),
+        Amount DECIMAL(18,4)
+    );
+
+    ;WITH PeriodBoundaries AS
+    (
+        SELECT 
+            pt.PeriodType,
+            CASE pt.PeriodType
+                WHEN 'daily' THEN @Today
+                WHEN 'weekly' THEN DATEADD(DAY, - (DATEPART(WEEKDAY, @Today) - 1), @Today)
+                WHEN 'monthly' THEN DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1)
+                WHEN 'yearly' THEN DATEFROMPARTS(YEAR(@Today), 1, 1)
+                ELSE NULL
+            END AS PeriodStart,
+            CASE pt.PeriodType
+                WHEN 'daily' THEN @Today
+                WHEN 'weekly' THEN DATEADD(DAY, 6, DATEADD(DAY, - (DATEPART(WEEKDAY, @Today) - 1), @Today))
+                WHEN 'monthly' THEN EOMONTH(@Today)
+                WHEN 'yearly' THEN DATEFROMPARTS(YEAR(@Today), 12, 31)
+                ELSE NULL
+            END AS PeriodEnd
+        FROM @PeriodTypes pt
+    )
+    
+    MERGE t_TransactionAccruals AS target
+    USING
+    (
+        SELECT 
+            @CustomerId AS CustomerId,
+            pb.PeriodType,
+            pb.PeriodStart,
+            pb.PeriodEnd,
+            @TransactionAmount AS TransactionAmount
+        FROM PeriodBoundaries pb
+    ) AS source
+    ON target.CustomerId = source.CustomerId
+       AND target.PeriodType = source.PeriodType
+       AND target.PeriodStart = source.PeriodStart
+       AND target.PeriodEnd = source.PeriodEnd
+    WHEN MATCHED THEN 
+        UPDATE SET 
+            CumulativeAmount = target.CumulativeAmount + source.TransactionAmount,
+            LastModifiedDate = GETDATE()
+    WHEN NOT MATCHED THEN
+        INSERT 
+			(
+				CustomerId, 
+				PeriodType, 
+				PeriodStart, 
+				PeriodEnd, 
+				CumulativeAmount
+			)
+        VALUES 
+			(
+				source.CustomerId, 
+				source.PeriodType, 
+				source.PeriodStart, 
+				source.PeriodEnd, 
+				source.TransactionAmount
+			)
+    -- Output changes into the table variable.
+    OUTPUT inserted.Id AS AccrualId, source.CustomerId, source.PeriodType, source.TransactionAmount AS Amount
+    INTO @AuditOutput;
+
+    -- Now insert the audit data from the table variable into t_AuditTransactionAccruals.
+    INSERT INTO t_AuditTransactionAccruals 
+		(
+			AccrualId, 
+			CustomerId, 
+			PeriodType, 
+			Amount
+		)
+    SELECT 
+		AccrualId, 
+		CustomerId, 
+		PeriodType, 
+		Amount
+    FROM @AuditOutput;
+END
+GO
+
+
+-- DB Data
+INSERT [dbo].[t_TransactionLimitGroup] ([GroupName], [GroupDescription]) VALUES ('Global', N'Global limit for all standard customers')
+GO
+
+
+INSERT [dbo].[t_TransactionLimits] ([GroupId], [PeriodType], [LimitAmount], [EffectiveFrom], [EffectiveTo]) VALUES (1, 'daily', 1000, '2025-01-01', NULL)
+GO
+INSERT [dbo].[t_TransactionLimits] ([GroupId], [PeriodType], [LimitAmount], [EffectiveFrom], [EffectiveTo]) VALUES (1, 'monthly', 5000, '2025-01-01', NULL)
+GO
+
+
+-- 5 Customers (Testing)
+INSERT [dbo].[t_CustomerGroup] ([CustomerId], [GroupId]) VALUES (1, 1)
+GO
+INSERT [dbo].[t_CustomerGroup] ([CustomerId], [GroupId]) VALUES (2, 1)
+GO
+INSERT [dbo].[t_CustomerGroup] ([CustomerId], [GroupId]) VALUES (3, 1)
+GO
+INSERT [dbo].[t_CustomerGroup] ([CustomerId], [GroupId]) VALUES (4, 1)
+GO
+INSERT [dbo].[t_CustomerGroup] ([CustomerId], [GroupId]) VALUES (5, 1)
+GO
+
+-- DB Query For Testing
+
+DECLARE @RC int
+DECLARE @CustomerId int = 1
+DECLARE @TransactionAmount decimal(18,4) = 100
+DECLARE @Error nvarchar(max)
+
+CREATE TABLE #ValidationResults
+(
+	PeriodType NVARCHAR(255),
+    PeriodStart DATE,
+    PeriodEnd DATE,
+	CurrentAccrued decimal(18,4),
+	NewTotal DECIMAL(18,4),
+	LimitAmount DECIMAL(18,4),
+    IsWithinLimit BIT,
+	Message NVARCHAR(255)
+);
+
+-- Capture the stored procedure’s output into the temporary table.
+INSERT INTO #ValidationResults
+EXECUTE dbo.usp_ValidateAllTransactionLimits 
+    @CustomerId = @CustomerId,
+    @TransactionAmount = @TransactionAmount,
+    @Error = @Error OUTPUT;
+
+
+SELECT * FROM #ValidationResults
+
+IF @Error = '' AND NOT EXISTS (SELECT 1 FROM #ValidationResults WHERE IsWithinLimit = 0)
+BEGIN
+	EXECUTE @RC = [dbo].[usp_UpdateTransactionAccruals] 
+	   @CustomerId
+	  ,@TransactionAmount
+	  ,@Error OUTPUT
+END
+ELSE
+BEGIN
+	PRINT @Error;
+END
+
+-- Clean up the temporary table.
+DROP TABLE #ValidationResults;
+
+select * from t_TransactionLimits;
+select * from t_TransactionAccruals;
+select * from t_AuditTransactionAccruals;
+
+--truncate table t_TransactionLimits;
+--truncate table t_CustomerGroup;
+--DELETE FROM  t_TransactionLimitGroup;
+--DBCC CHECKIDENT ('[t_TransactionLimitGroup]', RESEED, 0);
+
+
+
+--truncate table t_AuditTransactionAccruals;
+--DELETE FROM t_TransactionAccruals;
+--DBCC CHECKIDENT ('[t_TransactionAccruals]', RESEED, 0);
