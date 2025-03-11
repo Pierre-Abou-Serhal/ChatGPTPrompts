@@ -3,6 +3,7 @@
 
 Table t_TransactionLimits  {
   Id integer [primary key, increment]
+  GroupId integer [not null]
   PeriodType varchar  [not null]
   LimitAmount decimal(18,4) [not null]
   EffectiveFrom date [not null]
@@ -11,6 +12,21 @@ Table t_TransactionLimits  {
   CreatedDate date [not null, default: `now()`]
   LastModifiedBy varchar [not null, default: `AlternaSystem`]
   LastModifiedDate date [not null, default: `now()`]
+}
+
+Table t_TransactionLimitGroup {
+  Id integer [primary key, increment]
+  GroupName varchar  [not null]
+  GroupDescription varchar [null]
+  CreatedBy varchar [not null, default: `AlternaSystem`]
+  CreatedDate date [not null, default: `now()`]
+  LastModifiedBy varchar [not null, default: `AlternaSystem`]
+  LastModifiedDate date [not null, default: `now()`]
+}
+
+Table t_CustomerGroup {
+  CustomerId interger [not null]
+  GroupId integer
 }
 
 Table t_TransactionAccruals {
@@ -38,7 +54,35 @@ Table t_AuditTransactionAccruals {
   LastModifiedDate date [not null, default: `now()`]
 }
 
+Table t_CurrencyRate {
+  CurrencyRateId integer [increment]
+  FromCurrencyId integer [not null]
+  ToCurrencyId integer [not null]
+  RateDate datetime [not null]
+  Rate decimal(18,4) [not null]
+  CreatedBy varchar [not null, default: `AlternaSystem`]
+  CreatedDate date [not null, default: `now()`]
+  LastModifiedBy varchar [not null, default: `AlternaSystem`]
+  LastModifiedDate date [not null, default: `now()`]
+}
+
+Table t_Currency {
+  CurrencyId integer [increment, not null] 
+  CurrencyCode varchar [not null] 
+  CurrencyName varchar [not null]
+  CurrencyDescription varchar [not null]
+  IsDefault bit [not null]
+  CreatedBy varchar [not null, default: `AlternaSystem`]
+  CreatedDate date [not null, default: `now()`]
+  LastModifiedBy varchar [not null, default: `AlternaSystem`]
+  LastModifiedDate date [not null, default: `now()`]
+}
+
+
+
 Ref: t_TransactionAccruals.Id < t_AuditTransactionAccruals.AccrualId
+Ref: t_TransactionLimits.GroupId > t_TransactionLimitGroup.Id
+
 
 // CREATE PROCEDURE sp_CreateTransactionLimit
 //     @PeriodType VARCHAR(50),
