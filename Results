@@ -1,1 +1,14 @@
-https://secure-web.cisco.com/1_cic7GxLDqbstbZLCPLdwLsNXEYYTj10kKVM_cmsy-xFwoTfbh5LslevTDLRCI52vnGMc2CIps7f7JDmm0zdbmyCymr-tAVei_8UHK-Se7V1K4NNBBPGqWE6E3VTlk8AJ9u4V0XQVjX3ZwvfOzRSj58e_8MFOcO5dRDlyQfmRZ7mBSEz1_1oNH6_M8adMemh4yqm5cSZPLqMl26RMD5J-frdt9lnrLy_OQRJcvS2cGSgtL_8TGrywV4Lfkx3w5DV/https%3A%2F%2Ftechdocs.mastercard.com%2Fbundle%2Fm_CI%2Fpage%2Fbfu1738793268442.html
+const crypto = require('crypto');
+
+function stringSha(password, hashAlgorithm) {
+  if (hashAlgorithm.toUpperCase() === 'SHA256') {
+    const hash = crypto.createHash('sha256');
+    hash.update(password, 'utf8');
+    return hash.digest('hex'); // Equivalent of GetStringFromHash
+  }
+  return null;
+}
+
+// Example usage:
+const hashed = stringSha('myPassword123', 'SHA256');
+console.log('SHA256 Hash:', hashed);
