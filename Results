@@ -1,53 +1,52 @@
-/// <summary>
-        /// The generate public key.
-        /// </summary>
-        /// <param name="username">The username.</param>
-        /// <param name="correlationId">The correlationId.</param>
-        /// <returns>The hashed string <see cref="string"/>.</returns>
-        public static string GeneratePublicKey(string username, string correlationId)
-        {
-            var keyStr = username + correlationId + Constants.SECRETKEY;
-            var key = StringSha(keyStr, "sha256");
+const crypto = require('crypto');
 
-            return key;
-        }
+// You can define your constants similarly
+const Constants = {
+  SECRETKEY: 'YourSecretKeyHere', // Replace with your actual secret
+  HASH256: 'SHA256'
+};
 
-        /// <summary>
-        /// The string sha.
-        /// </summary>
-        /// <param name="password">The password.</param>
-        /// <param name="hashAlgorithm">The hashAlgorithm.</param>
-        /// <returns>The hash string <see cref="string"/>.</returns>
-        public static string StringSha(string password, string hashAlgorithm)
-        {
-            if (hashAlgorithm.ToUpper() == Constants.HASH256)
-            {
-                using (var sha256 = SHA256.Create())
-                {
-                    var bytes = Encoding.UTF8.GetBytes(password);
-                    return GetStringFromHash(sha256.ComputeHash(bytes));
-                }
-            }
+/**
+ * Generate a public key using username, correlationId, and secret key.
+ * @param {string} username 
+ * @param {string} correlationId 
+ * @returns {string} Hashed public key
+ */
+function generatePublicKey(username, correlationId) {
+  const keyStr = username + correlationId + Constants.SECRETKEY;
+  const key = stringSha(keyStr, 'sha256');
+  return key;
+}
 
-            using (var sha512 = SHA512.Create())
-            {
-                var bytes = Encoding.UTF8.GetBytes(password);
-                return GetStringFromHash(sha512.ComputeHash(bytes));
-            }
-        }
+/**
+ * Hash a string using the specified algorithm.
+ * @param {string} password 
+ * @param {string} hashAlgorithm 
+ * @returns {string} Hash as hex string
+ */
+function stringSha(password, hashAlgorithm) {
+  const algo = hashAlgorithm.toUpperCase();
 
-        /// <summary>
-        /// Get the string from hash.
-        /// </summary>
-        /// <param name="hash">The hash.</param>
-        /// <returns>The <see cref="string"/>.</returns>
-        private static string GetStringFromHash(IEnumerable<byte> hash)
-        {
-            var result = new StringBuilder();
-            foreach (var c in hash)
-            {
-                result.Append(c.ToString("x2"));
-            }
+  let hash;
+  if (algo === Constants.HASH256) {
+    hash = crypto.createHash('sha256').update(password, 'utf8').digest();
+  } else {
+    hash = crypto.createHash('sha512').update(password, 'utf8').digest();
+  }
 
-            return result.ToString();
-        }
+  return getStringFromHash(hash);
+}
+
+/**
+ * Convert a Buffer to a hex string.
+ * @param {Buffer} hash 
+ * @returns {string} Hex string
+ */
+function getStringFromHash(hash) {
+  return Array.from(hash)
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Example usage:
+console.log(generatePublicKey('myUser', 'corrId123'));
