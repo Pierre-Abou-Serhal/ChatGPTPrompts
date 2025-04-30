@@ -1,14 +1,53 @@
-const crypto = require('crypto');
+/// <summary>
+        /// The generate public key.
+        /// </summary>
+        /// <param name="username">The username.</param>
+        /// <param name="correlationId">The correlationId.</param>
+        /// <returns>The hashed string <see cref="string"/>.</returns>
+        public static string GeneratePublicKey(string username, string correlationId)
+        {
+            var keyStr = username + correlationId + Constants.SECRETKEY;
+            var key = StringSha(keyStr, "sha256");
 
-function stringSha(password, hashAlgorithm) {
-  if (hashAlgorithm.toUpperCase() === 'SHA256') {
-    const hash = crypto.createHash('sha256');
-    hash.update(password, 'utf8');
-    return hash.digest('hex'); // Equivalent of GetStringFromHash
-  }
-  return null;
-}
+            return key;
+        }
 
-// Example usage:
-const hashed = stringSha('myPassword123', 'SHA256');
-console.log('SHA256 Hash:', hashed);
+        /// <summary>
+        /// The string sha.
+        /// </summary>
+        /// <param name="password">The password.</param>
+        /// <param name="hashAlgorithm">The hashAlgorithm.</param>
+        /// <returns>The hash string <see cref="string"/>.</returns>
+        public static string StringSha(string password, string hashAlgorithm)
+        {
+            if (hashAlgorithm.ToUpper() == Constants.HASH256)
+            {
+                using (var sha256 = SHA256.Create())
+                {
+                    var bytes = Encoding.UTF8.GetBytes(password);
+                    return GetStringFromHash(sha256.ComputeHash(bytes));
+                }
+            }
+
+            using (var sha512 = SHA512.Create())
+            {
+                var bytes = Encoding.UTF8.GetBytes(password);
+                return GetStringFromHash(sha512.ComputeHash(bytes));
+            }
+        }
+
+        /// <summary>
+        /// Get the string from hash.
+        /// </summary>
+        /// <param name="hash">The hash.</param>
+        /// <returns>The <see cref="string"/>.</returns>
+        private static string GetStringFromHash(IEnumerable<byte> hash)
+        {
+            var result = new StringBuilder();
+            foreach (var c in hash)
+            {
+                result.Append(c.ToString("x2"));
+            }
+
+            return result.ToString();
+        }
