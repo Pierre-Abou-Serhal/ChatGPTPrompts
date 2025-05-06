@@ -1,233 +1,28 @@
-DE 42 (Acceptor ID)
-DE 42 (Acceptor ID) contains the identifier assigned by the acquirer to the acceptor and its
-location, or to the payment facilitator.
-Table 176: Attributes
-Attribute Description
-Data Representation ans-15
-Data Length N/A
-Data Field Contents of positions 1–15
-Subfields N/A
-Justification Left
-Usage
-Following is the usage of DE 42 (whether it is mandatory, conditional, optional, system provided,
-or not required) in applicable messages.
-Table 177: Applicable messages
-Message Org Sys Dst
-Authorization Request/0100 C • C
-Authorization Advice/0120: acquirer-generated C • C
-Authorization Advice/0120: system-generated • X C
-Reversal Request/0400 C • C
-Administrative Request/0600 O • O
-Administrative Request Response/0610 CE • CE
-Administrative Advice/0620: system-generated • X C
-Processing rules
-The Acceptor ID must be present in all transactions and must uniquely identify each acceptor
-and its location.
-Payment facilitator-enabled transactions must uniquely identify the payment facilitator. The
-Acceptor ID of the sponsored merchant must be provided in the sponsored merchant ID data
-element.
-Data element definitions
-DE 42 (Acceptor ID)
-© 1997–2025 Mastercard. Proprietary. All rights reserved.
-Customer Interface Specification • 25 February 2025 391
-The following Dual Message Authorization System edit will apply:
-Table 178: Associated edits
-WHEN... THEN the Authorization System...
-DE 42 (Acceptor ID) is not present and DE 3
-(Processing Code), subfield 1 (Cardholder
-Transaction Type code) contains the value 00
-(Purchase), 09 (Purchase with Cash Back), or 28
-(Payment Transaction) in an Authorization
-Request/0100, Authorization Advice/0120:
-acquirer-generated, or a Reversal Request/0400
-message
-sends the acquirer an Authorization Request
-Response/0110, Authorization Advice Response/
-0130, or a Reversal Request Response/0410
-message where:
-• DE 39 (Response Code) = 30 (Format Error)
-• DE 44 (Additional Response Data) = 042 (which
-identifies DE 42 as the source of the error)
-American Express Authorizations
-An American Express merchant ID consists of the 10-digit numeric value (referred to as “SE
-number” by American Express) or two-character alphanumeric IATA airline code (which may be
-followed by the IATA travel agent ID, T + 5-8 digits, separated by a space). Since DE 42 is
-defined as ans-15, an American Express 10-digit SE number in character format should be leftjustified
-and followed by trailing spaces. This 10-digit number also should pass the Modulus 9
-check digit routine.
-DE 43 (Acceptor Name and Location)
-DE 43 (Acceptor Name and Location) contains the name and location of the acceptor point of
-interaction.
-Table 179: Attributes
-Attribute Description
-Data Representation ans-40 (supports extended character sets)
-Data Length N/A
-Data Field Contents of subfields 1–5
-Subfields 5
-Justification See subfields
-Data element definitions
-DE 43 (Acceptor Name and Location)
-© 1997–2025 Mastercard. Proprietary. All rights reserved.
-Customer Interface Specification • 25 February 2025 392
-Usage
-Following is the usage of DE 43 (whether it is mandatory, conditional, optional, system provided,
-or not required) in applicable messages.
-Table 180: Applicable messages
-Message Org Sys Dst
-Authorization Request/0100 C • C
-Authorization Advice/0120: acquirer-generated C • C
-Authorization Advice/0120: system-generated • X C
-Reversal Request/0400 C • C
-Reversal Advice/0420 • X C
-Administrative Request/0600 O • O
-Administrative Request Response/0610 CE • CE
-Values
-The data element subfields are dependent on the type of message type sent.
-Application notes
-This data element is required for all Authorization Request/0100 messages for Mastercard and
-Visa programs and services.
-For Authorization Request/0100, use of DE 43 is conditional (C) based on the program or
-service being processed. If the program is Mastercard or Visa, use of DE 43 is mandatory (M). Its
-usage is optional if the transaction involves Private Label, Travel and Entertainment, or other
-programs.
-This data element satisfies “Regulation-E” requirements. It also is required when the DE 22
-(Point-of-Service [POS] Entry Mode) is 05 (PAN auto-entry via integrated circuit card).
-As ISO specifies, this data element is an alphanumeric text string of 40 characters. Mastercard
-requires standardized formatting of this data element as specified in the following table to
-meet uniform standards for printing this information on customer account statements and
-billing statements.
-This data element is required for all Mastercard programs and services. The Dual Message
-Authorization System does not perform edits on this data element.
-DE 43 is required for Mastercard Hosted Mobile Phone Top-up transactions.
-Data element definitions
-DE 43 (Acceptor Name and Location)
-© 1997–2025 Mastercard. Proprietary. All rights reserved.
-Customer Interface Specification • 25 February 2025 393
-Subfield 1 (Acceptor Name)
-DE 43 (Acceptor Name and Location), subfield 1 (Acceptor Name) contains the name of the
-acceptor that should be recognizable by the cardholder and may include other descriptors, such
-as a store number.
-Table 181: Attributes
-Attribute Description
-Data Representation ans-22
-Data Field Contents of positions 1–22
-Justification Left
-Processing rules
-The Acceptor Name must be present for all transactions and contain a valid merchant/ATM
-owner/entity name that is most recognizable to the cardholder.
-Unique identifiers, invoice numbers, or additional descriptors must be placed after the
-merchant/ATM owner/entity name.
-When a merchant is a part of a chain or franchise, the name most recognizable to the
-cardholder must be provided at the beginning of the field, followed by a store number or other
-unique identifier for each location. For a chain or franchise that has been issued a Mastercard
-Assigned ID, all submitted transactions must contain the Mastercard Assigned ID data element.
-For any MCC in the 3000-3350 range (Airlines), the Abbreviated Airline listed in Chapter 3 of
-the Quick Reference Booklet must be provided in positions 1-9 of the field followed by the Airline
-Ticket Number.
-For any MCC in the 3351-3500 range (Automobile/Vehicle Rentals), the first nine characters of
-the Description listed in Chapter 3 of the Quick Reference Booklet must be provided in positions
-1-9 of the field and then followed by a unique identifier for each location.
-For any MCC in the 3501-3999 range (Hotels and Motels), the first nine characters of the
-Description listed in Chapter 3 of the Quick Reference Booklet must be provided in positions 1-9
-of the field and then followed by a unique identifier for each location.
-The (ISO)/IEC 8859-1:1998 (Latin Alphabet No. 1) character set must be used.
-Program rules
-Payment facilitator-enabled transactions: The sponsored merchant name must be provided. The
-Payment Facilitator Name or abbreviated name must be provided, followed by an asterisk (*)
-and the sponsored merchant name. All submitted transactions must contain the Payment
-Facilitator ID submitted in the Payment Facilitator ID data element.
-Data element definitions
-Subfield 1 (Acceptor Name)
-© 1997–2025 Mastercard. Proprietary. All rights reserved.
-Customer Interface Specification • 25 February 2025 394
-Staged digital wallet operator: The staged digital wallet operator name must be provided. If
-issuer authorization for the transaction is occurring at the time of the consumer’s purchase of
-products or services, then the staged digital wallet operator name must be provided, followed
-by an asterisk (*) and the retailer name. If the retailer is identified with an MCC in the
-3000-3999 range, then the appropriate industry MCC value, rather than individual retailer MCC,
-if assigned, must be provided.
-Mastercard® rePower™ transactions must have the value MC repower following the
-merchant/ATM owner/entity name providing the service.
-Payment Transactions must contain the name of the payment provider. Payee information must
-be provided in the Additional Transaction Reference Data and Mastercard Send Receiver Data
-data elements.
-Country rules
-Mexico-acquired transactions must contain only
-• uppercase alpha characters (A-Z) (cannot contain accent characters)
-• numeric characters (0–9)
-• ampersand (&)
-• asterisk (*)
-• space (cannot be the first character or contain more than one space between words)
-Subfield 2 (Space)
-DE 43 (Acceptor Name and Location), subfield 2 (Space) indicates a space character.
-Table 182: Attributes
-Attribute Description
-Data Representation ans-1
-Data Field Contents of position 23
-Justification N/A
-Value
-Delimiter (space).
-Data element definitions
-Subfield 2 (Space)
-© 1997–2025 Mastercard. Proprietary. All rights reserved.
-Customer Interface Specification • 25 February 2025 395
-Subfield 3 (Acceptor City)
-DE 43 (Acceptor Name and Location), subfield 3 (Acceptor City) indicates the city of the
-merchant.
-Table 183: Attributes
-Attribute Description
-Data Representation ans-13
-Data Field Contents of positions 24–36
-Justification Left
-Values
-Acceptor City Name must contain the name of the city, town, or village as defined by country
-postal standards.
-For U.S. region transactions, Acceptor City Name must match the U.S. Postal Service list of
-acceptable cities and spellings by postal code.
-Processing rules
-The Acceptor City Name must be present for all transactions and contain a valid location for the
-acceptor. The location of the acceptor will generally be the physical location where the
-transaction occurred or the business/operations location for transactions that occur virtually.
-Program rules
-Payment facilitator-enabled transactions: The sponsored merchant city name must be provided.
-Subfield 4 (Space)
-DE 43 (Acceptor Name and Location), subfield 4 (Space) indicates a space character.
-Table 184: Attributes
-Attribute Description
-Data Representation ans-1
-Data Field Contents of position 37
-Justification N/A
-Value
-Delimiter (space).
-Data element definitions
-Subfield 3 (Acceptor City)
-© 1997–2025 Mastercard. Proprietary. All rights reserved.
-Customer Interface Specification • 25 February 2025 396
-Subfield 5 (Acceptor Country Code)
-DE 43 (Acceptor Name and Location), subfield 5 (Acceptor Country Code) contains the country
-code of the acceptor.
-Table 185: Attributes
-Attribute Description
-Data Representation a–3
-Data Field Contents of positions 38–40
-Justification Left
-Values
-Acceptor Country Code must contain a valid three-character alphabetic code as defined in
-Chapter 2 of the Quick Reference Booklet. When territories have a defined country code in the
-Quick Reference Booklet, that country code must be used.
-Processing rules
-The Acceptor Country Code must be present for all transactions.
-Program rules
-Payment facilitator-enabled transactions: The sponsored merchant country code must be
-provided.
-DE 43, subfield 5 Dual Message Authorization System edits
-The Dual Message Authorization System will perform the following system edits.
-Authorization Request/0100 message edits for DE 43, subfield 5
-Table 186: Associated edits
-If... Then the Dual Message Authorization System...
-DE 43, subfield 5 does not contain a valid country
-code
-will return to the acquirer an Authorization Request
-Response/0110 message where:
-• DE 39 = 30
-• DE 44 = 043
+const fs = require('fs');
+const path = require('path');
+
+// Replace with the folder path you want to scan
+const directoryPath = 'C:/path/to/your/folder';
+
+fs.readdir(directoryPath, (err, files) => {
+  if (err) {
+    return console.error('Error reading directory:', err);
+  }
+
+  files.forEach((file) => {
+    const fullPath = path.join(directoryPath, file);
+    const ext = path.extname(file);
+
+    // Only rename files that have no extension
+    if (!ext) {
+      const newPath = fullPath + '.csv';
+      fs.rename(fullPath, newPath, (renameErr) => {
+        if (renameErr) {
+          console.error(`Error renaming ${file}:`, renameErr);
+        } else {
+          console.log(`Renamed: ${file} -> ${path.basename(newPath)}`);
+        }
+      });
+    }
+  });
+});
