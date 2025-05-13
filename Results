@@ -1,28 +1,30 @@
-const fs = require('fs');
-const path = require('path');
+private async Task<(T? Result, HttpStatusCode StatusCode)> PostAsync<T>(string endpoint, string authorization, JsonElement req)
+{
+    HttpClient httpClient = httpClientFactory.CreateClient(name: "GeneratedClient");
 
-// Replace with the folder path you want to scan
-const directoryPath = 'C:/path/to/your/folder';
+    var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+    {
+        Content = new StringContent(req.ToString(), Encoding.UTF8, "application/json")
+    };
 
-fs.readdir(directoryPath, (err, files) => {
-  if (err) {
-    return console.error('Error reading directory:', err);
-  }
+    request.Headers.Add("Accept", "application/json");
+    request.Headers.Add("Authorization", authorization);
 
-  files.forEach((file) => {
-    const fullPath = path.join(directoryPath, file);
-    const ext = path.extname(file);
+    HttpResponseMessage httpResp = await httpClient.SendAsync(request);
+    HttpStatusCode statusCode = httpResp.StatusCode;
 
-    // Only rename files that have no extension
-    if (!ext) {
-      const newPath = fullPath + '.csv';
-      fs.rename(fullPath, newPath, (renameErr) => {
-        if (renameErr) {
-          console.error(`Error renaming ${file}:`, renameErr);
-        } else {
-          console.log(`Renamed: ${file} -> ${path.basename(newPath)}`);
-        }
-      });
+    string respString = await httpResp.Content.ReadAsStringAsync();
+
+    T? retRes = default;
+
+    if (httpResp.IsSuccessStatusCode)
+    {
+        retRes = JsonSerializer.Deserialize<T>(respString, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        });
     }
-  });
-});
+
+    return (retRes, statusCode);
+}
