@@ -1,30 +1,28 @@
-private async Task<(T? Result, HttpStatusCode StatusCode)> PostAsync<T>(string endpoint, string authorization, JsonElement req)
-{
-    HttpClient httpClient = httpClientFactory.CreateClient(name: "GeneratedClient");
-
-    var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+public async Task<GetTransactionByTransferIdResponse[]> CheckTransactionStatuses(List<MastercardTransactionsModel> mastercardTransactionList)
     {
-        Content = new StringContent(req.ToString(), Encoding.UTF8, "application/json")
-    };
-
-    request.Headers.Add("Accept", "application/json");
-    request.Headers.Add("Authorization", authorization);
-
-    HttpResponseMessage httpResp = await httpClient.SendAsync(request);
-    HttpStatusCode statusCode = httpResp.StatusCode;
-
-    string respString = await httpResp.Content.ReadAsStringAsync();
-
-    T? retRes = default;
-
-    if (httpResp.IsSuccessStatusCode)
-    {
-        retRes = JsonSerializer.Deserialize<T>(respString, new JsonSerializerOptions
+        IEnumerable<Task<GetTransactionByTransferIdResponse>> tasks = mastercardTransactionList.Select(i =>
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
-        });
-    }
+            using JsonDocument document = JsonDocument.Parse(i.BBOriginalRequest);
+            JsonElement rootElement = document.RootElement;
 
-    return (retRes, statusCode);
-}
+            if (rootElement.TryGetProperty("MasterCardSendPostTransferReq", out JsonElement bbOriginalRequest))
+            {
+                GetTransactionByTransferIdRequest request = new GetTransactionByTransferIdRequest()
+                {
+                    correlationId = i.BBReference,
+                    bbReference = i.BBReference,
+                    masterCardTransactionReference = i.MasterCardTransactionReference,
+                    t24IBReference = i.T24IBReference,
+                    bbOriginalRequest = bbOriginalRequest
+                };
+            
+                return PostAsync<GetTransactionByTransferIdResponse>(request, $"{_globalSettings.OSBEndpointUrl}MasterCardSend/GetTransferById");
+            }
+
+            throw new Exception("Could not extract original Backbase request JSON properties!");
+        });
+        
+        GetTransactionByTransferIdResponse[] response = await Task.WhenAll(tasks);
+
+        return response;
+    }
