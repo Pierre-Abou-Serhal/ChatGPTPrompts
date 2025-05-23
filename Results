@@ -1,28 +1,9 @@
-public async Task<GetTransactionByTransferIdResponse[]> CheckTransactionStatuses(List<MastercardTransactionsModel> mastercardTransactionList)
-    {
-        IEnumerable<Task<GetTransactionByTransferIdResponse>> tasks = mastercardTransactionList.Select(i =>
-        {
-            using JsonDocument document = JsonDocument.Parse(i.BBOriginalRequest);
-            JsonElement rootElement = document.RootElement;
-
-            if (rootElement.TryGetProperty("MasterCardSendPostTransferReq", out JsonElement bbOriginalRequest))
-            {
-                GetTransactionByTransferIdRequest request = new GetTransactionByTransferIdRequest()
-                {
-                    correlationId = i.BBReference,
-                    bbReference = i.BBReference,
-                    masterCardTransactionReference = i.MasterCardTransactionReference,
-                    t24IBReference = i.T24IBReference,
-                    bbOriginalRequest = bbOriginalRequest
-                };
-            
-                return PostAsync<GetTransactionByTransferIdResponse>(request, $"{_globalSettings.OSBEndpointUrl}MasterCardSend/GetTransferById");
-            }
-
-            throw new Exception("Could not extract original Backbase request JSON properties!");
-        });
-        
-        GetTransactionByTransferIdResponse[] response = await Task.WhenAll(tasks);
-
-        return response;
-    }
+1-	Where can we find the API documentations ? Is there a web portal available ?
+2-	Are all APIs that will be calling free to use or will there be paid APIs ?
+3-	Will there be an API that is will be used to get card eligibility before making a transaction?
+4-	What will be the authorization protocol of the APIs ? OAuth 1.0 or OAuth 2.0?
+5-	Will we have access to test cards ?
+6-	Is there a sandbox environment that we can use in order to prepare our APIs?
+7-	Is there a Pre-Production environment that we can use to test the whole implementation ?
+8-	Will test cases be given to us ? How can we test our implementation ? will there be a technical support team dedicated for us ?
+9-	How can we know which APIs/Project is the right one for our scenarios ?
