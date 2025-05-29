@@ -1,6 +1,12 @@
 Hello @Priyanka and @Rana,
 
-We want to ask you if what we are currently doing regarding the “country_subdivision” field in the recipient address object will not cause an issue from your side on PRODUCTION environment.
-We are doing the following:
--	If the recipient country is “CAN” we will be sending the static value “QC” 
--	If the recipient country is “USA” we will be sending the static value “IL” 
+We would like to confirm whether our current handling of the country_subdivision field in the recipient address object could cause any issues on your side in the PRODUCTION environment.
+
+Specifically, we are doing the following:
+
+If the recipient country is CAN, we are sending the static value "QC".
+
+If the recipient country is USA, we are sending the static value "IL".
+
+
+Please let us know if this approach is acceptable or if any adjustments are needed.
