@@ -1,25 +1,6 @@
-1. Where can we find the API documentation? Is there a website or portal for it?
+Hello @Priyanka and @Rana,
 
-
-2. Are all the APIs free to use, or are some of them paid?
-
-
-3. Will there be an API we can use to check if a card is eligible before doing a transaction?
-
-
-4. What kind of security will the APIs use? OAuth 1.0 or OAuth 2.0?
-
-
-5. Will we get test cards to use during development?
-
-
-6. Is there a sandbox (test) environment where we can try out our APIs safely?
-
-
-7. Is there a Pre-Production environment where we can test everything before going live?
-
-
-8. Will you give us test cases? How should we test our setup? Will we have a technical support team to help us?
-
-
-9. How can we know which APIs or project we should use for our specific needs?
+We want to ask you if what we are currently doing regarding the “country_subdivision” field in the recipient address object will not cause an issue from your side on PRODUCTION environment.
+We are doing the following:
+-	If the recipient country is “CAN” we will be sending the static value “QC” 
+-	If the recipient country is “USA” we will be sending the static value “IL” 
