@@ -1,6 +1,12 @@
+using MemoryStream memoryStream = new();
+                using (ZipArchive archive = new(memoryStream, ZipArchiveMode.Create, true))
+                {
+                    foreach (var (fileBytes, fileName) in files)
+                    {
+                        var entry = archive.CreateEntry(fileName, CompressionLevel.Fastest);
+                        using var entryStream = entry.Open();
+                        entryStream.Write(fileBytes, 0, fileBytes.Length);
+                    }
+                }
 
-I hope this message finds you well.
-
-I would like to inform you that I will be depositing funds into my USD Fresh account, as I am acting as the guarantor for my brother’s studies in France.
-
-Please let me know if any additional documentation or information is required.
+                return File(memoryStream.ToArray(), "application/zip", $"Generated-Files-{DateTime.Now:yyyy-MM-dd hh:mm:ss}.zip");
