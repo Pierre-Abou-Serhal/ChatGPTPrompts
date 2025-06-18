@@ -1,110 +1,53 @@
-000054244000
-000065772000
-000054403000
-000054244000
-000065772000
-000054403000
-000038155000
-000054244000
-000054244000
-000063298000
-000063172000
-000063397000
-000054370000
-000038155000
-000054244000
-000054244000
-000063298000
-000063172000
-000063397000
-000054370000
-000067901000
-000067946000
-000068396000
-000053920000
-000072985000
-000065289000
-000053887000
-000053794000
-000063172000
-000065613000
-000067946000
-000067451000
-000067550000
-000067451000
-000067544000
-000065900000
-000066563000
-000067362000
-000065722000
-000066622000
-000093853000
-000069134000
-000068744000
-000094053000
-000067901000
-000069134000
-000065213000
-000002975000
-000063813000
-000065223000
-000065613000
-000089340000
-000065613000
-000072952000
-000065613000
-000063238000
-000067049000
-000065722000
-000066622000
-000093853000
-000069134000
-000068744000
-000094053000
-000067901000
-000069134000
-000065213000
-000002975000
-000063813000
-000065223000
-000065613000
-000089340000
-000065613000
-000072952000
-000065613000
-000063238000
-000054310000
-000053794000
-000068735000
-000066294000
-000065772000
-000054310000
-000054436000
-000067901000
-000067946000
-000068396000
-000053920000
-000072985000
-000065289000
-000067049000
-000054310000
-000053794000
-000068735000
-000066294000
-000065772000
-000054310000
-000054436000
-000053887000
-000053794000
-000063172000
-000065613000
-000067946000
-000067451000
-000067550000
-000067451000
-000067544000
-000065900000
-000066563000
-000067362000
-000063205000
-000063205000
+EncryptedPayload encryptedPayload = JsonSerializer.Deserialize<EncryptedPayload>(encryptedContent, _jsonOptions) 
+                                            ?? throw new SGBLBadRequestException("Failed to parse encrypted payload");
+
+RSA privateKey = ImportMLEPrivateKey(Path.Combine(AppContext.BaseDirectory, "MLE-Keys", _globalSettings.MlEPrivateKeyName));
+        
+return JWT.Decode(encryptedPayload.EncData, privateKey);
+
+private static RSA ImportMLEPrivateKey(string pemPath)
+    {
+        String pem = File.ReadAllText(pemPath);
+        PemReader pr = new PemReader(new StringReader(pem));
+        object obj = pr.ReadObject();
+
+        RsaPrivateCrtKeyParameters privateKeyParams;
+
+        if (obj is AsymmetricCipherKeyPair keyPair)
+        {
+            // PEM contains both public and private key
+            privateKeyParams = (RsaPrivateCrtKeyParameters) keyPair.Private;
+        }
+        else if (obj is RsaPrivateCrtKeyParameters keyParams)
+        {
+            // PEM contains only the private key
+            privateKeyParams = keyParams;
+        }
+        else
+        {
+            throw new SGBLBadRequestException("Unsupported MLE private key format: " + obj.GetType().FullName);
+        }
+
+        var rsaParams = DotNetUtilities.ToRSAParameters(privateKeyParams);
+        var rsa = RSA.Create();
+        
+        rsa.ImportParameters(rsaParams);
+        
+        return rsa;
+    }
+
+Unknown error (0xc100000d)
+
+at Interop.BCrypt.BCryptDecryptRsa(SafeBCryptKeyHandle key, ReadOnlySpan`1 source, Span`1 destination, Void* pPaddingInfo, BCryptEncryptFlags dwFlags, Int32& bytesWritten)
+   at System.Security.Cryptography.RSABCrypt.TryDecrypt(ReadOnlySpan`1 data, Span`1 destination, RSAEncryptionPadding padding, Int32& bytesWritten)
+   at System.Security.Cryptography.RSA.<Decrypt>g__TryWithDecrypt|17_0(RSA rsa, ReadOnlySpan`1 input, Byte[] destination, RSAEncryptionPadding padding, Int32& bytesWritten)
+   at System.Security.Cryptography.RSA.TryWithKeyBuffer[TState](ReadOnlySpan`1 input, TState state, TryFunc`1 callback, Boolean tryKeySizeFirst)
+   at System.Security.Cryptography.RSA.Decrypt(ReadOnlySpan`1 data, RSAEncryptionPadding padding)
+   at System.Security.Cryptography.RSABCrypt.Decrypt(Byte[] data, RSAEncryptionPadding padding)
+   at Jose.RsaOaepKeyManagement.Unwrap(Byte[] encryptedCek, Object key, Int32 cekSizeBits, IDictionary`2 header)
+   at Jose.JWE.Decrypt(String jwe, Object key, Nullable`1 expectedJweAlg, Nullable`1 expectedJweEnc, JwtSettings settings)
+   at Jose.JWT.DecodeBytes(Iterator parts, Object key, Nullable`1 expectedJwsAlg, Nullable`1 expectedJweAlg, Nullable`1 expectedJweEnc, JwtSettings settings, Byte[] payload)
+   at Jose.JWT.Decode(String token, Object key, Nullable`1 jwsAlg, Nullable`1 jweAlg, Nullable`1 jweEnc, JwtSettings settings, String payload)
+   at Jose.JWT.Decode(String token, Object key, JwtSettings settings, String payload)
+   at BAL.Bal.GetDecryptedPayload(String encryptedContent) in D:\@Workspace\deve-repo\VisaDirect\BAL\Utils.cs:line 101
+   at VisaDirect.Controllers.VisaDirectController.DecryptPayload(Nullable`1 content) in D:\@Workspace\deve-repo\VisaDirect\VisaDirect\Controllers\VisaDirectController.cs:line 181
