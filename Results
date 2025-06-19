@@ -1,25 +1,22 @@
-public EncryptedPayload GetEncryptedPayload(string content)
+public static Boolean UploadFile(Byte[] fileBytes, String fileName, String filePath, String ftpServer, Int32 ftpPort, String ftpUsername, String ftpPassword)
     {
-        RSA? visaPubKey = new X509Certificate2(Path.Combine(
-            AppContext.BaseDirectory, "MLE-Keys", _globalSettings.MLEPublicCertName)).GetRSAPublicKey();
+        using FtpClient client = new FtpClient(ftpServer, ftpUsername, ftpPassword);
         
-        long iat = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        client.Port = ftpPort;
+        client.Config.EncryptionMode = FtpEncryptionMode.Auto;
+        client.Config.ValidateAnyCertificate = true;
+        
+        client.Connect();
 
-        var jweHeaders = new Dictionary<string, object>
-        {
-            { "kid", _globalSettings.MLEKeyId },
-            { "iat", iat }
-        };
-
-        string token = JWT.Encode(
-            content,
-            visaPubKey,
-            JweAlgorithm.RSA_OAEP_256,
-            JweEncryption.A128GCM,
-            extraHeaders: jweHeaders);
-
-        return new()
-        {
-            EncData = token
-        };
+        String remotePath = filePath + "/" + fileName;
+        
+        using MemoryStream ms = new (fileBytes);
+        
+        client.UploadStream(ms, remotePath);
+        
+        Boolean success = client.FileExists(remotePath);
+        
+        client.Disconnect();
+        
+        return success;
     }
