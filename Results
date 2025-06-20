@@ -1,32 +1,40 @@
-public static Boolean UploadFile(Byte[] fileBytes, String fileName, String filePath, String ftpServer, Int32 ftpPort, String ftpUsername, String ftpPassword)
-    {
-        // FTP
-        // using FtpClient client = new FtpClient(ftpServer, ftpUsername, ftpPassword);
-        // client.Port = ftpPort;
-        // client.Config.EncryptionMode = FtpEncryptionMode.None;
-        // client.Config.ValidateAnyCertificate = true;
-        //
-        // client.Connect();
-        
-        // FTPS
-        using FtpClient client = new FtpClient(ftpServer, ftpUsername, ftpPassword);
-        
-        client.Port = ftpPort;
-        client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
-        client.Config.DataConnectionEncryption = true;
-        client.Config.ValidateAnyCertificate = true;
-        
-        client.Connect();
-        
-        String remotePath = filePath + "/" + fileName;
-        
-        using MemoryStream ms = new (fileBytes);
-        
-        FtpStatus status = client.UploadStream(ms, remotePath);
-        
-        Boolean success = client.FileExists(remotePath);
-        
-        client.Disconnect();
-        
-        return success;
-    }
+public static bool UploadFile(
+    byte[] fileBytes,
+    string fileName,
+    string filePath,
+    string ftpServer,
+    int ftpPort,
+    string ftpUsername,
+    string ftpPassword)
+{
+    using var client = new FtpClient(ftpServer, ftpUsername, ftpPassword);
+
+    // Choose Explicit (port 21) vs Implicit (port 990) based on your server:
+    client.Port = ftpPort;
+    client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
+    client.Config.DataConnectionEncryption = true;
+    client.Config.ValidateAnyCertificate = true;
+
+    // Force passive data connection
+    client.Config.DataConnectionType = FtpDataConnectionType.PASV;
+
+    // Optional: enable console logging for debugging
+    // client.Config.LogToConsole = true;
+
+    client.Connect();
+
+    // Make sure the remote directory exists
+    client.CreateDirectory(filePath, true);
+
+    string remotePath = $"{filePath}/{fileName}";
+
+    using var ms = new MemoryStream(fileBytes);
+    ms.Position = 0;
+
+    // Upload and overwrite if file exists
+    var status = client.Upload(ms, remotePath, FtpExists.Overwrite, false);
+    bool success = (status == FtpStatus.Success);
+
+    client.Disconnect();
+    return success;
+}
