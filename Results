@@ -1,13 +1,23 @@
 public static Boolean UploadFile(Byte[] fileBytes, String fileName, String filePath, String ftpServer, Int32 ftpPort, String ftpUsername, String ftpPassword)
     {
+        // FTP
+        // using FtpClient client = new FtpClient(ftpServer, ftpUsername, ftpPassword);
+        // client.Port = ftpPort;
+        // client.Config.EncryptionMode = FtpEncryptionMode.None;
+        // client.Config.ValidateAnyCertificate = true;
+        //
+        // client.Connect();
+        
+        // FTPS
         using FtpClient client = new FtpClient(ftpServer, ftpUsername, ftpPassword);
-        var x = new FtpClient();
+        
         client.Port = ftpPort;
-        client.Config.EncryptionMode = FtpEncryptionMode.None;
+        client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
+        client.Config.DataConnectionEncryption = true;
         client.Config.ValidateAnyCertificate = true;
         
         client.Connect();
-
+        
         String remotePath = filePath + "/" + fileName;
         
         using MemoryStream ms = new (fileBytes);
