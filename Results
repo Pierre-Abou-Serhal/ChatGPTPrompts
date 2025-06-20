@@ -1,40 +1,6 @@
-public static bool UploadFile(
-    byte[] fileBytes,
-    string fileName,
-    string filePath,
-    string ftpServer,
-    int ftpPort,
-    string ftpUsername,
-    string ftpPassword)
-{
-    using var client = new FtpClient(ftpServer, ftpUsername, ftpPassword);
-
-    // Choose Explicit (port 21) vs Implicit (port 990) based on your server:
-    client.Port = ftpPort;
-    client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
-    client.Config.DataConnectionEncryption = true;
-    client.Config.ValidateAnyCertificate = true;
-
-    // Force passive data connection
-    client.Config.DataConnectionType = FtpDataConnectionType.PASV;
-
-    // Optional: enable console logging for debugging
-    // client.Config.LogToConsole = true;
-
-    client.Connect();
-
-    // Make sure the remote directory exists
-    client.CreateDirectory(filePath, true);
-
-    string remotePath = $"{filePath}/{fileName}";
-
-    using var ms = new MemoryStream(fileBytes);
-    ms.Position = 0;
-
-    // Upload and overwrite if file exists
-    var status = client.Upload(ms, remotePath, FtpExists.Overwrite, false);
-    bool success = (status == FtpStatus.Success);
-
-    client.Disconnect();
-    return success;
-}
+ // Logging FTP
+        // create Serilog logger
+        var serilogLogger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.File("logs/FluentFTPLogs.txt", rollingInterval: RollingInterval.Day)
+            .CreateLogger();
