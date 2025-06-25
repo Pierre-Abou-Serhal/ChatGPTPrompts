@@ -1,6 +1,239 @@
- // Logging FTP
-        // create Serilog logger
-        var serilogLogger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
-            .WriteTo.File("logs/FluentFTPLogs.txt", rollingInterval: RollingInterval.Day)
-            .CreateLogger();
+public GetEmailByInternetIdResponse GetEmailByInternetId(string internetId)
+        {
+            _log.Verbose("TRACE: Entering {Method} with InternetId: {InternetId}",
+                nameof(GetEmailByInternetId), internetId);
+
+            var res = new GetEmailByInternetIdResponse();
+
+            // 1) Create the EWS service client
+            var service = new ExchangeService(ExchangeVersion.Exchange2016)
+            {
+                Url = new Uri(_appSettings.EwsUrl),
+                Credentials = new WebCredentials(_appSettings.MailBoxUsername, _appSettings.MailBoxPassword)
+            };
+            _log.Debug("Constructed ExchangeService with URL: {Url}", _appSettings.EwsUrl);
+            
+            // 2) Build the search filter (wrapping ID in angle brackets, decode if needed)
+            var decodedId = HttpUtility.UrlDecode(internetId);
+            _log.Verbose("TRACE: Decoded InternetId to {DecodedId}", decodedId);
+
+            var searchFilter = new SearchFilter.IsEqualTo(
+                EmailMessageSchema.InternetMessageId,
+                $"<{decodedId}>"
+            );
+
+            _log.Debug("Preparing to search all folders for InternetMessageId <{Id}>", decodedId);
+
+            // 3) Get ALL subfolders under the mailbox root (Deep traversal)
+            //    This includes Inbox, Sent Items, and everything else.
+            var folderView = new FolderView(int.MaxValue)
+            {
+                Traversal = FolderTraversal.Deep
+            };
+
+            FindFoldersResults folderResults;
+            
+            // 4) Impersonating a target mailbox
+            String impersonatedUser = _appSettings.ImpersonatedUsers[0];
+            
+            service.ImpersonatedUserId =
+                new ImpersonatedUserId(
+                    ConnectingIdType.SmtpAddress,
+                    impersonatedUser
+                );
+            
+            _log.Debug("Impersonated user: {targetMailBox} having ID: {impersonatedUserId}", impersonatedUser, service.ImpersonatedUserId);
+            
+            try
+            {
+                folderResults = service.FindFolders(WellKnownFolderName.MsgFolderRoot, folderView);
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Error finding folders in mailbox. Credentials {UserName} / {Password}",
+                    _appSettings.MailBoxUsername, _appSettings.MailBoxPassword);
+                return res;
+            }
+
+            // 5) Build a list of all FolderIds to search, including Root itself if desired.
+            var foldersToSearch = new List<FolderId>();
+            // Optionally add Root. Usually you skip Root because it doesn't directly hold items,
+            // but if you want to be thorough:
+            foldersToSearch.Add(WellKnownFolderName.Root);
+
+            foreach (var f in folderResults.Folders)
+            {
+                foldersToSearch.Add(f.Id);
+            }
+
+            // 6) Loop over all folders, trying to find the first match
+            Item foundItem = null;
+            var view = new ItemView(1);
+
+            foreach (var folderId in foldersToSearch)
+            {
+                FindItemsResults<Item> findResults;
+                try
+                {
+                    findResults = service.FindItems(folderId, searchFilter, view);
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex,
+                        "Error searching for items in folder {FolderId}, with credentials {UserName}/{Password}",
+                        folderId, _appSettings.MailBoxUsername, _appSettings.MailBoxPassword);
+                    continue; // move on to the next folder
+                }
+
+                if (findResults.TotalCount > 0)
+                {
+                    _log.Debug("Found {Count} item(s) in folder {FolderId}; binding first item...",
+                        findResults.TotalCount, folderId);
+                    foundItem = findResults.Items[0];
+                    break; // Stop at first match
+                }
+            }
+
+            if (foundItem == null)
+            {
+                // No items found in any folder
+                _log.Warning("No email found in any folder for InternetMessageId <{Id}>", decodedId);
+                return res;
+            }
+
+            // 7) Bind to the found item with full properties
+            var props = new PropertySet(
+                BasePropertySet.FirstClassProperties,
+                ItemSchema.Attachments,
+                ItemSchema.Body
+            )
+            {
+                RequestedBodyType = BodyType.HTML
+            };
+
+            EmailMessage message;
+            try
+            {
+                message = EmailMessage.Bind(service, foundItem.Id, props);
+                _log.Debug("Successfully bound to email with UniqueId: {UniqueId}", message.Id.UniqueId);
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Error binding to the matched item");
+                return res;
+            }
+
+            // 8) Gather attachments
+            var attachments = new List<AttachmentInfo>();
+            _log.Verbose("TRACE: Processing {Count} attachments", message.Attachments.Count);
+
+            foreach (Attachment attachment in message.Attachments)
+            {
+                // A) FileAttachment
+                if (attachment is FileAttachment fileAttachment)
+                {
+                    try
+                    {
+                        fileAttachment.Load();
+                        attachments.Add(new AttachmentInfo(
+                            fileAttachment.Id,
+                            fileAttachment.Name,
+                            false,
+                            fileAttachment.Content,
+                            null,
+                            null
+                        ));
+                        _log.Verbose("TRACE: Loaded FileAttachment {Name}", fileAttachment.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Error(ex, "Error loading file attachment {Name}", fileAttachment.Name);
+                    }
+                }
+                // B) ItemAttachment
+                else if (attachment is ItemAttachment itemAttachment)
+                {
+                    try
+                    {
+                        var itemProps = new PropertySet(BasePropertySet.FirstClassProperties)
+                        {
+                            RequestedBodyType = BodyType.HTML
+                        };
+                        itemAttachment.Load(itemProps);
+
+                        if (itemAttachment.Item is EmailMessage attachedEmail)
+                        {
+                            attachments.Add(new AttachmentInfo(
+                                itemAttachment.Id,
+                                itemAttachment.Name,
+                                true,
+                                null,
+                                attachedEmail.Subject,
+                                attachedEmail.Body
+                            ));
+                            _log.Verbose("TRACE: Loaded ItemAttachment (EmailMessage) {Name}", itemAttachment.Name);
+                        }
+                        else
+                        {
+                            attachments.Add(new AttachmentInfo(
+                                itemAttachment.Id,
+                                itemAttachment.Name,
+                                true,
+                                null,
+                                "Non-email item attached",
+                                null
+                            ));
+                            _log.Debug("ItemAttachment {Name} is non-email item; stored basic metadata",
+                                itemAttachment.Name);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Error(ex, "Error loading item attachment {Name}", itemAttachment.Name);
+                    }
+                }
+            }
+
+            // 9) Identify custom local parts vs. actual addresses
+            var customRecipientLocalParts = new List<string>();
+            var actualRecipientEmailAddresses = new List<string>();
+
+            foreach (EmailAddress emailAddress in message.ToRecipients)
+            {
+                //JP@deve.local,saldom@exch.alternafn
+                string[] parts = emailAddress.Address.Split('@');
+                if (parts.Length >= 2)
+                {
+                    bool isCustomLocalPart = _appSettings.DestinationMappings.Any(m =>
+                                                 m.LocalPart.Equals(parts[0], StringComparison.OrdinalIgnoreCase))
+                                             && parts[1].Equals(_appSettings.Domain,
+                                                 StringComparison.OrdinalIgnoreCase);
+
+                    if (isCustomLocalPart)
+                    {
+                        customRecipientLocalParts.Add(parts[0]);
+                    }
+                    else
+                    {
+                        actualRecipientEmailAddresses.Add(emailAddress.Address);
+                    }
+                }
+            }
+
+            _log.Verbose("TRACE: Found {CountCustom} custom localPart(s) and {CountActual} actual address(es)",
+                customRecipientLocalParts.Count, actualRecipientEmailAddresses.Count);
+
+            // 10) Populate and return result
+            res.EmailUniqueId = message.Id.UniqueId;
+            res.EmailSubject = message.Subject;
+            res.EmailBody = message.Body;
+            res.Attachments = attachments;
+            res.EmailCustomLocalParts = string.Join(",", customRecipientLocalParts);
+            res.EmailFrom = message.From?.Address;
+            res.EmailTo = string.Join(",", actualRecipientEmailAddresses);
+
+            _log.Debug("Returning email details: Subject={Subject}, From={From}, To={To}",
+                res.EmailSubject, res.EmailFrom, res.EmailTo);
+
+            return res;
+        }
