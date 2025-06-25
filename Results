@@ -1,6 +1,50 @@
-2025-06-25 09:57:52.275 +03:00 [DBG] Connection id "0HNDJMLIH55LM" reset.
-2025-06-25 09:57:52.276 +03:00 [DBG] Connection id "0HNDJMLIH55LM" accepted.
-2025-06-25 09:57:52.276 +03:00 [DBG] Connection id "0HNDJMLIH55LM" started.
-2025-06-25 09:57:52.276 +03:00 [DBG] Connection id "0HNDJMLIH55LM" sending FIN because: "The Socket transport's send loop completed gracefully."
-2025-06-25 09:57:52.276 +03:00 [DBG] Connection id "0HNDJMLIH55LM" disconnecting.
-2025-06-25 09:57:52.277 +03:00 [DBG] Connection id "0HNDJMLIH55LM" stopped.
+2025-06-25 10:03:49.406 +03:00 [DBG] Starting HttpMessageHandler cleanup cycle with 1 items
+2025-06-25 10:03:49.407 +03:00 [DBG] Ending HttpMessageHandler cleanup cycle after 0.0047ms - processed: 0 items - remaining: 1 items
+2025-06-25 10:03:52.317 +03:00 [DBG] Connection id "0HNDJMLIH55NU" reset.
+2025-06-25 10:03:52.317 +03:00 [DBG] Connection id "0HNDJMLIH55NU" accepted.
+2025-06-25 10:03:52.317 +03:00 [DBG] Connection id "0HNDJMLIH55NU" started.
+2025-06-25 10:03:52.317 +03:00 [DBG] Connection id "0HNDJMLIH55NU" sending FIN because: "The Socket transport's send loop completed gracefully."
+2025-06-25 10:03:52.318 +03:00 [DBG] Connection id "0HNDJMLIH55NU" disconnecting.
+2025-06-25 10:03:52.318 +03:00 [DBG] Connection id "0HNDJMLIH55NU" stopped.
+2025-06-25 10:03:57.318 +03:00 [DBG] Connection id "0HNDJMLIH55NV" reset.
+2025-06-25 10:03:57.318 +03:00 [DBG] Connection id "0HNDJMLIH55NV" accepted.
+2025-06-25 10:03:57.318 +03:00 [DBG] Connection id "0HNDJMLIH55NV" started.
+2025-06-25 10:03:57.318 +03:00 [DBG] Connection id "0HNDJMLIH55NV" sending FIN because: "The Socket transport's send loop completed gracefully."
+2025-06-25 10:03:57.318 +03:00 [DBG] Connection id "0HNDJMLIH55NV" disconnecting.
+2025-06-25 10:03:57.319 +03:00 [DBG] Connection id "0HNDJMLIH55NV" stopped.
+2025-06-25 10:03:59.406 +03:00 [DBG] Starting HttpMessageHandler cleanup cycle with 1 items
+2025-06-25 10:03:59.407 +03:00 [DBG] Ending HttpMessageHandler cleanup cycle after 0.0559ms - processed: 0 items - remaining: 1 items
+2025-06-25 10:04:02.319 +03:00 [DBG] Connection id "0HNDJMLIH55O0" reset.
+2025-06-25 10:04:02.319 +03:00 [DBG] Connection id "0HNDJMLIH55O0" accepted.
+2025-06-25 10:04:02.319 +03:00 [DBG] Connection id "0HNDJMLIH55O0" started.
+2025-06-25 10:04:02.319 +03:00 [DBG] Connection id "0HNDJMLIH55O0" sending FIN because: "The Socket transport's send loop completed gracefully."
+2025-06-25 10:04:02.319 +03:00 [DBG] Connection id "0HNDJMLIH55O0" disconnecting.
+2025-06-25 10:04:02.320 +03:00 [DBG] Connection id "0HNDJMLIH55O0" stopped.
+2025-06-25 10:04:07.319 +03:00 [DBG] Connection id "0HNDJMLIH55O1" reset.
+2025-06-25 10:04:07.319 +03:00 [DBG] Connection id "0HNDJMLIH55O1" accepted.
+2025-06-25 10:04:07.319 +03:00 [DBG] Connection id "0HNDJMLIH55O1" started.
+2025-06-25 10:04:07.319 +03:00 [DBG] Connection id "0HNDJMLIH55O1" sending FIN because: "The Socket transport's send loop completed gracefully."
+2025-06-25 10:04:07.319 +03:00 [DBG] Connection id "0HNDJMLIH55O1" disconnecting.
+2025-06-25 10:04:07.320 +03:00 [DBG] Connection id "0HNDJMLIH55O1" stopped.
+2025-06-25 10:04:09.422 +03:00 [DBG] Starting HttpMessageHandler cleanup cycle with 1 items
+2025-06-25 10:04:09.422 +03:00 [DBG] Ending HttpMessageHandler cleanup cycle after 0.0067ms - processed: 0 items - remaining: 1 items
+2025-06-25 10:04:12.320 +03:00 [DBG] Connection id "0HNDJMLIH55O2" reset.
+2025-06-25 10:04:12.321 +03:00 [DBG] Connection id "0HNDJMLIH55O2" accepted.
+2025-06-25 10:04:12.321 +03:00 [DBG] Connection id "0HNDJMLIH55O2" started.
+2025-06-25 10:04:12.321 +03:00 [DBG] Connection id "0HNDJMLIH55O2" sending FIN because: "The Socket transport's send loop completed gracefully."
+2025-06-25 10:04:12.321 +03:00 [DBG] Connection id "0HNDJMLIH55O2" disconnecting.
+2025-06-25 10:04:12.321 +03:00 [DBG] Connection id "0HNDJMLIH55O2" stopped.
+2025-06-25 10:04:17.320 +03:00 [DBG] Connection id "0HNDJMLIH55O3" reset.
+2025-06-25 10:04:17.320 +03:00 [DBG] Connection id "0HNDJMLIH55O3" accepted.
+2025-06-25 10:04:17.321 +03:00 [DBG] Connection id "0HNDJMLIH55O3" started.
+2025-06-25 10:04:17.321 +03:00 [DBG] Connection id "0HNDJMLIH55O3" sending FIN because: "The Socket transport's send loop completed gracefully."
+2025-06-25 10:04:17.321 +03:00 [DBG] Connection id "0HNDJMLIH55O3" disconnecting.
+2025-06-25 10:04:17.321 +03:00 [DBG] Connection id "0HNDJMLIH55O3" stopped.
+2025-06-25 10:04:19.437 +03:00 [DBG] Starting HttpMessageHandler cleanup cycle with 1 items
+2025-06-25 10:04:19.437 +03:00 [DBG] Ending HttpMessageHandler cleanup cycle after 0.0023ms - processed: 0 items - remaining: 1 items
+2025-06-25 10:04:22.321 +03:00 [DBG] Connection id "0HNDJMLIH55O4" reset.
+2025-06-25 10:04:22.321 +03:00 [DBG] Connection id "0HNDJMLIH55O4" accepted.
+2025-06-25 10:04:22.321 +03:00 [DBG] Connection id "0HNDJMLIH55O4" started.
+2025-06-25 10:04:22.321 +03:00 [DBG] Connection id "0HNDJMLIH55O4" sending FIN because: "The Socket transport's send loop completed gracefully."
+2025-06-25 10:04:22.322 +03:00 [DBG] Connection id "0HNDJMLIH55O4" disconnecting.
+2025-06-25 10:04:22.322 +03:00 [DBG] Connection id "0HNDJMLIH55O4" stopped.
