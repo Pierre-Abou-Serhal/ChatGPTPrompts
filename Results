@@ -1,57 +1,138 @@
 public GetEmailByInternetIdResponse GetEmailByInternetId(string internetId)
 {
-    _log.Verbose("Entering {M} with InternetId {Id}", nameof(GetEmailByInternetId), internetId);
+    _log.Verbose("TRACE: Entering {Method} with InternetId: {InternetId}",
+        nameof(GetEmailByInternetId), internetId);
 
-    // build service once
-    var service = new ExchangeService(ExchangeVersion.Exchange2016) {
-        Url         = new Uri(_appSettings.EwsUrl),
+    var res = new GetEmailByInternetIdResponse();
+
+    // 1) Construct the bare ExchangeService once
+    var service = new ExchangeService(ExchangeVersion.Exchange2016)
+    {
+        Url = new Uri(_appSettings.EwsUrl),
         Credentials = new WebCredentials(_appSettings.MailBoxUsername, _appSettings.MailBoxPassword)
     };
+    _log.Debug("Constructed ExchangeService with URL: {Url}", _appSettings.EwsUrl);
 
-    // prepare filter
+    // 2) Prepare your search filter
     var decodedId = HttpUtility.UrlDecode(internetId);
-    var filter    = new SearchFilter.IsEqualTo(
+    var searchFilter = new SearchFilter.IsEqualTo(
         EmailMessageSchema.InternetMessageId,
         $"<{decodedId}>"
     );
+    _log.Debug("Search filter set to InternetMessageId = <{Id}>", decodedId);
 
-    // create one Task per mailbox
-    var searchTasks = _appSettings.ImpersonatedUsers
-        .Select(smtp => Task.Run(() => {
-            service.ImpersonatedUserId = new ImpersonatedUserId(
-                ConnectingIdType.SmtpAddress, smtp
-            );
-            _log.Debug("Impersonating {Smtp}", smtp);
+    Item foundItem = null;
 
-            // deep search in one shot
-            var view = new ItemView(1) {
-                Traversal = ItemTraversal.Deep
-            };
-            var results = service.FindItems(WellKnownFolderName.MsgFolderRoot, filter, view);
-            return (Smtp: smtp, Results: results);
-        }))
-        .ToList();
-
-    // As soon as any mailbox returns a hit, take it
-    while (searchTasks.Count > 0)
+    // 3) Try each mailbox in turn
+    foreach (var smtp in _appSettings.ImpersonatedUsers)
     {
-        var finished = Task.WhenAny(searchTasks).Result;
-        searchTasks.Remove(finished);
+        _log.Debug("Attempting to impersonate {SmtpAddress}", smtp);
+        service.ImpersonatedUserId = new ImpersonatedUserId(
+            ConnectingIdType.SmtpAddress,
+            smtp
+        );
 
-        var (smtp, results) = finished.Result;
-        if (results.TotalCount > 0)
+        FindFoldersResults folderResults;
+        try
         {
-            _log.Debug("Found in {Smtp}", smtp);
-            var item = results.Items.First();
-            return BindAndBuildResponse(service, item);   // your existing bind/attachment logic
+            // find all folders under MsgFolderRoot
+            var folderView = new FolderView(int.MaxValue) { Traversal = FolderTraversal.Deep };
+            folderResults = service.FindFolders(WellKnownFolderName.MsgFolderRoot, folderView);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Could not enumerate folders for {SmtpAddress}, skipping", smtp);
+            continue;
+        }
+
+        // build the list of FolderIds to search
+        var foldersToSearch = new List<FolderId> { WellKnownFolderName.Root };
+        foldersToSearch.AddRange(folderResults.Folders.Select(f => f.Id));
+
+        // 4) search each folder in turn
+        var view = new ItemView(1);
+        foreach (var folderId in foldersToSearch)
+        {
+            FindItemsResults<Item> results;
+            try
+            {
+                results = service.FindItems(folderId, searchFilter, view);
+            }
+            catch (Exception ex)
+            {
+                _log.Warning(ex, "Error searching folder {FolderId} under {Smtp}, skipping", folderId, smtp);
+                continue;
+            }
+
+            if (results.TotalCount > 0)
+            {
+                _log.Debug("Found {Count} items in {FolderId} of {Smtp}", results.TotalCount, folderId, smtp);
+                foundItem = results.Items[0];
+                break;
+            }
+        }
+
+        if (foundItem != null)
+        {
+            _log.Debug("Email found under mailbox {Smtp}", smtp);
+            break;
         }
         else
         {
-            _log.Debug("Not in {Smtp}, continuing", smtp);
+            _log.Debug("No email found under mailbox {Smtp}, trying next", smtp);
         }
     }
 
-    // none found
-    _log.Warning("No email found for InternetMessageId <{Id}>", decodedId);
-    return new GetEmailByInternetIdResponse();
+    if (foundItem == null)
+    {
+        _log.Warning("No email found for InternetMessageId <{Id}> in any configured mailbox", decodedId);
+        return res;
+    }
+
+    // 5) Bind to the item and extract body, attachments, recipients, etc.
+    var props = new PropertySet(BasePropertySet.FirstClassProperties,
+                                ItemSchema.Attachments,
+                                ItemSchema.Body)
+    { RequestedBodyType = BodyType.HTML };
+
+    EmailMessage message;
+    try
+    {
+        message = EmailMessage.Bind(service, foundItem.Id, props);
+        _log.Debug("Bound to message UniqueId={UniqueId}", message.Id.UniqueId);
+    }
+    catch (Exception ex)
+    {
+        _log.Error(ex, "Error binding to the found item");
+        return res;
+    }
+
+    // 6) (unchanged) process attachments…
+    var attachments = new List<AttachmentInfo>();
+    foreach (var att in message.Attachments)
+    {
+        // … same as your current loop
+    }
+
+    // 7) (unchanged) process recipients …
+    var customLocalParts = new List<string>();
+    var actualEmails     = new List<string>();
+    foreach (var addr in message.ToRecipients)
+    {
+        // … same as your current loop
+    }
+
+    // 8) populate response
+    res.EmailUniqueId          = message.Id.UniqueId;
+    res.EmailSubject           = message.Subject;
+    res.EmailBody              = message.Body;
+    res.Attachments            = attachments;
+    res.EmailCustomLocalParts  = string.Join(",", customLocalParts);
+    res.EmailFrom              = message.From?.Address;
+    res.EmailTo                = string.Join(",", actualEmails);
+
+    _log.Debug("Returning email: Subject={Subject}, From={From}, To={To}",
+               res.EmailSubject, res.EmailFrom, res.EmailTo);
+
+    return res;
 }
