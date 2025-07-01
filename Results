@@ -6,25 +6,24 @@ builder.Services.AddReverseProxy()
 
         if (clusterId == "mastercardCluster")
         {
-            // Load your client certificate from file
             var certPath = builder.Configuration["Visa:ClientCertificate:Path"];
             var certPassword = builder.Configuration["Visa:ClientCertificate:Password"];
 
             var clientCert = new X509Certificate2(certPath, certPassword);
 
-            var handlerWithClientCert = handler as HttpClientHandler;
-            if (handlerWithClientCert != null)
+            var socketsHandler = handler as SocketsHttpHandler;
+            if (socketsHandler != null)
             {
-                handlerWithClientCert.ClientCertificates.Add(clientCert);
-                handlerWithClientCert.ClientCertificateOptions = ClientCertificateOption.Manual;
+                socketsHandler.SslOptions = new SslClientAuthenticationOptions
+                {
+                    ClientCertificates = new X509CertificateCollection { clientCert },
 
-                // OPTIONAL: trust Visa’s root or intermediate certificate
-                // (Usually not needed in production if their cert is trusted)
-                handlerWithClientCert.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+                    // WARNING: for development only!
+                    RemoteCertificateValidationCallback = (sender, cert, chain, errors) => true
+                };
             }
         }
 
-        // If you’re using a corporate proxy
         var proxyAddress = builder.Configuration["WebProxyAddress"];
         if (!string.IsNullOrEmpty(proxyAddress))
         {
@@ -32,13 +31,3 @@ builder.Services.AddReverseProxy()
             handler.UseProxy = true;
         }
     });
-
-
-
-
-"Visa": {
-  "ClientCertificate": {
-    "Path": "certs/client_cert.pfx",
-    "Password": "your_cert_password"
-  }
-}
