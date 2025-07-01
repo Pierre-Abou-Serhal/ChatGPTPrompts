@@ -1,27 +1,166 @@
+using Yarp.ReverseProxy.Configuration;
+using System.Net;
+using Serilog;
+
+// Detect if the app is running as a Windows service
+var isWindowsService = !Environment.UserInteractive;
+
+if (isWindowsService)
 {
-  "Serilog": {
-    "Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
-    "MinimumLevel": {
+    var pathToContentRoot = AppContext.BaseDirectory;
+    Directory.SetCurrentDirectory(pathToContentRoot);
+}
+
+Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "logs"));
+
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+if (OperatingSystem.IsWindows())
+{
+    builder.Host.UseWindowsService();
+}
+
+#region Serilog Configuration
+// Creating The Serilog Logger
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+#endregion
+
+// CORS config (unchanged)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicyConfig",
+        builder => builder
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+});
+
+// Add YARP with proxy-aware HttpMessageHandler
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    .ConfigureHttpClient((context, handler) =>
+    {
+        WebProxy webProxy = new WebProxy(builder.Configuration.GetSection("WebProxyAddress").Value);
+        
+        handler.Proxy = webProxy;
+        handler.UseProxy = true;
+    });
+
+WebApplication app = builder.Build();
+
+app.UseCors("CorsPolicyConfig");
+// Middleware to log incoming requests and outgoing responses
+app.Use(async (context, next) =>
+{
+    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+
+    logger.LogInformation("Request Received: {Method} {Path}{QueryString}",
+        context.Request.Method, context.Request.Path, context.Request.QueryString);
+
+    // Enable buffering for request body
+    context.Request.EnableBuffering();
+
+    if (context.Request.ContentLength > 0 && context.Request.Body.CanSeek)
+    {
+        context.Request.Body.Position = 0;
+        using var reader = new StreamReader(context.Request.Body, leaveOpen: true);
+        var body = await reader.ReadToEndAsync();
+        logger.LogInformation("Request Body: {Body}", body);
+        context.Request.Body.Position = 0; // Rewind for YARP to read
+    }
+
+    // Capture original response body stream
+    var originalBodyStream = context.Response.Body;
+    await using var responseBody = new MemoryStream();
+    context.Response.Body = responseBody;
+
+    await next(); // Continue pipeline, including proxy
+
+    // Log response status
+    logger.LogInformation("Response Status: {StatusCode}", context.Response.StatusCode);
+
+    // Read and log response body
+    responseBody.Seek(0, SeekOrigin.Begin);
+    string responseText = await new StreamReader(responseBody).ReadToEndAsync();
+    logger.LogInformation("Response Body: {Body}", responseText);
+
+    // Copy response back to original stream
+    responseBody.Seek(0, SeekOrigin.Begin);
+    await responseBody.CopyToAsync(originalBodyStream);
+});
+app.UseHttpsRedirection();
+app.UseRouting();
+app.MapReverseProxy();
+
+app.Run();
+
+{
+  "Logging": {
+    "LogLevel": {
       "Default": "Information",
-      "Override": {
-        // suppress all Microsoft debug-level noise
-        "Microsoft":                        "Warning",
-        // specifically silence Kestrel transport messages
-        "Microsoft.AspNetCore.Server.Kestrel": "Warning",
-        // silence HttpClientFactory cleanup messages
-        "Microsoft.Extensions.Http":           "Warning"
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "ReverseProxy": {
+    "Routes": {
+      "mastercard-route": {
+        "ClusterId": "mastercardCluster",
+        "Match": {
+          "Path": "/mastercard/{**catch-all}"
+        },
+        "Transforms": [
+          { "PathRemovePrefix": "/mastercard" }
+        ]
+      },
+      "portservices-route": {
+        "ClusterId": "portCluster",
+        "Match": {
+          "Path": "/port/{**catch-all}"
+        },
+        "Transforms": [
+          { "PathRemovePrefix": "/port" }
+        ]
       }
     },
-    "Enrich": [ "FromLogContext", "WithMachineName", "WithThreadId" ],
+    "Clusters": {
+      "mastercardCluster": {
+        "Destinations": {
+          "mastercardDestination": {
+            "Address": "https://sandbox.api.mastercard.com/"
+          }
+        }
+      },
+      "portCluster": {
+        "Destinations": {
+          "portDestination": {
+            "Address": "https://port.example.com/"
+          }
+        }
+      }
+    }
+  },
+  "WebProxyAddress": "http://10.0.40.854:7561",
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.File" ],
+    "MinimumLevel": "Information",
     "WriteTo": [
-      { "Name": "Console" },
       {
         "Name": "File",
         "Args": {
-          "path":         "Logs/log-.txt",
+          "path": "logs/ProxyService-.log",
           "rollingInterval": "Day",
-          "retainedFileCountLimit": 7
+          "fileSizeLimitBytes": "65535000",
+          "retainedFileCountLimit": "100",
+          "rollOnFileSizeLimit": true
         }
       }
-    ]
-  },
+    ],
+    "Enrich": [ "FromLogContext" ]
+  }
+}
