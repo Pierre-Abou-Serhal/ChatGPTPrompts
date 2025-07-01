@@ -30,4 +30,4 @@ builder.Services.AddReverseProxy()
             handler.Proxy = new WebProxy(proxyAddress);
             handler.UseProxy = true;
         }
-    });
+    })
