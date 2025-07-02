@@ -1,13 +1,42 @@
-using Microsoft.AspNetCore.Builder;
-using ReverseProxy.Middleware;
+using ReverseProxy.Extensions;
+using Serilog;
 
-namespace ReverseProxy.Extensions
+var isWindowsService = !Environment.UserInteractive;
+if (isWindowsService)
 {
-    public static class MiddlewareExtensions
-    {
-        public static IApplicationBuilder UseRequestLogging(this IApplicationBuilder app)
-        {
-            return app.UseMiddleware<RequestLoggingMiddleware>();
-        }
-    }
+    Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 }
+
+Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "logs"));
+
+var builder = WebApplication.CreateBuilder(args);
+
+if (OperatingSystem.IsWindows())
+{
+    builder.Host.UseWindowsService();
+}
+
+// Serilog Setup
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .CreateLogger();
+builder.Host.UseSerilog();
+
+// CORS Setup
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicyConfig", builder =>
+        builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+});
+
+// Add Reverse Proxy using Extension
+builder.Services.AddConfiguredReverseProxy(builder.Configuration);
+
+var app = builder.Build();
+
+app.UseCors("CorsPolicyConfig");
+app.UseRequestLogging(); // Middleware added here
+app.UseHttpsRedirection();
+app.UseRouting();
+app.MapReverseProxy();
+app.Run();
