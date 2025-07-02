@@ -1,7 +1,127 @@
+System.Net.Sockets.SocketException (10049): The requested address is not valid in its context.
+   at System.Net.Sockets.Socket.UpdateStatusAfterSocketErrorAndThrowException(SocketError error, Boolean disconnectOnFailure, String callerName)
+   at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+   at System.Net.Sockets.Socket.Bind(EndPoint localEP)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportOptions.CreateDefaultBoundListenSocket(EndPoint endpoint)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportFactory.BindAsync(EndPoint endpoint, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.TransportManager.BindAsync(EndPoint endPoint, ConnectionDelegate connectionDelegate, EndpointConfig endpointConfig, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.<>c__DisplayClass28_0`1.<<StartAsync>g__OnBind|0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.ListenOptions.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.AddressesStrategy.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindAsync(ListenOptions[] listenOptions, AddressBindContext context, Func`2 useHttps, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.BindAsync(CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.StartAsync[TContext](IHttpApplication`1 application, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Hosting.GenericWebHostService.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__14_1(IHostedService service, CancellationToken token)
+   at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>g__LogAndRethrow|14_3(<>c__DisplayClass14_0&)
+   at Microsoft.Extensions.Hosting.Internal.Host.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.Run(IHost host)
+   at Program.<Main>$(String[] args) in D:\@Workspace\deve-repo\alterna-reverse-proxy\ReverseProxy\Program.cs:line 130
+
+{
+  "Urls": "http://10.0.40.41:8211",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "ReverseProxy": {
+    "Routes": {
+      "mastercard-route": {
+        "ClusterId": "mastercardCluster",
+        "Match": {
+          "Path": "/mastercard/{**catch-all}"
+        },
+        "Transforms": [
+          { "PathRemovePrefix": "/mastercard" }
+        ]
+      },
+      "portservices-route": {
+        "ClusterId": "portCluster",
+        "Match": {
+          "Path": "/port/{**catch-all}"
+        },
+        "Transforms": [
+          { "PathRemovePrefix": "/port" }
+        ]
+      },
+      "visadirect-route": {
+        "ClusterId": "visaDirectCluster",
+        "Match": {
+          "Path": "/visadirect/{**catch-all}"
+        },
+        "Transforms": [
+          { "PathRemovePrefix": "/visadirect" }
+        ]
+      }
+    },
+    "Clusters": {
+      "mastercardCluster": {
+        "Destinations": {
+          "mastercardDestination": {
+            "Address": "https://sandbox.api.mastercard.com/"
+          }
+        }
+      },
+      "portCluster": {
+        "Destinations": {
+          "portDestination": {
+            "Address": "https://cama.portdebeyrouth.com/"
+          }
+        }
+      },
+      "visaDirectCluster": {
+        "Destinations": {
+          "portDestination": {
+            "Address": "https://sandbox.api.visa.com/"
+          }
+        }
+      }
+    }
+  },
+  "WebProxyAddress": "http://10.0.30.222:3128",
+  "Certificates": {
+    "ClientCertificates": [
+      {
+        "ClusterId": "visaDirectCluster",
+        "Path": "Certs/Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unecrypted.p12",
+        "Password": "V1s@D1rect"
+      }
+    ]
+  },
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.File" ],
+    "MinimumLevel": "Information",
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/ProxyService-.log",
+          "rollingInterval": "Day",
+          "fileSizeLimitBytes": "65535000",
+          "retainedFileCountLimit": "100",
+          "rollOnFileSizeLimit": true
+        }
+      }
+    ],
+    "Enrich": [ "FromLogContext" ]
+  }
+}
+
 using Yarp.ReverseProxy.Configuration;
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
+using ReverseProxy.Common;
 using Serilog;
 
 // Detect if the app is running as a Windows service
@@ -41,6 +161,8 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader());
 });
 
+Certificate certificates = builder.Configuration.GetSection("Certificates").Get<Certificate>() ?? new();
+
 // Add YARP with proxy-aware HttpMessageHandler
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
@@ -48,26 +170,28 @@ builder.Services.AddReverseProxy()
     {
         var clusterId = context.ClusterId;
 
-        if (clusterId == "visaDirectCluster")
+        foreach (var clientCertificate in certificates.ClientCertificates)
         {
-            // Load your client certificate from file
-            String certPath = Path.Combine(
-                AppContext.BaseDirectory,
-                builder.Configuration["ClientCertificates:VisaDirect:Path"] ?? throw new ArgumentException("Client certificate path is missing from configuration"));
-            String certPassword = builder.Configuration["ClientCertificates:VisaDirect:Password"] ?? throw new ArgumentException("Client certificate password is missing from configuration");
-
-            var clientCert = new X509Certificate2(
-                certPath, 
-                certPassword, 
-                X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
-            
-            if (!clientCert.HasPrivateKey)
-                throw new InvalidOperationException("Client certificate is missing a private key");
-            
-            handler.SslOptions = new SslClientAuthenticationOptions
+            if (clusterId == clientCertificate.ClusterId)
             {
-                ClientCertificates = new X509CertificateCollection { clientCert },
-            };
+                // Load your client certificate from file
+                String certPath = Path.Combine(AppContext.BaseDirectory, clientCertificate.Path);
+                
+                String certPassword = clientCertificate.Password;
+
+                var clientCert = new X509Certificate2(
+                    certPath, 
+                    certPassword, 
+                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
+            
+                if (!clientCert.HasPrivateKey)
+                    throw new InvalidOperationException("Client certificate is missing a private key");
+            
+                handler.SslOptions = new SslClientAuthenticationOptions
+                {
+                    ClientCertificates = new X509CertificateCollection { clientCert },
+                };
+            }
         }
         
         WebProxy webProxy = new WebProxy(builder.Configuration.GetSection("WebProxyAddress").Value);
