@@ -1,50 +1,46 @@
-using Microsoft.Extensions.DependencyInjection;
-using ReverseProxy.Common;
-using System.Net;
-using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
-using Yarp.ReverseProxy.Configuration;
-
-namespace ReverseProxy.Extensions
+namespace ReverseProxy.Middleware
 {
-    public static class ReverseProxyExtensions
+    public class RequestLoggingMiddleware
     {
-        public static void AddConfiguredReverseProxy(this IServiceCollection services, IConfiguration configuration)
+        private readonly RequestDelegate _next;
+        private readonly ILogger<RequestLoggingMiddleware> _logger;
+
+        public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)
         {
-            Certificate certificates = configuration.GetSection("Certificates").Get<Certificate>() ?? new();
+            _next = next;
+            _logger = logger;
+        }
 
-            services.AddReverseProxy()
-                .LoadFromConfig(configuration.GetSection("ReverseProxy"))
-                .ConfigureHttpClient((context, handler) =>
-                {
-                    var clusterId = context.ClusterId;
+        public async Task Invoke(HttpContext context)
+        {
+            _logger.LogInformation("Request Received: {Method} {Path}{QueryString}",
+                context.Request.Method, context.Request.Path, context.Request.QueryString);
 
-                    ClientCertificate? clientCertificate = certificates.ClientCertificates
-                        .FirstOrDefault(i => i.ClusterId.Equals(clusterId, StringComparison.OrdinalIgnoreCase));
+            context.Request.EnableBuffering();
 
-                    if (clientCertificate is not null)
-                    {
-                        string certPath = Path.Combine(AppContext.BaseDirectory, clientCertificate.Path);
-                        string certPassword = clientCertificate.Password;
+            if (context.Request.ContentLength > 0 && context.Request.Body.CanSeek)
+            {
+                context.Request.Body.Position = 0;
+                using var reader = new StreamReader(context.Request.Body, leaveOpen: true);
+                var body = await reader.ReadToEndAsync();
+                _logger.LogInformation("Request Body: {Body}", body);
+                context.Request.Body.Position = 0;
+            }
 
-                        var clientCert = new X509Certificate2(
-                            certPath,
-                            certPassword,
-                            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
+            var originalBodyStream = context.Response.Body;
+            await using var responseBody = new MemoryStream();
+            context.Response.Body = responseBody;
 
-                        if (!clientCert.HasPrivateKey)
-                            throw new InvalidOperationException("Client certificate is missing a private key");
+            await _next(context);
 
-                        handler.SslOptions = new SslClientAuthenticationOptions
-                        {
-                            ClientCertificates = new X509CertificateCollection { clientCert },
-                        };
-                    }
+            _logger.LogInformation("Response Status: {StatusCode}", context.Response.StatusCode);
 
-                    WebProxy webProxy = new WebProxy(configuration["WebProxyAddress"]);
-                    handler.Proxy = webProxy;
-                    handler.UseProxy = true;
-                });
+            responseBody.Seek(0, SeekOrigin.Begin);
+            var responseText = await new StreamReader(responseBody).ReadToEndAsync();
+            _logger.LogInformation("Response Body: {Body}", responseText);
+
+            responseBody.Seek(0, SeekOrigin.Begin);
+            await responseBody.CopyToAsync(originalBodyStream);
         }
     }
 }
