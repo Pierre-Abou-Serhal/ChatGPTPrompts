@@ -1,42 +1,11 @@
-using ReverseProxy.Extensions;
-using Serilog;
+DECLARE @CurrentHashedValue VARBINARY(20);  -- SHA1 produces 20 bytes
 
-var isWindowsService = !Environment.UserInteractive;
-if (isWindowsService)
-{
-    Directory.SetCurrentDirectory(AppContext.BaseDirectory);
-}
+SELECT @CurrentHashedValue = HASHBYTES('SHA1',
+	(
+		SELECT Code, Description, CreatedBy, CAST(CreatedDate AS DATE) AS CreatedDate
+		FROM table
+		FOR XML RAW
+	)
+);
 
-Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "logs"));
 
-var builder = WebApplication.CreateBuilder(args);
-
-if (OperatingSystem.IsWindows())
-{
-    builder.Host.UseWindowsService();
-}
-
-// Serilog Setup
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .CreateLogger();
-builder.Host.UseSerilog();
-
-// CORS Setup
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("CorsPolicyConfig", builder =>
-        builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-});
-
-// Add Reverse Proxy using Extension
-builder.Services.AddConfiguredReverseProxy(builder.Configuration);
-
-var app = builder.Build();
-
-app.UseCors("CorsPolicyConfig");
-app.UseRequestLogging(); // Middleware added here
-app.UseHttpsRedirection();
-app.UseRouting();
-app.MapReverseProxy();
-app.Run();
