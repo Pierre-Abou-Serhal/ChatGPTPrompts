@@ -1,11 +1,721 @@
-Bonjour Mme Abou-Sleiman,
+4- Customer Induvidual:
 
-J’espère que vous allez bien.
 
-Je me permets de vous contacter afin de vous remettre un document intitulé "attestation de travail", émis par mon université, que je dois faire signer par votre service.
 
-Par ailleurs, je souhaiterais également obtenir une attestation de travail officielle délivrée par l’entreprise.
 
-Je reste à votre disposition pour toute information complémentaire et vous remercie par avance pour votre aide.
 
-Bien cordialement,
+CUSTOMER INDIVITUAL LIMITS FOR INSTANT PAYMENTS
+BRD
+
+
+
+
+
+
+
+
+
+
+Document Properties
+
+Title	Customer individual limits For Instant Payments
+Subject	Customer individual limits For Instant Payments
+Author	Stylianos Argyridis & Evgenios Kyriakou
+Version	v1.0
+Status	Draft Version
+Publish Date	30/05/2025
+
+
+Document History
+Version	Date	Author	Status	Comment
+v1.0	29/05/2025	SA & EK	First draft Version	First Draft Vesrion
+V1.1	05/06/2025	StL	Reviewed	Reviewed version
+
+
+
+
+
+
+
+
+
+
+
+Table of Contents
+1.	Purpose	3
+2.	Project Scope	3
+3.	Current Behaviour	4
+4.	Requirements	4
+5.	Handling Rejections:	5
+6.	New Function: "Instant Payment Indivitual Limits"	5
+7.	Transaction Blocking & Options	6
+8.	Updated Disclaimer For External Transfers:	6
+9.	Use Cases - Basic and Alternatice Flows	7
+Individual limits - Transfer amount above the limits set by the customer.	7
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1.	Purpose
+As per the IP Regulation the bank cannot differentiate the Instant from SEPA payments. Therefore, the bank cannot set any limits to the customers for a specific instrument, except from the global limits it currently offers to its customers through specific payment channels.
+However, a per the regulation, the customer should be able to set individual limits for Instant Payments. The limits, may be either on per transaction or a per day basis, at the sole discretion of the customer.
+The purpose of this document is to describe a new function in the Digital Banking platform (Mobile Apps and Web Banking) that allows customers to set and manage their indivitual limits for Outgoing Instant payments ONLY. Customers will be able to define two types of limits: A Per Transaction Limit and Daily Global Limit. These limits can be adjusted by the customer at any time (24/7/365) without the need for bank’s approval. This functionality is part of the ECB Instant Payment regulatory compliance initiative. The goal is to give customers full control, while ensuring all rules and limits defined in the core banking system (ALTERNA) are respected.	
+2.	Project Scope
+
+This enhancement includes the following:
+•	Enabling customers to define and manage indivitual limits, per transaction and daily global limits for Instant Payments, using both Mobile Apps [Android & IOS] and the Website.
+•	Immediate application of customer-defined limits without any validation from the bank.
+•	Placement of a new "Instant Payment Indivitual Limits" section within Transfers tab (below External Transfers)
+•	Validations to ensure:
+	Per Transaction Limit does not exceed Daily Global Limit.
+	Both limits remain within boundaries set in ALTERNA.
+	Error handling and messages for invalid entries. 
+	Pop-up prompts when the payment amount is above the limit, prompting the customer to adjust the limit, or confirm the payment as is. In this case the bank will sent the payment as normal SEPA. Please see Section 9
+	Synchronization between ALTERNA and Individual Instant Payment limits in real-time.
+	The  existing limits logic set by the bank for all payments should remain as is.
+
+3.	Current Behaviour
+•	Customers cannot set or update transaction limits independently.
+•	Any changes must be done through a manual request handled by MCS.
+•	If a payment is rejected at Digital Banking level, the amount is still deducted from the customer’s daily limit, which is not the desired behaviour.
+4.	Requirements
+•	Customers must be able to define and edit both limits, anytime of the day, 7 days a week [27/4/365], through Mobile Apps (iOS & Android) and Web Banking.
+•	Limits are applied instantly after submission.
+•	No bank validation is required.
+•	Validation must be in place to automatically check and synchronize the defined instant payment individual limits with those set in ALTERNA.
+•	The current limits set by the bank for non-SEPA or non-Instant Payment types, should remain as is.
+•	The limits added by the customer shall not exceed the pre-set global limits set by the bank for the specific customer.  
+•	When an Instant outgoing payment exceeds the limits set by the customer, the system shall not execute the payment. The system shall inform the customer that the limit exceeds their individual limit set and guide how to amend it, or proceed with alternative methods [SEPA]. If the customer proceeds as is, the system shall send the the payment as SEPA.
+•	The Use Cases describing the Basic and Alternative Flows and the real time communication with the customer are in Secton 9.
+
+5.	Handling Rejections:
+•	When a payment is rejected for any reason, either by the bank, or when a Negative Response is received for an Instant Payment, the system must not reduce the customer’s available limit in Alternal, neither the Instant Payments Indivitual Limits.  
+For example, if an inputter submits a payment [Of any type: SEPA, NON SEPA, Instant, etc.] of €1,000 and a validator later rejects this transaction within the Digital Banking platform, or in the case of Instant Payment, a Negative Response is received for an Outgoing Payment, this amount must not be deducted from the Daily Global Limit set in ALTERNA, nor from the customer’s Indivitual Limits. The full €1,000 must be immediately reinstated to the available limit, to both user’s Instant Payments or ALTERNA global limits.
+6.	New Function: "Instant Payment Indivitual Limits"
+A new section labeled "Instant Payment Indivitual Limits" shall be added to Digital Banking. It will allow the customer to set two fields:
+•	Limit Per Transaction
+•	Daily Global Limit
+Placement Options:
+The new section will appear in the Transfers tab, directly below the External Transfer option.
+Rules:
+•	When a customer clicks on the ‘Instant Payment Individual Limits’ tab, the system should pop-up an explanatory message 
+“For your security, you can set individual limits per transaction and per day for your Insant Payments in Euro. If a payment exceeds these limits, we will ask you to either come here and adjust your limits first, or authorise the payment to be sent as a SEPA Credit Transfer. Adjust your limits here, to stay in control of your payments.”
+•	The Limit Per Transaction must never exceed the Daily Global Limit. If the customer tries to enter a Per transaction amount that is greater than the Daily Limit:
+•	The system must block the change and then, Display an error message warning the user about its action:
+“Limit Per Transaction cannot be greater than Daily Global Limit”
+•	Both values must also be lower than, or equal to the customer’s individual maximum limits stored in ALTERNA.
+•	If the customer enters an amount(s) above the allowed maximum limit(s) as they have been defined in ALTERNA, the system must display the following message:
+"The amount you entered exceeds the individual limits set by the bank. Please change the amount, or contact your Relationship Manager, or Digital Banking Hotline at +357 22399766."
+7.	Transaction Blocking & Options
+•	If a customer tries to perform an instant payment that exceeds their defined instant Payment limits:
+o	A pop-up window must appear with the following message:
+“Security Alert: Your instant payment limit is set at €XX,XXX. The amount entered exceeds this limit. To proceed please select one of the options.
+	Cancel the payment and adjust your limit settings from the Transfers Screen, before proceeding.
+	Proceed with the payment without adjusting your limits, The payment will not be sent Instantly. It will be sent to the bank for processing.”
+
+The Use Cases, including the Basic and Alternative Flows and the real time communication with the customer is in Section 9. 
+8.	Updated Disclaimer For External Transfers:
+•	The current disclaimer must be updated to reflect the handling of Instant and SEPA payments:
+Updated Disclaimer: “Kindly be informed that incoming and outgoing Instant Payments are executed immediately 24hrs a day, 365 days a year. Internal transfers are executed immediately, except during our end-of-day process. In that case, they are executed right after EOD. External Transfers received by the Bank Monday to Thursday before 15:15 and on Fridays before 14:45 are executed on the same day. Transfers received after these times are executed on the next working day.. If a transfer is rejected or more information is needed, you will be contacted by your Relationship Manager.”
+
+
+
+
+
+
+
+
+
+
+
+
+9.	Use Cases - Basic and Alternatice Flows 
+
+Individual limits - Transfer amount above the limits set by the customer. 
+This flow describes the scenario, where a customer has set a specific limit for their Instant Payments and then submits a payment, which is above the limit. In this case the bank has to inform the customer that the amount is above the limits set and give him the option to cancel and amend the limits, or proceed with the payment. 
+Alternative Flow: 
+BF1.	Digital Banking forwards a message to OSB to check Account Status and Customer’s limits set for Instant Payment [if applicable].
+BF2.	OSB checks that the payment is SEPA [SQL Table with SEPA Banks will be provided], confirms that the amount exceeds the limit set by the customer for Instant Payments and forwards the message to ICBS to get the Account Status
+BF3.	ICBS responds to OSB with the Account Status.
+BF4.	OSB sends the Account Status to Digital Banking [payment amount exceeds the customer’s individual limits].
+BF5.	OSB sends a pop-up message to Digital Banking:
+“Security Alert: Your instant payment limit is set at €XX,XXX. The amount entered exceeds this limit. To proceed please select one of the options
+•	Cancel the payment and adjust your limit settings from the Transfers Screen, before proceeding.
+•	Proceed with the payment without adjusting your limits, The payment will not be sent Instantly. It will be sent to the bank for processing.”
+BF6.	Digital Banking displays the pop-up message to the customer, providing the option to cancel the transaction, or to proceed with the payment. 
+•	If Customer clicks to cancel – End of Flow
+•	If the customer clicks to proceed with the payment, then continue with below flow.
+BF7.	Digital Banking forwards the payment submitted by the customer to OSB.
+BF8.	OSB sends the transaction to ICBS to be processed as SEPA by BO, during working hours, as per the current flow.
+BF9.	OSB sends a popup message to the customer “Success! Your transfer is sent for processing.”
+BF10.	Digital Banking displays the popup message to the customer.
+BF11.	OSB sends a Push Notification to BB “Your payment of €250.80 to George Georgiou has been submitted to the bank for processing”.
+BF12.	Digital Banking sends the push notification to the customer. 
+End of Flow
+
+
+
+
+
+Diagram of the Alternative Flow:
+
+
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+3- Bulk Verification
+
+
+
+
+
+
+
+BULK VERIFICATION OF PAYEE
+BRD
+
+
+
+
+ 
+
+Document Properties
+Title	Bulk Verification of Payee [Web Banking]
+
+Subject	Bulk Verification of Payee [Web Banking]
+
+Author	Stylianos Argyridis & Evgenios Kyriakou
+Version	v1.1
+Status	Draft Version
+Publish Date	26/06/2025
+
+
+Document History
+Version	Date	Author	Status	Comment
+v1.0	03/06/2025	SA & EK	First draft Version	First Draft Vesrion
+v1.1	06/06/2025	STL	Reviwed version	
+v1.2	25/06/2025	SA	Updated Version	Updated to incorporate the utilization of OSB Server
+
+
+
+
+
+
+
+
+
+
+
+Table of Contents
+1.	Purpose	3
+2.	Project Scope	3
+3.	Out-of-Scope	4
+4.	Current behaviour	4
+5.	Requirements	4
+5.1. Error handling due to systems miscommunication:	4
+5.2. Handling of SGBCy Beneficiaries	4
+5.3. Bulk VOP Service	5
+6.	Use Cases – Basic and Alternative Flows and Real Time communication with customers	6
+6.1.	Verification Of Payee - BULK	6
+6.2.	Alternative Flow – DIAS responds with No MATCH	9
+6.3.	Alternative Flow Verification of Payee BULK – NO BICs in EDS Directory.	13
+6.4.	Alternative Flow Verification of Payee BULK - DIAS not available	14
+1.	Appendix	17
+1.1.	Instant Payment Regulation	17
+1.2.	VOP Rulebook	17
+1.3.	VOP -API Specifications	17
+
+
+
+
+
+
+
+
+
+1.	Purpose
+This document outlines the business requirements for enhancing the digital banking platform to support the implementation of the Verification of Payee (VOP) service for bulk beneficiary creation via Web Banking. This is in accordance with the EPC218-23 v1.0 rulebook. The objective is to enable real-time (up to 10 minutes) validation of account holder details for SEPA Outgoing and Within SGBCy beneficiaries, using DIAS as the external VOP service provider. Customers will use the same file they currently upload [CSV file], containing beneficiary details through the existing platform. Upon customer’s request, the file will be converted, formatted, and sent to DIAS via Web Service for VOP. Users must be notified of the expected processing duration and informed that only SEPA beneficiaries are eligible for VOP. Clients can opt out and proceed without validation if they choose, by following the existing procedure in force.
+2.	Project Scope
+•	VOP BULK service available only through Web Banking interface.
+•	Implementation of the EPC218-23 compliant VOP scheme for bulk beneficiaries [Appendxix 1.2].
+•	Users should be able to Opt-Out from the VOP service, by continuing with the current flow already in place.
+•	Real-time VOP of bulk beneficiary files (up to 10 minutes response time).
+•	Integration with DIAS through secure web service [VOP – API Specifications Appendix  1.3].
+•	Automatic conversion of internal account numbers to IBAN structure before verification.
+•	The results are returned as a file structure from DIAS to the user's screen, via the existing Web service. The user should be notified through push notifications and alerts generation.
+•	Error handling, alerting, and User interface updates to guide users’ interaction with the system.
+•	Existing front-end validations and file processing logic into ICBS will remain unchanged.
+•	In case a file has SEPA and NON Sepa BICs and the customer asks to perform a VOP, the bank should perform a VOP only for the SEPA BICS
+•	Use Cases describing the Basic and Alternative Flows and real time communication with customers are in Section 6
+3.	Out-of-Scope
+•	This service is not available via Mobile Banking.
+•	Non-SEPA beneficiaries will not be verified through VOP.
+•	The service does not include customer’s Own Accounts
+•	No changes to existing bulk beneficiary template structure.
+4.	Current behaviour
+•	The user fills out a CSV file by following the structured template provided in the platform.
+•	The user submits and then verifies the creation using the OTP method of authentication.
+•	No beneficiary verification is provided to the user.
+5.	Requirements
+5.1. Error handling due to systems miscommunication:
+The following messages should be displayed in alerts and push notifications to inform users of any issues:
+o	If file formatting controls fail during conversion [For Internals], or the file structure is incorrect, users are prompted to correct and re-upload.
+"There was an issue processing your file. Please ensure the format is correct and re-upload."
+5.2. Handling of SGBCy Beneficiaries
+•	Internal account numbers must be converted to IBAN format, before sending to DIAS for verification.
+•	Despite conversion for VOP, the original file must be submitted to ICBS unaltered, showing VOP responses on the last column.
+5.3. Bulk VOP Service
+•	When the customer clicks on the existing option to the ‘Add Bulk Beneficiaries’, to submit a new file, the system should:
+o	Check that the beneficiary banks are registred in the EPC Register, which means they adhere to the VOP Scheme.
+o	If both above are positive, display the following pop-up message shown in Section 6, prompting the customer to Verify the Payees.
+	Proceed with Verification: Triggers the VOP process. Conversion of IInternal beneficiaries [If Any] should be converted to IBAN structured type, formatting, and submit to DIAS.
+	Submit the file without Verification: Submits the file as per the normal Add Bulk Beneficiary process, in order to create the beneficiaries in ICBS.
+•	The bank will send a file to DIAS with all the VOP messages as bulk and DIAS will debulk the file and forward the individual messages to each bank.
+•	The bank will send to DIAS only beneficiaries that are registered in the EPC Directory for VOP.
+•	Dias will reply only when it receives the responses from all the banks, with maximum time 10 minutes.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+6.	Use Cases – Basic and Alternative Flows and Real Time communication with customers
+
+6.1.	Verification Of Payee - BULK
+Banks that offer Bulk Payments to their customers should also offer the VOP BULK service to their customers. In our case since we offer bulk payments as well as the option to add bulk beneficiaries, we have to offer the VOP BULK service. This flow describes the scenario, when a customer uploads a Bulk Beneficiary file and the bank offers the customer the option to verify the account holders’ details through the Bulk VOP service. In such case, the bank converts the file and sends a VOP Bulk to DIAS. DIAS only replies back when it receives all the responses from the beneficiary banks. Maximum Execution time is 10 minutes. The customers with MACTH are automatically added in ICBS. Then the system displays each beneficiary in the Beneficiaries Overview screen, for the customer [the Inputer] to take action and decide if s/he wants to add or reject each beneficiary. The service will only be offered on Web Banking. VOP shall be done for external and internal beneficiaries. 
+
+The process starts from the moment the customer follows the existing process to submit a Bulk Beneficiary file on Web Banking.
+Basic Flow: 
+BF1.	Digital Banking sends the Bulk Beneficiary file to OSB.
+BF2.	OSB sends the file to SMC to check if any BICs are in the EDS Register. 
+BF3.	SMC Checks the EDS Register and finds BICs that are Registered.
+BF4.	SMC responds to OSB with a Positive Response [all or some BICs are in EDS]. 
+BF5.	OSB sends a pop-up message to the Digital Banking:
+“SGBCy can perform a Verification Of Payees, in order to confirm the Account Holders’ details for you? The check is done only for EU SEPA Countries. You will receive a Response File with the results within 10 minutes.
+
+If you have already verified the account holders’ details, please click to proceed without verification.
+
+Would you like us to proceed and confirm the accounts' details, or proceed without verification?” 
+BF6.	Digital Banking displays the pop-up message to the customer giving the option to click “Proceed with Verification” or “Submit the File without Verification”.:
+•	If Customer clicks “Submit the file without Verification”. the file is submitted through the normal Bulk Beneficiary process. – End of Flow.
+•	If customer clicks “Proceed with Verification”, proceed with below.
+BF7.	Digital Banking sends the message to OSB to proceed with Verification Of Payees.
+BF8.	OSB sends the fle to ALTERNA to register the information in the database.
+BF9.	OSB sends file to SMC.
+BF10.	SMC responds back with a Confirmation Message [Handshake].
+BF11.	OSB sends a Pop-up message to Digital Banking “We are processing your request. The process can take up to 10 minutes. You will receive a Notification when we have a results.” 
+BF12.	Digital Banking displays the message to the customer.
+BF13.	SMC converts the file submitted by the customer and sends the webservice to DIAS for Bulk VOP, only for the BICs Registered in EDS.
+BF14.	DIAS sends the Response file to SMC, within 10 minutes.
+BF15.	SMC:
+•	Converts the response file to the Original File format, submitted by the customer, keeping the VOP Response next to each record. For BICs that are not SEPA state “Bank not in EDS” 
+•	Sends the Response file to OSB.
+BF16.	OSB sends the beneficiaries with “MATCH” and “Bank not in EDS” to be added in ICBS. In this scenario all records are MATCH or Bank not in EDS.
+BF17.	ISBS adds the beneficiaries and responds back with “Success”.
+BF18.	OSB sends the Response File to Digital Banking.
+BF19.	Digital Banking displays a Pop-up message to the customer:
+ “Account holders’ details are confirmed. All beneficiaries were successfully added”.
+BF20.	OSB sends a push notification to Digital Banking
+“Account holders’ details are confirmed. All beneficiaries were successfully added.”
+BF21.	Digital Banking sends the push notification to the customer.
+End of Flow
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Diagram of the Basic Flow:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+6.2.	Alternative Flow – DIAS responds with No MATCH
+This AF describes the scenario were the reponse from DIAS includes records that are ‘”CLOSE MATCH”, “NO MATCH” or “VOP NOT POSSIBLE”. In such case, the Digital Banking should display these records in the Beneficiary Overview screen, enabling the customer to approve or cancel.  
+
+The process starts from the moment the customer follows the existing process to submit a Bulk Beneficiary file on Web Banking.
+Alternative Flow: 
+AF1.	Digital Banking sends the Bulk Beneficiary file to OSB.
+AF2.	OSB sends the file to SMC to check if any BICs are in the EDS Register. 
+AF3.	SMC Checks the EDS Register and finds BICs that are Registered.
+AF4.	SMC responds to OSB with a Positive Response [all or some BICs are in EDS]. 
+AF5.	OSB sends a pop-up message to the Digital Banking:
+“SGBCy can perform a Verification Of Payees, in order to confirm the Account Holders’ details for you? The check is done only for EU SEPA Countries. You will receive a Response File with the results within 10 minutes.
+
+If you have already verified the account holders’ details, please click to proceed without verification.
+
+Would you like us to proceed and confirm the accounts' details, or proceed without verification?” 
+AF6.	Digital Banking displays the pop-up message to the customer giving the option to click “Proceed with Verification” or “Submit the File without Verification”.:
+•	If Customer clicks “Submit the file without Verification”. the file is submitted through the normal Bulk Beneficiary process. – End of Flow.
+•	If customer clicks “Proceed with Verification”, proceed with below.
+AF7.	Digital Banking sends the message to OSB to proceed with Verification Of Payees.
+AF8.	OSB sends the fle to ALTERNA to register the information in the database.
+AF9.	OSB sends file to SMC.
+AF10.	SMC responds back with a Confirmation Message [Handshake].
+AF11.	OSB sends a Pop-up message to Digital Banking “We are processing your request. The process can take up to 10 minutes. You will receive a Notification when we have a results.” 
+AF12.	Digital Banking displays the message to the customer.
+AF13.	SMC converts the file submitted by the customer and sends the webservice to DIAS for Bulk VOP, only for the BICs Registered in EDS.
+AF14.	DIAS sends the Response file to SMC, within 10 minutes. Containing records “PARTIAL MATCH, “NO MATCH”, “VOP NOT POSSIBLE”.
+AF15.	SMC:
+•	Converts the response file to the Original File format, submitted by the customer, keeping the VOP Response next to each record. For BICs that are not SEPA state “Bank not in EDS” 
+•	Sends the Response file to OSB.
+AF16.	OSB sends the beneficiaries with “MATCH” and “Bank not in EDS” ONLY to be added in ICBS. 
+AF17.	ISBS adds the beneficiaries and responds back with “Success”.
+AF18.	OSB sends the Response File to Digital Banking.
+AF19.	Digital Banking displays a Pop-up message to the customer:
+ “The Responses are ready, please check the results. All beneficiaries with correct account holder details are successfully added. For Beneficiaries without a MATCH, we strongly recommend verifying the information with the account holder before you proceed. Adding these beneficiaries may lead to transferring funds to the wrong recipient. You can review each beneficiary from the Beneficiaries Overview screen and select one of the options: 
+
+• Submit the beneficiary without changes.
+• Cancel the beneficiary”.
+AF20.	OSB sends a push notification to Digital Banking:
+“The Responses are ready, please check the results. All beneficiaries with correct account holder details are successfully added. For Beneficiaries without a MATCH, we strongly recommend verifying the information with the account holder before you proceed. Adding these beneficiaries may lead to transferring funds to the wrong recipient. You can review each beneficiary from the Beneficiaries Overview screen.”
+AF21.	Digital Banking sends the push notification to the customer.
+By clicking on the push notification, the system takes the customer directly to the Beneficiaries Overview screen.
+AF22.	Customer selects “Submit Beneficiary” [one by one or all, as shown in the screen below] and Digital Banking sends the specific beneficiaries in OSB. This action should be done by the Inputer.
+For Beneficiaries that the customer selects “Cancel” – End of Flow
+AF23.	OSB sends a message to ICBS to add the Beneficiary
+AF24.	ICBS responds with a “Success” message:
+AF25.	OSB sends a Pop Up message to Digital Banking 
+“Beneficiary added successfully”
+AF26.	Digital Banking dispays the Pop Up message to the customer.  
+End of Flow
+
+
+
+
+
+
+
+
+Diagram of the Alternative  Flow:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sample of the Beneficiaries Overview Screen:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+When customer clicks on a Beneficiary
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+6.3.	Alternative Flow Verification of Payee BULK – NO BICs in EDS Directory.
+This AF describes the scenario when the file does not contain any BICs registered in the EDS Directory. In this case SMC should respond back with a Negative Response and OSB should add the Beneficiaries in ICBS as per the current procees.Inform the customer that all beneficiaries were added.
+
+Alternative Flow:
+AF1.	Digital Banking sends the Bulk Beneficiary file to OSB.
+AF2.	OSB sends the file to SMC to check if any BICs are in the EDS Register. 
+AF3.	SMC Checks the EDS Register and finds No BICs that are Registered.
+AF4.	SMC responds to OSB with a Negative Response. 
+AF5.	OSB sends the file to ALTERNA to add the records in the database.
+AF6.	OSB sends a message to ICBS to add the beneficiaries.
+AF7.	ICBS responds back with success.
+AF8.	OSB sends a Pop-up message to Digital Banking “Beneficiaries added successfully”.
+AF9.	Digital Banking displays the popup message to the customer.
+AF10.	OSB sends a Push Notification to Digital Banking “Beneficiaries added successfully”.
+AF11.	Digital Banking sends the Push Notification to the customer.
+		  End of Flow
+
+Diagram of the Alternative Flow:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+6.4.	Alternative Flow Verification of Payee BULK - DIAS not available
+This AF describes the scenario where DIAS is not available to perform a Bulk VOP. In this case the customer should be advised to try again later, but given the choice to proceed without verification. 
+
+Alternative Flow:
+AF1.	Digital Banking sends the Bulk Beneficiary file to OSB.
+AF2.	OSB sends the file to SMC to check if any BICs are in the EDS Register. 
+AF3.	SMC Checks the EDS Register and finds BICs that are Registered.
+AF4.	SMC responds to OSB with a Positive Response [all or some BICs are in EDS]. 
+AF5.	OSB sends a pop-up message to the Digital Banking:
+“SGBCy can perform a Verification Of Payees, in order to confirm the Account Holders’ details for you? The check is done only for EU SEPA Countries. You will receive a Response File with the results within 10 minutes.
+
+If you have already verified the account holders’ details, please click to proceed without verification.
+
+Would you like us to proceed and confirm the accounts' details, or proceed without verification?” 
+AF6.	Digital Banking displays the pop-up message to the customer giving the option to click “Proceed with Verification” or “Submit the File without Verification”
+•	If Customer clicks “Submit the file without Verification”. the file is submitted through the normal Bulk Beneficiary process. – End of Flow.
+•	If customer clicks “Proceed with Verification”, proceed with below.
+AF7.	Digital Banking sends the file to OSB to proceed with Verification Of Payees.
+AF8.	OSB sends the file to ALTERNA to register the information in the database.
+AF9.	OSB sends file to SMC.
+AF10.	SMC responds back with a Confirmation Message [Handshake].
+AF11.	OSB sends a Pop-up message to Digital Banking: 
+“We are processing your request. The process can take up to 10 minutes. You will receive a Notification when we have a results.” 
+AF12.	Digital Banking displays the message to the customer.
+AF13.	SMC converts the file submitted by the customer and sends the webservice to DIAS for Bulk VOP, only for the BICs Registered in EDS.
+AF14.	SMC after not receiving a response from DIAS in 5 seconds, sends a negative message to OSB.
+AF15.	OSB sends the Response File to Digital Banking.
+AF16.	Digital Banking displays a Pop-up message to the customer:
+ “Verification of Payees is not possible at the moment. We strongly recommend to try again later. Adding beneficiaries without verification may lead to transferring funds to the wrong recipient.  Please select one of the options: 
+
+• Submit beneficiaries without verification
+• Cancel the process”.
+AF17.	OSB sends a push notification to Digital Banking:
+“Verification of Payees is not possible at the moment. We strongly recommend to try again later. Adding beneficiaries without verification may lead to transferring funds to the wrong recipient. Please login to SGBCy Web Banking, action is required.”
+AF18.	Digital Banking sends the push notification to the customer.
+AF19.	Digital Banking:
+a.	If customer selects “Cancel the process” – End of Flow
+b.	If customer selects “Submit Beneficiaries without verification” sends all the beneficiaries to OSB.
+AF20.	OSB sends a message to ICBS to add the Beneficiaries
+AF21.	ICBS responds with a “Success” message:
+AF22.	OSB sends a Pop Up message to Digital Banking 
+“Beneficiary successfully added”
+AF23.	Digital Banking dispays the Pop Up message to the customer.  
+AF24.	OSB sends a Push Notification to Digital Banking:
+“Beneficiaries successfully added”
+AF25.	Digital Banking sends the Push Notification to the customer.  
+End of Flow 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Diagram of the Alternative Flow:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1.	Appendix
+
+1.1.	Instant Payment Regulation
+
+
+
+1.2.	VOP Rulebook
+
+
+
+1.3.	VOP -API Specifications
+
+
+
