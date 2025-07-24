@@ -1,87 +1,11 @@
--- SQL Query To Get Checksum 
+Bonjour Mme Abou-Sleiman,
 
-DECLARE @CurrentHashedValue VARBINARY(20);  -- SHA1 produces 20 bytes
+J’espère que vous allez bien.
 
-SELECT @CurrentHashedValue = HASHBYTES('SHA1',
-	(
-		SELECT Code, Description, CreatedBy, CAST(CreatedDate AS DATE) AS CreatedDate
-		FROM table
-		FOR XML RAW
-	)
-);
+Je me permets de vous contacter afin de vous remettre un document intitulé "attestation de travail", émis par mon université, que je dois faire signer par votre service.
 
+Par ailleurs, je souhaiterais également obtenir une attestation de travail officielle délivrée par l’entreprise.
 
+Je reste à votre disposition pour toute information complémentaire et vous remercie par avance pour votre aide.
 
-
-
-
-
--- Stored Procedure to Redeem Points --
-
-CREATE PROCEDURE dbo.RedeemPoints
-  @RedeemPoints DECIMAL(18,4)
-AS
-BEGIN
-  SET NOCOUNT ON;
-
-  DECLARE @TotalRemaining DECIMAL(18,4);
-
- /* Calculate the total points still available */
-  SELECT
-    @TotalRemaining = SUM(AddedPoints - RedeemedPoints)
-  FROM dbo.t_Transaction
-  WHERE ExpiryDate >= GETDATE()
-    AND AddedPoints > RedeemedPoints;
-
-  /* Check that the requested amount does not exceed the remaining total */
-  IF @RedeemPoints > ISNULL(@TotalRemaining, 0)
-  BEGIN
-    PRINT(
-      'Impossible: you are requesting: ' + CAST(@RedeemPoints AS NVARCHAR(MAX)) + ' points, while only ' + CAST(@TotalRemaining AS NVARCHAR(MAX)) + ' remain.' 
-    );
-    RETURN;
-  END
-
-  ;WITH ToProcess AS (
-    -- 1) only‐not‐expired rows with points left
-    SELECT
-      TransactionID,
-      AddedPoints,
-      RedeemedPoints,
-      Remaining = AddedPoints - RedeemedPoints,
-      -- running total of all Remaining up to this row (ordered by ExpiryDate ASC)
-      CumRemaining = 
-        SUM(AddedPoints - RedeemedPoints) 
-          OVER (
-            ORDER BY ExpiryDate ASC, CreatedDate ASC
-            ROWS UNBOUNDED PRECEDING
-          )
-    FROM dbo.t_Transaction
-    WHERE ExpiryDate >= GETDATE()
-      AND AddedPoints > RedeemedPoints
-  ),
-  Allocation AS (
-    -- 2) compute per‐row how much to apply
-    SELECT
-      TransactionID,
-      RedeemAmount = CASE
-        -- if your redeem budget reaches/passes this row’s cum total, take all of this row’s Remaining
-        WHEN CumRemaining <= @RedeemPoints 
-          THEN Remaining
-        -- else if budget hasn’t reached this row’s ending boundary, but is > the prior cum total,
-        -- take only the remainder of budget after prior rows
-        WHEN (CumRemaining - Remaining) < @RedeemPoints 
-          THEN @RedeemPoints - (CumRemaining - Remaining)
-        -- otherwise take none
-        ELSE 0
-      END
-    FROM ToProcess
-  )
-  -- 3) apply only where RedeemAmount > 0
-  UPDATE T
-    SET RedeemedPoints = T.RedeemedPoints + A.RedeemAmount
-  FROM t_Transaction AS T
-  JOIN Allocation AS A
-    ON T.TransactionID = A.TransactionID
-  WHERE A.RedeemAmount > 0;
-END;
+Bien cordialement,
