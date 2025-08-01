@@ -1,19 +1,8 @@
-Hetzner Online GmbH
+Dear Reine,
 
-Industriestr 25
+-	Issue related to “Beneficiary (file)” is now fixed, we need you to try and generate a T24 file again and then upload in to T24. Let us know if it worked.
 
-Gunzenhausen
-
-91710
-
-Germany
-
-Deutsche Bank AG
-
-Germany
-
-DE92760700120750007700
-
-DEUTDEMM760
-
-Taunusanlage 12 60325 Frankfurt am Main
+-	Issue related to both accounts “010691404002422” and “010283427004422” were caused because T24 PROD and T24 UAT are not live synchronized,
+So what happened is the following:
+	010691404002422 on PROD is set as “Salary Account - Public sector” but on UAT it is still “Current Account”
+	010283427004422 is found on PROD but is still not yet created on UAT
