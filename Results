@@ -1,8 +1,16 @@
 Dear Reine,
 
--	Issue related to “Beneficiary (file)” is now fixed, we need you to try and generate a T24 file again and then upload in to T24. Let us know if it worked.
+I hope you're doing well.
 
--	Issue related to both accounts “010691404002422” and “010283427004422” were caused because T24 PROD and T24 UAT are not live synchronized,
-So what happened is the following:
-	010691404002422 on PROD is set as “Salary Account - Public sector” but on UAT it is still “Current Account”
-	010283427004422 is found on PROD but is still not yet created on UAT
+The issue related to the "Beneficiary (file)" has been resolved. Please try generating the T24 file again and upload it to T24. Kindly let us know if it works as expected.
+
+Regarding the accounts 010691404002422 and 010283427004422, the issue stems from the lack of live synchronization between T24 PROD and T24 UAT environments.
+Here’s what we observed:
+
+010691404002422 is set as "Salary Account - Public Sector" on PROD, but it still appears as "Current Account" on UAT.
+
+010283427004422 exists on PROD but has not yet been created on UAT.
+
+
+
+Please feel free to reach out if you need any further clarification.
