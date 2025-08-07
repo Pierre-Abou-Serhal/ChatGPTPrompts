@@ -1,7 +1,11 @@
 Dear Dimitri,
 
-Can you please double check the if anything has been modified for “paie.sgbl@sgbl.com” in the Microsoft Exchange configurations ?
+Could you please verify whether any changes have been made to the Microsoft Exchange configurations for paie.sgbl@sgbl.com?
 
-Because I have checked the logs and it appeas that From 2025/08/03, when an email is being received, it is failing to saving in Alterna Salma.
+Upon reviewing the logs, I noticed that starting from August 3, 2025, incoming emails to this address have been consistently failing to be saved in Alterna Salma.
 
-This is the error that for every email from 2025/08/03 up to today:
+The following error has been occurring for every email received since that date:
+
+"[Insert specific error message here if available]"
+
+Your assistance in checking this would be greatly appreciated.
