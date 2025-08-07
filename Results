@@ -1,12 +1,17 @@
-Dears,
+Dear All,
 
-This is the Json Object that will be used for the onboarding process:
+Please find below the JSON object intended for use in the onboarding process.
 
-Find in Red the taxResidencyDetails.
-In this object, there is three repetitive fields:
+Highlighted in red are the taxResidencyDetails. Within this object, there are three sets of repetitive fields:
 
-1.	haveTinNumber, haveTinNumber1, haveTinNumber2, haveTinNumber3
-2.	countryOfTaxResidence, countryOfTaxResidence1, countryOfTaxResidence2, countryOfTaxResidence3
-3.	tinNumber, tinNumber1, tinNumber2, tinNumber3
+1. haveTinNumber, haveTinNumber1, haveTinNumber2, haveTinNumber3
 
-Will these fields always have a maximum number of 4 ? or can the customer have more than 4 tin numbers ?
+
+2. countryOfTaxResidence, countryOfTaxResidence1, countryOfTaxResidence2, countryOfTaxResidence3
+
+
+3. tinNumber, tinNumber1, tinNumber2, tinNumber3
+
+
+
+Could you please confirm whether the number of these fields is fixed at a maximum of four, or if a customer can potentially have more than four TIN numbers?
