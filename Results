@@ -1,11 +1,12 @@
-Dear Dimitri,
+Dears,
 
-Could you please verify whether any changes have been made to the Microsoft Exchange configurations for paie.sgbl@sgbl.com?
+This is the Json Object that will be used for the onboarding process:
 
-Upon reviewing the logs, I noticed that starting from August 3, 2025, incoming emails to this address have been consistently failing to be saved in Alterna Salma.
+Find in Red the taxResidencyDetails.
+In this object, there is three repetitive fields:
 
-The following error has been occurring for every email received since that date:
+1.	haveTinNumber, haveTinNumber1, haveTinNumber2, haveTinNumber3
+2.	countryOfTaxResidence, countryOfTaxResidence1, countryOfTaxResidence2, countryOfTaxResidence3
+3.	tinNumber, tinNumber1, tinNumber2, tinNumber3
 
-"[Insert specific error message here if available]"
-
-Your assistance in checking this would be greatly appreciated.
+Will these fields always have a maximum number of 4 ? or can the customer have more than 4 tin numbers ?
