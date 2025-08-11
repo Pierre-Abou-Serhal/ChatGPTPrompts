@@ -1,17 +1,87 @@
-Dear All,
+for $CardDetailsAPIRecord in $request/ns1:GetCardsByClientV2Result/ns1:OutObject/ns1:CardDetailsAPIRecord
+                where 
+                (
+                    (fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '14'
+                                    and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '03' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '41' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '43' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '36' and 
+                    fn:data($CardDetailsAPIRecord/ns1:ExternalCode) != '02;WS-WARM' and 
+                    (fn:data($CardDetailsAPIRecord/ns1:Status) != 'WARM') and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '04' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '05' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '01' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '37' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '38' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '62' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '66' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '67' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '75' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '76' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '07' and 
+                    fn:data($CardDetailsAPIRecord/ns1:StatusCode) != '08') 
+                    or 
+                    (fn:data($CardDetailsAPIRecord/ns1:StatusCode) = '36' and fn:data($CardDetailsAPIRecord/ns1:ExternalCode) = '02;WS-WARM')
+                    or
+                    (fn:data($CardDetailsAPIRecord/ns1:ProductionStatus) = 'L;Locked')
+                    and 
+                    fn:upper-case(fn-bea:trim(fn:substring-after(fn:data($CardDetailsAPIRecord/ns1:Product),'-'))) != 'PPM'
+                                        and 
+                    fn:upper-case(fn-bea:trim(fn:substring-after(fn:data($CardDetailsAPIRecord/ns1:Product),'-'))) != 'PPV'
+                                        and 
+                    fn:upper-case(fn-bea:trim(fn:substring-after(fn:data($CardDetailsAPIRecord/ns1:Product),'-'))) != 'PPW'
+                                        and 
+                    fn:upper-case(fn-bea:trim(fn:substring-after(fn:data($CardDetailsAPIRecord/ns1:Product),'-'))) != 'PPE'
+                                        and 
+                    not(fn:contains(fn:upper-case(fn:data($CardDetailsAPIRecord/ns1:Product)),'PRIORITY PASS')) )
 
-Please find below the JSON object intended for use in the onboarding process.
-
-Highlighted in red are the taxResidencyDetails. Within this object, there are three sets of repetitive fields:
-
-1. haveTinNumber, haveTinNumber1, haveTinNumber2, haveTinNumber3
-
-
-2. countryOfTaxResidence, countryOfTaxResidence1, countryOfTaxResidence2, countryOfTaxResidence3
-
-
-3. tinNumber, tinNumber1, tinNumber2, tinNumber3
 
 
 
-Could you please confirm whether the number of these fields is fixed at a maximum of four, or if a customer can potentially have more than four TIN numbers?
+
+
+<CardDetailsAPIRecord>
+    <Institution>730;SGBL</Institution>
+    <Branch>060;STAFF</Branch>
+    <ClientCategory>P;Private</ClientCategory>
+    <ProductCategory>C;Issuing</ProductCategory>
+    <ContractCategory>C;Card</ContractCategory>
+    <ParentProduct>161104000000000000015014;002-DEBIT MC PLAT USD MAIN</ParentProduct>
+    <CounterpartChannel>E;MasterCard (IPM)</CounterpartChannel>
+    <CardNumber>5175771006135267</CardNumber>
+    <CardName>PATRICIA KHADRA</CardName>
+    <Product>250701000000000000024120;002-DEBIT MC PLAT VIRTUAL USD SUB</Product>
+    <DateOpen>2025-06-10</DateOpen>
+    <ExpirationDate>3006</ExpirationDate>
+    <Available>99999999999.99</Available>
+    <Currency>840;USD</Currency>
+    <Blocked>0</Blocked>
+    <CreditLimit>0</CreditLimit>
+    <AddLimit>0</AddLimit>
+    <CBSNumber>010460784002840</CBSNumber>
+    <SequenceNumber>1</SequenceNumber>
+    <OrderReason>NDVC;New Digital Virtual Card</OrderReason>
+    <AvailableProductionAction>Mark</AvailableProductionAction>
+    <ProductCode>DEBIT_MC_PLAT_VIRTUAL_USD_SUB</ProductCode>
+    <ParentProductCode>DEBIT_MC_PLAT_USD_MAIN</ParentProductCode>
+    <MaxPinAttempts>3</MaxPinAttempts>
+    <PinAttemptsCounter>0</PinAttemptsCounter>
+    <RiskFactor>1;&lt;&lt;1>></RiskFactor>
+    <EmbossedFirstName>PATRICIA VIRT CARD</EmbossedFirstName>
+    <EmbossedLastName>.</EmbossedLastName>
+    <AddInfo03>INQUIRY=Y; RESIDENT = R;</AddInfo03>
+    <CustomRules>AS=&lt;ASV170124095542>&lt;SOV170124095542>;SP=&lt;SPV250807144707>&lt;SPA35110>;NO_SUBS;NO_LIABS;INIT_EVNT;</CustomRules>
+    <Status>14;Card OK</Status>
+    <StatusCode>00</StatusCode>
+    <ProductionStatus>R;Ready</ProductionStatus>
+    <Ready>Y;Yes</Ready>
+    <ExternalCode>00;Card OK</ExternalCode>
+    <ID>40870760</ID>
+    <AmendmentDate>2025-07-18T14:23:11</AmendmentDate>
+    <Client>847705;PATRICIA YOUSSEF KHADRA</Client>
+    <Parent>40870750;002-P-8954706</Parent>
+    <ServPack>90500</ServPack>
+    <AmendmentOfficer>2065;WX Administrator SGBL</AmendmentOfficer>
+    </CardDetailsAPIRecord>
+    
