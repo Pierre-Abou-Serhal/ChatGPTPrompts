@@ -1,68 +1,116 @@
-// Endpoint
-app.MapPost("/api/session", async Task<Results<Ok<CreateSessionResponse>, BadRequest<string>>> (
-        /// <summary>Creates a session via the upstream gateway.</summary>
-        /// <param name="request">Payload with session.authenticationLimit.</param>
-        /// <returns>The upstream CreateSession response.</returns>
-        CreateSessionRequest request,
-        IGatewayClient client,
-        CancellationToken ct) =>
-    {
-        if (request?.Session is null || request.Session.AuthenticationLimit <= 0)
-            return TypedResults.BadRequest("Invalid request: 'session.authenticationLimit' must be > 0.");
+Initialize API configuration example
 
-        try
-        {
-            var result = await client.CreateSessionAsync(request, ct);
-            return TypedResults.Ok(result);
+<html>
+    <head>
+    <script src="../../../../../../../static/threeDS/1.3.0/three-ds.min.js"
+            data-error="errorCallback"
+            data-cancel="cancelCallback">
+    </script>
+
+    <script type="text/javascript">
+        //The output of this call will return 'false', since the API is not configured yet
+        console.log(ThreeDS.isConfigured());
+        /**
+        Configure method with the configuration{} parameter set and demonstrates the state change of the ThreeDS object before and after the configure method is invoked.
+        */
+        ThreeDS.configure({
+            merchantId: {merchantId},
+            sessionId: {sessionId},
+            containerId: "3DSUI",
+            callback: function () {
+                if (ThreeDS.isConfigured())
+                    console.log("Done with configure");
+            },
+            configuration: {
+                userLanguage: "en-AU", //Optional parameter
+                wsVersion: 81
+            }
+        });
+
+        //The output of this call will return 'true', since the API is configured
+        console.log(ThreeDS.isConfigured());
+
+        //The output of the following code might look like "ThreeDS JS API Version : 1.2.0"
+        console.log("ThreeDS JS API Version : " + ThreeDS.version);
+    </script>
+    </head>
+    <body>
+        <div id="3DSUI"></div>
+    </body>
+</html>
+
+Initiate authentication request example
+
+var optionalParams = {
+    sourceOfFunds: {
+        type: "CARD"
+    },
+};
+
+ThreeDS.initiateAuthentication({orderId}, {transactionId}, function (data) {
+    if (data && data.error) {
+        var error = data.error;
+
+        //Something bad happened, the error value will match what is returned by the Authentication API
+        console.error("error.code : ", error.code);
+        console.error("error.msg : ", error.msg);
+        console.error("error.result : ", error.result);
+        console.error("error.status : ", error.status);
+    } else {
+        console.log("After Initiate 3DS ", data);
+
+        //data.response will contain information like gatewayRecommendation, authentication version, and so on.
+        console.log("REST API raw response ", data.restApiResponse);
+        console.log("Correlation Id", data.correlationId);
+        console.log("Gateway Recommendation", data.gatewayRecommendation);
+        console.log("HTML Redirect Code", data.htmlRedirectCode);
+        console.log("Authentication Version", data.authenticationVersion);
+
+        switch (data.gatewayRecommendation) {
+            case "PROCEED":
+                authenticatePayer();//merchant's method
+                break;
+            case "RESUBMIT_WITH_ALTERNATIVE_PAYMENT_DETAILS":
+               tryOtherPayment();//Card does not support 3DS and transaction filtering rules require 3DS on this transaction: Ask the payer to select a different payment method.
+                break;
         }
-        catch (HttpRequestException ex)
-        {
-            return TypedResults.BadRequest($"CreateSession failed: {ex.Message}");
+    }
+}, optionalParams);
+
+Authenticate payer request example
+
+var optionalParams = {
+    fullScreenRedirect: true,
+    billing: {
+        address: {
+            city: "London",
+            country: "GBR"
         }
-    })
-    .WithName("CreateSession");               // 🔹 Improves Swagger operation naming
-
-app.MapPut("/api/rest/version/{version}/merchant/{merchantId}/session/{session}",
-        async (string version,
-            string merchantId,
-            string session,
-            JsonDocument body,
-            IGatewayClient client,
-            CancellationToken ct) =>
-        {
-            // Optionally validate version/merchant vs config here if you want to restrict.
-            try
-            {
-                var resultDoc = await client.PutToSessionAsync(session, body, version, merchantId, ct);
-
-                // Return upstream JSON as-is
-                return Results.Content(resultDoc.RootElement.GetRawText(), "application/json");
-            }
-            catch (HttpRequestException ex)
-            {
-                return Results.BadRequest($"Upstream call failed: {ex.Message}");
-            }
-        })
-    .WithName("PutSessionAction");
-
-app.MapPut("/api/rest/version/{version}/merchant/{merchantId}/order/{orderId}/transaction/{transactionId}",
-        async (string version,
-            string merchantId,
-            string orderId,
-            string transactionId,
-            JsonDocument body,
-            IGatewayClient client,
-            CancellationToken ct) =>
-        {
-            try
-            {
-                var resultDoc =
-                    await client.PutOrderTransactionAsync(orderId, transactionId, body, version, merchantId, ct);
-                return Results.Content(resultDoc.RootElement.GetRawText(), "application/json");
-            }
-            catch (HttpRequestException ex)
-            {
-                return Results.BadRequest($"Upstream call failed: {ex.Message}");
-            }
-        })
-    .WithName("InitiateAuthentication");
+    }
+};
+ 
+ThreeDS.authenticatePayer({orderId}, {transactionId}, function (data) {
+    if (!data.error) {
+        //data.response will contain all the response payload from the AUTHENTICATE_PAYER call.
+        console.log("REST API response ", data.restApiResponse);
+        console.log("HTML redirect code", data.htmlRedirectCode);
+        displayReceipt(data);
+    }
+}, optionalParams);
+ 
+ 
+function displayReceipt(apiResponse) {
+    var responseBody = {
+        "apiResponse": apiResponse
+    };
+ 
+    var xhr = new XMLHttpRequest();
+    xhr.open('PUT', '3dsreceipt', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState == XMLHttpRequest.DONE) {
+            document.documentElement.innerHTML = this.response;
+        }
+    }
+    xhr.send(JSON.stringify(responseBody));
+}
