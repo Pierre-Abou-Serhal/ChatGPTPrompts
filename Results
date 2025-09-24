@@ -1,116 +1,319 @@
-Initialize API configuration example
+Awesome—here’s a self-contained **demo HTML** that uses your **ThreeDS.min.js** and calls **your three proxy endpoints** exactly as you mapped them:
 
-<html>
-    <head>
-    <script src="../../../../../../../static/threeDS/1.3.0/three-ds.min.js"
-            data-error="errorCallback"
-            data-cancel="cancelCallback">
+* `POST /api/session` → get `session.id`
+* `PUT /api/rest/version/{version}/merchant/{merchantId}/session/{session}` → (handled by SDK if you use it for other ops)
+* `PUT /api/rest/version/{version}/merchant/{merchantId}/order/{orderId}/transaction/{transactionId}` → done by SDK for `INITIATE_AUTHENTICATION` and `AUTHENTICATE_PAYER`
+
+> 🔑 Key trick: we set `window.apiUrl` **before** loading `ThreeDS.min.js`. The SDK will parse that to decide which **host** to call (your proxy), and will put the version from `wsVersion`.
+
+---
+
+### one-file demo (drop into `public/index.html` or serve statically)
+
+> Replace the `src="/static/ThreeDS.min.js"` with your actual path to the file you pasted earlier.
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MPGS 3DS Demo (via your proxy)</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+      .card { border: 1px solid #e6e6e6; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+      .row { display: grid; grid-template-columns: 180px 1fr; gap: 10px; align-items: center; margin: 8px 0; }
+      label { font-size: 14px; color: #333; }
+      input, select, textarea { padding: 8px; border: 1px solid #d0d0d0; border-radius: 8px; width: 100%; }
+      button { padding: 10px 14px; border: 0; border-radius: 10px; background: #111827; color: white; cursor: pointer; }
+      button.secondary { background: #374151; }
+      button:disabled { background: #9ca3af; cursor: not-allowed; }
+      pre { background: #0b1020; color: #e6fffb; padding: 12px; border-radius: 10px; max-height: 320px; overflow: auto; }
+      small { color: #666; }
+      .ok { color: #059669; font-weight: 600; }
+      .err { color: #dc2626; font-weight: 600; }
+      .muted { color: #6b7280; }
+    </style>
+
+    <!-- IMPORTANT: Point the SDK at YOUR proxy host -->
+    <script>
+      // If you host this page at the same origin as your API, you can leave this as location.origin
+      // Otherwise, set to your API base URL (the SDK only needs the host part)
+      window.apiUrl = location.origin; // e.g., "https://your-api.example.com"
     </script>
 
-    <script type="text/javascript">
-        //The output of this call will return 'false', since the API is not configured yet
-        console.log(ThreeDS.isConfigured());
-        /**
-        Configure method with the configuration{} parameter set and demonstrates the state change of the ThreeDS object before and after the configure method is invoked.
-        */
-        ThreeDS.configure({
-            merchantId: {merchantId},
-            sessionId: {sessionId},
-            containerId: "3DSUI",
+    <!-- Load the MPGS ThreeDS SDK (your provided minified file) -->
+    <script
+      src="/static/ThreeDS.min.js"
+      data-error="errorCallback"
+      data-cancel="cancelCallback"
+    ></script>
+  </head>
+  <body>
+    <h1>MPGS 3DS Demo</h1>
+    <p class="muted">This page uses <code>ThreeDS.min.js</code> and your proxy endpoints to run the full 3DS flow.</p>
+
+    <div class="card">
+      <div class="row">
+        <label>API Host (derived)</label>
+        <input id="apiHost" disabled />
+      </div>
+      <div class="row">
+        <label>API Version (<code>wsVersion</code>)</label>
+        <input id="wsVersion" value="100" />
+      </div>
+      <div class="row">
+        <label>Merchant ID</label>
+        <input id="merchantId" placeholder="002M7270" />
+      </div>
+      <div class="row">
+        <label>Authentication Limit</label>
+        <input id="authLimit" type="number" min="1" value="25" />
+      </div>
+      <div class="row">
+        <label>Order ID</label>
+        <input id="orderId" placeholder="123123" />
+      </div>
+      <div class="row">
+        <label>Transaction ID</label>
+        <input id="transactionId" placeholder="1" value="1" />
+      </div>
+      <div class="row">
+        <label>Full Screen Redirect</label>
+        <select id="fsRedirect">
+          <option value="true">true</option>
+          <option value="false" selected>false</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Session ID</label>
+        <input id="sessionId" placeholder="(auto after Create Session)" disabled />
+      </div>
+      <div class="row">
+        <label></label>
+        <div style="display:flex; gap:8px; flex-wrap: wrap;">
+          <button id="btnCreateSession">1) Create Session</button>
+          <button id="btnConfigure" class="secondary" disabled>2) Configure SDK</button>
+          <button id="btnInitiate" class="secondary" disabled>3) Initiate Authentication</button>
+          <button id="btnAuthenticate" class="secondary" disabled>4) Authenticate Payer</button>
+        </div>
+      </div>
+      <small>
+        Tip: Step 3 calls <code>INITIATE_AUTHENTICATION</code> and Step 4 calls <code>AUTHENTICATE_PAYER</code>.
+        The SDK will call your proxy at <code>/api/rest/version/{version}/merchant/{merchantId}/order/{orderId}/transaction/{transactionId}</code>.
+      </small>
+    </div>
+
+    <div class="card">
+      <div class="row"><label>Status</label><div id="status" class="muted">Idle</div></div>
+      <div class="row" style="align-items:start;">
+        <label>Log</label>
+        <pre id="log"></pre>
+      </div>
+    </div>
+
+    <!-- Where the SDK injects its iframes / forms if needed -->
+    <div id="3DSUI" class="card"></div>
+
+    <script>
+      const els = {
+        apiHost: document.getElementById('apiHost'),
+        wsVersion: document.getElementById('wsVersion'),
+        merchantId: document.getElementById('merchantId'),
+        authLimit: document.getElementById('authLimit'),
+        orderId: document.getElementById('orderId'),
+        transactionId: document.getElementById('transactionId'),
+        fsRedirect: document.getElementById('fsRedirect'),
+        sessionId: document.getElementById('sessionId'),
+        btnCreateSession: document.getElementById('btnCreateSession'),
+        btnConfigure: document.getElementById('btnConfigure'),
+        btnInitiate: document.getElementById('btnInitiate'),
+        btnAuthenticate: document.getElementById('btnAuthenticate'),
+        status: document.getElementById('status'),
+        log: document.getElementById('log')
+      };
+
+      // Helper logging
+      const log = (...args) => {
+        console.log(...args);
+        els.log.textContent += args.map(a => {
+          try { return typeof a === 'string' ? a : JSON.stringify(a, null, 2); }
+          catch { return String(a); }
+        }).join(' ') + '\n';
+        els.log.scrollTop = els.log.scrollHeight;
+      };
+      const setStatus = (text, cls='muted') => {
+        els.status.className = cls;
+        els.status.textContent = text;
+      };
+
+      // Show derived host
+      try {
+        const url = new URL(window.apiUrl, location.href);
+        els.apiHost.value = url.host;
+      } catch {
+        els.apiHost.value = '(check window.apiUrl)';
+      }
+
+      // Step 1: Create session (your proxy)
+      els.btnCreateSession.onclick = async () => {
+        setStatus('Creating session...', 'muted');
+        try {
+          const res = await fetch('/api/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session: { authenticationLimit: Number(els.authLimit.value || 25) } })
+          });
+          if (!res.ok) {
+            const errTxt = await res.text();
+            throw new Error(`CreateSession failed: ${errTxt}`);
+          }
+          const data = await res.json();
+          log('CreateSession response:', data);
+          const sid = data?.session?.id;
+          if (!sid) throw new Error('No session.id in response');
+          els.sessionId.value = sid;
+          setStatus('Session created ✔', 'ok');
+          els.btnConfigure.disabled = false;
+        } catch (err) {
+          log('CreateSession error:', err);
+          setStatus('CreateSession failed', 'err');
+        }
+      };
+
+      // Step 2: Configure SDK
+      els.btnConfigure.onclick = () => {
+        try {
+          const merchantId = els.merchantId.value.trim();
+          const sessionId = els.sessionId.value.trim();
+          const wsVersion = Number(els.wsVersion.value || 100);
+
+          if (!merchantId) { alert('Merchant ID required'); return; }
+          if (!sessionId)  { alert('Session ID required (Create Session first)'); return; }
+
+          log('ThreeDS.isConfigured() before:', ThreeDS.isConfigured());
+
+          ThreeDS.configure({
+            merchantId,
+            sessionId,
+            containerId: '3DSUI',
             callback: function () {
-                if (ThreeDS.isConfigured())
-                    console.log("Done with configure");
+              if (ThreeDS.isConfigured()) {
+                log('ThreeDS configured');
+                setStatus('SDK configured ✔', 'ok');
+                els.btnInitiate.disabled = false;
+                els.btnAuthenticate.disabled = false; // you can allow direct call if needed
+              }
             },
             configuration: {
-                userLanguage: "en-AU", //Optional parameter
-                wsVersion: 81
+              userLanguage: navigator.language || 'en-US',
+              wsVersion
             }
-        });
+          });
 
-        //The output of this call will return 'true', since the API is configured
-        console.log(ThreeDS.isConfigured());
+          log('ThreeDS.isConfigured() after:', ThreeDS.isConfigured());
+          log('ThreeDS JS API Version:', ThreeDS.version);
+        } catch (err) {
+          log('Configure error:', err);
+          setStatus('Configure failed', 'err');
+        }
+      };
 
-        //The output of the following code might look like "ThreeDS JS API Version : 1.2.0"
-        console.log("ThreeDS JS API Version : " + ThreeDS.version);
+      // Step 3: Initiate Authentication
+      els.btnInitiate.onclick = () => {
+        setStatus('Initiating authentication...', 'muted');
+
+        const orderId = els.orderId.value.trim();
+        const transactionId = els.transactionId.value.trim() || '1';
+
+        const optionalParams = {
+          sourceOfFunds: { type: 'CARD' } // optional; SDK builds the rest
+        };
+
+        ThreeDS.initiateAuthentication(orderId, transactionId, (data) => {
+          if (data && data.error) {
+            log('INITIATE_AUTHENTICATION error:', data.error);
+            setStatus('Initiate failed', 'err');
+            return;
+          }
+          log('INITIATE_AUTHENTICATION data:', data);
+          log('REST API raw response:', data.restApiResponse);
+          log('Correlation Id:', data.correlationId);
+          log('Gateway Recommendation:', data.gatewayRecommendation);
+          log('HTML Redirect Code:', data.htmlRedirectCode);
+          log('Authentication Version:', data.authenticationVersion);
+
+          if (data.gatewayRecommendation === 'PROCEED') {
+            setStatus('Initiated ✔ — proceed to Authenticate', 'ok');
+          } else if (data.gatewayRecommendation === 'RESUBMIT_WITH_ALTERNATIVE_PAYMENT_DETAILS') {
+            setStatus('Card not eligible for 3DS — try different payment details', 'err');
+          } else {
+            setStatus(`Gateway recommendation: ${data.gatewayRecommendation}`, 'muted');
+          }
+        }, optionalParams);
+      };
+
+      // Step 4: Authenticate Payer
+      els.btnAuthenticate.onclick = () => {
+        setStatus('Authenticating payer...', 'muted');
+
+        const orderId = els.orderId.value.trim();
+        const transactionId = els.transactionId.value.trim() || '1';
+
+        const optionalParams = {
+          fullScreenRedirect: (els.fsRedirect.value === 'true'),
+          billing: {
+            address: {
+              city: "London",
+              country: "GBR"
+            }
+          }
+        };
+
+        ThreeDS.authenticatePayer(orderId, transactionId, (data) => {
+          if (data && data.error) {
+            log('AUTHENTICATE_PAYER error:', data.error);
+            setStatus('Authenticate failed', 'err');
+            return;
+          }
+          log('AUTHENTICATE_PAYER response:', data.restApiResponse);
+          log('HTML redirect code (if any):', data.htmlRedirectCode);
+          setStatus('Authenticated ✔', 'ok');
+
+          // Example: Display a simple receipt
+          const receipt = {
+            orderId,
+            transactionId,
+            result: data.restApiResponse?.result,
+            authentication: data.restApiResponse?.authentication,
+            response: data.restApiResponse?.response
+          };
+          log('Receipt:', receipt);
+        }, optionalParams);
+      };
+
+      // SDK data-error / data-cancel hooks (optional)
+      window.errorCallback = function (err) {
+        log('ThreeDS errorCallback:', err);
+        setStatus('ThreeDS error', 'err');
+      };
+      window.cancelCallback = function () {
+        log('ThreeDS cancelCallback (challenge canceled)');
+        setStatus('Challenge canceled', 'err');
+      };
     </script>
-    </head>
-    <body>
-        <div id="3DSUI"></div>
-    </body>
+  </body>
 </html>
+```
 
-Initiate authentication request example
+---
 
-var optionalParams = {
-    sourceOfFunds: {
-        type: "CARD"
-    },
-};
+## Notes & sanity checks
 
-ThreeDS.initiateAuthentication({orderId}, {transactionId}, function (data) {
-    if (data && data.error) {
-        var error = data.error;
-
-        //Something bad happened, the error value will match what is returned by the Authentication API
-        console.error("error.code : ", error.code);
-        console.error("error.msg : ", error.msg);
-        console.error("error.result : ", error.result);
-        console.error("error.status : ", error.status);
-    } else {
-        console.log("After Initiate 3DS ", data);
-
-        //data.response will contain information like gatewayRecommendation, authentication version, and so on.
-        console.log("REST API raw response ", data.restApiResponse);
-        console.log("Correlation Id", data.correlationId);
-        console.log("Gateway Recommendation", data.gatewayRecommendation);
-        console.log("HTML Redirect Code", data.htmlRedirectCode);
-        console.log("Authentication Version", data.authenticationVersion);
-
-        switch (data.gatewayRecommendation) {
-            case "PROCEED":
-                authenticatePayer();//merchant's method
-                break;
-            case "RESUBMIT_WITH_ALTERNATIVE_PAYMENT_DETAILS":
-               tryOtherPayment();//Card does not support 3DS and transaction filtering rules require 3DS on this transaction: Ask the payer to select a different payment method.
-                break;
-        }
-    }
-}, optionalParams);
-
-Authenticate payer request example
-
-var optionalParams = {
-    fullScreenRedirect: true,
-    billing: {
-        address: {
-            city: "London",
-            country: "GBR"
-        }
-    }
-};
- 
-ThreeDS.authenticatePayer({orderId}, {transactionId}, function (data) {
-    if (!data.error) {
-        //data.response will contain all the response payload from the AUTHENTICATE_PAYER call.
-        console.log("REST API response ", data.restApiResponse);
-        console.log("HTML redirect code", data.htmlRedirectCode);
-        displayReceipt(data);
-    }
-}, optionalParams);
- 
- 
-function displayReceipt(apiResponse) {
-    var responseBody = {
-        "apiResponse": apiResponse
-    };
- 
-    var xhr = new XMLHttpRequest();
-    xhr.open('PUT', '3dsreceipt', true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.onreadystatechange = function () {
-        if (xhr.readyState == XMLHttpRequest.DONE) {
-            document.documentElement.innerHTML = this.response;
-        }
-    }
-    xhr.send(JSON.stringify(responseBody));
-}
+* **CORS**: Allow the browser to call your API from this page’s origin. In your ASP.NET app, enable CORS for `PUT`/`POST` routes above.
+* **Host detection**: The SDK uses `window.apiUrl` to extract the **host** for requests. We set it to `location.origin` so it targets your proxy.
+* **Authorization header**: The SDK sends `Authorization: Basic merchant.{merchantId}:{sessionId}`. Your proxy **doesn’t need it**, and will ignore it—this is expected.
+* **Version**: `wsVersion` should match your path version (`100`) since the SDK builds `/api/rest/version/{wsVersion}/...`.
+* **Ordering**: You must create & configure the session **before** initiating/authenticating.
+* **Security**: Don’t log PAN/CVV anywhere. This page only demonstrates the 3DS flow; keep it for testing/demo only.
