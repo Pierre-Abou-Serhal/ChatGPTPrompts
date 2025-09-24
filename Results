@@ -317,3 +317,90 @@ Awesome—here’s a self-contained **demo HTML** that uses your **ThreeDS.min.j
 * **Version**: `wsVersion` should match your path version (`100`) since the SDK builds `/api/rest/version/{wsVersion}/...`.
 * **Ordering**: You must create & configure the session **before** initiating/authenticating.
 * **Security**: Don’t log PAN/CVV anywhere. This page only demonstrates the 3DS flow; keep it for testing/demo only.
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+Yes—serve it right from your ASP.NET Minimal API. Easiest path: use **static files** with a small folder structure.
+
+## 1) Put the files in `wwwroot`
+
+```
+YourProject/
+  wwwroot/
+    3ds-demo/
+      index.html        <-- the demo page I gave you
+    static/
+      ThreeDS.min.js    <-- the SDK file you pasted
+```
+
+Update the `<script>` tag in `index.html` to:
+
+```html
+<script src="/static/ThreeDS.min.js" data-error="errorCallback" data-cancel="cancelCallback"></script>
+```
+
+## 2) Enable static files in `Program.cs`
+
+Add this **before** your endpoint mappings (after `var app = builder.Build();` is fine):
+
+```csharp
+// If you don't already have it:
+app.UseStaticFiles();      // serves files under wwwroot
+app.UseDefaultFiles();     // serves index.html for / if present (optional)
+```
+
+> If you want the demo under a nice path like `/demo`, also add:
+
+```csharp
+app.MapGet("/demo", () => Results.Redirect("/3ds-demo/index.html"));
+```
+
+Swagger and your API endpoints will continue to work as-is.
+
+## 3) (Optional) CORS for the API
+
+If you’ll open the HTML page **from the same origin** as your API (recommended), you don’t need special CORS for the page itself.
+If you plan to open the page from **another** origin, enable CORS so the browser can `POST /api/session` and `PUT /api/rest/...`:
+
+```csharp
+// before Build()
+builder.Services.AddCors(o =>
+{
+    o.AddPolicy("Demo", p =>
+        p.WithOrigins("https://your-demo-origin.example") // or .AllowAnyOrigin() in dev only
+         .AllowAnyHeader()
+         .AllowAnyMethod());
+});
+
+// after Build()
+app.UseCors("Demo");
+```
+
+## 4) Make sure the SDK points to your API
+
+In the demo HTML I set:
+
+```js
+window.apiUrl = location.origin; // SDK will call your proxy on the same host
+```
+
+Keep it like that when serving from the same app. If you host the HTML elsewhere, set `window.apiUrl` to your API’s base URL (only host/domain is used by the SDK).
+
+## 5) Run it
+
+```bash
+dotnet run
+```
+
+* Open `https://localhost:5001/3ds-demo/index.html` (or `/demo` if you mapped the redirect).
+* Click **Create Session**, then **Configure SDK**, then **Initiate** / **Authenticate**.
+
+### Notes
+
+* `Microsoft.AspNetCore.StaticFiles` is included by default in ASP.NET Core; no extra package needed.
+* Put `ThreeDS.min.js` under `/static/` so it’s served with the correct content type.
+* Keep `window.apiUrl = location.origin` so the SDK targets your proxy (not MPGS directly).
+* In production, serve over HTTPS and consider caching headers for static assets.
+
