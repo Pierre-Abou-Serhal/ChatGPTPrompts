@@ -1,95 +1,245 @@
-I want to add an endpoint: /api/rest/version/100/merchant/{{merchantId}}/session/{{session}}
+Great—let’s add a second proxy endpoint that mirrors the upstream path and forwards the JSON body with Basic Auth.
 
-The request:
+Below are **surgical diffs** you can drop into your existing project.
+
+---
+
+## 1) Update the gateway client
+
+### `Gateway/GatewayClient.cs` (add a new method + small helper)
+
+```csharp
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Options;
+using YourProject.Contracts;
+
+namespace YourProject.Gateway;
+
+public interface IGatewayClient
 {
-    "accountFunding": {
-        "senderType": "PERSON",
-        "senderIsRecipient": "true",
-        "purpose": "OTHER",
-        "recipient": {
-            "firstName": "John",
-            "lastName": "Smith",
-            "account": {
-                "fundingMethod": "CREDIT",
-                "identifierType": "CARD_NUMBER",
-                "identifier": "1234779999996392"
-            }
+    Task<CreateSessionResponse> CreateSessionAsync(CreateSessionRequest request, CancellationToken ct = default);
+
+    // 🔹 NEW: generic forwarder for the /session/{session} endpoint
+    Task<JsonDocument> PostToSessionAsync(
+        string sessionId,
+        JsonDocument payload,
+        string? versionOverride = null,
+        string? merchantOverride = null,
+        CancellationToken ct = default);
+}
+
+public sealed class GatewayClient(IOptions<GatewayOptions> options, HttpClient http) : IGatewayClient
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly GatewayOptions _cfg = options.Value;
+    private readonly HttpClient _http = http;
+
+    private void ApplyBasicAuth()
+    {
+        var rawCreds = $"{_cfg.Username}:{_cfg.Password}";
+        var b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(rawCreds));
+        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", b64);
+    }
+
+    public async Task<CreateSessionResponse> CreateSessionAsync(CreateSessionRequest request, CancellationToken ct = default)
+    {
+        var url = $"https://{_cfg.Host}/api/rest/version/{_cfg.Version}/merchant/{_cfg.MerchantId}/session";
+        ApplyBasicAuth();
+
+        using var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(url, content, ct);
+        var body = await resp.Content.ReadAsStringAsync(ct);
+
+        if (!resp.IsSuccessStatusCode)
+            throw new HttpRequestException($"Upstream error {(int)resp.StatusCode}: {body}");
+
+        var parsed = JsonSerializer.Deserialize<CreateSessionResponse>(body, JsonOptions)
+                    ?? throw new InvalidOperationException("Failed to parse CreateSession response.");
+        return parsed;
+    }
+
+    // 🔹 NEW
+    public async Task<JsonDocument> PostToSessionAsync(
+        string sessionId,
+        JsonDocument payload,
+        string? versionOverride = null,
+        string? merchantOverride = null,
+        CancellationToken ct = default)
+    {
+        var version = string.IsNullOrWhiteSpace(versionOverride) ? _cfg.Version : versionOverride!;
+        var merchant = string.IsNullOrWhiteSpace(merchantOverride) ? _cfg.MerchantId : merchantOverride!;
+
+        var url = $"https://{_cfg.Host}/api/rest/version/{version}/merchant/{merchant}/session/{sessionId}";
+        ApplyBasicAuth();
+
+        using var content = new StringContent(payload.RootElement.GetRawText(), Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(url, content, ct);
+        var body = await resp.Content.ReadAsStringAsync(ct);
+
+        if (!resp.IsSuccessStatusCode)
+            throw new HttpRequestException($"Upstream error {(int)resp.StatusCode}: {body}");
+
+        // Return raw JSON so we don't have to model every field
+        return JsonDocument.Parse(body);
+    }
+}
+```
+
+---
+
+## 2) Map the new endpoint
+
+### `Program.cs` (add this block under your existing `/api/session` mapping)
+
+```csharp
+using Microsoft.OpenApi.Models;
+using System.Text.Json;
+using YourProject.Contracts;
+using YourProject.Gateway;
+
+// ... existing builder & Swagger setup ...
+
+var app = builder.Build();
+
+// ... existing Swagger middleware and first endpoint ...
+
+// 🔹 NEW: Proxy PAY to upstream /session/{session}
+//     Local route mirrors upstream: /api/rest/version/{version}/merchant/{merchantId}/session/{session}
+app.MapPost("/api/rest/version/{version}/merchant/{merchantId}/session/{session}",
+    async (string version,
+            string merchantId,
+            string session,
+            JsonDocument body,
+            IGatewayClient client,
+            CancellationToken ct) =>
+    {
+        // Optionally validate version/merchant vs config here if you want to restrict.
+        try
+        {
+            var resultDoc = await client.PostToSessionAsync(session, body, version, merchantId, ct);
+
+            // Return upstream JSON as-is
+            return Results.Content(resultDoc.RootElement.GetRawText(), "application/json");
         }
+        catch (HttpRequestException ex)
+        {
+            return Results.BadRequest($"Upstream call failed: {ex.Message}");
+        }
+    })
+    .WithName("PostSessionAction") // Swagger operationId
+    .WithOpenApi(op =>
+    {
+        // Provide a helpful example in Swagger
+        op.Summary = "Forward a PAY request to the upstream /session/{session} endpoint.";
+        op.Description = "Mirrors the upstream API. Uses Basic Auth (configured) and forwards the JSON body.";
+        op.RequestBody = new()
+        {
+            Required = true,
+            Content =
+            {
+                ["application/json"] = new Microsoft.OpenApi.Models.OpenApiMediaType
+                {
+                    Example = new Microsoft.OpenApi.Any.OpenApiString("""
+{
+  "accountFunding": {
+    "senderType": "PERSON",
+    "senderIsRecipient": "true",
+    "purpose": "OTHER",
+    "recipient": {
+      "firstName": "John",
+      "lastName": "Smith",
+      "account": {
+        "fundingMethod": "CREDIT",
+        "identifierType": "CARD_NUMBER",
+        "identifier": "1234779999996392"
+      }
+    }
+  },
+  "apiOperation": "PAY",
+  "order": {
+    "amount": "100.00",
+    "currency": "USD",
+    "purchaseType": "ACCOUNT_FUNDING"
+  },
+  "sourceOfFunds": {
+    "type": "CARD",
+    "provided": {
+      "card": {
+        "number": "5123456789012346",
+        "expiry": { "month": "01", "year": "39" },
+        "securityCode": "000"
+      }
+    }
+  },
+  "authentication": { "channel": "PAYER_BROWSER" }
+}
+""")
+                }
+            }
+        };
+        return op;
+    });
+
+app.Run();
+```
+
+---
+
+## 3) Try it locally
+
+```bash
+# Start your API
+dotnet run
+```
+
+* Swagger UI: `http://localhost:5000/swagger`
+* Example call (your API, mirrored route):
+
+```bash
+curl -X POST \
+  http://localhost:5000/api/rest/version/100/merchant/002M7270/session/SESSION0002129947563N13816378N8 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accountFunding": {
+      "senderType": "PERSON",
+      "senderIsRecipient": "true",
+      "purpose": "OTHER",
+      "recipient": {
+        "firstName": "John",
+        "lastName": "Smith",
+        "account": {
+          "fundingMethod": "CREDIT",
+          "identifierType": "CARD_NUMBER",
+          "identifier": "1234779999996392"
+        }
+      }
     },
     "apiOperation": "PAY",
     "order": {
-        "amount": "100.00",
-        "currency": "USD",
-        "purchaseType": "ACCOUNT_FUNDING"
+      "amount": "100.00",
+      "currency": "USD",
+      "purchaseType": "ACCOUNT_FUNDING"
     },
     "sourceOfFunds": {
-        "type": "CARD",
-        "provided": {
-            "card": {
-                "number": "5123456789012346",
-                "expiry": {
-                    "month": "01",
-                    "year": "39"
-                },
-                "securityCode": "000"
-            }
+      "type": "CARD",
+      "provided": {
+        "card": {
+          "number": "5123456789012346",
+          "expiry": { "month": "01", "year": "39" },
+          "securityCode": "000"
         }
+      }
     },
-    "authentication":{  
-      "channel":"PAYER_BROWSER"
-   }
-}
+    "authentication": { "channel": "PAYER_BROWSER" }
+  }'
+```
 
-The response:
-{
-    "accountFunding": {
-        "purpose": "OTHER",
-        "recipient": {
-            "account": {
-                "fundingMethod": "CREDIT",
-                "identifier": "1234779999996392",
-                "identifierType": "CARD_NUMBER"
-            },
-            "firstName": "John",
-            "lastName": "Smith"
-        },
-        "senderIsRecipient": "true",
-        "senderType": "PERSON"
-    },
-    "authentication": {
-        "channel": "PAYER_BROWSER"
-    },
-    "merchant": "002M7270",
-    "order": {
-        "amount": "100.00",
-        "currency": "USD",
-        "purchaseType": "ACCOUNT_FUNDING"
-    },
-    "session": {
-        "id": "SESSION0002129947563N13816378N8",
-        "updateStatus": "SUCCESS",
-        "version": "eed6f9a702"
-    },
-    "sourceOfFunds": {
-        "provided": {
-            "card": {
-                "brand": "MASTERCARD",
-                "expiry": {
-                    "month": "1",
-                    "year": "39"
-                },
-                "fundingMethod": "DEBIT",
-                "number": "512345xxxxxx2346",
-                "scheme": "MASTERCARD",
-                "securityCode": "xxx"
-            }
-        },
-        "type": "CARD"
-    },
-    "version": "100"
-}
+---
 
-It also use basic Auth
+## Notes
 
-The URL that will be called by this endpoint is the following:
-https://{{host}}/api/rest/version/100/merchant/{{merchantId}}/session/{{session}}
+* **Security/PCI**: You’re proxying PAN and CVV—ensure TLS, strict logging redaction, and never persist sensitive fields.
+* **Validation**: If you want to force the configured `MerchantId`/`Version`, compare route values to config and reject mismatches.
+* **Typing**: We used `JsonDocument` to avoid modeling the full schema; if you prefer strong types, I can generate request/response records next.
