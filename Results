@@ -1,136 +1,26 @@
-<!doctype html>
-<html>
-  <head>
-    <!-- Define script tag callbacks (optional, but you referenced them) -->
-    <script>
-      function errorCallback(err){ console.error("ThreeDS loader error:", err); }
-      function cancelCallback(){ console.warn("ThreeDS loader canceled."); }
-    </script>
+I want to create a .Net Web API that have the following endpoints that will call theses APIs:
 
-    <script src="./1.3.0/three-ds.min.js"
-            data-error="errorCallback"
-            data-cancel="cancelCallback"></script>
+1- CreateSession:
+  Request:
+  {
+  	"session": {
+  		"authenticationLimit": 25
+  	}
+  }
+  the endpoint to call: POST https://{{host}}/api/rest/version/100/merchant/{{merchantId}}/session
+  host and merchant will be configured
 
-    <script>
-      // Demo values — replace with your real ones
-      const merchantId    = "TEST002M7023";
-      const sessionId     = "SESSION0002229272837H97092070G2";
-      const orderId       = "123456";
-      const transactionId = "1";
+  Response:
+  {
+    "merchant": "002M7270",
+    "result": "SUCCESS",
+    "session": {
+        "aes256Key": "M/YzE59RoEy+fS8efdCtJz6J4QhV/JzzoZ+/pZzWtIA=",
+        "authenticationLimit": 25,
+        "id": "SESSION0002129947563N13816378N8",
+        "updateStatus": "NO_UPDATE",
+        "version": "4e7143bf01"
+    }
+}
 
-      // IMPORTANT: host must be hostname only (NO protocol)
-      const apiHost = "test-sgbl.mtf.gateway.mastercard.com";
-
-      // 1) Configure the SDK
-      ThreeDS.configure({
-        merchantId,
-        sessionId,
-        containerId: "3DSUI",
-        apiHost,                             // hostname only
-        callback: function () {
-          if (ThreeDS.isConfigured()) {
-            console.log("ThreeDS configured. Version:", ThreeDS.version);
-            // You can kick off IA here if you want to wait for configure:
-            initiate3DS();
-          }
-        },
-        configuration: {
-          userLanguage: "en-AU",
-          wsVersion: 100 // >=54 is required; 100 is fine on test
-        }
-      });
-
-      console.log("Configured?", ThreeDS.isConfigured());
-
-      // 2) Build optional params for Initiate Authentication
-      const optionalParams = {
-        apiOperation: "INITIATE_AUTHENTICATION",
-        authentication: { channel: "PAYER_BROWSER" },
-        order: {
-          currency: "USD",         // Use 3-letter code (e.g., "USD", "LBP", "EUR")
-          amount: "1.00"           // Recommended for realistic flows
-        },
-        sourceOfFunds: {
-          provided: {
-            card: {
-              number: "5123450000000008",
-              expiry: { month: "05", year: "2030" } // helpful in some test flows
-            }
-          }
-        }
-        // Do NOT include apiHost here — ThreeDS uses the one from configure()
-      };
-
-      function initiate3DS() {
-        ThreeDS.initiateAuthentication(
-          orderId,
-          transactionId,
-          function (data) {
-            if (data && data.error) {
-              const e = data.error;
-              console.error("IA error.code:", e.code);
-              console.error("IA error.msg:", e.msg);
-              console.error("IA error.result:", e.result);
-              console.error("IA error.status:", e.status);
-              return;
-            }
-
-            console.log("Initiate Auth payload:", data);
-            console.log("Correlation Id:", data.correlationId);
-            console.log("Gateway Recommendation:", data.gatewayRecommendation);
-            console.log("Authentication Version:", data.authenticationVersion);
-
-            switch (data.gatewayRecommendation) {
-              case "PROCEED":
-                // Move to Authenticate Payer step
-                authenticatePayer();
-                break;
-              case "RESUBMIT_WITH_ALTERNATIVE_PAYMENT_DETAILS":
-                // Card doesn’t support 3DS or your rules require 3DS
-                console.warn("Try another payment method.");
-                break;
-              default:
-                console.warn("Unhandled gatewayRecommendation:", data.gatewayRecommendation);
-            }
-          },
-          optionalParams
-        );
-      }
-
-      // 3) Implement the missing authenticatePayer() function
-      function authenticatePayer() {
-        ThreeDS.authenticatePayer(
-          orderId,
-          transactionId,
-          function (data) {
-            if (data && data.error) {
-              const e = data.error;
-              console.error("AP error.code:", e.code);
-              console.error("AP error.msg:", e.msg);
-              console.error("AP error.result:", e.result);
-              console.error("AP error.status:", e.status);
-              return;
-            }
-
-            console.log("Authenticate Payer payload:", data);
-            // The SDK will inject challenge/redirect UI into #3DSUI automatically when needed.
-            // If you set fullScreenRedirect (see below), it may write a full-page form/iframe.
-          },
-          {
-            // Show the challenge full-screen if the ACS requires it
-            fullScreenRedirect: true
-            // You can pass other optional fields here if needed (device/browser hints, etc.)
-          }
-        );
-      }
-    </script>
-  </head>
-  <body>
-    <!-- The SDK will render the 3DS challenge/redirect UI into this container -->
-    <div id="3DSUI" style="min-height: 300px;"></div>
-
-    <!-- If you prefer to start IA manually rather than on configure callback:
-    <button onclick="initiate3DS()">Start 3DS</button>
-    -->
-  </body>
-</html>
+The API use Basic Authorisation with username and password
