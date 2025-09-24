@@ -1,11 +1,69 @@
-I want to add an endpoint: https://{{host}}/api/rest/version/100/merchant/{{merchantId}}/order/{{orderId}}/transaction/{{transactionId}}
+Great news: you don’t need any new gateway code. Your existing `PutOrderTransactionAsync` + generic `PUT /api/rest/version/{version}/merchant/{merchantId}/order/{orderId}/transaction/{transactionId}` route already works for `apiOperation: "AUTHENTICATE_PAYER"`.
 
-Method: PUT
-Request:
+Below is a drop-in **Program.cs** update that (a) ensures the generic PUT route exists and (b) enriches Swagger with a **second example** showing the `AUTHENTICATE_PAYER` payload you provided.
+
+---
+
+## Program.cs — ensure/augment the generic PUT route
+
+> If you already have this route, just replace the `.WithOpenApi(...)` block with the version below to add the new example.
+
+```csharp
+using System.Text.Json;
+using Microsoft.OpenApi.Any;
+using Microsoft.OpenApi.Models;
+// ... your other usings
+
+// 🔹 Generic PUT for any transactionId (works for INITIATE_AUTHENTICATION and AUTHENTICATE_PAYER)
+app.MapPut("/api/rest/version/{version}/merchant/{merchantId}/order/{orderId}/transaction/{transactionId}",
+    async (string version,
+            string merchantId,
+            string orderId,
+            string transactionId,
+            JsonDocument body,
+            IGatewayClient client,
+            CancellationToken ct) =>
+    {
+        try
+        {
+            var resultDoc = await client.PutOrderTransactionAsync(orderId, transactionId, body, version, merchantId, ct);
+            return Results.Content(resultDoc.RootElement.GetRawText(), "application/json");
+        }
+        catch (HttpRequestException ex)
+        {
+            return Results.BadRequest($"Upstream call failed: {ex.Message}");
+        }
+    })
+    .WithName("PutOrderTransaction")
+    .WithOpenApi(op =>
+    {
+        op.Summary = "Proxy PUT to /order/{orderId}/transaction/{transactionId}";
+        op.Description =
+            "Passes the JSON body to the upstream Mastercard gateway using Basic Auth from configuration. " +
+            "Supports operations like INITIATE_AUTHENTICATION and AUTHENTICATE_PAYER.";
+
+        var media = new OpenApiMediaType();
+
+        // Example 1: INITIATE_AUTHENTICATION (kept for reference)
+        media.Examples = new Dictionary<string, OpenApiExample>
+        {
+            ["initiateAuthentication"] = new OpenApiExample
+            {
+                Summary = "INITIATE_AUTHENTICATION",
+                Value = new OpenApiString("""
 {
-   "session": {
-   		"id": "{{session}}"
-   },
+  "apiOperation": "INITIATE_AUTHENTICATION",
+  "session": { "id": "SESSION0002129947563N13816378N8" }
+}
+""")
+            },
+            // 🔹 Example 2: AUTHENTICATE_PAYER (your new use case)
+            ["authenticatePayer"] = new OpenApiExample
+            {
+                Summary = "AUTHENTICATE_PAYER",
+                Value = new OpenApiString("""
+{
+  "session": { "id": "SESSION0002129947563N13816378N8" },
   "device": {
     "browser": "MOZILLA",
     "browserDetails": {
@@ -22,114 +80,53 @@ Request:
   },
   "apiOperation": "AUTHENTICATE_PAYER"
 }
-
-Response:
-{
-    "accountFunding": {
-        "purpose": "OTHER",
-        "recipient": {
-            "account": {
-                "fundingMethod": "CREDIT",
-                "identifier": "123477xxxxxx6392",
-                "identifierType": "CARD_NUMBER"
-            },
-            "firstName": "John",
-            "lastName": "Smith"
-        },
-        "senderIsRecipient": true,
-        "senderType": "PERSON"
-    },
-    "authentication": {
-        "3ds": {
-            "acsEci": "02",
-            "authenticationToken": "xgQYYgZVAAAAAAAAAAAAAAAAAAAA",
-            "transactionId": "4bec67ed-25d8-4e81-a8ac-5dcb45e3f5c0"
-        },
-        "3ds2": {
-            "3dsServerTransactionId": "34022577-5caf-4d2d-ba4d-ec86ea78ead8",
-            "acsReference": "3DS_LOA_ACS_MCTF_020200_05450",
-            "acsTransactionId": "b5d2d3fa-f2fb-4c7f-8d28-59ebd25950dd",
-            "authenticationScheme": "MASTERCARD",
-            "directoryServerId": "A000000004",
-            "dsReference": "MSIGNIA_MOCK_DS_RSA",
-            "dsTransactionId": "4bec67ed-25d8-4e81-a8ac-5dcb45e3f5c0",
-            "methodCompleted": false,
-            "methodSupported": "SUPPORTED",
-            "protocolVersion": "2.1.0",
-            "requestorId": "MAS00001_INT_MPGS_MT002M7270",
-            "requestorName": "SGBL TEST AFT",
-            "transactionStatus": "Y"
-        },
-        "amount": 100.00,
-        "payerInteraction": "NOT_REQUIRED",
-        "redirect": {
-            "domainName": "acs-public.tp.mastercard.com",
-            "html": "<div id=\"threedsFrictionLessRedirect\" xmlns=\"http://www.w3.org/1999/html\"> <iframe id=\"challengeFrame\" name=\"challengeFrame\"> </iframe> <form id=\"threedsFrictionLessRedirectForm\" method=\"POST\" action=\"\" target=\"challengeFrame\"> <input type=\"hidden\" name=\"order.id\" value=\"123123\" /> <input type=\"hidden\" name=\"transaction.id\" value=\"1\" /> <input type=\"hidden\" name=\"response.gatewayRecommendation\" value=\"PROCEED\" /> <input type=\"hidden\" name=\"encryptedData.ciphertext\" value=\"W5sih2rhpZ8Nlsy4PGbpK4iQuKIizbM/wYGw11vOgF8VxUvPuPQnMloHk3LxnnS28btzglhD5RwBrbKamGa38Q99XBwBzMAshqLR8MAqMwCq7fZwl6qndu8bpA6M7tcttU3MyRlBXGQC9oRscpADkE43jnt4I+9hXYiEE8x8O+zSDxgiZ7AWeCJmQybOmdfjmHRY6xSOFNJ+qaz5srAzka0ATK8BKOr0rA/KG/cuBppR/o/igMYucZ3OwTk5UWiHygkFCf0uwLs5PkUBJvK1kPKf0svHfdrGP5XbUHpxNS0/9/V3E6Mox+u+bNQdqFsXLvy26UPPa4t6yTzxIvEwW/GkoZ4Q8TGPyolztGOcgaLz3xeIIDycIHgGcTi7KqLfltcUG4RfqQl0b2X2X39/XRlar+qSa/3oazsKPjRKU5+Pj8DCLMPXi7AQIhOgAh+PhGYGN64u60Kfb30RkfWwIlsVJogfMLZOdY0xRIdhirEMxfhyWMgWiG/beX6Bu+thzKmTMCUCtcYQXq9if+q8RcWL6mUHo7VkZm/qsXs4o5cBKD185m29PBM9itwo8FajFLhL9oGH1ia6RRI=\" /> <input type=\"hidden\" name=\"encryptedData.nonce\" value=\"dcxPSl/cLdOAAABb\" /> <input type=\"hidden\" name=\"encryptedData.tag\" value=\"oPfoVCxN7gCtSFSo6o2G4A==\" /> <input type=\"hidden\" name=\"result\" value=\"SUCCESS\" /> </form> <script id=\"authenticate-payer-script\"> var e=document.getElementById(\"threedsFrictionLessRedirectForm\"); if (e) { e.submit(); if (e.parentNode !== null) { e.parentNode.removeChild(e); } } </script> </div>"
-        },
-        "time": "2025-09-24T06:26:12.973Z",
-        "version": "3DS2"
-    },
-    "device": {
-        "browser": "MOZILLA",
-        "ipAddress": "127.0.0.1"
-    },
-    "encryptedData": {
-        "ciphertext": "W5sih2rhpZ8Nlsy4PGbpK4iQuKIizbM/wYGw11vOgF8VxUvPuPQnMloHk3LxnnS28btzglhD5RwBrbKamGa38Q99XBwBzMAshqLR8MAqMwCq7fZwl6qndu8bpA6M7tcttU3MyRlBXGQC9oRscpADkE43jnt4I+9hXYiEE8x8O+zSDxgiZ7AWeCJmQybOmdfjmHRY6xSOFNJ+qaz5srAzka0ATK8BKOr0rA/KG/cuBppR/o/igMYucZ3OwTk5UWiHygkFCf0uwLs5PkUBJvK1kPKf0svHfdrGP5XbUHpxNS0/9/V3E6Mox+u+bNQdqFsXLvy26UPPa4t6yTzxIvEwW/GkoZ4Q8TGPyolztGOcgaLz3xeIIDycIHgGcTi7KqLfltcUG4RfqQl0b2X2X39/XRlar+qSa/3oazsKPjRKU5+Pj8DCLMPXi7AQIhOgAh+PhGYGN64u60Kfb30RkfWwIlsVJogfMLZOdY0xRIdhirEMxfhyWMgWiG/beX6Bu+thzKmTMCUCtcYQXq9if+q8RcWL6mUHo7VkZm/qsXs4o5cBKD185m29PBM9itwo8FajFLhL9oGH1ia6RRI=",
-        "nonce": "dcxPSl/cLdOAAABb",
-        "tag": "oPfoVCxN7gCtSFSo6o2G4A=="
-    },
-    "merchant": "002M7270",
-    "order": {
-        "amount": 100.00,
-        "authenticationStatus": "AUTHENTICATION_SUCCESSFUL",
-        "creationTime": "2025-09-24T06:25:46.208Z",
-        "currency": "USD",
-        "id": "123123",
-        "lastUpdatedTime": "2025-09-24T06:26:12.969Z",
-        "merchantCategoryCode": "6540",
-        "status": "AUTHENTICATED",
-        "totalAuthorizedAmount": 0,
-        "totalCapturedAmount": 0,
-        "totalRefundedAmount": 0,
-        "valueTransfer": {
-            "accountType": "NOT_A_TRANSFER"
-        }
-    },
-    "response": {
-        "gatewayCode": "APPROVED",
-        "gatewayRecommendation": "PROCEED"
-    },
-    "result": "SUCCESS",
-    "sourceOfFunds": {
-        "provided": {
-            "card": {
-                "brand": "MASTERCARD",
-                "expiry": {
-                    "month": "1",
-                    "year": "39"
-                },
-                "fundingMethod": "DEBIT",
-                "number": "512345xxxxxx2346",
-                "scheme": "MASTERCARD"
+""")
             }
-        },
-        "type": "CARD"
-    },
-    "timeOfLastUpdate": "2025-09-24T06:26:12.969Z",
-    "timeOfRecord": "2025-09-24T06:25:46.208Z",
-    "transaction": {
-        "acquirer": {
-            "merchantId": "000422727099099"
-        },
-        "amount": 100.00,
-        "authenticationStatus": "AUTHENTICATION_SUCCESSFUL",
-        "currency": "USD",
-        "id": "1",
-        "type": "AUTHENTICATION"
-    },
-    "version": "100"
-}
+        };
 
-It also uses basic Auth.
-The endpoint will call the following URL:
-https://{{host}}/api/rest/version/100/merchant/{{merchantId}}/order/{{orderId}}/transaction/{{transactionId}}
+        op.RequestBody = new OpenApiRequestBody
+        {
+            Required = true,
+            Content = { ["application/json"] = media }
+        };
+        return op;
+    });
+```
+
+---
+
+## Try it (your API)
+
+```bash
+curl -X PUT \
+  "http://localhost:5000/api/rest/version/100/merchant/002M7270/order/123123/transaction/1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": { "id": "SESSION0002129947563N13816378N8" },
+    "device": {
+      "browser": "MOZILLA",
+      "browserDetails": {
+        "3DSecureChallengeWindowSize": "FULL_SCREEN",
+        "acceptHeaders": "application/json",
+        "colorDepth": 24,
+        "javaEnabled": true,
+        "language": "en-US",
+        "screenHeight": 640,
+        "screenWidth": 480,
+        "timeZone": 273
+      },
+      "ipAddress": "127.0.0.1"
+    },
+    "apiOperation": "AUTHENTICATE_PAYER"
+  }'
+```
+
+You’ll get the upstream JSON (including the `authentication.redirect.html` and encrypted data) returned as-is.
+
+---
+
+### Notes
+
+* **No extra models needed**: keeping `JsonDocument` avoids having to model the full 3DS payloads.
+* **Security**: Don’t log request/response bodies—PAN/CVV and encrypted blobs can appear in upstream responses.
+* **Validation (optional)**: You can enforce `version`/`merchantId` to match configured values before forwarding.
