@@ -1,55 +1,102 @@
-I want to add an endpoint: /api/rest/version/100/merchant/{{merchantId}}/order/{{orderId}}/transaction/1
+I want to add an endpoint: https://{{host}}/api/rest/version/100/merchant/{{merchantId}}/order/{{orderId}}/transaction/{{transactionId}}
 
 Method: PUT
 Request:
-{  
-   "apiOperation":"INITIATE_AUTHENTICATION",
-   "session":{  
-      "id":"{{session}}"
-   }
+{
+   "session": {
+   		"id": "{{session}}"
+   },
+  "device": {
+    "browser": "MOZILLA",
+    "browserDetails": {
+      "3DSecureChallengeWindowSize": "FULL_SCREEN",
+      "acceptHeaders": "application/json",
+      "colorDepth": 24,
+      "javaEnabled": true,
+      "language": "en-US",
+      "screenHeight": 640,
+      "screenWidth": 480,
+      "timeZone": 273
+    },
+    "ipAddress": "127.0.0.1"
+  },
+  "apiOperation": "AUTHENTICATE_PAYER"
 }
 
 Response:
 {
+    "accountFunding": {
+        "purpose": "OTHER",
+        "recipient": {
+            "account": {
+                "fundingMethod": "CREDIT",
+                "identifier": "123477xxxxxx6392",
+                "identifierType": "CARD_NUMBER"
+            },
+            "firstName": "John",
+            "lastName": "Smith"
+        },
+        "senderIsRecipient": true,
+        "senderType": "PERSON"
+    },
     "authentication": {
+        "3ds": {
+            "acsEci": "02",
+            "authenticationToken": "xgQYYgZVAAAAAAAAAAAAAAAAAAAA",
+            "transactionId": "4bec67ed-25d8-4e81-a8ac-5dcb45e3f5c0"
+        },
         "3ds2": {
+            "3dsServerTransactionId": "34022577-5caf-4d2d-ba4d-ec86ea78ead8",
+            "acsReference": "3DS_LOA_ACS_MCTF_020200_05450",
+            "acsTransactionId": "b5d2d3fa-f2fb-4c7f-8d28-59ebd25950dd",
             "authenticationScheme": "MASTERCARD",
             "directoryServerId": "A000000004",
+            "dsReference": "MSIGNIA_MOCK_DS_RSA",
+            "dsTransactionId": "4bec67ed-25d8-4e81-a8ac-5dcb45e3f5c0",
             "methodCompleted": false,
             "methodSupported": "SUPPORTED",
             "protocolVersion": "2.1.0",
             "requestorId": "MAS00001_INT_MPGS_MT002M7270",
-            "requestorName": "SGBL TEST AFT"
+            "requestorName": "SGBL TEST AFT",
+            "transactionStatus": "Y"
         },
-        "acceptVersions": "3DS1,3DS2,PASSKEY",
-        "channel": "PAYER_BROWSER",
-        "purpose": "PAYMENT_TRANSACTION",
+        "amount": 100.00,
+        "payerInteraction": "NOT_REQUIRED",
         "redirect": {
-            "customizedHtml": {
-                "3ds2": {
-                    "methodPostData": "eyJ0aHJlZURTTWV0aG9kTm90aWZpY2F0aW9uVVJMIjoiaHR0cHM6Ly9tdGYuZ2F0ZXdheS5tYXN0ZXJjYXJkLmNvbS9jYWxsYmFja0ludGVyZmFjZS9nYXRld2F5LzkwMTNlNDZlYWE1MGQ1ZWVhOTRiZGQ5MGM1MGQ0MjVmODNjYWYyNjBmMzVlMTMyMmUwN2VjMTg0MTAyOTkxNGIiLCJ0aHJlZURTU2VydmVyVHJhbnNJRCI6IjM0MDIyNTc3LTVjYWYtNGQyZC1iYTRkLWVjODZlYTc4ZWFkOCJ9",
-                    "methodUrl": "https://acs-public.tp.mastercard.com/api/v1/3ds_method"
-                }
-            },
-            "html": "<div id=\"initiate3dsSimpleRedirect\" xmlns=\"http://www.w3.org/1999/html\"> <iframe id=\"methodFrame\" name=\"methodFrame\" height=\"100\" width=\"200\" > </iframe> <form id =\"initiate3dsSimpleRedirectForm\" method=\"POST\" action=\"https://acs-public.tp.mastercard.com/api/v1/3ds_method\" target=\"methodFrame\"> <input type=\"hidden\" name=\"threeDSMethodData\" value=\"eyJ0aHJlZURTTWV0aG9kTm90aWZpY2F0aW9uVVJMIjoiaHR0cHM6Ly9tdGYuZ2F0ZXdheS5tYXN0ZXJjYXJkLmNvbS9jYWxsYmFja0ludGVyZmFjZS9nYXRld2F5LzkwMTNlNDZlYWE1MGQ1ZWVhOTRiZGQ5MGM1MGQ0MjVmODNjYWYyNjBmMzVlMTMyMmUwN2VjMTg0MTAyOTkxNGIiLCJ0aHJlZURTU2VydmVyVHJhbnNJRCI6IjM0MDIyNTc3LTVjYWYtNGQyZC1iYTRkLWVjODZlYTc4ZWFkOCJ9\" /> </form> <script id=\"initiate-authentication-script\"> var e=document.getElementById(\"initiate3dsSimpleRedirectForm\"); if (e) { e.submit(); if (e.parentNode !== null) { e.parentNode.removeChild(e); } } </script> </div>"
+            "domainName": "acs-public.tp.mastercard.com",
+            "html": "<div id=\"threedsFrictionLessRedirect\" xmlns=\"http://www.w3.org/1999/html\"> <iframe id=\"challengeFrame\" name=\"challengeFrame\"> </iframe> <form id=\"threedsFrictionLessRedirectForm\" method=\"POST\" action=\"\" target=\"challengeFrame\"> <input type=\"hidden\" name=\"order.id\" value=\"123123\" /> <input type=\"hidden\" name=\"transaction.id\" value=\"1\" /> <input type=\"hidden\" name=\"response.gatewayRecommendation\" value=\"PROCEED\" /> <input type=\"hidden\" name=\"encryptedData.ciphertext\" value=\"W5sih2rhpZ8Nlsy4PGbpK4iQuKIizbM/wYGw11vOgF8VxUvPuPQnMloHk3LxnnS28btzglhD5RwBrbKamGa38Q99XBwBzMAshqLR8MAqMwCq7fZwl6qndu8bpA6M7tcttU3MyRlBXGQC9oRscpADkE43jnt4I+9hXYiEE8x8O+zSDxgiZ7AWeCJmQybOmdfjmHRY6xSOFNJ+qaz5srAzka0ATK8BKOr0rA/KG/cuBppR/o/igMYucZ3OwTk5UWiHygkFCf0uwLs5PkUBJvK1kPKf0svHfdrGP5XbUHpxNS0/9/V3E6Mox+u+bNQdqFsXLvy26UPPa4t6yTzxIvEwW/GkoZ4Q8TGPyolztGOcgaLz3xeIIDycIHgGcTi7KqLfltcUG4RfqQl0b2X2X39/XRlar+qSa/3oazsKPjRKU5+Pj8DCLMPXi7AQIhOgAh+PhGYGN64u60Kfb30RkfWwIlsVJogfMLZOdY0xRIdhirEMxfhyWMgWiG/beX6Bu+thzKmTMCUCtcYQXq9if+q8RcWL6mUHo7VkZm/qsXs4o5cBKD185m29PBM9itwo8FajFLhL9oGH1ia6RRI=\" /> <input type=\"hidden\" name=\"encryptedData.nonce\" value=\"dcxPSl/cLdOAAABb\" /> <input type=\"hidden\" name=\"encryptedData.tag\" value=\"oPfoVCxN7gCtSFSo6o2G4A==\" /> <input type=\"hidden\" name=\"result\" value=\"SUCCESS\" /> </form> <script id=\"authenticate-payer-script\"> var e=document.getElementById(\"threedsFrictionLessRedirectForm\"); if (e) { e.submit(); if (e.parentNode !== null) { e.parentNode.removeChild(e); } } </script> </div>"
         },
+        "time": "2025-09-24T06:26:12.973Z",
         "version": "3DS2"
+    },
+    "device": {
+        "browser": "MOZILLA",
+        "ipAddress": "127.0.0.1"
+    },
+    "encryptedData": {
+        "ciphertext": "W5sih2rhpZ8Nlsy4PGbpK4iQuKIizbM/wYGw11vOgF8VxUvPuPQnMloHk3LxnnS28btzglhD5RwBrbKamGa38Q99XBwBzMAshqLR8MAqMwCq7fZwl6qndu8bpA6M7tcttU3MyRlBXGQC9oRscpADkE43jnt4I+9hXYiEE8x8O+zSDxgiZ7AWeCJmQybOmdfjmHRY6xSOFNJ+qaz5srAzka0ATK8BKOr0rA/KG/cuBppR/o/igMYucZ3OwTk5UWiHygkFCf0uwLs5PkUBJvK1kPKf0svHfdrGP5XbUHpxNS0/9/V3E6Mox+u+bNQdqFsXLvy26UPPa4t6yTzxIvEwW/GkoZ4Q8TGPyolztGOcgaLz3xeIIDycIHgGcTi7KqLfltcUG4RfqQl0b2X2X39/XRlar+qSa/3oazsKPjRKU5+Pj8DCLMPXi7AQIhOgAh+PhGYGN64u60Kfb30RkfWwIlsVJogfMLZOdY0xRIdhirEMxfhyWMgWiG/beX6Bu+thzKmTMCUCtcYQXq9if+q8RcWL6mUHo7VkZm/qsXs4o5cBKD185m29PBM9itwo8FajFLhL9oGH1ia6RRI=",
+        "nonce": "dcxPSl/cLdOAAABb",
+        "tag": "oPfoVCxN7gCtSFSo6o2G4A=="
     },
     "merchant": "002M7270",
     "order": {
-        "authenticationStatus": "AUTHENTICATION_AVAILABLE",
+        "amount": 100.00,
+        "authenticationStatus": "AUTHENTICATION_SUCCESSFUL",
         "creationTime": "2025-09-24T06:25:46.208Z",
         "currency": "USD",
         "id": "123123",
-        "lastUpdatedTime": "2025-09-24T06:25:46.193Z",
+        "lastUpdatedTime": "2025-09-24T06:26:12.969Z",
         "merchantCategoryCode": "6540",
-        "status": "AUTHENTICATION_INITIATED",
+        "status": "AUTHENTICATED",
         "totalAuthorizedAmount": 0,
         "totalCapturedAmount": 0,
-        "totalRefundedAmount": 0
+        "totalRefundedAmount": 0,
+        "valueTransfer": {
+            "accountType": "NOT_A_TRANSFER"
+        }
     },
     "response": {
-        "gatewayCode": "AUTHENTICATION_IN_PROGRESS",
+        "gatewayCode": "APPROVED",
         "gatewayRecommendation": "PROCEED"
     },
     "result": "SUCCESS",
@@ -68,11 +115,14 @@ Response:
         },
         "type": "CARD"
     },
-    "timeOfLastUpdate": "2025-09-24T06:25:46.193Z",
+    "timeOfLastUpdate": "2025-09-24T06:26:12.969Z",
     "timeOfRecord": "2025-09-24T06:25:46.208Z",
     "transaction": {
-        "amount": 0,
-        "authenticationStatus": "AUTHENTICATION_AVAILABLE",
+        "acquirer": {
+            "merchantId": "000422727099099"
+        },
+        "amount": 100.00,
+        "authenticationStatus": "AUTHENTICATION_SUCCESSFUL",
         "currency": "USD",
         "id": "1",
         "type": "AUTHENTICATION"
