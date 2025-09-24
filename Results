@@ -189,20 +189,71 @@ public sealed class GatewayClient(IOptions<GatewayOptions> options, HttpClient h
 
 ```csharp
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.OpenApi.Models; // 🔹
 using YourProject.Contracts;
 using YourProject.Gateway;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Bind options
+// Options
 builder.Services.Configure<GatewayOptions>(builder.Configuration.GetSection("Gateway"));
 
-// HttpClient (can add Polly/retries if desired)
+// HttpClient
 builder.Services.AddHttpClient<IGatewayClient, GatewayClient>();
+
+// 🔹 Swagger services
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "YourProject API",
+        Version = "v1",
+        Description = "Gateway API that forwards CreateSession to the upstream provider."
+    });
+
+    // Include XML comments (if enabled in csproj)
+    var xml = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = System.IO.Path.Combine(AppContext.BaseDirectory, xml);
+    if (System.IO.File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+    }
+
+    // (Optional) Define Basic Auth scheme in case you later secure YOUR endpoint
+    c.AddSecurityDefinition("basic", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "basic",
+        In = ParameterLocation.Header,
+        Description = "Basic auth (enter your API credentials)."
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme{ Reference = new OpenApiReference{ Type = ReferenceType.SecurityScheme, Id = "basic" } },
+            Array.Empty<string>()
+        }
+    });
+});
 
 var app = builder.Build();
 
+// 🔹 Swagger middleware
+// Expose Swagger everywhere; switch to IsDevelopment() if you prefer dev-only.
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "YourProject API v1");
+    c.RoutePrefix = "swagger"; // UI at /swagger
+});
+
+// Endpoint
 app.MapPost("/api/session", async Task<Results<Ok<CreateSessionResponse>, BadRequest<string>>> (
+    /// <summary>Creates a session via the upstream gateway.</summary>
+    /// <param name="request">Payload with session.authenticationLimit.</param>
+    /// <returns>The upstream CreateSession response.</returns>
     CreateSessionRequest request,
     IGatewayClient client,
     CancellationToken ct) =>
@@ -217,12 +268,14 @@ app.MapPost("/api/session", async Task<Results<Ok<CreateSessionResponse>, BadReq
     }
     catch (HttpRequestException ex)
     {
-        // Upstream error
         return TypedResults.BadRequest($"CreateSession failed: {ex.Message}");
     }
-});
+})
+.WithName("CreateSession")               // 🔹 Improves Swagger operation naming
+.WithOpenApi();                          // 🔹 Ensures it appears with inferred schema
 
 app.Run();
+
 ```
 
 ---
