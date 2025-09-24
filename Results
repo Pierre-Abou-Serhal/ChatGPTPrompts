@@ -1,138 +1,85 @@
-Awesome—here are the **exact additions** you need to proxy the `PUT /api/rest/version/{version}/merchant/{merchantId}/order/{orderId}/transaction/{transactionId}` call with Basic Auth, passing the request body through and returning the upstream JSON as-is.
+I want to add an endpoint: /api/rest/version/100/merchant/{{merchantId}}/order/{{orderId}}/transaction/1
 
----
-
-## 1) Extend the gateway client
-
-### `Gateway/GatewayClient.cs` – add a new method + interface signature
-
-```csharp
-// interface IGatewayClient
-public interface IGatewayClient
-{
-    Task<CreateSessionResponse> CreateSessionAsync(CreateSessionRequest request, CancellationToken ct = default);
-    Task<JsonDocument> PostToSessionAsync(string sessionId, JsonDocument payload, string? versionOverride = null, string? merchantOverride = null, CancellationToken ct = default);
-
-    // 🔹 NEW: PUT /order/{orderId}/transaction/{transactionId}
-    Task<JsonDocument> PutOrderTransactionAsync(
-        string orderId,
-        string transactionId,
-        JsonDocument payload,
-        string? versionOverride = null,
-        string? merchantOverride = null,
-        CancellationToken ct = default);
+Method: PUT
+Request:
+{  
+   "apiOperation":"INITIATE_AUTHENTICATION",
+   "session":{  
+      "id":"{{session}}"
+   }
 }
-```
 
-```csharp
-// class GatewayClient : IGatewayClient
-public sealed class GatewayClient(IOptions<GatewayOptions> options, HttpClient http) : IGatewayClient
+Response:
 {
-    // ...existing members...
-
-    // 🔹 NEW
-    public async Task<JsonDocument> PutOrderTransactionAsync(
-        string orderId,
-        string transactionId,
-        JsonDocument payload,
-        string? versionOverride = null,
-        string? merchantOverride = null,
-        CancellationToken ct = default)
-    {
-        var version = string.IsNullOrWhiteSpace(versionOverride) ? _cfg.Version : versionOverride!;
-        var merchant = string.IsNullOrWhiteSpace(merchantOverride) ? _cfg.MerchantId : merchantOverride!;
-
-        var url = $"https://{_cfg.Host}/api/rest/version/{version}/merchant/{merchant}/order/{orderId}/transaction/{transactionId}";
-        ApplyBasicAuth();
-
-        using var req = new HttpRequestMessage(HttpMethod.Put, url)
-        {
-            Content = new StringContent(payload.RootElement.GetRawText(), Encoding.UTF8, "application/json")
-        };
-
-        using var resp = await _http.SendAsync(req, ct);
-        var body = await resp.Content.ReadAsStringAsync(ct);
-
-        if (!resp.IsSuccessStatusCode)
-            throw new HttpRequestException($"Upstream error {(int)resp.StatusCode}: {body}");
-
-        return JsonDocument.Parse(body);
-    }
-}
-```
-
----
-
-## 2) Map the new endpoint
-
-### `Program.cs` – add this mapping (near your other routes)
-
-```csharp
-using System.Text.Json;
-// ...other usings...
-
-// 🔹 NEW: PUT /api/rest/version/{version}/merchant/{merchantId}/order/{orderId}/transaction/{transactionId}
-app.MapPut("/api/rest/version/{version}/merchant/{merchantId}/order/{orderId}/transaction/{transactionId}",
-    async (string version,
-            string merchantId,
-            string orderId,
-            string transactionId,
-            JsonDocument body,
-            IGatewayClient client,
-            CancellationToken ct) =>
-    {
-        try
-        {
-            var resultDoc = await client.PutOrderTransactionAsync(orderId, transactionId, body, version, merchantId, ct);
-            return Results.Content(resultDoc.RootElement.GetRawText(), "application/json");
-        }
-        catch (HttpRequestException ex)
-        {
-            return Results.BadRequest($"Upstream call failed: {ex.Message}");
-        }
-    })
-    .WithName("InitiateAuthentication")
-    .WithOpenApi(op =>
-    {
-        op.Summary = "Initiate 3DS authentication for a transaction.";
-        op.Description = "Proxies to the upstream PUT /order/{orderId}/transaction/{transactionId}. Uses configured Basic Auth.";
-        op.RequestBody = new()
-        {
-            Required = true,
-            Content =
-            {
-                ["application/json"] = new Microsoft.OpenApi.Models.OpenApiMediaType
-                {
-                    Example = new Microsoft.OpenApi.Any.OpenApiString("""
-{
-  "apiOperation": "INITIATE_AUTHENTICATION",
-  "session": { "id": "SESSION0002129947563N13816378N8" }
-}
-""")
+    "authentication": {
+        "3ds2": {
+            "authenticationScheme": "MASTERCARD",
+            "directoryServerId": "A000000004",
+            "methodCompleted": false,
+            "methodSupported": "SUPPORTED",
+            "protocolVersion": "2.1.0",
+            "requestorId": "MAS00001_INT_MPGS_MT002M7270",
+            "requestorName": "SGBL TEST AFT"
+        },
+        "acceptVersions": "3DS1,3DS2,PASSKEY",
+        "channel": "PAYER_BROWSER",
+        "purpose": "PAYMENT_TRANSACTION",
+        "redirect": {
+            "customizedHtml": {
+                "3ds2": {
+                    "methodPostData": "eyJ0aHJlZURTTWV0aG9kTm90aWZpY2F0aW9uVVJMIjoiaHR0cHM6Ly9tdGYuZ2F0ZXdheS5tYXN0ZXJjYXJkLmNvbS9jYWxsYmFja0ludGVyZmFjZS9nYXRld2F5LzkwMTNlNDZlYWE1MGQ1ZWVhOTRiZGQ5MGM1MGQ0MjVmODNjYWYyNjBmMzVlMTMyMmUwN2VjMTg0MTAyOTkxNGIiLCJ0aHJlZURTU2VydmVyVHJhbnNJRCI6IjM0MDIyNTc3LTVjYWYtNGQyZC1iYTRkLWVjODZlYTc4ZWFkOCJ9",
+                    "methodUrl": "https://acs-public.tp.mastercard.com/api/v1/3ds_method"
                 }
+            },
+            "html": "<div id=\"initiate3dsSimpleRedirect\" xmlns=\"http://www.w3.org/1999/html\"> <iframe id=\"methodFrame\" name=\"methodFrame\" height=\"100\" width=\"200\" > </iframe> <form id =\"initiate3dsSimpleRedirectForm\" method=\"POST\" action=\"https://acs-public.tp.mastercard.com/api/v1/3ds_method\" target=\"methodFrame\"> <input type=\"hidden\" name=\"threeDSMethodData\" value=\"eyJ0aHJlZURTTWV0aG9kTm90aWZpY2F0aW9uVVJMIjoiaHR0cHM6Ly9tdGYuZ2F0ZXdheS5tYXN0ZXJjYXJkLmNvbS9jYWxsYmFja0ludGVyZmFjZS9nYXRld2F5LzkwMTNlNDZlYWE1MGQ1ZWVhOTRiZGQ5MGM1MGQ0MjVmODNjYWYyNjBmMzVlMTMyMmUwN2VjMTg0MTAyOTkxNGIiLCJ0aHJlZURTU2VydmVyVHJhbnNJRCI6IjM0MDIyNTc3LTVjYWYtNGQyZC1iYTRkLWVjODZlYTc4ZWFkOCJ9\" /> </form> <script id=\"initiate-authentication-script\"> var e=document.getElementById(\"initiate3dsSimpleRedirectForm\"); if (e) { e.submit(); if (e.parentNode !== null) { e.parentNode.removeChild(e); } } </script> </div>"
+        },
+        "version": "3DS2"
+    },
+    "merchant": "002M7270",
+    "order": {
+        "authenticationStatus": "AUTHENTICATION_AVAILABLE",
+        "creationTime": "2025-09-24T06:25:46.208Z",
+        "currency": "USD",
+        "id": "123123",
+        "lastUpdatedTime": "2025-09-24T06:25:46.193Z",
+        "merchantCategoryCode": "6540",
+        "status": "AUTHENTICATION_INITIATED",
+        "totalAuthorizedAmount": 0,
+        "totalCapturedAmount": 0,
+        "totalRefundedAmount": 0
+    },
+    "response": {
+        "gatewayCode": "AUTHENTICATION_IN_PROGRESS",
+        "gatewayRecommendation": "PROCEED"
+    },
+    "result": "SUCCESS",
+    "sourceOfFunds": {
+        "provided": {
+            "card": {
+                "brand": "MASTERCARD",
+                "expiry": {
+                    "month": "1",
+                    "year": "39"
+                },
+                "fundingMethod": "DEBIT",
+                "number": "512345xxxxxx2346",
+                "scheme": "MASTERCARD"
             }
-        };
-        return op;
-    });
-```
+        },
+        "type": "CARD"
+    },
+    "timeOfLastUpdate": "2025-09-24T06:25:46.193Z",
+    "timeOfRecord": "2025-09-24T06:25:46.208Z",
+    "transaction": {
+        "amount": 0,
+        "authenticationStatus": "AUTHENTICATION_AVAILABLE",
+        "currency": "USD",
+        "id": "1",
+        "type": "AUTHENTICATION"
+    },
+    "version": "100"
+}
 
----
-
-## 3) Quick test (your API)
-
-```bash
-curl -X PUT \
-  "http://localhost:5000/api/rest/version/100/merchant/002M7270/order/123123/transaction/1" \
-  -H "Content-Type: application/json" \
-  -d '{ "apiOperation":"INITIATE_AUTHENTICATION", "session": { "id": "SESSION0002129947563N13816378N8" } }'
-```
-
-You’ll get the upstream JSON (including the `authentication.redirect.html` snippet) streamed back unchanged.
-
----
-
-### Notes
-
-* **Security**: You’re relaying sensitive 3DS data; keep TLS on, avoid logging request/response bodies, and consider output filtering in production logs.
-* **Validation**: If you want to restrict to your configured `Version`/`MerchantId`, compare route values to options and reject mismatches.
-* **Swagger**: This route will appear automatically in your Swagger UI with the example payload.
+It also uses basic Auth.
+The endpoint will call the following URL:
+https://{{host}}/api/rest/version/100/merchant/{{merchantId}}/order/{{orderId}}/transaction/{{transactionId}}
