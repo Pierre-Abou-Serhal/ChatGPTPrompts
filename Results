@@ -1,335 +1,95 @@
-I want to create a .Net Web API that have the following endpoints that will call theses APIs:
+I want to add an endpoint: /api/rest/version/100/merchant/{{merchantId}}/session/{{session}}
 
-1- CreateSession:
-  Request:
-  {
-  	"session": {
-  		"authenticationLimit": 25
-  	}
-  }
-  the endpoint to call: POST https://{{host}}/api/rest/version/100/merchant/{{merchantId}}/session
-  host and merchant will be configured
+The request:
+{
+    "accountFunding": {
+        "senderType": "PERSON",
+        "senderIsRecipient": "true",
+        "purpose": "OTHER",
+        "recipient": {
+            "firstName": "John",
+            "lastName": "Smith",
+            "account": {
+                "fundingMethod": "CREDIT",
+                "identifierType": "CARD_NUMBER",
+                "identifier": "1234779999996392"
+            }
+        }
+    },
+    "apiOperation": "PAY",
+    "order": {
+        "amount": "100.00",
+        "currency": "USD",
+        "purchaseType": "ACCOUNT_FUNDING"
+    },
+    "sourceOfFunds": {
+        "type": "CARD",
+        "provided": {
+            "card": {
+                "number": "5123456789012346",
+                "expiry": {
+                    "month": "01",
+                    "year": "39"
+                },
+                "securityCode": "000"
+            }
+        }
+    },
+    "authentication":{  
+      "channel":"PAYER_BROWSER"
+   }
+}
 
-  Response:
-  {
+The response:
+{
+    "accountFunding": {
+        "purpose": "OTHER",
+        "recipient": {
+            "account": {
+                "fundingMethod": "CREDIT",
+                "identifier": "1234779999996392",
+                "identifierType": "CARD_NUMBER"
+            },
+            "firstName": "John",
+            "lastName": "Smith"
+        },
+        "senderIsRecipient": "true",
+        "senderType": "PERSON"
+    },
+    "authentication": {
+        "channel": "PAYER_BROWSER"
+    },
     "merchant": "002M7270",
-    "result": "SUCCESS",
+    "order": {
+        "amount": "100.00",
+        "currency": "USD",
+        "purchaseType": "ACCOUNT_FUNDING"
+    },
     "session": {
-        "aes256Key": "M/YzE59RoEy+fS8efdCtJz6J4QhV/JzzoZ+/pZzWtIA=",
-        "authenticationLimit": 25,
         "id": "SESSION0002129947563N13816378N8",
-        "updateStatus": "NO_UPDATE",
-        "version": "4e7143bf01"
-    }
+        "updateStatus": "SUCCESS",
+        "version": "eed6f9a702"
+    },
+    "sourceOfFunds": {
+        "provided": {
+            "card": {
+                "brand": "MASTERCARD",
+                "expiry": {
+                    "month": "1",
+                    "year": "39"
+                },
+                "fundingMethod": "DEBIT",
+                "number": "512345xxxxxx2346",
+                "scheme": "MASTERCARD",
+                "securityCode": "xxx"
+            }
+        },
+        "type": "CARD"
+    },
+    "version": "100"
 }
 
-The API use Basic Authorisation with username and password
+It also use basic Auth
 
-
-----------------------------------------------------------
-
-Awesome—here’s a clean, production-ready template for a .NET 8 Minimal API that exposes a `POST /api/session` endpoint and forwards to the upstream “CreateSession” API using Basic Auth. Host, merchant ID, version, and credentials are configurable.
-
-# Project layout
-
-```
-YourProject/
- ├─ Program.cs
- ├─ Gateway/
- │   ├─ GatewayOptions.cs
- │   └─ GatewayClient.cs
- ├─ Contracts/
- │   ├─ CreateSessionRequest.cs
- │   └─ CreateSessionResponse.cs
- └─ appsettings.json
-```
-
----
-
-### `appsettings.json`
-
-```json
-{
-  "Gateway": {
-    "Host": "your-host.example.com",
-    "MerchantId": "002M7270",
-    "Version": "100",
-    "Username": "YOUR_USERNAME",
-    "Password": "YOUR_PASSWORD"
-  },
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  }
-}
-```
-
----
-
-### `Contracts/CreateSessionRequest.cs`
-
-```csharp
-using System.Text.Json.Serialization;
-
-namespace YourProject.Contracts;
-
-public record CreateSessionRequest(
-    [property: JsonPropertyName("session")] CreateSessionRequestBody Session
-);
-
-public record CreateSessionRequestBody(
-    [property: JsonPropertyName("authenticationLimit")] int AuthenticationLimit
-);
-```
-
----
-
-### `Contracts/CreateSessionResponse.cs`
-
-```csharp
-using System.Text.Json.Serialization;
-
-namespace YourProject.Contracts;
-
-public record CreateSessionResponse(
-    [property: JsonPropertyName("merchant")] string Merchant,
-    [property: JsonPropertyName("result")] string Result,
-    [property: JsonPropertyName("session")] CreateSessionSession Session
-);
-
-public record CreateSessionSession(
-    [property: JsonPropertyName("aes256Key")] string? Aes256Key,
-    [property: JsonPropertyName("authenticationLimit")] int AuthenticationLimit,
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("updateStatus")] string UpdateStatus,
-    [property: JsonPropertyName("version")] string Version
-);
-```
-
----
-
-### `Gateway/GatewayOptions.cs`
-
-```csharp
-namespace YourProject.Gateway;
-
-public sealed class GatewayOptions
-{
-    public string Host { get; set; } = default!;
-    public string MerchantId { get; set; } = default!;
-    public string Version { get; set; } = "100";
-    public string Username { get; set; } = default!;
-    public string Password { get; set; } = default!;
-}
-```
-
----
-
-### `Gateway/GatewayClient.cs`
-
-```csharp
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-using Microsoft.Extensions.Options;
-using YourProject.Contracts;
-
-namespace YourProject.Gateway;
-
-public interface IGatewayClient
-{
-    Task<CreateSessionResponse> CreateSessionAsync(
-        CreateSessionRequest request,
-        CancellationToken ct = default);
-}
-
-public sealed class GatewayClient(IOptions<GatewayOptions> options, HttpClient http) : IGatewayClient
-{
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly GatewayOptions _cfg = options.Value;
-    private readonly HttpClient _http = http;
-
-    public async Task<CreateSessionResponse> CreateSessionAsync(
-        CreateSessionRequest request,
-        CancellationToken ct = default)
-    {
-        // Build full URL: https://{host}/api/rest/version/{version}/merchant/{merchantId}/session
-        var url = $"https://{_cfg.Host}/api/rest/version/{_cfg.Version}/merchant/{_cfg.MerchantId}/session";
-
-        // Basic Auth
-        var rawCreds = $"{_cfg.Username}:{_cfg.Password}";
-        var b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(rawCreds));
-        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", b64);
-
-        using var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
-        using var resp = await _http.PostAsync(url, content, ct);
-
-        var body = await resp.Content.ReadAsStringAsync(ct);
-
-        if (!resp.IsSuccessStatusCode)
-        {
-            // Bubble up upstream details but avoid leaking credentials
-            throw new HttpRequestException($"Upstream error {(int)resp.StatusCode}: {body}");
-        }
-
-        var parsed = JsonSerializer.Deserialize<CreateSessionResponse>(body, JsonOptions);
-        if (parsed is null)
-            throw new InvalidOperationException("Failed to parse CreateSession response.");
-
-        return parsed;
-    }
-}
-```
-
----
-
-### `Program.cs`
-
-```csharp
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.OpenApi.Models; // 🔹
-using YourProject.Contracts;
-using YourProject.Gateway;
-
-var builder = WebApplication.CreateBuilder(args);
-
-// Options
-builder.Services.Configure<GatewayOptions>(builder.Configuration.GetSection("Gateway"));
-
-// HttpClient
-builder.Services.AddHttpClient<IGatewayClient, GatewayClient>();
-
-// 🔹 Swagger services
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "YourProject API",
-        Version = "v1",
-        Description = "Gateway API that forwards CreateSession to the upstream provider."
-    });
-
-    // Include XML comments (if enabled in csproj)
-    var xml = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = System.IO.Path.Combine(AppContext.BaseDirectory, xml);
-    if (System.IO.File.Exists(xmlPath))
-    {
-        c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
-    }
-
-    // (Optional) Define Basic Auth scheme in case you later secure YOUR endpoint
-    c.AddSecurityDefinition("basic", new OpenApiSecurityScheme
-    {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "basic",
-        In = ParameterLocation.Header,
-        Description = "Basic auth (enter your API credentials)."
-    });
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme{ Reference = new OpenApiReference{ Type = ReferenceType.SecurityScheme, Id = "basic" } },
-            Array.Empty<string>()
-        }
-    });
-});
-
-var app = builder.Build();
-
-// 🔹 Swagger middleware
-// Expose Swagger everywhere; switch to IsDevelopment() if you prefer dev-only.
-app.UseSwagger();
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "YourProject API v1");
-    c.RoutePrefix = "swagger"; // UI at /swagger
-});
-
-// Endpoint
-app.MapPost("/api/session", async Task<Results<Ok<CreateSessionResponse>, BadRequest<string>>> (
-    /// <summary>Creates a session via the upstream gateway.</summary>
-    /// <param name="request">Payload with session.authenticationLimit.</param>
-    /// <returns>The upstream CreateSession response.</returns>
-    CreateSessionRequest request,
-    IGatewayClient client,
-    CancellationToken ct) =>
-{
-    if (request?.Session is null || request.Session.AuthenticationLimit <= 0)
-        return TypedResults.BadRequest("Invalid request: 'session.authenticationLimit' must be > 0.");
-
-    try
-    {
-        var result = await client.CreateSessionAsync(request, ct);
-        return TypedResults.Ok(result);
-    }
-    catch (HttpRequestException ex)
-    {
-        return TypedResults.BadRequest($"CreateSession failed: {ex.Message}");
-    }
-})
-.WithName("CreateSession")               // 🔹 Improves Swagger operation naming
-.WithOpenApi();                          // 🔹 Ensures it appears with inferred schema
-
-app.Run();
-
-```
-
----
-
-## How to run
-
-1. Create the project:
-
-```bash
-dotnet new web -n YourProject
-```
-
-Add the folders/files above (or `dotnet new webapi` if you prefer controllers).
-
-2. Configure `appsettings.json` with your actual `Host`, `MerchantId`, `Username`, and `Password`.
-
-3. Run:
-
-```bash
-dotnet run
-```
-
----
-
-## Example request (to **your** API)
-
-```bash
-curl -X POST http://localhost:5000/api/session \
-  -H "Content-Type: application/json" \
-  -d '{ "session": { "authenticationLimit": 25 } }'
-```
-
-### Example successful response (proxied from upstream)
-
-```json
-{
-  "merchant": "002M7270",
-  "result": "SUCCESS",
-  "session": {
-    "aes256Key": "M/YzE59RoEy+fS8efdCtJz6J4QhV/JzzoZ+/pZzWtIA=",
-    "authenticationLimit": 25,
-    "id": "SESSION0002129947563N13816378N8",
-    "updateStatus": "NO_UPDATE",
-    "version": "4e7143bf01"
-  }
-}
-```
-
----
-
-## Notes & options
-
-* **Security**: Keep credentials in `appsettings.Development.json` or user-secrets locally; use environment variables in production.
-* **Polly / resilience**: You can add retries/timeouts to the `HttpClient` if the upstream can be flaky.
-* **Controllers instead of Minimal API**: If you prefer MVC, I can swap to a `SessionsController` sample.
-
-If you want to add more endpoints that call other upstream APIs, tell me their specs and I’ll extend this skeleton consistently.
+The URL that will be called by this endpoint is the following:
+https://{{host}}/api/rest/version/100/merchant/{{merchantId}}/session/{{session}}
