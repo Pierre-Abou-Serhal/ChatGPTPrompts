@@ -1,396 +1,45 @@
-```html
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>MPGS 3DS Demo (via your ASP.NET proxy)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+https://test-sgbl.mtf.gateway.mastercard.com/api/rest/version/100/merchant/002M7270/order/OREDER_30/transaction/TRX_30
+Http Status Code: 401
+{"transaction":{"acquirer":{}},"correlationId":"3ds-db0f07a3-32e4-4fd7-a71a-964ee1ca2bed","apiOperation":"INITIATE_AUTHENTICATION","session":{"id":"SESSION0002914235588M92927996G1"}}
 
-  <style>
-    :root { --fg:#111827; --muted:#6b7280; --ok:#059669; --err:#dc2626; --bd:#e5e7eb; --bg:#fff; }
-    * { box-sizing: border-box; }
-    body { margin: 24px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: var(--fg); background: var(--bg); }
-    h1 { margin: 0 0 8px; font-size: 22px; }
-    p.muted { color: var(--muted); margin-top: 0; }
-    .grid { display: grid; grid-template-columns: 220px 1fr; gap: 10px 12px; }
-    .row { display: contents; }
-    label { align-self: center; font-size: 13px; color: #333; }
-    input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--bd); border-radius: 8px; }
-    input[disabled] { background: #f3f4f6; color: var(--muted); }
-    .card { border: 1px solid var(--bd); border-radius: 12px; padding: 16px; margin: 16px 0; background: #fff; }
-    .btns { display: flex; flex-wrap: wrap; gap: 8px; }
-    button { padding: 10px 14px; border: 0; border-radius: 10px; color: #fff; background: #111827; cursor: pointer; }
-    button.secondary { background: #374151; }
-    button:disabled { background: #9ca3af; cursor: not-allowed; }
-    .status { font-weight: 600; }
-    .ok { color: var(--ok); }
-    .err { color: var(--err); }
-    .muted { color: var(--muted); }
-    pre { background: #0b1020; color: #e6fffb; padding: 12px; border-radius: 10px; max-height: 360px; overflow: auto; margin: 0; }
-    code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
-    #threeDSHost { min-height: 40px; }
-  </style>
-
-  <!-- IMPORTANT: Point the SDK at YOUR proxy host (same origin recommended) -->
-  <script>
-    // If you serve this page from the same app, this will be your API host automatically.
-    // If hosting elsewhere, set a full origin: e.g., window.apiUrl = "https://api.yourdomain.com";
-    window.apiUrl = location.origin;
-  </script>
-
-  <!-- Load the MPGS ThreeDS SDK you provided (adjust the src path if needed) -->
-  <script src="/static/ThreeDS.min.js" data-error="errorCallback" data-cancel="cancelCallback"></script>
-</head>
-<body>
-  <h1>MPGS 3-D Secure Demo</h1>
-  <p class="muted">This page uses <code>ThreeDS.min.js</code> and your ASP.NET proxy to run the full 3DS flow.</p>
-
-  <div class="card">
-    <div class="grid">
-      <div class="row">
-        <label>API Host (derived)</label>
-        <input id="apiHost" disabled />
-      </div>
-
-      <div class="row">
-        <label>API Version (<code>wsVersion</code>)</label>
-        <input id="wsVersion" value="100" />
-      </div>
-
-      <div class="row">
-        <label>Merchant ID</label>
-        <input id="merchantId" placeholder="002M7270" />
-      </div>
-
-      <div class="row">
-        <label>Authentication Limit</label>
-        <input id="authLimit" type="number" min="1" value="25" />
-      </div>
-
-      <div class="row">
-        <label>Order ID</label>
-        <input id="orderId" placeholder="123123" />
-      </div>
-
-      <div class="row">
-        <label>Transaction ID</label>
-        <input id="transactionId" placeholder="1" value="1" />
-      </div>
-
-      <div class="row">
-        <label>Amount</label>
-        <input id="amount" value="100.00" />
-      </div>
-
-      <div class="row">
-        <label>Currency</label>
-        <input id="currency" value="USD" />
-      </div>
-
-      <div class="row">
-        <label>Card Number</label>
-        <input id="cardNumber" value="5123456789012346" autocomplete="off" />
-      </div>
-
-      <div class="row">
-        <label>Expiry (MM)</label>
-        <input id="expMonth" value="01" autocomplete="off" />
-      </div>
-
-      <div class="row">
-        <label>Expiry (YY)</label>
-        <input id="expYear" value="39" autocomplete="off" />
-      </div>
-
-      <div class="row">
-        <label>CVV</label>
-        <input id="cvv" value="000" autocomplete="off" />
-      </div>
-
-      <div class="row">
-        <label>Full Screen Redirect</label>
-        <select id="fsRedirect">
-          <option value="true">true</option>
-          <option value="false" selected>false</option>
-        </select>
-      </div>
-
-      <div class="row">
-        <label>Session ID</label>
-        <input id="sessionId" placeholder="(auto after Create Session)" disabled />
-      </div>
-
-      <div class="row">
-        <label></label>
-        <div class="btns">
-          <button id="btnCreateSession">1) Create Session</button>
-          <button id="btnUpdateSession" class="secondary" disabled>2) Update Session</button>
-          <button id="btnConfigure" class="secondary" disabled>3) Configure SDK</button>
-          <button id="btnInitiate" class="secondary" disabled>4) Initiate Authentication</button>
-          <button id="btnAuthenticate" class="secondary" disabled>5) Authenticate Payer</button>
-        </div>
-      </div>
-    </div>
-    <p class="muted" style="margin-top:8px">
-      Flow: <code>Create Session</code> → <code>Update Session</code> → <code>Configure</code> → <code>Initiate</code> → <code>Authenticate</code>.
-      The SDK will call your proxy at <code>/api/rest/version/{version}/merchant/{merchantId}/order/{orderId}/transaction/{transactionId}</code>.
-    </p>
-  </div>
-
-  <div class="card">
-    <div class="grid">
-      <div class="row">
-        <label>Status</label>
-        <div id="status" class="status muted">Idle</div>
-      </div>
-      <div class="row" style="align-items:start;">
-        <label>Log</label>
-        <pre id="log"></pre>
-      </div>
-    </div>
-  </div>
-
-  <!-- Where the SDK injects its iframes / forms if needed -->
-  <div id="threeDSHost" class="card">
-    <div id="3DSUI"></div>
-  </div>
-
-  <script>
-    // ----- element refs -----
-    const els = {
-      apiHost: document.getElementById('apiHost'),
-      wsVersion: document.getElementById('wsVersion'),
-      merchantId: document.getElementById('merchantId'),
-      authLimit: document.getElementById('authLimit'),
-      orderId: document.getElementById('orderId'),
-      transactionId: document.getElementById('transactionId'),
-      amount: document.getElementById('amount'),
-      currency: document.getElementById('currency'),
-      cardNumber: document.getElementById('cardNumber'),
-      expMonth: document.getElementById('expMonth'),
-      expYear: document.getElementById('expYear'),
-      cvv: document.getElementById('cvv'),
-      fsRedirect: document.getElementById('fsRedirect'),
-      sessionId: document.getElementById('sessionId'),
-      btnCreateSession: document.getElementById('btnCreateSession'),
-      btnUpdateSession: document.getElementById('btnUpdateSession'),
-      btnConfigure: document.getElementById('btnConfigure'),
-      btnInitiate: document.getElementById('btnInitiate'),
-      btnAuthenticate: document.getElementById('btnAuthenticate'),
-      status: document.getElementById('status'),
-      log: document.getElementById('log')
-    };
-
-    // ----- tiny logger / status -----
-    const log = (...args) => {
-      console.log(...args);
-      els.log.textContent += args.map(a => {
-        if (a instanceof Error) return a.stack || a.message;
-        try { return typeof a === 'string' ? a : JSON.stringify(a, null, 2); }
-        catch { return String(a); }
-      }).join(' ') + '\n';
-      els.log.scrollTop = els.log.scrollHeight;
-    };
-    const setStatus = (text, cls='muted') => {
-      els.status.className = `status ${cls}`;
-      els.status.textContent = text;
-    };
-
-    // ----- SDK host display -----
-    try {
-      const url = new URL(window.apiUrl, location.href);
-      els.apiHost.value = url.host;
-    } catch { els.apiHost.value = '(check window.apiUrl)'; }
-
-    // ===== 1) Create Session (POST /api/session) =====
-    els.btnCreateSession.onclick = async () => {
-      setStatus('Creating session...', 'muted');
-      try {
-        const res = await fetch('/api/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session: { authenticationLimit: Number(els.authLimit.value || 25) } })
-        });
-        const text = await res.text();
-        if (!res.ok) throw new Error(text || 'CreateSession failed');
-        const data = JSON.parse(text);
-        const sid = data?.session?.id;
-        if (!sid) throw new Error('No session.id in response');
-        els.sessionId.value = sid;
-        log('CreateSession response:', data);
-        setStatus('Session created ✔', 'ok');
-        els.btnUpdateSession.disabled = false;
-      } catch (err) {
-        log('CreateSession error:', err);
-        setStatus('CreateSession failed', 'err');
-      }
-    };
-
-    // ===== 2) Update Session (PUT /api/rest/version/{v}/merchant/{m}/session/{session}) =====
-    els.btnUpdateSession.onclick = async () => {
-      setStatus('Updating session...', 'muted');
-
-      const version = Number(els.wsVersion.value || 100);
-      const merchantId = els.merchantId.value.trim();
-      const sessionId = els.sessionId.value.trim();
-
-      if (!merchantId || !sessionId) { alert('Merchant ID and Session ID are required'); return; }
-
-      const payload = {
-        session: { id: sessionId },
-        order: {
-          amount: els.amount.value.trim(),
-          currency: els.currency.value.trim(),
-          purchaseType: "ACCOUNT_FUNDING"
-        },
-        sourceOfFunds: {
-          type: "CARD",
-          provided: {
-            card: {
-              number: els.cardNumber.value.trim(),
-              expiry: { month: els.expMonth.value.trim(), year: els.expYear.value.trim() },
-              securityCode: els.cvv.value.trim()
-            }
+      ThreeDS.configure({
+        merchantId,
+        sessionId,
+        containerId: '3DSUI',
+        callback: function () {
+          if (ThreeDS.isConfigured()) {
+            log('ThreeDS configured');
+            setStatus('SDK configured ✔', 'ok');
+            els.btnInitiate.disabled = false;
+            els.btnAuthenticate.disabled = false;
           }
         },
-        authentication: { channel: "PAYER_BROWSER" }
-      };
+        configuration: {
+          userLanguage: navigator.language || 'en-US',
+          wsVersion
+        }
+      });
 
-      try {
-        const url = `/api/rest/version/${version}/merchant/${encodeURIComponent(merchantId)}/session/${encodeURIComponent(sessionId)}`;
-        const res = await fetch(url, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const text = await res.text();
-        if (!res.ok) throw new Error(text || 'Update Session failed');
-        const data = JSON.parse(text);
-        log('Update Session response:', data);
-        setStatus('Session updated ✔', 'ok');
-        els.btnConfigure.disabled = false;
-        els.btnInitiate.disabled = false;
-      } catch (err) {
-        log('Update Session error:', err);
-        setStatus('Update Session failed', 'err');
+
+    ThreeDS.initiateAuthentication(orderId, transactionId, (data) => {
+      if (data && data.error) {
+        log('INITIATE_AUTHENTICATION error:', data.error);
+        setStatus('Initiate failed', 'err');
+        return;
       }
-    };
+      log('INITIATE_AUTHENTICATION data:', data);
+      log('REST API raw response:', data.restApiResponse);
+      log('Correlation Id:', data.correlationId);
+      log('Gateway Recommendation:', data.gatewayRecommendation);
+      log('HTML Redirect Code:', data.htmlRedirectCode);
+      log('Authentication Version:', data.authenticationVersion);
 
-    // ===== 3) Configure SDK =====
-    els.btnConfigure.onclick = () => {
-      try {
-        const merchantId = els.merchantId.value.trim();
-        const sessionId  = els.sessionId.value.trim();
-        const wsVersion  = Number(els.wsVersion.value || 100);
-        if (!merchantId) { alert('Merchant ID required'); return; }
-        if (!sessionId)  { alert('Session ID required'); return; }
-
-        log('ThreeDS.isConfigured() before:', ThreeDS.isConfigured());
-
-        ThreeDS.configure({
-          merchantId,
-          sessionId,
-          containerId: '3DSUI',
-          callback: function () {
-            if (ThreeDS.isConfigured()) {
-              log('ThreeDS configured');
-              setStatus('SDK configured ✔', 'ok');
-              els.btnInitiate.disabled = false;
-              els.btnAuthenticate.disabled = false;
-            }
-          },
-          configuration: {
-            userLanguage: navigator.language || 'en-US',
-            wsVersion
-          }
-        });
-
-        log('ThreeDS.isConfigured() after:', ThreeDS.isConfigured());
-        log('ThreeDS JS API Version:', ThreeDS.version);
-      } catch (err) {
-        log('Configure error:', err);
-        setStatus('Configure failed', 'err');
+      if (data.gatewayRecommendation === 'PROCEED') {
+        setStatus('Initiated ✔ — proceed to Authenticate', 'ok');
+      } else if (data.gatewayRecommendation === 'RESUBMIT_WITH_ALTERNATIVE_PAYMENT_DETAILS') {
+        setStatus('Card not eligible for 3DS — try different payment details', 'err');
+      } else {
+        setStatus(`Gateway recommendation: ${data.gatewayRecommendation}`, 'muted');
       }
-    };
-
-    // ===== 4) Initiate Authentication =====
-    els.btnInitiate.onclick = () => {
-      setStatus('Initiating authentication...', 'muted');
-
-      const orderId = els.orderId.value.trim();
-      const transactionId = els.transactionId.value.trim() || '1';
-
-      const optionalParams = {
-        sourceOfFunds: { type: 'CARD' }
-      };
-
-      ThreeDS.initiateAuthentication(orderId, transactionId, (data) => {
-        if (data && data.error) {
-          log('INITIATE_AUTHENTICATION error:', data.error);
-          setStatus('Initiate failed', 'err');
-          return;
-        }
-        log('INITIATE_AUTHENTICATION data:', data);
-        log('REST API raw response:', data.restApiResponse);
-        log('Correlation Id:', data.correlationId);
-        log('Gateway Recommendation:', data.gatewayRecommendation);
-        log('HTML Redirect Code:', data.htmlRedirectCode);
-        log('Authentication Version:', data.authenticationVersion);
-
-        if (data.gatewayRecommendation === 'PROCEED') {
-          setStatus('Initiated ✔ — proceed to Authenticate', 'ok');
-        } else if (data.gatewayRecommendation === 'RESUBMIT_WITH_ALTERNATIVE_PAYMENT_DETAILS') {
-          setStatus('Card not eligible for 3DS — try different payment details', 'err');
-        } else {
-          setStatus(`Gateway recommendation: ${data.gatewayRecommendation}`, 'muted');
-        }
-      }, optionalParams);
-    };
-
-    // ===== 5) Authenticate Payer =====
-    els.btnAuthenticate.onclick = () => {
-      setStatus('Authenticating payer...', 'muted');
-
-      const orderId = els.orderId.value.trim();
-      const transactionId = els.transactionId.value.trim() || '1';
-
-      const optionalParams = {
-        fullScreenRedirect: (els.fsRedirect.value === 'true'),
-        billing: { address: { city: "London", country: "GBR" } }
-      };
-
-      ThreeDS.authenticatePayer(orderId, transactionId, (data) => {
-        if (data && data.error) {
-          log('AUTHENTICATE_PAYER error:', data.error);
-          setStatus('Authenticate failed', 'err');
-          return;
-        }
-        log('AUTHENTICATE_PAYER response:', data.restApiResponse);
-        log('HTML redirect code (if any):', data.htmlRedirectCode);
-        setStatus('Authenticated ✔', 'ok');
-
-        // Simple receipt example
-        const receipt = {
-          orderId,
-          transactionId,
-          result: data.restApiResponse?.result,
-          authentication: data.restApiResponse?.authentication,
-          response: data.restApiResponse?.response
-        };
-        log('Receipt:', receipt);
-      }, optionalParams);
-    };
-
-    // ===== SDK data-error / data-cancel hooks =====
-    window.errorCallback = function (err) {
-      log('ThreeDS errorCallback:', err);
-      setStatus('ThreeDS error', 'err');
-    };
-    window.cancelCallback = function () {
-      log('ThreeDS cancelCallback (challenge canceled)');
-      setStatus('Challenge canceled', 'err');
-    };
-  </script>
-</body>
-</html>
-```
+    }, optionalParams);
+  };
