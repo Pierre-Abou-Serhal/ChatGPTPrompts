@@ -1,45 +1,114 @@
-https://test-sgbl.mtf.gateway.mastercard.com/api/rest/version/100/merchant/002M7270/order/OREDER_30/transaction/TRX_30
-Http Status Code: 401
-{"transaction":{"acquirer":{}},"correlationId":"3ds-db0f07a3-32e4-4fd7-a71a-964ee1ca2bed","apiOperation":"INITIATE_AUTHENTICATION","session":{"id":"SESSION0002914235588M92927996G1"}}
-
-      ThreeDS.configure({
-        merchantId,
-        sessionId,
-        containerId: '3DSUI',
-        callback: function () {
-          if (ThreeDS.isConfigured()) {
-            log('ThreeDS configured');
-            setStatus('SDK configured ✔', 'ok');
-            els.btnInitiate.disabled = false;
-            els.btnAuthenticate.disabled = false;
-          }
+{
+    "accountFunding": {
+        "purpose": "OTHER",
+        "recipient": {
+            "account": {
+                "identifier": "01128xxxxxxx8840",
+                "identifierType": "OTHER"
+            },
+            "firstName": "John",
+            "lastName": "Smith"
         },
-        configuration: {
-          userLanguage: navigator.language || 'en-US',
-          wsVersion
-        }
-      });
-
-
-    ThreeDS.initiateAuthentication(orderId, transactionId, (data) => {
-      if (data && data.error) {
-        log('INITIATE_AUTHENTICATION error:', data.error);
-        setStatus('Initiate failed', 'err');
-        return;
-      }
-      log('INITIATE_AUTHENTICATION data:', data);
-      log('REST API raw response:', data.restApiResponse);
-      log('Correlation Id:', data.correlationId);
-      log('Gateway Recommendation:', data.gatewayRecommendation);
-      log('HTML Redirect Code:', data.htmlRedirectCode);
-      log('Authentication Version:', data.authenticationVersion);
-
-      if (data.gatewayRecommendation === 'PROCEED') {
-        setStatus('Initiated ✔ — proceed to Authenticate', 'ok');
-      } else if (data.gatewayRecommendation === 'RESUBMIT_WITH_ALTERNATIVE_PAYMENT_DETAILS') {
-        setStatus('Card not eligible for 3DS — try different payment details', 'err');
-      } else {
-        setStatus(`Gateway recommendation: ${data.gatewayRecommendation}`, 'muted');
-      }
-    }, optionalParams);
-  };
+        "reference": "0005250527212485901",
+        "senderIsRecipient": true,
+        "senderType": "PERSON"
+    },
+    "authorizationResponse": {
+        "cardLevelIndicator": "P ",
+        "cardSecurityCodeError": "M",
+        "commercialCard": "!01",
+        "commercialCardIndicator": "0",
+        "date": "0929",
+        "merchantAdviceCode": "00",
+        "posData": "1025100006600",
+        "posEntryMode": "812",
+        "processingCode": "103000",
+        "responseCode": "00",
+        "returnAci": "D",
+        "sourceReasonCode": "V",
+        "stan": "199997",
+        "time": "124859",
+        "transactionIdentifier": "305272461398826",
+        "validationCode": "XBHF"
+    },
+    "device": {
+        "ipAddress": "212.36.199.75"
+    },
+    "gatewayEntryPoint": "WEB_SERVICES_API",
+    "merchant": "002M7270",
+    "order": {
+        "amount": 5000.00,
+        "authenticationStatus": "AUTHENTICATION_NOT_IN_EFFECT",
+        "chargeback": {
+            "amount": 0,
+            "currency": "LBP"
+        },
+        "creationTime": "2025-09-29T12:48:39.763Z",
+        "currency": "LBP",
+        "id": "ORDER_40",
+        "lastUpdatedTime": "2025-09-29T12:48:59.931Z",
+        "merchantAmount": 5000.00,
+        "merchantCategoryCode": "6540",
+        "merchantCurrency": "LBP",
+        "purchaseType": "ACCOUNT_FUNDING",
+        "status": "CAPTURED",
+        "totalAuthorizedAmount": 5000.00,
+        "totalCapturedAmount": 5000.00,
+        "totalDisbursedAmount": 0.00,
+        "totalRefundedAmount": 0.00
+    },
+    "response": {
+        "acquirerCode": "00",
+        "acquirerMessage": "Approved",
+        "cardSecurityCode": {
+            "acquirerCode": "M",
+            "gatewayCode": "MATCH"
+        },
+        "gatewayCode": "APPROVED",
+        "gatewayRecommendation": "NO_ACTION"
+    },
+    "result": "SUCCESS",
+    "sourceOfFunds": {
+        "provided": {
+            "card": {
+                "brand": "VISA",
+                "expiry": {
+                    "month": "12",
+                    "year": "31"
+                },
+                "fundingMethod": "DEBIT",
+                "issuer": "INTL HDQTRS-CENTER OWNED",
+                "issuerCountryCode": "LBN",
+                "number": "476130xxxxxx1110",
+                "paymentAccountReference": "V0010013019043500173368898376",
+                "scheme": "VISA",
+                "storedOnFile": "NOT_STORED"
+            }
+        },
+        "type": "CARD"
+    },
+    "timeOfLastUpdate": "2025-09-29T12:48:59.931Z",
+    "timeOfRecord": "2025-09-29T12:48:59.634Z",
+    "transaction": {
+        "acquirer": {
+            "batch": 20250929,
+            "date": "0929",
+            "id": "SGBL_S2I",
+            "merchantId": "000422727099099",
+            "settlementDate": "2025-09-29",
+            "timeZone": "+0300",
+            "transactionId": "305272461398826"
+        },
+        "amount": 5000.00,
+        "authenticationStatus": "AUTHENTICATION_NOT_IN_EFFECT",
+        "authorizationCode": "093410",
+        "currency": "LBP",
+        "id": "TRX_401",
+        "receipt": "527212199997",
+        "source": "INTERNET",
+        "stan": "199997",
+        "terminal": "SGBL0005",
+        "type": "PAYMENT"
+    },
+    "version": "100"
+}
