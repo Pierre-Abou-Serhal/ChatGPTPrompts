@@ -1,17 +1,25 @@
-      ThreeDS.configure({
-        merchantId,
-        sessionId,
-        containerId: '3DSUI',
-        callback: function () {
-          if (ThreeDS.isConfigured()) {
-            log('ThreeDS configured');
-            setStatus('SDK configured ✔', 'ok');
-            els.btnInitiate.disabled = false;
-            els.btnAuthenticate.disabled = false;
-          }
-        },
-        configuration: {
-          userLanguage: navigator.language || 'en-US',
-          wsVersion
-        }
-      });
+const optionalParams = {
+      apiHost: els.apiHost.value
+    };
+
+    ThreeDS.initiateAuthentication(orderId, transactionId, (data) => {
+      if (data && data.error) {
+        log('INITIATE_AUTHENTICATION error:', data.error);
+        setStatus('Initiate failed', 'err');
+        return;
+      }
+      log('INITIATE_AUTHENTICATION data:', data);
+      log('REST API raw response:', data.restApiResponse);
+      log('Correlation Id:', data.correlationId);
+      log('Gateway Recommendation:', data.gatewayRecommendation);
+      log('HTML Redirect Code:', data.htmlRedirectCode);
+      log('Authentication Version:', data.authenticationVersion);
+
+      if (data.gatewayRecommendation === 'PROCEED') {
+        setStatus('Initiated ✔ — proceed to Authenticate', 'ok');
+      } else if (data.gatewayRecommendation === 'RESUBMIT_WITH_ALTERNATIVE_PAYMENT_DETAILS') {
+        setStatus('Card not eligible for 3DS — try different payment details', 'err');
+      } else {
+        setStatus(`Gateway recommendation: ${data.gatewayRecommendation}`, 'muted');
+      }
+    }, optionalParams);
