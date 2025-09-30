@@ -1,11 +1,1 @@
-PUT
-	https://test-sgbl.mtf.gateway.mastercard.com/api/rest/version/100/merchant/002M7270/order/ORDER_48/transaction/TRX_49
-
-Status
-401
-
-Authorization: Basic bWVyY2hhbnQuMDAyTTcyNzA6U0VTU0lPTjAwMDI2OTI1MDM4NTBKMjI1MTAxNUY0MQ==
-
-{"transaction":{"acquirer":{}},"correlationId":"3ds-9dbf302d-23a6-4fe6-d41f-eb54d800b1c1","apiOperation":"INITIATE_AUTHENTICATION","session":{"id":"SESSION0002692503850J2251015F41"}}
-
-{"correlationId":"3ds-9dbf302d-23a6-4fe6-d41f-eb54d800b1c1","error":{"cause":"INVALID_REQUEST","field":"url:merchant/{merchantId}/order/{orderid}","validationType":"INVALID"},"result":"ERROR"}
+Basic bWVyY2hhbnQuMDAyTTcyNzA6OGMzYjNiNjJhZjBlOGZmMzY4NmE2NWUwNzkzOTM0NjM=
