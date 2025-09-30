@@ -1,1 +1,17 @@
-https://localhost:7049/api/rest/version/100/merchant/002M7270/session/SESSION0002688444427H5117080N70
+      ThreeDS.configure({
+        merchantId,
+        sessionId,
+        containerId: '3DSUI',
+        callback: function () {
+          if (ThreeDS.isConfigured()) {
+            log('ThreeDS configured');
+            setStatus('SDK configured ✔', 'ok');
+            els.btnInitiate.disabled = false;
+            els.btnAuthenticate.disabled = false;
+          }
+        },
+        configuration: {
+          userLanguage: navigator.language || 'en-US',
+          wsVersion
+        }
+      });
