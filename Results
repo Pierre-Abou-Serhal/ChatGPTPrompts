@@ -1,1 +1,57 @@
-Basic bWVyY2hhbnQuMDAyTTcyNzA6OGMzYjNiNjJhZjBlOGZmMzY4NmE2NWUwNzkzOTM0NjM=
+{
+    "authentication": {
+        "3ds1": {
+            "veResEnrolled": "Y"
+        },
+        "acceptVersions": "3DS1,3DS2,PASSKEY",
+        "channel": "PAYER_BROWSER",
+        "purpose": "PAYMENT_TRANSACTION",
+        "redirect": {
+            "html": "<script id=\"initiate-authentication-script\"></script>"
+        },
+        "version": "3DS1"
+    },
+    "merchant": "002M7270",
+    "order": {
+        "authenticationStatus": "AUTHENTICATION_AVAILABLE",
+        "creationTime": "2025-09-30T12:11:24.438Z",
+        "currency": "USD",
+        "id": "829721848",
+        "lastUpdatedTime": "2025-09-30T12:11:24.426Z",
+        "merchantCategoryCode": "6540",
+        "status": "AUTHENTICATION_INITIATED",
+        "totalAuthorizedAmount": 0,
+        "totalCapturedAmount": 0,
+        "totalRefundedAmount": 0
+    },
+    "response": {
+        "gatewayCode": "AUTHENTICATION_IN_PROGRESS",
+        "gatewayRecommendation": "PROCEED"
+    },
+    "result": "SUCCESS",
+    "sourceOfFunds": {
+        "provided": {
+            "card": {
+                "brand": "VISA",
+                "expiry": {
+                    "month": "1",
+                    "year": "39"
+                },
+                "fundingMethod": "CREDIT",
+                "number": "418077xxxxxx6392",
+                "scheme": "VISA"
+            }
+        },
+        "type": "CARD"
+    },
+    "timeOfLastUpdate": "2025-09-30T12:11:24.426Z",
+    "timeOfRecord": "2025-09-30T12:11:24.438Z",
+    "transaction": {
+        "amount": 0,
+        "authenticationStatus": "AUTHENTICATION_AVAILABLE",
+        "currency": "USD",
+        "id": "65",
+        "type": "AUTHENTICATION"
+    },
+    "version": "100"
+}
