@@ -1,1 +1,212 @@
-2025-09-25T20:23:47,527Z app=mpgs region=mt stripe=1 resource=SecurityLog INFO [thread_id=55328, id=XHDWTWC3HWFLG, GW=REST-JSON, Op=Authentication:InitiateAuthentication, remoteip=93.185.232.9, Meth=PUT, Mso=ANONYMOUS, Mer=002M7270] Sep 25, 2025 20:23:47 GMT|40000|MPGS|unknownEntityType:none:Unknown merchant:none:002M7270|wjb5stl400|-|-|-|-|-|directApi|USER_ATTEMPTS_UNAUTHORISED_ACTION:VERIFY|id=XHDWTWC3HWFLG, This field cannot be accepted from any payer browser or device. If you need to supply this field, make the request from your server and supply full merchant credentials.|FAILURE 
+Create Session Browser -> Server -> MPGS
+
+  URL:  POST https://test-sgbl.mtf.gateway.mastercard.com/api/rest/version/100/merchant/002M7270/session
+  
+  Request:
+  Headers:
+  POST /api/session HTTP/2
+  Host: localhost:7049
+  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0
+  Accept: */*
+  Accept-Language: en-US,en;q=0.5
+  Accept-Encoding: gzip, deflate, br, zstd
+  Referer: https://localhost:7049/3ds-demo/index.html
+  Content-Type: application/json
+  Content-Length: 38
+  Origin: https://localhost:7049
+  Connection: keep-alive
+  Sec-Fetch-Dest: empty
+  Sec-Fetch-Mode: cors
+  Sec-Fetch-Site: same-origin
+  Idempotency-Key: "15111529908861174500"
+  Priority: u=0
+  TE: trailers
+  
+  Payload: 
+  {
+  	"session": {
+  		"authenticationLimit": 25
+  	}
+  }
+  
+  Response:
+  Headers:
+  HTTP/2 200 
+  content-type: application/json; charset=utf-8
+  date: Thu, 02 Oct 2025 07:26:10 GMT
+  server: Kestrel
+  access-control-allow-origin: *
+  X-Firefox-Spdy: h2
+  
+  Payload:
+  {
+      "merchant": "002M7270",
+      "result": "SUCCESS",
+      "session": {
+          "aes256Key": "rvRYZczzW3OvTl5T+3TQfPmhlYdGLSTls4v4lPnotws=",
+          "authenticationLimit": 25,
+          "id": "SESSION0002508995945G26544951E4",
+          "updateStatus": "NO_UPDATE",
+          "version": "f4d89c8c01"
+      }
+  }
+
+------------------------------------------------------------------
+
+Update Session Browser -> Server -> MPGS
+
+  URL: PUT https://test-sgbl.mtf.gateway.mastercard.com/api/rest/version/100/merchant/002M7270/session/SESSION0002508995945G26544951E4
+
+  Request:
+  Headers:
+  PUT /api/rest/version/100/merchant/002M7270/session/SESSION0002508995945G26544951E4 HTTP/2
+  Host: localhost:7049
+  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0
+  Accept: */*
+  Accept-Language: en-US,en;q=0.5
+  Accept-Encoding: gzip, deflate, br, zstd
+  Referer: https://localhost:7049/3ds-demo/index.html
+  Content-Type: application/json
+  Content-Length: 305
+  Origin: https://localhost:7049
+  Connection: keep-alive
+  Sec-Fetch-Dest: empty
+  Sec-Fetch-Mode: cors
+  Sec-Fetch-Site: same-origin
+  Priority: u=0
+  TE: trailers
+
+  Payload:
+  {
+    "order": {
+        "amount": "100.00",
+        "currency": "USD"
+    },
+    "sourceOfFunds": {
+        "type": "CARD",
+        "provided": {
+            "card": {
+                "number": "5123450000000008",
+                "expiry": {
+                    "month": "01",
+                    "year": "39"
+                },
+                "securityCode": "000"
+            }
+        }
+    },
+    "authentication": {
+        "channel": "PAYER_BROWSER",
+        "purpose": "PAYMENT_TRANSACTION",
+        "redirectResponseUrl": "https://google.com"
+    }
+  }
+  Response:
+  Headers:
+  HTTP/2 200 
+  content-type: application/json
+  date: Thu, 02 Oct 2025 07:26:14 GMT
+  server: Kestrel
+  access-control-allow-origin: *
+  content-length: 508
+  X-Firefox-Spdy: h2
+
+  Payload:
+  {
+    "authentication": {
+        "channel": "PAYER_BROWSER",
+        "purpose": "PAYMENT_TRANSACTION",
+        "redirectResponseUrl": "https://google.com"
+    },
+    "merchant": "002M7270",
+    "order": {
+        "amount": "100.00",
+        "currency": "USD"
+    },
+    "session": {
+        "id": "SESSION0002508995945G26544951E4",
+        "updateStatus": "SUCCESS",
+        "version": "e09a682102"
+    },
+    "sourceOfFunds": {
+        "provided": {
+            "card": {
+                "brand": "MASTERCARD",
+                "expiry": {
+                    "month": "1",
+                    "year": "39"
+                },
+                "fundingMethod": "DEBIT",
+                "number": "512345xxxxxx0008",
+                "scheme": "MASTERCARD",
+                "securityCode": "xxx"
+            }
+        },
+        "type": "CARD"
+    },
+    "version": "100"
+  }
+
+------------------------------------------------------------------
+
+Initiate Authentication -> Browser (using ThreeDS SDK) -> MPGS
+
+  URL: PUT https://test-sgbl.mtf.gateway.mastercard.com/api/rest/version/100/merchant/002M7270/order/ORD_60/transaction/TRX_60
+
+  Request:
+  Headers:
+  PUT /api/rest/version/100/merchant/002M7270/order/ORD_60/transaction/TRX_60 HTTP/1.1
+  Host: test-sgbl.mtf.gateway.mastercard.com
+  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0
+  Accept: */*
+  Accept-Language: en-US,en;q=0.5
+  Accept-Encoding: gzip, deflate, br, zstd
+  Authorization: Basic bWVyY2hhbnQuMDAyTTcyNzA6U0VTU0lPTjAwMDI1MDg5OTU5NDVHMjY1NDQ5NTFFNA==
+  Content-Type: application/json
+  x-js-sdk: ThreeDS:1.3.0
+  Content-Length: 182
+  Origin: https://localhost:7049
+  Connection: keep-alive
+  Referer: https://localhost:7049/
+  Sec-Fetch-Dest: empty
+  Sec-Fetch-Mode: cors
+  Sec-Fetch-Site: cross-site
+  Priority: u=0
+
+  Payload:
+  {
+    "transaction": {
+        "acquirer": {}
+    },
+    "correlationId": "3ds-b6895915-63a7-446c-34a0-399afc0a595d",
+    "apiOperation": "INITIATE_AUTHENTICATION",
+    "session": {
+        "id": "SESSION0002508995945G26544951E4"
+    }
+  }
+
+  Response:
+  Headers:
+  HTTP/1.1 401 
+  Date: Thu, 02 Oct 2025 07:26:31 GMT
+  Content-Type: application/json;charset=ISO-8859-1
+  Content-Length: 192
+  Connection: keep-alive
+  Cache-Control: no-cache, no-store, must-revalidate
+  Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Headers: Authorization, Accept, Accept-Language, Content-Language, Content-Type, x-js-sdk, *
+  Pragma: no-cache
+  Expires: 0
+  Strict-Transport-Security: max-age=16070400; includeSubDomains; preload
+
+  Payload:
+  {
+    "correlationId": "3ds-b6895915-63a7-446c-34a0-399afc0a595d",
+    "error": {
+        "cause": "INVALID_REQUEST",
+        "field": "url:merchant/{merchantId}/order/{orderid}",
+        "validationType": "INVALID"
+    },
+    "result": "ERROR"
+  }
