@@ -1,5 +1,3 @@
-C# Code
-
 // P2A RequestCashWithdrawal
         for (Int32 y = 0; y < 2; y++)
         {
@@ -67,7 +65,7 @@ C# Code
                     {
                         payload = payload.Replace("{accountNumber}", P2ALBPAccountNbr);
                         payload = payload.Replace("{accountCurrency}", P2ALBPCurrency);
-                        payload = payload.Replace("{accountAmount}", P2AReservedAmoutLBP1);
+                        payload = payload.Replace("{accountAmount}", P2AAmountLBP1);
                         payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutLBP1);
                         payload = payload.Replace("{referenceId}", P2AReferenceIdLBP1);
                         payload = payload.Replace("{otp}", P2AOTPLBP1);
@@ -76,8 +74,7 @@ C# Code
                     {
                         payload = payload.Replace("{accountNumber}", P2AUSDAccountNbr);
                         payload = payload.Replace("{accountCurrency}", P2AUSDCurrency);
-                        
-                        payload = payload.Replace("{accountAmount}", P2AReservedAmoutUSD1);
+                        payload = payload.Replace("{accountAmount}", P2AAmountUSD1);
                         payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutUSD1);
                         payload = payload.Replace("{referenceId}", P2AReferenceIdUSD1);
                         payload = payload.Replace("{otp}", P2AOTPUSD1);
@@ -87,13 +84,13 @@ C# Code
                 // Sunday
                 DateTime sundayDate = new DateTime(2025, 10, 5);
                 
-                if (DateTime.Today == sundayDate)
+                if (DateTime.Today == DateTime.Today)
                 {
                     if (y % 2 == 0) // LBP
                     {
                         payload = payload.Replace("{accountNumber}", P2ALBPAccountNbr);
                         payload = payload.Replace("{accountCurrency}", P2ALBPCurrency);
-                        payload = payload.Replace("{accountAmount}", P2AReservedAmoutLBP2);
+                        payload = payload.Replace("{accountAmount}", P2AAmountLBP2);
                         payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutLBP2);
                         payload = payload.Replace("{referenceId}", P2AReferenceIdLBP2);
                         payload = payload.Replace("{otp}", P2AOTPLBP2);
@@ -103,17 +100,18 @@ C# Code
                         payload = payload.Replace("{accountNumber}", P2AUSDAccountNbr);
                         payload = payload.Replace("{accountCurrency}", P2AUSDCurrency);
                         
-                        payload = payload.Replace("{accountAmount}", P2AReservedAmoutUSD2);
+                        payload = payload.Replace("{accountAmount}", P2AAmountUSD2);
                         payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutUSD2);
                         payload = payload.Replace("{referenceId}", P2AReferenceIdUSD2);
                         payload = payload.Replace("{otp}", P2AOTPUSD2);
                     }
                 }
 
+                var x = payload;
+
                 _ = await _bll.PostAsyncStringPayload<dynamic>(payload,
                     "http://10.0.40.140:7603/chn.app/P2A/RequestCashWithdrawal");
             }
-
             catch (Exception ex)
             {
                 LogErrorJson(ex, new CorrelationInfo()
@@ -136,66 +134,3 @@ C# Code
                     attachments: []);
             }
         }
-
-
-
-------------------------------------------------------------------------------
-
-Data:
-
-1 SATURDAY LBP 
-
-    "customerId": "1217457",
-    "externalId": "19684000",
-    "TransactionType": "CASHW",
-    "AccountNumber": "011217457005422",
-    "AccountCurrency": "LBP",
-    "Amount": "400000",
-    "correlationId": "201409a8ea1f47eb8bad14a4ad51f163",
-    "ReferenceId": "2030248211",
-    "OTP": "482182"
-    "ReservedAmountId": "ACLK25276FC8P6MT"
-
--------------------------------------------------
-
-2 SUNDAY LBP 
-
-
-    "customerId": "1217457",
-    "externalId": "19684000",
-    "TransactionType": "CASHW",
-    "AccountNumber": "011217457005422",
-    "AccountCurrency": "LBP",
-    "Amount": "600000",
-    "correlationId": "a1009d644e8b40c99aa21a74352c02de",
-    "ReferenceId": "1517292296",
-    "OTP": "883770
-    "ReservedAmountId": "ACLK252765LGL3CC"
-
----------------------------------------------------------
-
-1ST TRANSACTION SATURADAY $
-
-    "customerId": "1217457",
-    "externalId": "19684000",
-    "AccountNumber": "011217457006840",
-    "AccountCurrency": "USD",
-    "Amount": "20",
-    "correlationId": "b846a676f3d3401a83db13c0ca3b1783",
-    "ReferenceId": "1394273710",
-    "OTP": "323779"
-    "ReservedAmountId": " ACLK252765LGBMMH",
-
--------------------------------------------------------
-
-2ND TRANSACTION SUNDAY $
-
-    "customerId": "1217457",
-    "externalId": "19684000",
-    "AccountNumber": "011217457006840",
-    "AccountCurrency": "USD",
-    "Amount": "30",
-    "correlationId": "546b20ad672e4ee090eb7c0b274a9f70",
-    "ReferenceId": "2662076470",
-    "OTP": "776800"
-    "ReservedAmountId": " ACLK25276MFJGVQ3",
