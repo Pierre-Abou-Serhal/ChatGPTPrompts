@@ -1,212 +1,201 @@
-Create Session Browser -> Server -> MPGS
+C# Code
 
-  URL:  POST https://test-sgbl.mtf.gateway.mastercard.com/api/rest/version/100/merchant/002M7270/session
-  
-  Request:
-  Headers:
-  POST /api/session HTTP/2
-  Host: localhost:7049
-  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0
-  Accept: */*
-  Accept-Language: en-US,en;q=0.5
-  Accept-Encoding: gzip, deflate, br, zstd
-  Referer: https://localhost:7049/3ds-demo/index.html
-  Content-Type: application/json
-  Content-Length: 38
-  Origin: https://localhost:7049
-  Connection: keep-alive
-  Sec-Fetch-Dest: empty
-  Sec-Fetch-Mode: cors
-  Sec-Fetch-Site: same-origin
-  Idempotency-Key: "15111529908861174500"
-  Priority: u=0
-  TE: trailers
-  
-  Payload: 
-  {
-  	"session": {
-  		"authenticationLimit": 25
-  	}
-  }
-  
-  Response:
-  Headers:
-  HTTP/2 200 
-  content-type: application/json; charset=utf-8
-  date: Thu, 02 Oct 2025 07:26:10 GMT
-  server: Kestrel
-  access-control-allow-origin: *
-  X-Firefox-Spdy: h2
-  
-  Payload:
-  {
-      "merchant": "002M7270",
-      "result": "SUCCESS",
-      "session": {
-          "aes256Key": "rvRYZczzW3OvTl5T+3TQfPmhlYdGLSTls4v4lPnotws=",
-          "authenticationLimit": 25,
-          "id": "SESSION0002508995945G26544951E4",
-          "updateStatus": "NO_UPDATE",
-          "version": "f4d89c8c01"
-      }
-  }
+// P2A RequestCashWithdrawal
+        for (Int32 y = 0; y < 2; y++)
+        {
+            String correlationId = Guid.NewGuid().ToString();
+            
+            String P2ALBPAccountNbr = "011217457005422";
+            String P2AUSDAccountNbr = "011217457006840";
 
-------------------------------------------------------------------
+            String P2ALBPCurrency = "LBP";
+            String P2AUSDCurrency = "USD";
 
-Update Session Browser -> Server -> MPGS
+            String P2AAmountLBP1 = "400000"; // Saturday
+            String P2AAmountLBP2 = "600000"; // Sunday
+            
+            String P2AAmountUSD1 = "20"; // Saturday
+            String P2AAmountUSD2 = "30"; // Sunday
 
-  URL: PUT https://test-sgbl.mtf.gateway.mastercard.com/api/rest/version/100/merchant/002M7270/session/SESSION0002508995945G26544951E4
+            String P2AReservedAmoutLBP1 = "ACLK25276FC8P6MT"; // Saturday
+            String P2AReservedAmoutLBP2 = "ACLK252765LGL3CC"; // Sunday
+            String P2AReservedAmoutUSD1 = "ACLK252765LGBMMH"; // Saturday
+            String P2AReservedAmoutUSD2 = "ACLK25276MFJGVQ3"; // Sunday
+            
+            String P2AReferenceIdLBP1 = "2030248211"; // Saturday
+            String P2AReferenceIdLBP2 = "1517292296"; // Sunday
+            String P2AReferenceIdUSD1 = "1394273710"; // Saturday
+            String P2AReferenceIdUSD2 = "2662076470"; // Sunday
+            
+            String P2AOTPLBP1 = "482182"; // Saturday
+            String P2AOTPLBP2 = "883770"; // Sunday
+            String P2AOTPUSD1 = "323779"; // Saturday
+            String P2AOTPUSD2 = "776800"; // Sunday
+            
+            try
+            {
+                String payload = """
+                                 {
+                                     "CorrelationId": "{correlationId}",
+                                     "TransactionType": "CASHW",
+                                     "CustomerId": "1217457",
+                                     "AccountNumber": "{accountNumber}",
+                                     "AccountCurrency": "{accountCurrency}",
+                                     "Amount": "{accountAmount}",
+                                     "AmountCurrency": "{accountCurrency}",
+                                     "Commission": "0.0",
+                                     "CommissionCurrency": "{accountCurrency}",
+                                     "SourceMobileNumber": "96179312020",
+                                     "SourceFullName": "MAROUN BECHARA CHKAIBAN",
+                                     "DestinationMobileNumber": "96179312020",
+                                     "ReservedAmountId": "{reservedAmountId}",
+                                     "ReferenceId": "{referenceId}",
+                                     "OTP": "{otp}",
+                                     "ExpiryDate": "2024-06-15T15:41:46.389299",
+                                     "TerminalId": "SGBLSF17"
+                                 }
+                                 """;
 
-  Request:
-  Headers:
-  PUT /api/rest/version/100/merchant/002M7270/session/SESSION0002508995945G26544951E4 HTTP/2
-  Host: localhost:7049
-  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0
-  Accept: */*
-  Accept-Language: en-US,en;q=0.5
-  Accept-Encoding: gzip, deflate, br, zstd
-  Referer: https://localhost:7049/3ds-demo/index.html
-  Content-Type: application/json
-  Content-Length: 305
-  Origin: https://localhost:7049
-  Connection: keep-alive
-  Sec-Fetch-Dest: empty
-  Sec-Fetch-Mode: cors
-  Sec-Fetch-Site: same-origin
-  Priority: u=0
-  TE: trailers
+                payload = payload.Replace("{correlationId}", correlationId.Replace("-", ""));
 
-  Payload:
-  {
-    "order": {
-        "amount": "100.00",
-        "currency": "USD"
-    },
-    "sourceOfFunds": {
-        "type": "CARD",
-        "provided": {
-            "card": {
-                "number": "5123450000000008",
-                "expiry": {
-                    "month": "01",
-                    "year": "39"
-                },
-                "securityCode": "000"
+                // Saturday
+                DateTime saturdayDate = new DateTime(2025, 10, 4);
+
+                if (DateTime.Today == saturdayDate)
+                {
+                    if (y % 2 == 0) // LBP
+                    {
+                        payload = payload.Replace("{accountNumber}", P2ALBPAccountNbr);
+                        payload = payload.Replace("{accountCurrency}", P2ALBPCurrency);
+                        payload = payload.Replace("{accountAmount}", P2AReservedAmoutLBP1);
+                        payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutLBP1);
+                        payload = payload.Replace("{referenceId}", P2AReferenceIdLBP1);
+                        payload = payload.Replace("{otp}", P2AOTPLBP1);
+                    }
+                    else // USD
+                    {
+                        payload = payload.Replace("{accountNumber}", P2AUSDAccountNbr);
+                        payload = payload.Replace("{accountCurrency}", P2AUSDCurrency);
+                        
+                        payload = payload.Replace("{accountAmount}", P2AReservedAmoutUSD1);
+                        payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutUSD1);
+                        payload = payload.Replace("{referenceId}", P2AReferenceIdUSD1);
+                        payload = payload.Replace("{otp}", P2AOTPUSD1);
+                    }
+                }
+                
+                // Sunday
+                DateTime sundayDate = new DateTime(2025, 10, 5);
+                
+                if (DateTime.Today == sundayDate)
+                {
+                    if (y % 2 == 0) // LBP
+                    {
+                        payload = payload.Replace("{accountNumber}", P2ALBPAccountNbr);
+                        payload = payload.Replace("{accountCurrency}", P2ALBPCurrency);
+                        payload = payload.Replace("{accountAmount}", P2AReservedAmoutLBP2);
+                        payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutLBP2);
+                        payload = payload.Replace("{referenceId}", P2AReferenceIdLBP2);
+                        payload = payload.Replace("{otp}", P2AOTPLBP2);
+                    }
+                    else // USD
+                    {
+                        payload = payload.Replace("{accountNumber}", P2AUSDAccountNbr);
+                        payload = payload.Replace("{accountCurrency}", P2AUSDCurrency);
+                        
+                        payload = payload.Replace("{accountAmount}", P2AReservedAmoutUSD2);
+                        payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutUSD2);
+                        payload = payload.Replace("{referenceId}", P2AReferenceIdUSD2);
+                        payload = payload.Replace("{otp}", P2AOTPUSD2);
+                    }
+                }
+
+                _ = await _bll.PostAsyncStringPayload<dynamic>(payload,
+                    "http://10.0.40.140:7603/chn.app/P2A/RequestCashWithdrawal");
+            }
+
+            catch (Exception ex)
+            {
+                LogErrorJson(ex, new CorrelationInfo()
+                {
+                    CorrelationId = correlationId,
+                    RDirection = RequestDirection.Response,
+                    RequestURL = "SetExpiredPoints",
+                    UserName = _globalSettings.AppUsername,
+                    Reserved = ex.Message
+                });
+
+                _ = _bll.SendEmail(
+                    userName: "AlternaSysUser",
+                    correlationId: correlationId,
+                    subject: "Alterna Loyalty Set Expired Points Job Error",
+                    body: ex.ToString(),
+                    isHtml: false,
+                    from: _firstJob.EmailFrom,
+                    to: _firstJob.ErrorUserEmailList,
+                    attachments: []);
             }
         }
-    },
-    "authentication": {
-        "channel": "PAYER_BROWSER",
-        "purpose": "PAYMENT_TRANSACTION",
-        "redirectResponseUrl": "https://google.com"
-    }
-  }
-  Response:
-  Headers:
-  HTTP/2 200 
-  content-type: application/json
-  date: Thu, 02 Oct 2025 07:26:14 GMT
-  server: Kestrel
-  access-control-allow-origin: *
-  content-length: 508
-  X-Firefox-Spdy: h2
 
-  Payload:
-  {
-    "authentication": {
-        "channel": "PAYER_BROWSER",
-        "purpose": "PAYMENT_TRANSACTION",
-        "redirectResponseUrl": "https://google.com"
-    },
-    "merchant": "002M7270",
-    "order": {
-        "amount": "100.00",
-        "currency": "USD"
-    },
-    "session": {
-        "id": "SESSION0002508995945G26544951E4",
-        "updateStatus": "SUCCESS",
-        "version": "e09a682102"
-    },
-    "sourceOfFunds": {
-        "provided": {
-            "card": {
-                "brand": "MASTERCARD",
-                "expiry": {
-                    "month": "1",
-                    "year": "39"
-                },
-                "fundingMethod": "DEBIT",
-                "number": "512345xxxxxx0008",
-                "scheme": "MASTERCARD",
-                "securityCode": "xxx"
-            }
-        },
-        "type": "CARD"
-    },
-    "version": "100"
-  }
 
-------------------------------------------------------------------
 
-Initiate Authentication -> Browser (using ThreeDS SDK) -> MPGS
+------------------------------------------------------------------------------
 
-  URL: PUT https://test-sgbl.mtf.gateway.mastercard.com/api/rest/version/100/merchant/002M7270/order/ORD_60/transaction/TRX_60
+Data:
 
-  Request:
-  Headers:
-  PUT /api/rest/version/100/merchant/002M7270/order/ORD_60/transaction/TRX_60 HTTP/1.1
-  Host: test-sgbl.mtf.gateway.mastercard.com
-  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0
-  Accept: */*
-  Accept-Language: en-US,en;q=0.5
-  Accept-Encoding: gzip, deflate, br, zstd
-  Authorization: Basic bWVyY2hhbnQuMDAyTTcyNzA6U0VTU0lPTjAwMDI1MDg5OTU5NDVHMjY1NDQ5NTFFNA==
-  Content-Type: application/json
-  x-js-sdk: ThreeDS:1.3.0
-  Content-Length: 182
-  Origin: https://localhost:7049
-  Connection: keep-alive
-  Referer: https://localhost:7049/
-  Sec-Fetch-Dest: empty
-  Sec-Fetch-Mode: cors
-  Sec-Fetch-Site: cross-site
-  Priority: u=0
+1 SATURDAY LBP 
 
-  Payload:
-  {
-    "transaction": {
-        "acquirer": {}
-    },
-    "correlationId": "3ds-b6895915-63a7-446c-34a0-399afc0a595d",
-    "apiOperation": "INITIATE_AUTHENTICATION",
-    "session": {
-        "id": "SESSION0002508995945G26544951E4"
-    }
-  }
+    "customerId": "1217457",
+    "externalId": "19684000",
+    "TransactionType": "CASHW",
+    "AccountNumber": "011217457005422",
+    "AccountCurrency": "LBP",
+    "Amount": "400000",
+    "correlationId": "201409a8ea1f47eb8bad14a4ad51f163",
+    "ReferenceId": "2030248211",
+    "OTP": "482182"
+    "ReservedAmountId": "ACLK25276FC8P6MT"
 
-  Response:
-  Headers:
-  HTTP/1.1 401 
-  Date: Thu, 02 Oct 2025 07:26:31 GMT
-  Content-Type: application/json;charset=ISO-8859-1
-  Content-Length: 192
-  Connection: keep-alive
-  Cache-Control: no-cache, no-store, must-revalidate
-  Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
-  Access-Control-Allow-Origin: *
-  Access-Control-Allow-Headers: Authorization, Accept, Accept-Language, Content-Language, Content-Type, x-js-sdk, *
-  Pragma: no-cache
-  Expires: 0
-  Strict-Transport-Security: max-age=16070400; includeSubDomains; preload
+-------------------------------------------------
 
-  Payload:
-  {
-    "correlationId": "3ds-b6895915-63a7-446c-34a0-399afc0a595d",
-    "error": {
-        "cause": "INVALID_REQUEST",
-        "field": "url:merchant/{merchantId}/order/{orderid}",
-        "validationType": "INVALID"
-    },
-    "result": "ERROR"
-  }
+2 SUNDAY LBP 
+
+
+    "customerId": "1217457",
+    "externalId": "19684000",
+    "TransactionType": "CASHW",
+    "AccountNumber": "011217457005422",
+    "AccountCurrency": "LBP",
+    "Amount": "600000",
+    "correlationId": "a1009d644e8b40c99aa21a74352c02de",
+    "ReferenceId": "1517292296",
+    "OTP": "883770
+    "ReservedAmountId": "ACLK252765LGL3CC"
+
+---------------------------------------------------------
+
+1ST TRANSACTION SATURADAY $
+
+    "customerId": "1217457",
+    "externalId": "19684000",
+    "AccountNumber": "011217457006840",
+    "AccountCurrency": "USD",
+    "Amount": "20",
+    "correlationId": "b846a676f3d3401a83db13c0ca3b1783",
+    "ReferenceId": "1394273710",
+    "OTP": "323779"
+    "ReservedAmountId": " ACLK252765LGBMMH",
+
+-------------------------------------------------------
+
+2ND TRANSACTION SUNDAY $
+
+    "customerId": "1217457",
+    "externalId": "19684000",
+    "AccountNumber": "011217457006840",
+    "AccountCurrency": "USD",
+    "Amount": "30",
+    "correlationId": "546b20ad672e4ee090eb7c0b274a9f70",
+    "ReferenceId": "2662076470",
+    "OTP": "776800"
+    "ReservedAmountId": " ACLK25276MFJGVQ3",
