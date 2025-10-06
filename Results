@@ -1,28 +1,107 @@
-Dears,
+Got it. Here’s a plain-English, step-by-step version you can share with non-technical folks. It keeps the same flow, just without the jargon.
 
-Find below the API flows of the Topup feature that will be implemented on Backbase
+# Top-Up Flow (simple overview)
 
-On continue, Backbase will be calling an API on OSB that will perform the following:
-1-	Validate Limits on Alterna
-2-	Create a session on MPGS servers (the session will be used to securely store all the information needed in order to make the topup)
-3-	Update the created session with the data that was inputted from the user on Bacbbase
-4-	API call “Verify” on MPGS that will be used for the following:
-a.	Check if the card can be used
-b.	Get the card issuer country code (to know if the transaction is domestic or international)
-c.	Get the card brand : Mastercard or Visa
-5-	API call “Forecast”  on T24 to forecast if the transaction will be successful or not (this API will use the inputted data from Backbase + the response of the Verify API). This API will return the commission that will be displayed on Backbase
-6-	Generate TransactionId + OrderId
-7-	Return to Backbase the following:
-a.	Comission
-b.	SessionId
-c.	TransactionId
-d.	OrderId
+## Who’s who
 
-On Submit, Backbase will be calling an API on OSB that will perform the following:
-1-	Using the SDK, Backbase will call begin the 3DS flow directly with MPGS using: MerchantId + SessionId + OrderId + TransactionId. During this process, Backbase will be sending the OSB API URL to MPGS so the OSB  API will be called automatically upon successfully submitting the OTP.
-2-	Upon successfully completing the OTP flow, Backbase will be calling An API on OSB (using the sent URL) that will be performing the following:
-a.	Call AFT Api on MPGS to get the pull from the card
-b.	Call T24 to push the money to the card
+* **Backbase**: the mobile/web app the customer uses.
+* **OSB**: the bank’s integration layer that connects systems.
+* **MPGS**: Mastercard Payment Gateway (handles the card and 3-D Secure steps).
+* **T24**: the core banking system (checks & posts money).
+* **Alterna**: limits/rules checker (e.g., daily limit).
 
-Best Regards,
-Pierre Abou Serhal.
+---
+
+## Phase 1 — “Continue” (before the customer confirms)
+
+**Goal:** check the card & rules, estimate fees, and prepare the payment.
+
+1. **Check limits**
+   OSB asks Alterna if this top-up is allowed (amount, daily limits, etc.).
+
+2. **Open a secure payment session**
+   OSB creates a secure session with MPGS (this stores card/payment details safely).
+
+3. **Fill the session**
+   The information the customer entered in Backbase is saved into that MPGS session.
+
+4. **Quick card check (“Verify”)**
+   MPGS tells us:
+
+   * Can this card be used?
+   * Card’s issuing country (to know if it’s local or international).
+   * Card brand (Visa/Mastercard).
+
+5. **Will this work? (“Forecast”)**
+   OSB asks T24 to “simulate” the top-up using the customer’s data and the Verify result.
+   T24 returns the **commission/fee** and whether the transaction looks OK.
+
+6. **Prepare identifiers**
+   OSB generates a **TransactionId** and **OrderId** for this operation.
+
+7. **Send results back to the app**
+   Backbase shows the customer:
+
+   * **Commission/fee**
+   * **SessionId** (hidden from the user; technical)
+   * **TransactionId** and **OrderId** (technical)
+
+> At this point, the customer can review the fee and press **Submit** to actually pay.
+
+---
+
+## Phase 2 — “Submit” (customer confirms & completes 3-D Secure)
+
+**Goal:** complete security (OTP/3-D Secure), collect money from the card, then credit the wallet/card.
+
+1. **3-D Secure (OTP) challenge**
+   Using the **MerchantId + SessionId + OrderId + TransactionId**, Backbase starts the 3-D Secure flow directly with MPGS.
+
+   * During this step, Backbase gives MPGS a special **callback URL** for OSB.
+   * The customer completes the OTP challenge (e.g., code from bank/SMS).
+
+2. **After successful OTP**
+   Backbase calls OSB (via that URL). OSB finishes the money movement:
+
+   * **Pull** funds from the card via MPGS (AFT call).
+   * **Push** funds into the customer’s account/card via T24.
+
+> If both steps succeed, the top-up is complete and the app shows success.
+
+---
+
+## What the customer experiences
+
+1. Enters amount & card details → taps **Continue**
+   → sees the **fee** and can review.
+2. Taps **Submit** → completes **OTP** (3-D Secure)
+   → sees **success** (or a clear error if something fails).
+
+---
+
+## Why the extra steps?
+
+* **Security & compliance**: card details are stored with MPGS (not in our app), and 3-D Secure protects the transaction.
+* **Transparency**: the fee is shown **before** the customer commits.
+* **Reliability**: “Forecast” checks with core banking to reduce failures.
+
+---
+
+## One-page version (you can paste into slides)
+
+**Continue (pre-check)**
+Backbase → OSB → Alterna (limits)
+Backbase → OSB → MPGS (create & fill session, verify card)
+OSB → T24 (forecast & fee)
+OSB → Backbase (fee + SessionId + TransactionId + OrderId)
+
+**Submit (finalize)**
+Backbase ↔ MPGS (3-D Secure / OTP)
+Backbase → OSB (callback)
+OSB → MPGS (pull from card)
+OSB → T24 (credit account)
+Backbase shows success
+
+---
+
+If you want, I can also turn this into a one-page PDF with a simple diagram for sharing with business teams.
