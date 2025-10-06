@@ -1,136 +1,28 @@
-// P2A RequestCashWithdrawal
-        for (Int32 y = 0; y < 2; y++)
-        {
-            String correlationId = Guid.NewGuid().ToString();
-            
-            String P2ALBPAccountNbr = "011217457005422";
-            String P2AUSDAccountNbr = "011217457006840";
+Dears,
 
-            String P2ALBPCurrency = "LBP";
-            String P2AUSDCurrency = "USD";
+Find below the API flows of the Topup feature that will be implemented on Backbase
 
-            String P2AAmountLBP1 = "400000"; // Saturday
-            String P2AAmountLBP2 = "600000"; // Sunday
-            
-            String P2AAmountUSD1 = "20"; // Saturday
-            String P2AAmountUSD2 = "30"; // Sunday
+On continue, Backbase will be calling an API on OSB that will perform the following:
+1-	Validate Limits on Alterna
+2-	Create a session on MPGS servers (the session will be used to securely store all the information needed in order to make the topup)
+3-	Update the created session with the data that was inputted from the user on Bacbbase
+4-	API call “Verify” on MPGS that will be used for the following:
+a.	Check if the card can be used
+b.	Get the card issuer country code (to know if the transaction is domestic or international)
+c.	Get the card brand : Mastercard or Visa
+5-	API call “Forecast”  on T24 to forecast if the transaction will be successful or not (this API will use the inputted data from Backbase + the response of the Verify API). This API will return the commission that will be displayed on Backbase
+6-	Generate TransactionId + OrderId
+7-	Return to Backbase the following:
+a.	Comission
+b.	SessionId
+c.	TransactionId
+d.	OrderId
 
-            String P2AReservedAmoutLBP1 = "ACLK25276FC8P6MT"; // Saturday
-            String P2AReservedAmoutLBP2 = "ACLK252765LGL3CC"; // Sunday
-            String P2AReservedAmoutUSD1 = "ACLK252765LGBMMH"; // Saturday
-            String P2AReservedAmoutUSD2 = "ACLK25276MFJGVQ3"; // Sunday
-            
-            String P2AReferenceIdLBP1 = "2030248211"; // Saturday
-            String P2AReferenceIdLBP2 = "1517292296"; // Sunday
-            String P2AReferenceIdUSD1 = "1394273710"; // Saturday
-            String P2AReferenceIdUSD2 = "2662076470"; // Sunday
-            
-            String P2AOTPLBP1 = "482182"; // Saturday
-            String P2AOTPLBP2 = "883770"; // Sunday
-            String P2AOTPUSD1 = "323779"; // Saturday
-            String P2AOTPUSD2 = "776800"; // Sunday
-            
-            try
-            {
-                String payload = """
-                                 {
-                                     "CorrelationId": "{correlationId}",
-                                     "TransactionType": "CASHW",
-                                     "CustomerId": "1217457",
-                                     "AccountNumber": "{accountNumber}",
-                                     "AccountCurrency": "{accountCurrency}",
-                                     "Amount": "{accountAmount}",
-                                     "AmountCurrency": "{accountCurrency}",
-                                     "Commission": "0.0",
-                                     "CommissionCurrency": "{accountCurrency}",
-                                     "SourceMobileNumber": "96179312020",
-                                     "SourceFullName": "MAROUN BECHARA CHKAIBAN",
-                                     "DestinationMobileNumber": "96179312020",
-                                     "ReservedAmountId": "{reservedAmountId}",
-                                     "ReferenceId": "{referenceId}",
-                                     "OTP": "{otp}",
-                                     "ExpiryDate": "2024-06-15T15:41:46.389299",
-                                     "TerminalId": "SGBLSF17"
-                                 }
-                                 """;
+On Submit, Backbase will be calling an API on OSB that will perform the following:
+1-	Using the SDK, Backbase will call begin the 3DS flow directly with MPGS using: MerchantId + SessionId + OrderId + TransactionId. During this process, Backbase will be sending the OSB API URL to MPGS so the OSB  API will be called automatically upon successfully submitting the OTP.
+2-	Upon successfully completing the OTP flow, Backbase will be calling An API on OSB (using the sent URL) that will be performing the following:
+a.	Call AFT Api on MPGS to get the pull from the card
+b.	Call T24 to push the money to the card
 
-                payload = payload.Replace("{correlationId}", correlationId.Replace("-", ""));
-
-                // Saturday
-                DateTime saturdayDate = new DateTime(2025, 10, 4);
-
-                if (DateTime.Today == saturdayDate)
-                {
-                    if (y % 2 == 0) // LBP
-                    {
-                        payload = payload.Replace("{accountNumber}", P2ALBPAccountNbr);
-                        payload = payload.Replace("{accountCurrency}", P2ALBPCurrency);
-                        payload = payload.Replace("{accountAmount}", P2AAmountLBP1);
-                        payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutLBP1);
-                        payload = payload.Replace("{referenceId}", P2AReferenceIdLBP1);
-                        payload = payload.Replace("{otp}", P2AOTPLBP1);
-                    }
-                    else // USD
-                    {
-                        payload = payload.Replace("{accountNumber}", P2AUSDAccountNbr);
-                        payload = payload.Replace("{accountCurrency}", P2AUSDCurrency);
-                        payload = payload.Replace("{accountAmount}", P2AAmountUSD1);
-                        payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutUSD1);
-                        payload = payload.Replace("{referenceId}", P2AReferenceIdUSD1);
-                        payload = payload.Replace("{otp}", P2AOTPUSD1);
-                    }
-                }
-                
-                // Sunday
-                DateTime sundayDate = new DateTime(2025, 10, 5);
-                
-                if (DateTime.Today == DateTime.Today)
-                {
-                    if (y % 2 == 0) // LBP
-                    {
-                        payload = payload.Replace("{accountNumber}", P2ALBPAccountNbr);
-                        payload = payload.Replace("{accountCurrency}", P2ALBPCurrency);
-                        payload = payload.Replace("{accountAmount}", P2AAmountLBP2);
-                        payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutLBP2);
-                        payload = payload.Replace("{referenceId}", P2AReferenceIdLBP2);
-                        payload = payload.Replace("{otp}", P2AOTPLBP2);
-                    }
-                    else // USD
-                    {
-                        payload = payload.Replace("{accountNumber}", P2AUSDAccountNbr);
-                        payload = payload.Replace("{accountCurrency}", P2AUSDCurrency);
-                        
-                        payload = payload.Replace("{accountAmount}", P2AAmountUSD2);
-                        payload = payload.Replace("{reservedAmountId}", P2AReservedAmoutUSD2);
-                        payload = payload.Replace("{referenceId}", P2AReferenceIdUSD2);
-                        payload = payload.Replace("{otp}", P2AOTPUSD2);
-                    }
-                }
-
-                var x = payload;
-
-                _ = await _bll.PostAsyncStringPayload<dynamic>(payload,
-                    "http://10.0.40.140:7603/chn.app/P2A/RequestCashWithdrawal");
-            }
-            catch (Exception ex)
-            {
-                LogErrorJson(ex, new CorrelationInfo()
-                {
-                    CorrelationId = correlationId,
-                    RDirection = RequestDirection.Response,
-                    RequestURL = "SetExpiredPoints",
-                    UserName = _globalSettings.AppUsername,
-                    Reserved = ex.Message
-                });
-
-                _ = _bll.SendEmail(
-                    userName: "AlternaSysUser",
-                    correlationId: correlationId,
-                    subject: "Alterna Loyalty Set Expired Points Job Error",
-                    body: ex.ToString(),
-                    isHtml: false,
-                    from: _firstJob.EmailFrom,
-                    to: _firstJob.ErrorUserEmailList,
-                    attachments: []);
-            }
-        }
+Best Regards,
+Pierre Abou Serhal.
