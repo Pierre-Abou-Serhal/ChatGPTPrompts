@@ -1,59 +1,54 @@
+required dields for Visa:
+
+accountFunding.senderType = PERSON
+accountFunding.recipient.account.identifierType= CARD_NUMBER
+accountFunding.recipient.account.fundingMethod= UNKNOWN
+accountFunding.senderIsRecipient = FALSE (If account identifier card is prepaid card, then TU will be populated in BAI)
+
+requried fields for Master card:
+
+F52:
+
+    accountFunding.senderIsRecipient= true
+    accountFunding.senderType = PERSON or COMMERCIAL_ORGANIZATION
+    accountFunding.recipient.account.identifierType = OTHER or CARD_NUMBER
+    [Any value other than CARD_NUMBER and STAGED_WALLET_USER_ID maps to OTHER]
+    IF identifier type is CARD_NUMBER then accountFunding. recipient.account.fundingMethod != CHARGE or CREDIT or DEBIT
+
 {
-	"id": "0e206094-5ed6-43f5-8e34-966daaa09e7c",
-	"name": "MPGS UAT",
-	"values": [
-		{
-			"key": "host",
-			"value": "test-sgbl.mtf.gateway.mastercard.com",
-			"enabled": true
-		},
-		{
-			"key": "merchantId",
-			"value": "002M7270",
-			"enabled": true
-		},
-		{
-			"key": "currency",
-			"value": "USD",
-			"enabled": true
-		},
-		{
-			"key": "apiPassword",
-			"value": "8c3b3b62af0e8ff3686a65e079393463",
-			"enabled": true
-		},
-		{
-			"key": "orderId",
-			"value": "",
-			"enabled": true
-		},
-		{
-			"key": "threeDSMethodPostData",
-			"value": "",
-			"enabled": true
-		},
-		{
-			"key": "session",
-			"value": "",
-			"enabled": true
-		},
-		{
-			"key": "3DS2acsURL",
-			"value": "",
-			"enabled": true
-		},
-		{
-			"key": "gatewayRecommendation",
-			"value": "",
-			"enabled": true
-		},
-		{
-			"key": "transactionId",
-			"value": "asd",
-			"enabled": true
-		}
-	],
-	"_postman_variable_scope": "environment",
-	"_postman_exported_at": "2025-10-07T08:36:58.889Z",
-	"_postman_exported_using": "Postman/9.4.1"
+  "accountFunding": {
+    "senderType": "PERSON",
+    "senderIsRecipient": true,
+    "purpose": "OTHER",
+    "recipient": {
+      "firstName": "John",
+      "lastName": "Smith",
+      "account": {
+        "identifierType": "OTHER",
+        "identifier": "011285354008840"
+      }
+    }
+  },
+  "order": {
+    "amount": "100.00",
+    "currency": "USD",
+    "purchaseType": "ACCOUNT_FUNDING"
+  },
+  "sourceOfFunds": {
+    "type": "CARD",
+    "provided": {
+      "card": {
+        "number": "5123450000000008",
+        "expiry": {
+          "month": "01",
+          "year": "39"
+        },
+        "securityCode": "000"
+      }
+    }
+  },
+  "authentication": {
+    "channel": "PAYER_APP",
+    "redirectResponseUrl": "https://localhost:7049/3ds/acs-callback/{{session}}"
+  }
 }
