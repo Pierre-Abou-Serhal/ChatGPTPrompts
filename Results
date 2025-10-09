@@ -1,3 +1,5 @@
+https://test-gateway.mastercard.com/api/documentation/integrationGuidelines/supportedFeatures/pickAdditionalFunctionality/authentication/3DS/integrationModelAPI.html?locale=en_US#x_initiateAuthentication1
+
 required dields for Visa:
 
 accountFunding.senderType = PERSON
