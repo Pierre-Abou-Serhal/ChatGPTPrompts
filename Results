@@ -54,3 +54,34 @@ F52:
     "redirectResponseUrl": "https://localhost:7049/3ds/acs-callback/{{session}}"
   }
 }
+
+----------------------------------
+
+{
+    "order": {
+        "id": "{{orderId}}",
+        "amount": "100.00",
+        "currency": "USD"
+    },
+    "transaction": {
+        "id": "{{transactionId}}"
+    },
+    "sourceOfFunds": {
+        "type": "CARD",
+        "provided": {
+            "card": {
+                "number": "5288049999998964",
+                "expiry": {
+                    "month": "01",
+                    "year": "39"
+                },
+                "securityCode": "000"
+            }
+        }
+    },
+    "authentication": {
+        "channel": "PAYER_BROWSER",
+        "purpose": "PAYMENT_TRANSACTION",
+        "redirectResponseUrl": "https://localhost:7049/3ds/acs-callback/SESSION0002358083736M43931921L0"
+    }
+}
