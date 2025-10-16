@@ -1,102 +1,38 @@
+https://sandbox.api.mastercard.com/send/v1/partners/ptnr_EO7HQ_FLju3gk7RZrqigJanpijL/transfers/payment?decline_details=true
 {
-  "Urls": "http://10.0.40.41:8211",
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft": "Warning",
-      "Microsoft.Hosting.Lifetime": "Information"
-    }
-  },
-  "AllowedHosts": "*",
-  "ReverseProxy": {
-    "Routes": {
-      "mastercard-route": {
-        "ClusterId": "mastercardCluster",
-        "Match": {
-          "Path": "/mastercard/{**catch-all}"
-        },
-        "Transforms": [
-          { "PathRemovePrefix": "/mastercard" }
-        ]
-      },
-      "portservices-route": {
-        "ClusterId": "portCluster",
-        "Match": {
-          "Path": "/port/{**catch-all}"
-        },
-        "Transforms": [{ "PathRemovePrefix": "/port" }]
-      },
-      "visadirect-route": {
-        "ClusterId": "visaDirectCluster",
-        "Match": {
-          "Path": "/visadirect/{**catch-all}"
-        },
-        "Transforms": [{ "PathRemovePrefix": "/visadirect" }]
-      },
-      "MPGS-route": {
-        "ClusterId": "MPGSCluster",
-        "Match": {
-          "Path": "/MPGS/{**catch-all}"
-        },
-        "Transforms": [{ "PathRemovePrefix": "/MPGS" }]
+  "payment_transfer" : {
+    "transfer_reference" : `${uuid}`,
+    "payment_type" : "P2P",
+    "amount" : "1100",
+    "currency" : "USD",
+    "sender_account_uri" : "raw:010792604012840",
+    "sender" : {
+      "first_name" : "GEORGES",
+      "last_name" : "HAOUILI",
+      "account_type" : "01",
+      "address" : {
+        "line1" : "HAWLI MAINROAD",
+        "city" : "DEKWANEH",
+        "postal_code" : "00000",
+        "country" : "LBN"
       }
     },
-    "Clusters": {
-      "mastercardCluster": {
-        "Destinations": {
-          "mastercardDestination": {
-            "Address": "https://sandbox.api.mastercard.com/"
-          }
-        }
-      },
-      "portCluster": {
-        "Destinations": {
-          "portDestination": {
-            "Address": "https://cama.portdebeyrouth.com/"
-          }
-        }
-      },
-      "visaDirectCluster": {
-        "Destinations": {
-          "portDestination": {
-            "Address": "https://sandbox.api.visa.com/"
-          }
-        }
-      },
-      "MPGSCluster": {
-        "Destinations": {
-          "portDestination": {
-            "Address": "https://test-sgbl.mtf.gateway.mastercard.com/"
-          }
-        }
+    "funding_source" : "DEBIT",
+    "recipient_account_uri" : "pan:2223530060000018",
+    "recipient" : {
+      "first_name" : "Pierre",
+      "last_name" : "Abou Serhal",
+      "account_type" : "03",
+      "address" : {
+        "country" : "LBN",
+        "postal_code" : "00000"
       }
+    },
+    "channel" : "MOBILE",
+    "participant" : {
+      "merchant_category_code" : "6536",
+      "interchange_rate_designator" : "MS",
+      "card_acceptor_id" : "00000000000SGBL"
     }
-  },
-  "WebProxyAddress": "http://10.0.30.222:3128",
-  "Certificates": {
-    "ClientCertificates": [
-      {
-        "ClusterId": "visaDirectCluster",
-        "Path": "Certs/VisaDirect/Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unecrypted.p12",
-        "Password": "V1s@D1rect"
-      }
-    ]
-  },
-  "Serilog": {
-    "Using": ["Serilog.Sinks.File"],
-    "MinimumLevel": "Information",
-    "WriteTo": [
-      {
-        "Name": "File",
-        "Args": {
-          "path": "logs/ProxyService-.log",
-          "rollingInterval": "Day",
-          "fileSizeLimitBytes": "65535000",
-          "retainedFileCountLimit": "100",
-          "rollOnFileSizeLimit": true
-        }
-      }
-    ],
-    "Enrich": ["FromLogContext"]
   }
 }
