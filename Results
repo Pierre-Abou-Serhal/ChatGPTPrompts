@@ -1,6 +1,102 @@
-2025-10-16 11:19:40.889 +03:00 [INF] Response Body: �      ��G�$IҼ�_��˂;`����a��#*P����ٽ2h�kD�����<���{��##";3�ٽ7��]UM\ETtgP��GPppFFC?���~#q8�)�d0�E��![�F�pME�o��Uڑ!-�|��z���Q�G�p�g~�A��d;*l
-��u��K:##Pʲ�N�F�����	��]K�a��uBc��L���4݀9ޢ�F���<�,3d-�#�JSpN>�g_���a5��R�8L��O�e�
-<�J�0��Z4�k[87i���x	'^��pbA��:Sz/:ϸ���YX�*E���o����WƂ��
-�"c^Sm��ˆ��״�'����EYw�<c^p��YCZ6���f�ޑ��Qk���}?`~?��<b>�s����ҩR����4
-�#d���>�~jr�J�8,JM͆t6Y��b���t����i��}J��r�z�m�����>���G&��σO�����gW��
-|F��V��f�E:��Sx�O8U�uXT�"�u�jF����tr�	ChK�n�膜Q�����ɐ��0H�<��uTgP��:SN�ؒעZ�?k���J��,��8��Nog�+�����;8u��h�*#+��\i��f:�o��y��5��a���)xP�Ws�|��>�[��)�*�\Q���NHt�/M�q�׊���*�$:j���Ǝ�bӒ@�	��*W��W±�t<����7�@���  
+{
+  "Urls": "http://10.0.40.41:8211",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "ReverseProxy": {
+    "Routes": {
+      "mastercard-route": {
+        "ClusterId": "mastercardCluster",
+        "Match": {
+          "Path": "/mastercard/{**catch-all}"
+        },
+        "Transforms": [
+          { "PathRemovePrefix": "/mastercard" }
+        ]
+      },
+      "portservices-route": {
+        "ClusterId": "portCluster",
+        "Match": {
+          "Path": "/port/{**catch-all}"
+        },
+        "Transforms": [{ "PathRemovePrefix": "/port" }]
+      },
+      "visadirect-route": {
+        "ClusterId": "visaDirectCluster",
+        "Match": {
+          "Path": "/visadirect/{**catch-all}"
+        },
+        "Transforms": [{ "PathRemovePrefix": "/visadirect" }]
+      },
+      "MPGS-route": {
+        "ClusterId": "MPGSCluster",
+        "Match": {
+          "Path": "/MPGS/{**catch-all}"
+        },
+        "Transforms": [{ "PathRemovePrefix": "/MPGS" }]
+      }
+    },
+    "Clusters": {
+      "mastercardCluster": {
+        "Destinations": {
+          "mastercardDestination": {
+            "Address": "https://sandbox.api.mastercard.com/"
+          }
+        }
+      },
+      "portCluster": {
+        "Destinations": {
+          "portDestination": {
+            "Address": "https://cama.portdebeyrouth.com/"
+          }
+        }
+      },
+      "visaDirectCluster": {
+        "Destinations": {
+          "portDestination": {
+            "Address": "https://sandbox.api.visa.com/"
+          }
+        }
+      },
+      "MPGSCluster": {
+        "Destinations": {
+          "portDestination": {
+            "Address": "https://test-sgbl.mtf.gateway.mastercard.com/"
+          }
+        }
+      }
+    }
+  },
+  "WebProxyAddress": "http://10.0.30.222:3128",
+  "Certificates": {
+    "ClientCertificates": [
+      {
+        "ClusterId": "visaDirectCluster",
+        "Path": "Certs/VisaDirect/Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unecrypted.p12",
+        "Password": "V1s@D1rect"
+      }
+    ]
+  },
+  "Serilog": {
+    "Using": ["Serilog.Sinks.File"],
+    "MinimumLevel": "Information",
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/ProxyService-.log",
+          "rollingInterval": "Day",
+          "fileSizeLimitBytes": "65535000",
+          "retainedFileCountLimit": "100",
+          "rollOnFileSizeLimit": true
+        }
+      }
+    ],
+    "Enrich": ["FromLogContext"]
+  }
+}
