@@ -1,1 +1,75 @@
-a9b6cb3fcfb430a83dc1631524699702
+[dbo].[t_File_Import]
+
+CREATE TABLE [dbo].[t_File_Import](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[FileId] [bigint] NOT NULL,
+	[AttachmentId] [int] NOT NULL,
+	[StatusCode] [nvarchar](50) NOT NULL,
+	[Name] [nvarchar](max) NOT NULL,
+	[RejectReason] [nvarchar](max) NULL,
+	[ValueDate] [datetime2](0) NULL,
+	[PaymentDescription] [nvarchar](35) NULL,
+	[TransactionDate] [datetime2](0) NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime2](0) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](0) NOT NULL
+)
+
+
+[dbo].[t_File_Import_Audit]
+
+CREATE TABLE [dbo].[t_File_Import_Audit](
+	[Id] [bigint] NOT NULL,
+	[FileId] [bigint] NOT NULL,
+	[AttachmentId] [int] NOT NULL,
+	[StatusCode] [nvarchar](50) NOT NULL,
+	[Name] [nvarchar](max) NOT NULL,
+	[RejectReason] [nvarchar](max) NULL,
+	[ValueDate] [datetime2](0) NULL,
+	[PaymentDescription] [nvarchar](35) NULL,
+	[TransactionDate] [datetime2](0) NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime2](0) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](0) NOT NULL
+)
+
+[dbo].[t_File_Import_Content]
+
+CREATE TABLE [dbo].[t_File_Import_Content](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[FileImportId] [bigint] NOT NULL,
+	[AltAccNbr] [nvarchar](255) NOT NULL,
+	[AccNbr] [nvarchar](255) NULL,
+	[CustomerName] [nvarchar](255) NULL,
+	[ProductCode] [nvarchar](30) NULL,
+	[Amount] [decimal](20, 4) NOT NULL,
+	[StatusId] [int] NOT NULL,
+	[ValidationRejectReason] [nvarchar](max) NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime2](0) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](0) NOT NULL,
+	[Other] [nvarchar](max) NULL
+)
+
+
+[dbo].[t_File_Import_Content_Audit]
+
+CREATE TABLE [dbo].[t_File_Import_Content_Audit](
+	[Id] [bigint] NOT NULL,
+	[FileImportId] [bigint] NOT NULL,
+	[AltAccNbr] [nvarchar](255) NOT NULL,
+	[AccNbr] [nvarchar](255) NULL,
+	[CustomerName] [nvarchar](255) NULL,
+	[ProductCode] [nvarchar](30) NULL,
+	[Amount] [decimal](18, 4) NOT NULL,
+	[StatusId] [int] NOT NULL,
+	[ValidationRejectReason] [nvarchar](max) NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime2](0) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](0) NOT NULL,
+	[Other] [nvarchar](max) NULL
+)
