@@ -1,76 +1,127 @@
-Id	FileImportId	AltAccNbr	AccNbr	CustomerName	ProductCode	Amount	StatusId	ValidationRejectReason	CreatedBy	CreatedDate	LastModifiedBy	LastModifiedDate	Other
-8780	6	031001362685156013	010685156003422	SAMAR HASSAN KOBEISSY	COMPTE.COURANT.362	62456000.0000	5	Account Product Is Incorrect 	AlternaSysUser	2025-10-29 13:31:50	AlternaSysUser	2025-10-29 13:31:50	سمر قبيسي
-8780	6	031001362685156013	010685156002422	SAMAR HASSAN KOBEISSY	IMP.BONIF.CTM	62456000.0000	2	Account Product Is Incorrect 	AlternaSystem	2025-10-29 13:31:50	mitani	2025-11-07 11:46:46	سمر قبيسي
-8780	6	031001362685156013	010685156001422	SAMAR HASSAN KOBEISSY	DEP.393	62456000.0000	2	Account Product Is Incorrect 	AlternaSystem	2025-10-29 13:31:50	pabouserhal	2025-11-07 11:47:18	سمر قبيسي
-8780	6	031001362685156013	010685156001422	SAMAR HASSAN KOBEISSY	DEP.393	62456000.0000	2	Account Product Is Incorrect 	AlternaSystem	2025-10-29 13:31:50	mitani	2025-11-07 11:48:58	سمر قبيسي
-8780	6	031001362685156013	010685156001422	SAMAR HASSAN KOBEISSY	DEP.393	62456000.0000	2	Account Product Is Incorrect 	AlternaSystem	2025-10-29 13:31:50	pabouserhal	2025-11-07 12:02:54	سمر قبيسي
+DECLARE @FileImportId bigint = 6;  -- << set this
 
-I have this table:
-CREATE TABLE [dbo].[t_File_Import_Content_Audit](
-	[Id] [bigint] NOT NULL,
-	[FileImportId] [bigint] NOT NULL,
-	[AltAccNbr] [nvarchar](255) NOT NULL,
-	[AccNbr] [nvarchar](255) NULL,
-	[CustomerName] [nvarchar](255) NULL,
-	[ProductCode] [nvarchar](30) NULL,
-	[Amount] [decimal](18, 4) NOT NULL,
-	[StatusId] [int] NOT NULL,
-	[ValidationRejectReason] [nvarchar](max) NULL,
-	[CreatedBy] [nvarchar](250) NOT NULL,
-	[CreatedDate] [datetime2](0) NOT NULL,
-	[LastModifiedBy] [nvarchar](250) NOT NULL,
-	[LastModifiedDate] [datetime2](0) NOT NULL,
-	[Other] [nvarchar](max) NULL
+WITH audit AS (
+    SELECT *
+    FROM dbo.t_File_Import_Content_Audit
+    WHERE FileImportId = @FileImportId
+),
+distinct_alt AS (
+    SELECT DISTINCT FileImportId, AltAccNbr
+    FROM audit
+),
+-- System proposed = first system-only row
+sys_proposed AS (
+    SELECT
+        FileImportId,
+        AltAccNbr,
+        AccNbr AS SystemProposedAccNbr,
+        ROW_NUMBER() OVER (
+            PARTITION BY FileImportId, AltAccNbr
+            ORDER BY LastModifiedDate ASC, Id ASC
+        ) AS rn
+    FROM audit
+    WHERE CreatedBy = N'AlternaSysUser'
+      AND LastModifiedBy = N'AlternaSysUser'
+),
+-- Last (current) account number = latest row
+last_row AS (
+    SELECT
+        FileImportId,
+        AltAccNbr,
+        AccNbr AS LastAccNbr,
+        ROW_NUMBER() OVER (
+            PARTITION BY FileImportId, AltAccNbr
+            ORDER BY LastModifiedDate DESC, Id DESC
+        ) AS rn
+    FROM audit
+),
+-- Change detection to find WHO edited AccNbr last time it actually changed
+ordered AS (
+    SELECT
+        FileImportId,
+        AltAccNbr,
+        AccNbr,
+        LastModifiedBy,
+        LastModifiedDate,
+        ROW_NUMBER() OVER (
+            PARTITION BY FileImportId, AltAccNbr
+            ORDER BY LastModifiedDate ASC, Id ASC
+        ) AS seq,
+        LAG(AccNbr) OVER (
+            PARTITION BY FileImportId, AltAccNbr
+            ORDER BY LastModifiedDate ASC, Id ASC
+        ) AS prev_acc
+    FROM audit
+),
+changes AS (
+    SELECT
+        FileImportId,
+        AltAccNbr,
+        LastModifiedBy,
+        LastModifiedDate,
+        seq,
+        CASE WHEN prev_acc IS NULL OR AccNbr <> prev_acc THEN 1 ELSE 0 END AS is_change
+    FROM ordered
+),
+-- Latest row where AccNbr actually changed -> who/when did the final change
+last_change AS (
+    SELECT
+        FileImportId,
+        AltAccNbr,
+        LastModifiedBy AS LastEditedBy,
+        LastModifiedDate AS LastEditedDate,
+        ROW_NUMBER() OVER (
+            PARTITION BY FileImportId, AltAccNbr
+            ORDER BY seq DESC
+        ) AS rn
+    FROM changes
+    WHERE is_change = 1
+),
+-- Who validated the file and when (latest StatusCode = '2')
+validated AS (
+    SELECT FileImportId, ValidatedBy, ValidatedDate
+    FROM (
+        SELECT
+            Id AS FileImportId,
+            LastModifiedBy AS ValidatedBy,
+            LastModifiedDate AS ValidatedDate,
+            ROW_NUMBER() OVER (
+                PARTITION BY Id
+                ORDER BY LastModifiedDate DESC, CreatedDate DESC, Id DESC
+            ) AS rn
+        FROM dbo.t_File_Import
+        WHERE StatusCode = N'2'
+    ) x
+    WHERE rn = 1
 )
-
-This table is an audit table and contains the accounts, how they entered the system (AltAccNbr) and they were modidied (AccNbr).
-So a same AltAccNbr per FileImportId can be found in multiple rows.
-
-I would like to get, one record per AltAccNbr that will give me the following:
-- The received account number (the accounts number that was read from the initial excel file. The column AltAccNbr will always contain this value and will never change)
-- The system proposed Account number (the column AltAccNbr for first record (ordered by LastModifiedDate ascending) having CreatedBy="AlternaSysUser" and LastModified="AlternaSysUser" )
-- The Last account number (the column "AccNbr" for the first row ordered by LastModifiedDate desc)
-- The Last edited by (it is the user that lastly edited the AccNbr column. To know it, we need to check the last AccNbr row order by LastModified asc. Then, we will go up one recor at a time checking if the AccNbr have changed or not. once we detect a change in the AccNbr, we need to stop going up and we need to get the LastModifiedBy column of the oldest record)
-- The Last edited date of the "Last edited by" (we can know this value when knowing who is the Last edited by because it is on the same row)
-- The Validated by (it is the user that lastly validated the entire file, we can get this user from the table t_File_Import_Audit. We need for a specific FileImportId (which is the Id column of the table), get the latest record having the statusCode = 2 )
-- The Validated date of the "The Validated by" (we can know this value when knowing who is the Validated by because it is on the same row)
-
-t_File_Import_Audit columns:
-CREATE TABLE [dbo].[t_File_Import](
-	[Id] [bigint] IDENTITY(1,1) NOT NULL,
-	[FileId] [bigint] NOT NULL,
-	[AttachmentId] [int] NOT NULL,
-	[StatusCode] [nvarchar](50) NOT NULL,
-	[Name] [nvarchar](max) NOT NULL,
-	[RejectReason] [nvarchar](max) NULL,
-	[ValueDate] [datetime2](0) NULL,
-	[PaymentDescription] [nvarchar](35) NULL,
-	[TransactionDate] [datetime2](0) NULL,
-	[CreatedBy] [nvarchar](250) NOT NULL,
-	[CreatedDate] [datetime2](0) NOT NULL,
-	[LastModifiedBy] [nvarchar](250) NOT NULL,
-	[LastModifiedDate] [datetime2](0) NOT NULL
-)
-
-Then for the last three columns, we need to take them from the table t_File_Import_Content
-CREATE TABLE [dbo].[t_File_Import_Content](
-	[Id] [bigint] IDENTITY(1,1) NOT NULL,
-	[FileImportId] [bigint] NOT NULL,
-	[AltAccNbr] [nvarchar](255) NOT NULL,
-	[AccNbr] [nvarchar](255) NULL,
-	[CustomerName] [nvarchar](255) NULL,
-	[ProductCode] [nvarchar](30) NULL,
-	[Amount] [decimal](20, 4) NOT NULL,
-	[Other] [nvarchar](max) NULL,
-	[StatusId] [int] NOT NULL,
-	[ValidationRejectReason] [nvarchar](max) NULL,
-	[CreatedBy] [nvarchar](250) NOT NULL,
-	[CreatedDate] [datetime2](0) NOT NULL,
-	[LastModifiedBy] [nvarchar](250) NOT NULL,
-	[LastModifiedDate] [datetime2](0) NOT NULL
-)
-
-We need to take for each AltAccNbr for the specific FileImportId the following:
-- ProductCode
-- CustomerName
-- Amount
+SELECT
+    d.FileImportId,
+    d.AltAccNbr                                   AS ReceivedAccountNumber,
+    sp.SystemProposedAccNbr,
+    lr.LastAccNbr,
+    lc.LastEditedBy,
+    lc.LastEditedDate,
+    v.ValidatedBy,
+    v.ValidatedDate,
+    c.ProductCode,
+    c.CustomerName,
+    c.Amount
+FROM distinct_alt d
+LEFT JOIN sys_proposed sp
+    ON sp.FileImportId = d.FileImportId
+   AND sp.AltAccNbr    = d.AltAccNbr
+   AND sp.rn = 1
+LEFT JOIN last_row lr
+    ON lr.FileImportId = d.FileImportId
+   AND lr.AltAccNbr    = d.AltAccNbr
+   AND lr.rn = 1
+LEFT JOIN last_change lc
+    ON lc.FileImportId = d.FileImportId
+   AND lc.AltAccNbr    = d.AltAccNbr
+   AND lc.rn = 1
+LEFT JOIN dbo.t_File_Import_Content c
+    ON c.FileImportId  = d.FileImportId
+   AND c.AltAccNbr     = d.AltAccNbr
+LEFT JOIN validated v
+    ON v.FileImportId  = d.FileImportId
+ORDER BY d.AltAccNbr;
