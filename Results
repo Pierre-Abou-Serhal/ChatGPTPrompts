@@ -1,1 +1,85 @@
-I have a string that is 15 characters long. Ex: 000125687411250 I want to convert this to a number in a string format following the rule: the first twelve chars are the number and the last three chards are the decimal point. So the result should be the following: 125687411.250
+// QuestPDF
+
+private byte[] GetByteArrayForBoxPDFForDestruction(DestructionBoxRequest destructionBoxRequest)
+    {
+        Settings.License = LicenseType.Community;
+        var FontsFamily = ConfigurationManager.AppSettings["FONT_FAMILY"] ?? "Times New Roman";
+        if (!float.TryParse(ConfigurationManager.AppSettings["FONT_SIZE"], out var FontSize)) FontSize = 14f;
+        string[] FontFamilyList = FontsFamily.Split(',');
+
+        var retRes = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(15);
+                page.DefaultTextStyle(x => x.FontFamily(FontFamilyList).FontSize(FontSize));
+
+                page.Header().Element(h =>
+                {
+                    h.Table(t =>
+                    {
+                        t.ColumnsDefinition(col =>
+                        {
+                            col.RelativeColumn();
+                            col.RelativeColumn();
+                        });
+                        t.Header(th =>
+                        {
+                            th.Cell().ColumnSpan(2).Element(HeadMid).Text("sdgsdgf").SemiBold()
+                                .FontSize(FontSize + 2);
+                        });
+
+                        t.Cell().ColumnSpan(2).Element(HeadLStart).Text($"dfg: {destructionBoxRequest.CreationDate}");
+                        t.Cell().ColumnSpan(2).Element(HeadL).Text($"dfg: {destructionBoxRequest.User}");
+                        t.Cell().ColumnSpan(2).Element(HeadLEnd).Text($"dfg: {destructionBoxRequest.Entity}");
+                    });
+                });
+                page.Content()
+                    .Column(x =>
+                    {
+                        x.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                            });
+                            table.Header(header =>
+                                {
+                                    header.Cell().Row(1).Column(1).Element(HeaderC).Text("dfg").FontSize(FontSize + 2);
+                                    header.Cell().Row(1).Column(2).ColumnSpan(2).Element(HeaderC)
+                                        .Text("dfgdfg").FontSize(FontSize + 2);
+                                }
+                            );
+
+                            uint i = 1;
+                            foreach (var box in destructionBoxRequest.BoxList)
+                            {
+                                table.Cell().Row(i).Column(1).Element(DocumentType).Text(box.BoxName);
+                                table.Cell().Row(i).Column(2).ColumnSpan(2).Element(Block).Text(box.DestructionDate);
+                                i++;
+                            }
+
+                            table.Footer(footer =>
+                                {
+                                    footer.Cell().ColumnSpan(3).Element(FooterR).Text("Adfgdfgdfg");
+                                }
+                            );
+                        });
+                    });
+                page.Footer()
+                    .AlignCenter()
+                    .Text(x =>
+                    {
+                        x.Span("Page ");
+                        x.CurrentPageNumber();
+                        x.Span(" Of ");
+                        x.TotalPages();
+                    });
+            });
+        }).GeneratePdf();
+
+        return retRes;
+    }
