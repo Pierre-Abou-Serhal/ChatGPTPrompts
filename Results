@@ -39,3 +39,54 @@ BEGIN
 END
 
 GO
+
+
+USE [Alterna.Saldom]
+GO
+
+/****** Object:  Table [dbo].[t_Dictionary]    Script Date: 11/27/2025 3:42:05 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[t_Dictionary](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[AlternativeAccountId] [nvarchar](255) NOT NULL,
+	[T24AccountId] [nvarchar](15) NOT NULL,
+	[ProductCode] [nvarchar](30) NOT NULL,
+	[FileId] [bigint] NOT NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime2](0) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](0) NOT NULL,
+ CONSTRAINT [PK_t_Dictionary] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+ALTER TABLE [dbo].[t_Dictionary] ADD  CONSTRAINT [DEFAULT_t_Dictionary_CreatedBy]  DEFAULT ('AlternaSysUser') FOR [CreatedBy]
+GO
+
+ALTER TABLE [dbo].[t_Dictionary] ADD  CONSTRAINT [DEFAULT_t_Dictionary_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+
+ALTER TABLE [dbo].[t_Dictionary] ADD  CONSTRAINT [DEFAULT_t_Dictionary_ModifiedBy]  DEFAULT ('AlternaSysUser') FOR [LastModifiedBy]
+GO
+
+ALTER TABLE [dbo].[t_Dictionary] ADD  CONSTRAINT [DEFAULT_t_Dictionary_ModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+
+ALTER TABLE [dbo].[t_Dictionary]  WITH CHECK ADD  CONSTRAINT [FK_t_Dictionary_t_File] FOREIGN KEY([FileId])
+REFERENCES [dbo].[t_File] ([Id])
+GO
+
+ALTER TABLE [dbo].[t_Dictionary] CHECK CONSTRAINT [FK_t_Dictionary_t_File]
+GO
+
+
+
