@@ -1,204 +1,21 @@
-using Microsoft.AspNetCore.Http.Extensions;
-using System.Text;
-using System.Text.Json;
-
-namespace MiddleWareApi
-{
-    public class ProxyMiddleware
-    {
-        private readonly RequestDelegate _next;
-
-        public ProxyMiddleware(RequestDelegate next)
-        {
-            _next = next;
-        }
-
-        public async Task InvokeAsync(
-            HttpContext context,
-            IHttpClientFactory httpClientFactory,
-            ILogger<ProxyMiddleware> logger)
-        {
-            var httpClient = new HttpClient(new HttpClientHandler())
-            {
-                Timeout = TimeSpan.FromSeconds(2)
-            };
+            Int32 chunkSize = 2000;
+            Int32 dictionaryCount = dictionaryList.Count;
             
-            try
+            Dictionary<Int32, List<Dictionary>> dataChunks = [];
+
+            
+            Int32 chuckCount = 0;
+            Int32 index = 0;
+            
+            foreach (Dictionary dict in dictionaryList)
             {
-                string? endpoint = null;
-                string? requestBodyContent = null;
-
-                // Try to get the endpoint from query parameter
-                endpoint = context.Request.Query["endpoint"].FirstOrDefault();
-
-                if (string.IsNullOrEmpty(endpoint))
+                if (chuckCount == chunkSize - 1)
                 {
-                    // If endpoint is not in query parameter and request has a body
-                    if (context.Request.ContentLength > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
-                    {
-                        context.Request.EnableBuffering();
-                        context.Request.Body.Position = 0;
-
-                        using (var reader = new StreamReader(context.Request.Body, Encoding.UTF8, leaveOpen: true))
-                        {
-                            var bodyText = await reader.ReadToEndAsync();
-                            context.Request.Body.Position = 0;
-
-                            // Parse the bodyText as JSON
-                            var json = JsonDocument.Parse(bodyText);
-
-                            // Try to get "EndPoint" and "RequestBody" from the JSON
-                            if (json.RootElement.TryGetProperty("EndPoint", out var endpointProperty))
-                            {
-                                endpoint = endpointProperty.GetString();
-                            }
-
-                            if (json.RootElement.TryGetProperty("RequestBody", out var requestBodyProperty))
-                            {
-                                requestBodyContent = requestBodyProperty.GetString();
-                            }
-                        }
-
-                        if (string.IsNullOrEmpty(endpoint))
-                        {
-                            throw new InvalidOperationException("Endpoint is missing in both query parameter and request body.");
-                        }
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("Endpoint is missing in both query parameter and request body.");
-                    }
-                }
-
-                // Validate the endpoint URI
-                if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var backendUri))
-                {
-                    throw new InvalidOperationException("Invalid endpoint URL.");
-                }
-
-                // Log the incoming and outgoing URLs
-                logger.LogInformation("Incoming Request URL: {Method} {Url}", context.Request.Method, context.Request.GetDisplayUrl());
-                logger.LogInformation("Outgoing Request URL: {BackendUri}", backendUri);
-
-                // Create the outgoing request message
-                var requestMessage = new HttpRequestMessage
-                {
-                    Method = new HttpMethod(context.Request.Method),
-                    RequestUri = backendUri
-                };
-
-                // Copy all request headers
-                foreach (var header in context.Request.Headers)
-                {
-                    if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
-                    {
-                        if (requestMessage.Content == null)
-                        {
-                            requestMessage.Content = new StreamContent(Stream.Null);
-                        }
-                        requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-                    }
-                }
-
-                // Set the request content if applicable
-                if (string.Equals(context.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(context.Request.Method, "PUT", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(context.Request.Method, "PATCH", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(context.Request.Method, "DELETE", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!string.IsNullOrEmpty(requestBodyContent))
-                    {
-                        // Use the requestBody extracted from the JSON
-                        requestMessage.Content = new StringContent(requestBodyContent, Encoding.UTF8, "application/json");
-                    }
-                    else
-                    {
-                        // If no requestBody extracted, copy the original request body
-                        context.Request.EnableBuffering();
-                        context.Request.Body.Position = 0;
-                        requestMessage.Content = new StreamContent(context.Request.Body);
-                        if (context.Request.ContentType != null)
-                        {
-                            requestMessage.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
-                        }
-                    }
+                    chuckCount = 0;
+                    index++;
                 }
                 
-                // Send the request and get the response
-                using var responseMessage = await httpClient.SendAsync(
-                    requestMessage, 
-                    HttpCompletionOption.ResponseHeadersRead, 
-                    context.RequestAborted);
                 
-                // Copy the status code
-                context.Response.StatusCode = (int)responseMessage.StatusCode;
-
-                // Copy response headers
-                foreach (var header in responseMessage.Headers)
-                {
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-                }
-                foreach (var header in responseMessage.Content.Headers)
-                {
-                    context.Response.Headers[header.Key] = header.Value.ToArray();
-                }
-                context.Response.Headers.Remove("transfer-encoding");
-
-                // Copy the response body
-                await responseMessage.Content.CopyToAsync(context.Response.Body);
+                
+                chuckCount ++;
             }
-            catch (Exception ex)
-            {
-                // Log detailed exception information including HttpClient.Timeout and cancellation status
-                logger.LogError(ex, "An error occurred while processing the request.");
-
-                // Return an error response
-                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-                await context.Response.WriteAsync("An error occurred while processing your request.");
-            }
-        }
-    }
-}
-
-
-Program.cs
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-
-namespace MiddleWareApi
-{
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
-
-            builder.Host.UseWindowsService();
-            // Configure logging
-            builder.Logging.ClearProviders();
-            builder.Logging.AddConsole();
-
-            // Add other services if needed
-            builder.AddServiceDefaults();
-            builder.Services.AddProblemDetails();
-
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy("DefaultCors", policyBuilder => policyBuilder
-                    .AllowAnyOrigin()
-                    .AllowAnyHeader()
-                    .AllowAnyMethod());
-            });
-            
-            var app = builder.Build();
-
-            app.UseCors("DefaultCors");
-            
-            // Use the proxy middleware
-            app.UseMiddleware<ProxyMiddleware>();
-            
-            app.Run();
-        }
-    }
-}
