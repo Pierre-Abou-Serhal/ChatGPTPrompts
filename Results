@@ -1,31 +1,16 @@
-        private void SyncDictionaryBulk(List<Dictionary> dictionaryList, String user)
+ public void SyncDictionaryBulk(List<Dictionary> dictionaryList, string user)
         {
-            Int32 chunkSize = 2000;
-            Int32 dictionaryCount = dictionaryList.Count;
-            
-            Dictionary<Int32, List<Dictionary>> dataChunks = [];
+            const int chunkSize = 2000;
 
-            
-            Int32 chuckCount = 0;
-            Int32 index = 0;
-            
-            foreach (Dictionary dict in dictionaryList)
+            foreach (var chunk in dictionaryList.Chunk(chunkSize))
             {
-                if (chuckCount == chunkSize - 1)
-                {
-                    chuckCount = 0;
-                    index++;
-                }
-                
-                
-                
-                chuckCount ++;
+                var parameters = new DynamicParameters();
+
+                parameters.Add("P__Dictionary",
+                    GetDictionaryDt(chunk).AsTableValuedParameter());
+
+                parameters.Add("P__User", user);
+
+                _dapperAccess.Execute("usp_Sync_Dictionary_Bulk", parameters);
             }
-            
-            DynamicParameters parameters = new DynamicParameters();
-
-            parameters.Add("P__Dictionary", GetDictionaryDt(dictionaryList).AsTableValuedParameter());
-            parameters.Add("P__User", user);
-
-            _dapperAccess.Execute("usp_Sync_Dictionary_Bulk", parameters);
         }
