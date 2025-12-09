@@ -1,186 +1,151 @@
+This is the schema of my tables.
+
+The audit tables contains records for each action taken.
+Some actions are indentical so some rows cannot showwhat truelly have been changed.
+
 USE [Alterna.Saldom]
 GO
-/****** Object:  StoredProcedure [dbo].[usp_Get_File_Content_Audit_By_File_Import_Id]    Script Date: 12/9/2025 1:02:59 PM ******/
+/****** Object:  Table [dbo].[t_File_Import]    Script Date: 12/9/2025 1:29:42 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+CREATE TABLE [dbo].[t_File_Import](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[FileId] [bigint] NOT NULL,
+	[AttachmentId] [int] NOT NULL,
+	[StatusCode] [nvarchar](50) NOT NULL,
+	[Name] [nvarchar](max) NOT NULL,
+	[RejectReason] [nvarchar](max) NULL,
+	[ValueDate] [datetime2](0) NULL,
+	[PaymentDescription] [nvarchar](35) NULL,
+	[TransactionDate] [datetime2](0) NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime2](0) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](0) NOT NULL,
+ CONSTRAINT [PK_t_File_Import] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
 
-ALTER PROCEDURE [dbo].[usp_Get_File_Content_Audit_By_File_Import_Id] 
-	@P__FileImportId BIGINT
-AS
-BEGIN
-	SET NOCOUNT ON;
+GO
+/****** Object:  Table [dbo].[t_File_Import_Audit]    Script Date: 12/9/2025 1:29:42 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_File_Import_Audit](
+	[Id] [bigint] NOT NULL,
+	[FileId] [bigint] NOT NULL,
+	[AttachmentId] [int] NOT NULL,
+	[StatusCode] [nvarchar](50) NOT NULL,
+	[Name] [nvarchar](max) NOT NULL,
+	[RejectReason] [nvarchar](max) NULL,
+	[ValueDate] [datetime2](0) NULL,
+	[PaymentDescription] [nvarchar](35) NULL,
+	[TransactionDate] [datetime2](0) NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime2](0) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](0) NOT NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
 
-	DECLARE @FileId BIGINT = (SELECT FileId FROM t_File_Import WHERE Id=@P__FileImportId);
+GO
+/****** Object:  Table [dbo].[t_File_Import_Content]    Script Date: 12/9/2025 1:29:42 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_File_Import_Content](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[FileImportId] [bigint] NOT NULL,
+	[AltAccNbr] [nvarchar](255) NOT NULL,
+	[AccNbr] [nvarchar](255) NULL,
+	[CustomerName] [nvarchar](255) NULL,
+	[ProductCode] [nvarchar](30) NULL,
+	[Amount] [decimal](20, 4) NOT NULL,
+	[Other] [nvarchar](max) NULL,
+	[StatusId] [int] NOT NULL,
+	[ValidationRejectReason] [nvarchar](max) NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime2](0) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](0) NOT NULL,
+	[SourceAccountNumber] [nvarchar](19) NOT NULL,
+ CONSTRAINT [PK_t_File_Content] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
 
-	-- File Import 
-	BEGIN
-		SELECT 
-			fi.[Id]
-			,fi.[FileId] 
-			,i.[Description] as 'InstitutionDescription'
-			,f.[Description] as [FileDescription]
-			,f.ProductCode as [FileProductCode]
-			,p.[Description] as [FileProductDescription]
-			,f.CurrencyCode as [FileCurrencyCode]
-			,lkp_currency.[Description] as [FileCurrencyDescription]
-			,fi.[Name]
-			,fi.[AttachmentId]
-			,a.[Name] as 'AttachmentDescription'
-			,fi.StatusCode
-			,lkp.[Description] as 'StatusDescription',
-			fi.ValueDate,
-			fi.TransactionDate,
-			fi.PaymentDescription
-		FROM [dbo].[t_File_Import] fi
-		INNER JOIN t_File f ON f.Id = fi.FileId
-		INNER JOIN t_Institution i ON f.InstitutionId = i.Id
-		INNER JOIN t_Attachment a ON a.Id = fi.AttachmentId
-		INNER JOIN t_Lookup lkp ON lkp.Code = fi.StatusCode AND lkp.TableName = 'FileStatus' 
-		INNER JOIN t_Lookup lkp_currency ON lkp_currency.Code = f.CurrencyCode AND lkp_currency.TableName='Currency'
-		LEFT JOIN [Alterna.BRef].[dbo].t_Product p ON f.ProductCode COLLATE SQL_Latin1_General_CP1256_CI_AS = p.Code
-		WHERE fi.Id = @P__FileImportId
-	END;
+GO
+/****** Object:  Table [dbo].[t_File_Import_Content_Audit]    Script Date: 12/9/2025 1:29:42 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_File_Import_Content_Audit](
+	[Id] [bigint] NOT NULL,
+	[FileImportId] [bigint] NOT NULL,
+	[AltAccNbr] [nvarchar](255) NOT NULL,
+	[AccNbr] [nvarchar](255) NULL,
+	[CustomerName] [nvarchar](255) NULL,
+	[ProductCode] [nvarchar](30) NULL,
+	[Amount] [decimal](18, 4) NOT NULL,
+	[Other] [nvarchar](max) NULL,
+	[StatusId] [int] NOT NULL,
+	[ValidationRejectReason] [nvarchar](max) NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime2](0) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](0) NOT NULL,
+	[SourceAccountNumber] [nvarchar](19) NOT NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
 
-	SELECT fp.[Id]
-		  ,[FileId]
-		  ,p.[Code]
-		  ,p.[Description]
-	FROM [dbo].[t_File_Product] fp
-	INNER JOIN t_File f ON f.Id = fp.FileId
-	LEFT JOIN [Alterna.BRef].[dbo].t_Product p ON fp.Code COLLATE SQL_Latin1_General_CP1256_CI_AS = p.Code
-	WHERE [FileId]=@FileId;
-
-	-- File Import Content Audi
-	BEGIN
-		WITH audit AS (
-			SELECT *
-			FROM dbo.t_File_Import_Content_Audit
-			WHERE FileImportId = @P__FileImportId
-		),
-		distinct_alt AS (
-			SELECT DISTINCT FileImportId, AltAccNbr
-			FROM audit
-		),
-		-- System proposed = first system-only row
-		sys_proposed AS (
-			SELECT
-				FileImportId,
-				AltAccNbr,
-				AccNbr AS SystemProposedAccNbr,
-				ROW_NUMBER() OVER (
-					PARTITION BY FileImportId, AltAccNbr
-					ORDER BY LastModifiedDate ASC, Id ASC
-				) AS rn
-			FROM audit
-			WHERE CreatedBy = N'AlternaSysUser'
-			  AND LastModifiedBy = N'AlternaSysUser'
-		),
-		-- Last (current) account number = latest row
-		last_row AS (
-			SELECT
-				FileImportId,
-				AltAccNbr,
-				AccNbr AS LastAccNbr,
-				ROW_NUMBER() OVER (
-					PARTITION BY FileImportId, AltAccNbr
-					ORDER BY LastModifiedDate DESC, Id DESC
-				) AS rn
-			FROM audit
-		),
-		-- Change detection to find WHO edited AccNbr last time it actually changed
-		ordered AS (
-			SELECT
-				FileImportId,
-				AltAccNbr,
-				AccNbr,
-				LastModifiedBy,
-				LastModifiedDate,
-				ROW_NUMBER() OVER (
-					PARTITION BY FileImportId, AltAccNbr
-					ORDER BY LastModifiedDate ASC, Id ASC
-				) AS seq,
-				LAG(AccNbr) OVER (
-					PARTITION BY FileImportId, AltAccNbr
-					ORDER BY LastModifiedDate ASC, Id ASC
-				) AS prev_acc
-			FROM audit
-		),
-		changes AS (
-			SELECT
-				FileImportId,
-				AltAccNbr,
-				LastModifiedBy,
-				LastModifiedDate,
-				seq,
-				CASE WHEN prev_acc IS NULL OR AccNbr <> prev_acc THEN 1 ELSE 0 END AS is_change
-			FROM ordered
-		),
-		-- Latest row where AccNbr actually changed -> who/when did the final change
-		last_change AS (
-			SELECT
-				FileImportId,
-				AltAccNbr,
-				LastModifiedBy AS LastEditedBy,
-				LastModifiedDate AS LastEditedDate,
-				ROW_NUMBER() OVER (
-					PARTITION BY FileImportId, AltAccNbr
-					ORDER BY seq DESC
-				) AS rn
-			FROM changes
-			WHERE is_change = 1
-		),
-		-- Who validated the file and when (latest StatusCode = '2')
-		validated AS (
-			SELECT FileImportId, ValidatedBy, ValidatedDate
-			FROM (
-				SELECT
-					Id AS FileImportId,
-					LastModifiedBy AS ValidatedBy,
-					LastModifiedDate AS ValidatedDate,
-					ROW_NUMBER() OVER (
-						PARTITION BY Id
-						ORDER BY LastModifiedDate DESC, CreatedDate DESC, Id DESC
-					) AS rn
-				FROM dbo.t_File_Import_Audit
-				WHERE StatusCode = N'2'
-			) x
-			WHERE rn = 1
-		)
-		SELECT
-			d.FileImportId,
-			d.AltAccNbr AS ReceivedAccountNumber,
-			sp.SystemProposedAccNbr,
-			lr.LastAccNbr,
-			lc.LastEditedBy,
-			lc.LastEditedDate,
-			v.ValidatedBy,
-			v.ValidatedDate,
-			c.ProductCode,
-			c.CustomerName,
-			c.Amount
-		FROM distinct_alt d
-		LEFT JOIN sys_proposed sp
-			ON sp.FileImportId = d.FileImportId
-		   AND sp.AltAccNbr    = d.AltAccNbr
-		   AND sp.rn = 1
-		LEFT JOIN last_row lr
-			ON lr.FileImportId = d.FileImportId
-		   AND lr.AltAccNbr    = d.AltAccNbr
-		   AND lr.rn = 1
-		LEFT JOIN last_change lc
-			ON lc.FileImportId = d.FileImportId
-		   AND lc.AltAccNbr    = d.AltAccNbr
-		   AND lc.rn = 1
-		LEFT JOIN dbo.t_File_Import_Content c
-			ON c.FileImportId  = d.FileImportId
-		   AND c.AltAccNbr     = d.AltAccNbr
-		LEFT JOIN validated v
-			ON v.FileImportId  = d.FileImportId
-		ORDER BY d.AltAccNbr;
-	END;
-END
-
-
-
+GO
+ALTER TABLE [dbo].[t_File_Import] ADD  CONSTRAINT [DF__t_File_Im__Creat__66603565]  DEFAULT ('AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_File_Import] ADD  CONSTRAINT [DF__t_File_Im__Creat__6754599E]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_File_Import] ADD  CONSTRAINT [DF__t_File_Im__LastM__68487DD7]  DEFAULT ('AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_File_Import] ADD  CONSTRAINT [DF__t_File_Im__LastM__693CA210]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content] ADD  CONSTRAINT [DF__t_File_Im__Creat__6A30C649]  DEFAULT ('AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content] ADD  CONSTRAINT [DF__t_File_Im__Creat__6B24EA82]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content] ADD  CONSTRAINT [DF__t_File_Im__LastM__6C190EBB]  DEFAULT ('AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content] ADD  CONSTRAINT [DF__t_File_Im__LastM__6D0D32F4]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content_Audit] ADD  CONSTRAINT [DF_t_File_Import_Content_Audit_CreatedBy]  DEFAULT (N'AlternaSysUser') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content_Audit] ADD  CONSTRAINT [DF_t_File_Import_Content_Audit_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content_Audit] ADD  CONSTRAINT [DF_t_File_Import_Content_Audit_LastModifiedBy]  DEFAULT (N'AlternaSysUser') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content_Audit] ADD  CONSTRAINT [DF_t_File_Import_Content_Audit_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_File_Import]  WITH CHECK ADD  CONSTRAINT [FK_t_File_Import_t_Attachment] FOREIGN KEY([AttachmentId])
+REFERENCES [dbo].[t_Attachment] ([Id])
+GO
+ALTER TABLE [dbo].[t_File_Import] CHECK CONSTRAINT [FK_t_File_Import_t_Attachment]
+GO
+ALTER TABLE [dbo].[t_File_Import]  WITH CHECK ADD  CONSTRAINT [FK_t_File_Import_t_File] FOREIGN KEY([FileId])
+REFERENCES [dbo].[t_File] ([Id])
+GO
+ALTER TABLE [dbo].[t_File_Import] CHECK CONSTRAINT [FK_t_File_Import_t_File]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content]  WITH CHECK ADD  CONSTRAINT [Fk_File_Import_Content_File_Import] FOREIGN KEY([FileImportId])
+REFERENCES [dbo].[t_File_Import] ([Id])
+GO
+ALTER TABLE [dbo].[t_File_Import_Content] CHECK CONSTRAINT [Fk_File_Import_Content_File_Import]
+GO
+ALTER TABLE [dbo].[t_File_Import_Content]  WITH CHECK ADD  CONSTRAINT [Fk_t_File_Import_Content_Status] FOREIGN KEY([StatusId])
+REFERENCES [dbo].[t_File_Import_Content_Status] ([Id])
+GO
+ALTER TABLE [dbo].[t_File_Import_Content] CHECK CONSTRAINT [Fk_t_File_Import_Content_Status]
+GO
