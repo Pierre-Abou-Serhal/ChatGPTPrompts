@@ -1,2 +1,186 @@
-CREATE UNIQUE NONCLUSTERED INDEX IX_t_Dictionary_AltAcc_File
-ON dbo.t_Dictionary (AlternativeAccountId, FileId);
+USE [Alterna.Saldom]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_Get_File_Content_Audit_By_File_Import_Id]    Script Date: 12/9/2025 1:02:59 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[usp_Get_File_Content_Audit_By_File_Import_Id] 
+	@P__FileImportId BIGINT
+AS
+BEGIN
+	SET NOCOUNT ON;
+
+	DECLARE @FileId BIGINT = (SELECT FileId FROM t_File_Import WHERE Id=@P__FileImportId);
+
+	-- File Import 
+	BEGIN
+		SELECT 
+			fi.[Id]
+			,fi.[FileId] 
+			,i.[Description] as 'InstitutionDescription'
+			,f.[Description] as [FileDescription]
+			,f.ProductCode as [FileProductCode]
+			,p.[Description] as [FileProductDescription]
+			,f.CurrencyCode as [FileCurrencyCode]
+			,lkp_currency.[Description] as [FileCurrencyDescription]
+			,fi.[Name]
+			,fi.[AttachmentId]
+			,a.[Name] as 'AttachmentDescription'
+			,fi.StatusCode
+			,lkp.[Description] as 'StatusDescription',
+			fi.ValueDate,
+			fi.TransactionDate,
+			fi.PaymentDescription
+		FROM [dbo].[t_File_Import] fi
+		INNER JOIN t_File f ON f.Id = fi.FileId
+		INNER JOIN t_Institution i ON f.InstitutionId = i.Id
+		INNER JOIN t_Attachment a ON a.Id = fi.AttachmentId
+		INNER JOIN t_Lookup lkp ON lkp.Code = fi.StatusCode AND lkp.TableName = 'FileStatus' 
+		INNER JOIN t_Lookup lkp_currency ON lkp_currency.Code = f.CurrencyCode AND lkp_currency.TableName='Currency'
+		LEFT JOIN [Alterna.BRef].[dbo].t_Product p ON f.ProductCode COLLATE SQL_Latin1_General_CP1256_CI_AS = p.Code
+		WHERE fi.Id = @P__FileImportId
+	END;
+
+	SELECT fp.[Id]
+		  ,[FileId]
+		  ,p.[Code]
+		  ,p.[Description]
+	FROM [dbo].[t_File_Product] fp
+	INNER JOIN t_File f ON f.Id = fp.FileId
+	LEFT JOIN [Alterna.BRef].[dbo].t_Product p ON fp.Code COLLATE SQL_Latin1_General_CP1256_CI_AS = p.Code
+	WHERE [FileId]=@FileId;
+
+	-- File Import Content Audi
+	BEGIN
+		WITH audit AS (
+			SELECT *
+			FROM dbo.t_File_Import_Content_Audit
+			WHERE FileImportId = @P__FileImportId
+		),
+		distinct_alt AS (
+			SELECT DISTINCT FileImportId, AltAccNbr
+			FROM audit
+		),
+		-- System proposed = first system-only row
+		sys_proposed AS (
+			SELECT
+				FileImportId,
+				AltAccNbr,
+				AccNbr AS SystemProposedAccNbr,
+				ROW_NUMBER() OVER (
+					PARTITION BY FileImportId, AltAccNbr
+					ORDER BY LastModifiedDate ASC, Id ASC
+				) AS rn
+			FROM audit
+			WHERE CreatedBy = N'AlternaSysUser'
+			  AND LastModifiedBy = N'AlternaSysUser'
+		),
+		-- Last (current) account number = latest row
+		last_row AS (
+			SELECT
+				FileImportId,
+				AltAccNbr,
+				AccNbr AS LastAccNbr,
+				ROW_NUMBER() OVER (
+					PARTITION BY FileImportId, AltAccNbr
+					ORDER BY LastModifiedDate DESC, Id DESC
+				) AS rn
+			FROM audit
+		),
+		-- Change detection to find WHO edited AccNbr last time it actually changed
+		ordered AS (
+			SELECT
+				FileImportId,
+				AltAccNbr,
+				AccNbr,
+				LastModifiedBy,
+				LastModifiedDate,
+				ROW_NUMBER() OVER (
+					PARTITION BY FileImportId, AltAccNbr
+					ORDER BY LastModifiedDate ASC, Id ASC
+				) AS seq,
+				LAG(AccNbr) OVER (
+					PARTITION BY FileImportId, AltAccNbr
+					ORDER BY LastModifiedDate ASC, Id ASC
+				) AS prev_acc
+			FROM audit
+		),
+		changes AS (
+			SELECT
+				FileImportId,
+				AltAccNbr,
+				LastModifiedBy,
+				LastModifiedDate,
+				seq,
+				CASE WHEN prev_acc IS NULL OR AccNbr <> prev_acc THEN 1 ELSE 0 END AS is_change
+			FROM ordered
+		),
+		-- Latest row where AccNbr actually changed -> who/when did the final change
+		last_change AS (
+			SELECT
+				FileImportId,
+				AltAccNbr,
+				LastModifiedBy AS LastEditedBy,
+				LastModifiedDate AS LastEditedDate,
+				ROW_NUMBER() OVER (
+					PARTITION BY FileImportId, AltAccNbr
+					ORDER BY seq DESC
+				) AS rn
+			FROM changes
+			WHERE is_change = 1
+		),
+		-- Who validated the file and when (latest StatusCode = '2')
+		validated AS (
+			SELECT FileImportId, ValidatedBy, ValidatedDate
+			FROM (
+				SELECT
+					Id AS FileImportId,
+					LastModifiedBy AS ValidatedBy,
+					LastModifiedDate AS ValidatedDate,
+					ROW_NUMBER() OVER (
+						PARTITION BY Id
+						ORDER BY LastModifiedDate DESC, CreatedDate DESC, Id DESC
+					) AS rn
+				FROM dbo.t_File_Import_Audit
+				WHERE StatusCode = N'2'
+			) x
+			WHERE rn = 1
+		)
+		SELECT
+			d.FileImportId,
+			d.AltAccNbr AS ReceivedAccountNumber,
+			sp.SystemProposedAccNbr,
+			lr.LastAccNbr,
+			lc.LastEditedBy,
+			lc.LastEditedDate,
+			v.ValidatedBy,
+			v.ValidatedDate,
+			c.ProductCode,
+			c.CustomerName,
+			c.Amount
+		FROM distinct_alt d
+		LEFT JOIN sys_proposed sp
+			ON sp.FileImportId = d.FileImportId
+		   AND sp.AltAccNbr    = d.AltAccNbr
+		   AND sp.rn = 1
+		LEFT JOIN last_row lr
+			ON lr.FileImportId = d.FileImportId
+		   AND lr.AltAccNbr    = d.AltAccNbr
+		   AND lr.rn = 1
+		LEFT JOIN last_change lc
+			ON lc.FileImportId = d.FileImportId
+		   AND lc.AltAccNbr    = d.AltAccNbr
+		   AND lc.rn = 1
+		LEFT JOIN dbo.t_File_Import_Content c
+			ON c.FileImportId  = d.FileImportId
+		   AND c.AltAccNbr     = d.AltAccNbr
+		LEFT JOIN validated v
+			ON v.FileImportId  = d.FileImportId
+		ORDER BY d.AltAccNbr;
+	END;
+END
+
+
+
