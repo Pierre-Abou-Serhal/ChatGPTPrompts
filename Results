@@ -1,116 +1,287 @@
--- File Import Content Audit
-BEGIN
-        WITH audit AS (
-                SELECT *
-                FROM dbo.t_File_Import_Content_Audit
-                WHERE FileImportId = @P__FileImportId
-        ),
-        -- System proposed = first system-only row per content line
-        sys_proposed AS (
-                SELECT
-                        Id AS FileImportContentId,
-                        AccNbr AS SystemProposedAccNbr,
-                        ROW_NUMBER() OVER (
-                                PARTITION BY Id
-                                ORDER BY LastModifiedDate ASC, CreatedDate ASC
-                        ) AS rn
-                FROM audit
-                WHERE CreatedBy      = N'AlternaSysUser'
-                  AND LastModifiedBy = N'AlternaSysUser'
-        ),
-        -- Last (current) account number per content line
-        last_row AS (
-                SELECT
-                        Id AS FileImportContentId,
-                        AccNbr AS LastAccNbr,
-                        ROW_NUMBER() OVER (
-                                PARTITION BY Id
-                                ORDER BY LastModifiedDate DESC, CreatedDate DESC
-                        ) AS rn
-                FROM audit
-        ),
-        -- Change detection per content line
-        ordered AS (
-                SELECT
-                        Id AS FileImportContentId,
-                        AccNbr,
-                        LastModifiedBy,
-                        LastModifiedDate,
-                        ROW_NUMBER() OVER (
-                                PARTITION BY Id
-                                ORDER BY LastModifiedDate ASC, CreatedDate ASC
-                        ) AS seq,
-                        LAG(AccNbr) OVER (
-                                PARTITION BY Id
-                                ORDER BY LastModifiedDate ASC, CreatedDate ASC
-                        ) AS prev_acc
-                FROM audit
-        ),
-        changes AS (
-                SELECT
-                        FileImportContentId,
-                        AccNbr,
-                        LastModifiedBy,
-                        LastModifiedDate,
-                        seq,
-                        CASE WHEN prev_acc IS NULL OR AccNbr <> prev_acc THEN 1 ELSE 0 END AS is_change
-                FROM ordered
-        ),
-        -- Latest row where AccNbr actually changed for this line
-        last_change AS (
-                SELECT
-                        FileImportContentId,
-                        LastModifiedBy AS LastEditedBy,
-                        LastModifiedDate AS LastEditedDate,
-                        ROW_NUMBER() OVER (
-                                PARTITION BY FileImportContentId
-                                ORDER BY seq DESC
-                        ) AS rn
-                FROM changes
-                WHERE is_change = 1
-        ),
-        -- Who validated the file and when (latest StatusCode = '2')
-        validated AS (
-                SELECT FileImportId, ValidatedBy, ValidatedDate
-                FROM (
-                        SELECT
-                                Id AS FileImportId,
-                                LastModifiedBy AS ValidatedBy,
-                                LastModifiedDate AS ValidatedDate,
-                                ROW_NUMBER() OVER (
-                                        PARTITION BY Id
-                                        ORDER BY LastModifiedDate DESC, CreatedDate DESC, Id DESC
-                                ) AS rn
-                        FROM dbo.t_File_Import_Audit
-                        WHERE StatusCode = N'2'
-                ) x
-                WHERE rn = 1
-        )
-        SELECT
-                c.FileImportId,
-                c.Id          AS FileImportContentId,
-                c.AltAccNbr   AS ReceivedAccountNumber,
-                sp.SystemProposedAccNbr,
-                lr.LastAccNbr,
-                lc.LastEditedBy,
-                lc.LastEditedDate,
-                v.ValidatedBy,
-                v.ValidatedDate,
-                c.ProductCode,
-                c.CustomerName,
-                c.Amount
-        FROM dbo.t_File_Import_Content c
-        LEFT JOIN sys_proposed sp
-                ON sp.FileImportContentId = c.Id
-               AND sp.rn = 1
-        LEFT JOIN last_row lr
-                ON lr.FileImportContentId = c.Id
-               AND lr.rn = 1
-        LEFT JOIN last_change lc
-                ON lc.FileImportContentId = c.Id
-               AND lc.rn = 1
-        LEFT JOIN validated v
-                ON v.FileImportId = c.FileImportId
-        WHERE c.FileImportId = @P__FileImportId
-        ORDER BY c.AltAccNbr, c.Id;
-END;
+public class T24CustomerDto
+{
+    public Int32 Id { get; set; }
+
+    public Int32 StatusId { get; set; }
+
+    public String LastKycReviewDate { get; set; }
+
+    #region Personal Info
+
+    #region Name
+    [JsonIgnore]
+    public String GivenNames { get; set; }
+
+    [JsonIgnore]
+    public String FamilyName { get; set; }
+    #endregion
+
+    #region Contact
+    [JsonIgnore]
+    public String MCntryCode { get; set; }
+
+    [JsonIgnore]
+    public String LbmbAreaCode { get; set; }
+
+    [JsonIgnore]
+    public String LbmbMobilenb { get; set; }
+
+    [JsonIgnore]
+    public String CompanyBook { get; set; }
+    #endregion
+
+    #region Spouse
+    public String MaritalStatus { get; set; }
+
+    public String SpFirstName { get; set; }
+
+    public String SpLastName { get; set; }
+
+    public String SpouseProf { get; set; }
+
+    public String SpofDetails { get; set; }
+
+    public String SgbSpAnlSal { get; set; }
+
+    public String SgbPep { get; set; }
+
+    public String SgbPepTitle { get; set; }
+    #endregion
+
+    #region Child
+    //public String SgbChildren { get; set; }
+
+    public String NoOfChildren { get; set; }
+
+    [JsonIgnore]
+    public String SgbChildName { get; set; }
+
+    [JsonIgnore]
+    public String SgbDtOfBirth { get; set; }
+
+    [JsonIgnore]
+    public String SgbEducation { get; set; }
+
+    [JsonIgnore]
+    public String SgbOccupation { get; set; }
+
+    [JsonIgnore]
+    public String SgbEmployer { get; set; }
+    #endregion
+
+    #region Nationality
+    public String Nationality { get; set; }
+    #endregion
+
+    #region Other Nationality
+    public String SgbHldOthNat { get; set; }
+
+    [JsonIgnore]
+    public String SgbOthrNat { get; set; }
+
+    [JsonIgnore]
+    public String SgbOthrDocNm { get; set; }
+
+    [JsonIgnore]
+    public String SgbOthrDocNr { get; set; }
+
+    public String GreenCardNo { get; set; }
+    #endregion
+
+    #endregion
+
+    #region Address Info
+    public String Residence { get; set; }
+
+    public String CusCity { get; set; }
+
+    public String City { get; set; }
+
+    public String Department { get; set; }
+
+    public String Province { get; set; }
+
+    public String Street { get; set; }
+
+    public String CustDistrict { get; set; }
+
+    public String CusBuilding { get; set; }
+
+    public String FloorNo { get; set; }
+
+    public String ApartmentNo { get; set; }
+
+    public String PoBox { get; set; }
+
+    public String CusRegion { get; set; }
+
+    [JsonIgnore]
+    public String ResidenceStatus { get; set; }
+
+    [JsonIgnore]
+    public String ResidenceType { get; set; }
+
+    [JsonIgnore]
+    public String ResidenceSince { get; set; }
+
+    [JsonIgnore]
+    public String PCntryCode { get; set; }
+
+    [JsonIgnore]
+    public String PhoneAreaCode { get; set; }
+
+    [JsonIgnore]
+    public String PhoneNo { get; set; }
+
+    [JsonIgnore]
+    public String FCntryCode { get; set; }
+
+    [JsonIgnore]
+    public String FAreaCode { get; set; }
+
+    [JsonIgnore]
+    public String Faxnb { get; set; }
+    #endregion
+
+    #region Employment Info
+    [JsonIgnore]
+    public String EmploymentStatus { get; set; }
+
+    [JsonIgnore]
+    public String Occupation { get; set; }
+
+    [JsonIgnore]
+    public String JobTitle { get; set; }
+
+    [JsonIgnore]
+    public String EmployersBuss { get; set; }
+
+    [JsonIgnore]
+    public String EmployersName { get; set; }
+
+    [JsonIgnore]
+    public String EmploymentStart { get; set; }
+
+    [JsonIgnore]
+    public String Salary { get; set; }
+
+    [JsonIgnore]
+    public String CustomerCurrency { get; set; }
+
+    [JsonIgnore]
+    public String SalaryDateFreq { get; set; }
+
+    public String SgbSalaryDom { get; set; }
+
+    public String SgbClientFunc { get; set; }
+
+    [JsonIgnore]
+    public String SgbCrsTaxRes { get; set; }
+
+    [JsonIgnore]
+    public String SgbCrsTaxId { get; set; }
+
+    [JsonIgnore]
+    public String SgbCrsTaxDt { get; set; }
+
+    [JsonIgnore]
+    public String SgbCrsCancel { get; set; }
+
+    [JsonIgnore]
+    public String SgbCrsCancDt { get; set; }
+
+    public String ProfDetails { get; set; }
+
+    public String SgbFinTwnCty { get; set; }
+    #endregion
+
+    #region Wealth Info
+    public String SgbNoOfSrcs { get; set; }
+
+    [JsonIgnore]
+    public String SgbSrcFunds { get; set; }
+
+    [JsonIgnore]
+    public String SgbFinDets { get; set; }
+
+    public String EstWealth { get; set; }
+    public String SgbSrcWealth { get; set; }
+
+    public String SglProsCoGrp { get; set; }
+
+    public String SgbEstWealth { get; set; }
+
+    public String SgbReaEsProp { get; set; }
+
+    public String SgbReaEsRegn { get; set; }
+
+    public String AnnualVolIn { get; set; }
+
+    public String AnnualVolOut { get; set; }
+    #endregion
+
+    #region Repeater Lists
+
+    #region Personal Info
+    public List<CustomerChild> ChildList { get; set; } = new List<CustomerChild>();
+
+    public List<OtherNationality> OtherNatList { get; set; } = new List<OtherNationality>();
+
+    public List<ResidenceInfo> ResidenceInfoList { get; set; } = new List<ResidenceInfo>();
+    #endregion
+
+    #region Address Info
+    public List<CustomerPhoneNumberDto> PhoneNumbersList { get; set; } = new List<CustomerPhoneNumberDto>();
+    #endregion
+
+    #region Employment  Info
+    public List<EmploymentDetails> EmploymentList { get; set; } = new List<EmploymentDetails>();
+
+    public List<CustomerEmploymentAddress> EmploymentAddressList { get; set; } = new List<CustomerEmploymentAddress>();
+
+    public List<TaxInfo> TaxList { get; set; } = new List<TaxInfo> { };
+    #endregion
+
+
+    #region Wealth Info
+    public List<CustomerFund> FundsList { get; set; } = new List<CustomerFund>();
+    #endregion
+
+    #endregion
+
+    // Used for OSB Push To T24 Request
+    public String correlationId { get; set; }
+    public String SgbCrsSource { get; set; }
+    public String SgbKycNewewal { get; set; }
+
+    // Used ONLY in Report
+    
+    // From DB
+    public String BirthRegNo { get; set; } = String.Empty;
+    public String Gender { get; set; } = String.Empty;
+    public String DateOfBirth { get; set; } = String.Empty;
+    public String FatherName { get; set; } = String.Empty;
+    public String MoFirstName { get; set; } = String.Empty;
+    public String MoLastName { get; set; } = String.Empty;
+    public String BirthRegister { get; set; } = String.Empty;
+    public String Email1 { get; set; } = String.Empty;
+    public String SgbBirthCnt { get; set; } = String.Empty;
+    public String SgbBnRgtOwnr { get; set; } = String.Empty;
+    
+    
+    // Defaulted or Concatenated
+    public String IsHolderOfGreenCard { get; set; } = String.Empty;
+    public String MobileNumber { get; set; } = String.Empty;
+    public String MotherFullName { get; set; } = String.Empty;
+    public String SpouseFullname { get; set; } = String.Empty;
+    public String LandLineNumber { get; set; } = String.Empty;
+    
+    // Reserved Fields (used to be placed on report -> will not contain data when report is printed)
+    public String ReservedSignedInPresence { get; set; } = String.Empty;
+    public String ReservedName { get; set; } = String.Empty;
+    public String ReservedSignature { get; set; } = String.Empty;
+    public String ReservedRefNbr { get; set; } = String.Empty;
+    public String ReservedVerification { get; set; } = String.Empty;
+    public String ReservedDate { get; set; } = String.Empty;
+
+}
