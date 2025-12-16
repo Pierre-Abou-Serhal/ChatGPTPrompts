@@ -506,3 +506,21 @@ GO
 
 Id,GivenNames,FamilyName,MaritalStatus,SpFirstName,SpLastName,SgbChildren,NoOfChildren,SgbChildName,SgbDtOfBirth,SgbEducation,SgbOccupation,SgbEmployer,SpouseProf,SpofDetails,SgbSpAnlSal,Nationality,SgbHldOthNat,SgbOthrNat,SgbOthrDocNm,SgbOthrDocNr,EmploymentStatus,SgbSalaryDom,SgbClientFunc,Occupation,JobTitle,EmployersBuss,EmployersName,EmploymentStart,Salary,SalaryDateFreq,SgbFinTwnCty,SgbFinMohfaz,SgbFinCaza,SgbFinCity,SgbFinLoc,SgbFinStreet,SgbFinDistrct,SgbFinBld,SgbFinFlrNo,SgbFinAptNo,SgbFinNextTo,SgbFinPoBox,SgbFinDept,SgbFinRegion,SgbFinPstOff,SgbCrsTaxRes,SgbCrsTaxId,SgbSpouseName,SgbNoOfSrcs,SgbSrcFunds,SgbFinDets,EstWealth,SglProsCoGrp,AnlSalary,SgbEstWealth,SgbReaEsProp,SgbReaEsRegn,AnnualVolIn,AnnualVolOut,Residence,CusCity,City,CusCaza,CusMohafaza,Department,Province,Street,CustDistrict,CusBuilding,FloorNo,ApartmentNo,NextTo,PoBox,CusRegion,PCntryCode,MCntryCode,LastKycReviewDate,SgbRbaClassif,AutoNextKycReviewDate,ManualNextKycReviewDate,Title,ArFirstName,ArLastName,ArFFirstName,ArMoLName,ArMoFName,FatherName,MoFirstName,MoLastName,Target,Industry,AccountOfficer,DateOfBirth,Gender,SgbCnEcSectr,CustomerStatus,BirthRegister,LegalId,LegalDocName,LegalIssDate,MainAdd,MailAddress,PhoneNo,PhoneAreaCode,ProfDetails,KycUpToDate,SgbHouseHead,SglArabicName,SgbEstablmnt,SgbEduLevel,SgbBnRgtOwnr,SgbOpFrCntry,SgbAcOpnCnxt,SgbPep,SgbAcctType,SgbMotAcOpen,SgbAcOpnAbrd,SgbAcNonResi,SgbCusAflGrp,SgbMnlIndicia,SgbPlDelivery,SgbCrsTestDt,SgbCrsIndSt,SgbCrsCoc,SgbCrsStDate,SgbCrsDoc,SgbCrsTestRt,SgbTransOrder,SgbBirthCnt,OthFinRel,OtFinInst,ResidenceStatus,ResidenceType,ResidenceSince,SgbJobPrev,SgbCrsTaxDt,SgbCrsCancel,SgbCrsCancDt,SgbCrsSource,SgbClosureRef,SgbKycNewewal,SgbPepTitle,CompanyBook,SgbDtRevRmi,LbmbAreaCode,LbmbMobilenb,Email1,ShortName,LegalHolderName,LegalExpDate,GreenCardNo,FCntryCode,FAreaCode,Faxnb,SgbSrcWealth,StatusId,CreatedBy,CreatedDate,LastModifiedBy,LastModifiedDate,ComputedSearchColumn,BirthRegNo
 1260165,PIERRE,ABOU SERHAL,SINGLE,,,No,,,,,,,999,NEANT,,LB,No,,,,ACTIVE,Private Sec.-Salary Domiciliated,,393,EMPLOYEE,BANKING,SGBL,20231017,1250.00,20231101M0101,LB,10000,16000,SIN EL FIL,16074,SALOUMEH,,SGBL,,,,,,,,LB,.,NEANT,01,06,SALAIRE DE SON TRAVAIL,,,,06,1,,15000,,LB,16024,,16000,10000,,,12-A,BAABDATE,30,2,,MUNICIPALITE BAABDAT,,BAABDATE,961,961,20231017,L,20271017,,M,بيار,ابو سرحال,جميل,سركيس,ميراي,JAMIL,MIREILLE,SARKIS,1101,9710,600,20010203,MALE,R01,52,13058,000044795115,3,20070414,PRINT.1,CARE.OF.BANK,820872,24,SOFTWARE DEVELOPER,YES,No,بيار جميل ابو سرحال,No,UNIVERSITY,Yes,No,Spontaneously,No,Individual,Salary domiciliation,No,No,No,No,LB,20231017,001,NO,20231017,YES,OK,Yes,LB,SAL.DOM,73,LIVING.WTH.PAR,RESIDENTIAL.APT,20010203,SOFTW,20231017,NO,,SELF.CERTIFICATION,[None],VISIT,,LB0010060,,76,331287,,"PIERRE JAMIL ABOU SERHAL ",,,,,,,SALAIRE,-2,AlternaSysUser,2024-11-04 16:15:17.073,AlternaSysUser,2024-11-04 16:15:17.073,pierre jamil abou serhal بيار جميل ابو سرحال,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.UseCors(corsOptions => corsOptions
+    .AllowAnyOrigin()
+    .AllowAnyHeader()
+    .AllowAnyMethod());
