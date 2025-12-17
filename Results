@@ -527,3 +527,5 @@ app.UseCors(corsOptions => corsOptions
 
 
 https://github.com/Pierre-Abou-Serhal/MPGS-Web
+
+https://localhost:7049/3ds-demo/index.html
