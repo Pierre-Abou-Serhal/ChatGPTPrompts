@@ -1,562 +1,5 @@
-public class T24CustomerDto
-{
-    public Int32 Id { get; set; }
-
-    public Int32 StatusId { get; set; }
-
-    public String LastKycReviewDate { get; set; }
-
-    #region Personal Info
-
-    #region Name
-    [JsonIgnore]
-    public String GivenNames { get; set; }
-
-    [JsonIgnore]
-    public String FamilyName { get; set; }
-    #endregion
-
-    #region Contact
-    [JsonIgnore]
-    public String MCntryCode { get; set; }
-
-    [JsonIgnore]
-    public String LbmbAreaCode { get; set; }
-
-    [JsonIgnore]
-    public String LbmbMobilenb { get; set; }
-
-    [JsonIgnore]
-    public String CompanyBook { get; set; }
-    #endregion
-
-    #region Spouse
-    public String MaritalStatus { get; set; }
-
-    public String SpFirstName { get; set; }
-
-    public String SpLastName { get; set; }
-
-    public String SpouseProf { get; set; }
-
-    public String SpofDetails { get; set; }
-
-    public String SgbSpAnlSal { get; set; }
-
-    public String SgbPep { get; set; }
-
-    public String SgbPepTitle { get; set; }
-    #endregion
-
-    #region Child
-    //public String SgbChildren { get; set; }
-
-    public String NoOfChildren { get; set; }
-
-    [JsonIgnore]
-    public String SgbChildName { get; set; }
-
-    [JsonIgnore]
-    public String SgbDtOfBirth { get; set; }
-
-    [JsonIgnore]
-    public String SgbEducation { get; set; }
-
-    [JsonIgnore]
-    public String SgbOccupation { get; set; }
-
-    [JsonIgnore]
-    public String SgbEmployer { get; set; }
-    #endregion
-
-    #region Nationality
-    public String Nationality { get; set; }
-    #endregion
-
-    #region Other Nationality
-    public String SgbHldOthNat { get; set; }
-
-    [JsonIgnore]
-    public String SgbOthrNat { get; set; }
-
-    [JsonIgnore]
-    public String SgbOthrDocNm { get; set; }
-
-    [JsonIgnore]
-    public String SgbOthrDocNr { get; set; }
-
-    public String GreenCardNo { get; set; }
-    #endregion
-
-    #endregion
-
-    #region Address Info
-    public String Residence { get; set; }
-
-    public String CusCity { get; set; }
-
-    public String City { get; set; }
-
-    public String Department { get; set; }
-
-    public String Province { get; set; }
-
-    public String Street { get; set; }
-
-    public String CustDistrict { get; set; }
-
-    public String CusBuilding { get; set; }
-
-    public String FloorNo { get; set; }
-
-    public String ApartmentNo { get; set; }
-
-    public String PoBox { get; set; }
-
-    public String CusRegion { get; set; }
-
-    [JsonIgnore]
-    public String ResidenceStatus { get; set; }
-
-    [JsonIgnore]
-    public String ResidenceType { get; set; }
-
-    [JsonIgnore]
-    public String ResidenceSince { get; set; }
-
-    [JsonIgnore]
-    public String PCntryCode { get; set; }
-
-    [JsonIgnore]
-    public String PhoneAreaCode { get; set; }
-
-    [JsonIgnore]
-    public String PhoneNo { get; set; }
-
-    [JsonIgnore]
-    public String FCntryCode { get; set; }
-
-    [JsonIgnore]
-    public String FAreaCode { get; set; }
-
-    [JsonIgnore]
-    public String Faxnb { get; set; }
-    #endregion
-
-    #region Employment Info
-    [JsonIgnore]
-    public String EmploymentStatus { get; set; }
-
-    [JsonIgnore]
-    public String Occupation { get; set; }
-
-    [JsonIgnore]
-    public String JobTitle { get; set; }
-
-    [JsonIgnore]
-    public String EmployersBuss { get; set; }
-
-    [JsonIgnore]
-    public String EmployersName { get; set; }
-
-    [JsonIgnore]
-    public String EmploymentStart { get; set; }
-
-    [JsonIgnore]
-    public String Salary { get; set; }
-
-    [JsonIgnore]
-    public String CustomerCurrency { get; set; }
-
-    [JsonIgnore]
-    public String SalaryDateFreq { get; set; }
-
-    public String SgbSalaryDom { get; set; }
-
-    public String SgbClientFunc { get; set; }
-
-    [JsonIgnore]
-    public String SgbCrsTaxRes { get; set; }
-
-    [JsonIgnore]
-    public String SgbCrsTaxId { get; set; }
-
-    [JsonIgnore]
-    public String SgbCrsTaxDt { get; set; }
-
-    [JsonIgnore]
-    public String SgbCrsCancel { get; set; }
-
-    [JsonIgnore]
-    public String SgbCrsCancDt { get; set; }
-
-    public String ProfDetails { get; set; }
-
-    public String SgbFinTwnCty { get; set; }
-    #endregion
-
-    #region Wealth Info
-    public String SgbNoOfSrcs { get; set; }
-
-    [JsonIgnore]
-    public String SgbSrcFunds { get; set; }
-
-    [JsonIgnore]
-    public String SgbFinDets { get; set; }
-
-    public String EstWealth { get; set; }
-    public String SgbSrcWealth { get; set; }
-
-    public String SglProsCoGrp { get; set; }
-
-    public String SgbEstWealth { get; set; }
-
-    public String SgbReaEsProp { get; set; }
-
-    public String SgbReaEsRegn { get; set; }
-
-    public String AnnualVolIn { get; set; }
-
-    public String AnnualVolOut { get; set; }
-    #endregion
-
-    #region Repeater Lists
-
-    #region Personal Info
-    public List<CustomerChild> ChildList { get; set; } = new List<CustomerChild>();
-
-    public List<OtherNationality> OtherNatList { get; set; } = new List<OtherNationality>();
-
-    public List<ResidenceInfo> ResidenceInfoList { get; set; } = new List<ResidenceInfo>();
-    #endregion
-
-    #region Address Info
-    public List<CustomerPhoneNumberDto> PhoneNumbersList { get; set; } = new List<CustomerPhoneNumberDto>();
-    #endregion
-
-    #region Employment  Info
-    public List<EmploymentDetails> EmploymentList { get; set; } = new List<EmploymentDetails>();
-
-    public List<CustomerEmploymentAddress> EmploymentAddressList { get; set; } = new List<CustomerEmploymentAddress>();
-
-    public List<TaxInfo> TaxList { get; set; } = new List<TaxInfo> { };
-    #endregion
-
-
-    #region Wealth Info
-    public List<CustomerFund> FundsList { get; set; } = new List<CustomerFund>();
-    #endregion
-
-    #endregion
-
-    // Used for OSB Push To T24 Request
-    public String correlationId { get; set; }
-    public String SgbCrsSource { get; set; }
-    public String SgbKycNewewal { get; set; }
-
-    // Used ONLY in Report
-    
-    // From DB
-    public String BirthRegNo { get; set; } = String.Empty;
-    public String Gender { get; set; } = String.Empty;
-    public String DateOfBirth { get; set; } = String.Empty;
-    public String FatherName { get; set; } = String.Empty;
-    public String MoFirstName { get; set; } = String.Empty;
-    public String MoLastName { get; set; } = String.Empty;
-    public String BirthRegister { get; set; } = String.Empty;
-    public String Email1 { get; set; } = String.Empty;
-    public String SgbBirthCnt { get; set; } = String.Empty;
-    public String SgbBnRgtOwnr { get; set; } = String.Empty;
-    
-    
-    // Defaulted or Concatenated
-    public String IsHolderOfGreenCard { get; set; } = String.Empty;
-    public String MobileNumber { get; set; } = String.Empty;
-    public String MotherFullName { get; set; } = String.Empty;
-    public String SpouseFullname { get; set; } = String.Empty;
-    public String LandLineNumber { get; set; } = String.Empty;
-    
-    // Reserved Fields (used to be placed on report -> will not contain data when report is printed)
-    public String ReservedSignedInPresence { get; set; } = String.Empty;
-    public String ReservedName { get; set; } = String.Empty;
-    public String ReservedSignature { get; set; } = String.Empty;
-    public String ReservedRefNbr { get; set; } = String.Empty;
-    public String ReservedVerification { get; set; } = String.Empty;
-    public String ReservedDate { get; set; } = String.Empty;
-
-}
-
------------------------------------
------------------------------------
------------------------------------
-
-USE [Alterna_KYC]
-GO
-
-/****** Object:  Table [dbo].[t_T24Customer]    Script Date: 12/15/2025 3:49:38 PM ******/
-SET ANSI_NULLS ON
-GO
-
-SET QUOTED_IDENTIFIER ON
-GO
-
-CREATE TABLE [dbo].[t_T24Customer](
-	[Id] [int] NOT NULL,
-	[GivenNames] [nvarchar](2000) NOT NULL,
-	[FamilyName] [nvarchar](2000) NOT NULL,
-	[MaritalStatus] [nvarchar](2000) NOT NULL,
-	[SpFirstName] [nvarchar](2000) NOT NULL,
-	[SpLastName] [nvarchar](2000) NOT NULL,
-	[SgbChildren] [nvarchar](2000) NOT NULL,
-	[NoOfChildren] [nvarchar](2000) NOT NULL,
-	[SgbChildName] [nvarchar](2000) NOT NULL,
-	[SgbDtOfBirth] [nvarchar](2000) NOT NULL,
-	[SgbEducation] [nvarchar](2000) NOT NULL,
-	[SgbOccupation] [nvarchar](2000) NOT NULL,
-	[SgbEmployer] [nvarchar](2000) NOT NULL,
-	[SpouseProf] [nvarchar](2000) NOT NULL,
-	[SpofDetails] [nvarchar](2000) NOT NULL,
-	[SgbSpAnlSal] [nvarchar](2000) NOT NULL,
-	[Nationality] [nvarchar](2000) NOT NULL,
-	[SgbHldOthNat] [nvarchar](2000) NOT NULL,
-	[SgbOthrNat] [nvarchar](2000) NOT NULL,
-	[SgbOthrDocNm] [nvarchar](2000) NOT NULL,
-	[SgbOthrDocNr] [nvarchar](2000) NOT NULL,
-	[EmploymentStatus] [nvarchar](2000) NOT NULL,
-	[SgbSalaryDom] [nvarchar](2000) NOT NULL,
-	[SgbClientFunc] [nvarchar](2000) NOT NULL,
-	[Occupation] [nvarchar](2000) NOT NULL,
-	[JobTitle] [nvarchar](2000) NOT NULL,
-	[EmployersBuss] [nvarchar](2000) NOT NULL,
-	[EmployersName] [nvarchar](2000) NOT NULL,
-	[EmploymentStart] [nvarchar](2000) NOT NULL,
-	[Salary] [nvarchar](2000) NOT NULL,
-	[SalaryDateFreq] [nvarchar](2000) NOT NULL,
-	[SgbFinTwnCty] [nvarchar](2000) NOT NULL,
-	[SgbFinMohfaz] [nvarchar](2000) NOT NULL,
-	[SgbFinCaza] [nvarchar](2000) NOT NULL,
-	[SgbFinCity] [nvarchar](2000) NOT NULL,
-	[SgbFinLoc] [nvarchar](2000) NOT NULL,
-	[SgbFinStreet] [nvarchar](2000) NOT NULL,
-	[SgbFinDistrct] [nvarchar](2000) NOT NULL,
-	[SgbFinBld] [nvarchar](2000) NOT NULL,
-	[SgbFinFlrNo] [nvarchar](2000) NOT NULL,
-	[SgbFinAptNo] [nvarchar](2000) NOT NULL,
-	[SgbFinNextTo] [nvarchar](2000) NOT NULL,
-	[SgbFinPoBox] [nvarchar](2000) NOT NULL,
-	[SgbFinDept] [nvarchar](2000) NOT NULL,
-	[SgbFinRegion] [nvarchar](2000) NOT NULL,
-	[SgbFinPstOff] [nvarchar](2000) NOT NULL,
-	[SgbCrsTaxRes] [nvarchar](2000) NOT NULL,
-	[SgbCrsTaxId] [nvarchar](2000) NOT NULL,
-	[SgbSpouseName] [nvarchar](2000) NOT NULL,
-	[SgbNoOfSrcs] [nvarchar](2000) NOT NULL,
-	[SgbSrcFunds] [nvarchar](2000) NOT NULL,
-	[SgbFinDets] [nvarchar](2000) NOT NULL,
-	[EstWealth] [nvarchar](2000) NOT NULL,
-	[SglProsCoGrp] [nvarchar](2000) NOT NULL,
-	[AnlSalary] [nvarchar](2000) NOT NULL,
-	[SgbEstWealth] [nvarchar](2000) NOT NULL,
-	[SgbReaEsProp] [nvarchar](2000) NOT NULL,
-	[SgbReaEsRegn] [nvarchar](2000) NOT NULL,
-	[AnnualVolIn] [nvarchar](2000) NOT NULL,
-	[AnnualVolOut] [nvarchar](2000) NOT NULL,
-	[Residence] [nvarchar](2000) NOT NULL,
-	[CusCity] [nvarchar](2000) NOT NULL,
-	[City] [nvarchar](2000) NOT NULL,
-	[CusCaza] [nvarchar](2000) NOT NULL,
-	[CusMohafaza] [nvarchar](2000) NOT NULL,
-	[Department] [nvarchar](2000) NOT NULL,
-	[Province] [nvarchar](2000) NOT NULL,
-	[Street] [nvarchar](2000) NOT NULL,
-	[CustDistrict] [nvarchar](2000) NOT NULL,
-	[CusBuilding] [nvarchar](2000) NOT NULL,
-	[FloorNo] [nvarchar](2000) NOT NULL,
-	[ApartmentNo] [nvarchar](2000) NOT NULL,
-	[NextTo] [nvarchar](2000) NOT NULL,
-	[PoBox] [nvarchar](2000) NOT NULL,
-	[CusRegion] [nvarchar](2000) NOT NULL,
-	[PCntryCode] [nvarchar](2000) NOT NULL,
-	[MCntryCode] [nvarchar](2000) NOT NULL,
-	[LastKycReviewDate] [nvarchar](2000) NOT NULL,
-	[SgbRbaClassif] [nvarchar](2000) NOT NULL,
-	[AutoNextKycReviewDate] [nvarchar](2000) NOT NULL,
-	[ManualNextKycReviewDate] [nvarchar](2000) NOT NULL,
-	[Title] [nvarchar](2000) NOT NULL,
-	[ArFirstName] [nvarchar](2000) NOT NULL,
-	[ArLastName] [nvarchar](2000) NOT NULL,
-	[ArFFirstName] [nvarchar](2000) NOT NULL,
-	[ArMoLName] [nvarchar](2000) NOT NULL,
-	[ArMoFName] [nvarchar](2000) NOT NULL,
-	[FatherName] [nvarchar](2000) NOT NULL,
-	[MoFirstName] [nvarchar](2000) NOT NULL,
-	[MoLastName] [nvarchar](2000) NOT NULL,
-	[Target] [nvarchar](2000) NOT NULL,
-	[Industry] [nvarchar](2000) NOT NULL,
-	[AccountOfficer] [nvarchar](2000) NOT NULL,
-	[DateOfBirth] [nvarchar](2000) NOT NULL,
-	[Gender] [nvarchar](2000) NOT NULL,
-	[SgbCnEcSectr] [nvarchar](2000) NOT NULL,
-	[CustomerStatus] [nvarchar](2000) NOT NULL,
-	[BirthRegister] [nvarchar](2000) NOT NULL,
-	[LegalId] [nvarchar](2000) NOT NULL,
-	[LegalDocName] [nvarchar](2000) NOT NULL,
-	[LegalIssDate] [nvarchar](2000) NOT NULL,
-	[MainAdd] [nvarchar](2000) NOT NULL,
-	[MailAddress] [nvarchar](2000) NOT NULL,
-	[PhoneNo] [nvarchar](2000) NOT NULL,
-	[PhoneAreaCode] [nvarchar](2000) NOT NULL,
-	[ProfDetails] [nvarchar](2000) NOT NULL,
-	[KycUpToDate] [nvarchar](2000) NOT NULL,
-	[SgbHouseHead] [nvarchar](2000) NOT NULL,
-	[SglArabicName] [nvarchar](2000) NOT NULL,
-	[SgbEstablmnt] [nvarchar](2000) NOT NULL,
-	[SgbEduLevel] [nvarchar](2000) NOT NULL,
-	[SgbBnRgtOwnr] [nvarchar](2000) NOT NULL,
-	[SgbOpFrCntry] [nvarchar](2000) NOT NULL,
-	[SgbAcOpnCnxt] [nvarchar](2000) NOT NULL,
-	[SgbPep] [nvarchar](2000) NOT NULL,
-	[SgbAcctType] [nvarchar](2000) NOT NULL,
-	[SgbMotAcOpen] [nvarchar](2000) NOT NULL,
-	[SgbAcOpnAbrd] [nvarchar](2000) NOT NULL,
-	[SgbAcNonResi] [nvarchar](2000) NOT NULL,
-	[SgbCusAflGrp] [nvarchar](2000) NOT NULL,
-	[SgbMnlIndicia] [nvarchar](2000) NOT NULL,
-	[SgbPlDelivery] [nvarchar](2000) NOT NULL,
-	[SgbCrsTestDt] [nvarchar](2000) NOT NULL,
-	[SgbCrsIndSt] [nvarchar](2000) NOT NULL,
-	[SgbCrsCoc] [nvarchar](2000) NOT NULL,
-	[SgbCrsStDate] [nvarchar](2000) NOT NULL,
-	[SgbCrsDoc] [nvarchar](2000) NOT NULL,
-	[SgbCrsTestRt] [nvarchar](2000) NOT NULL,
-	[SgbTransOrder] [nvarchar](2000) NOT NULL,
-	[SgbBirthCnt] [nvarchar](2000) NOT NULL,
-	[OthFinRel] [nvarchar](2000) NOT NULL,
-	[OtFinInst] [nvarchar](2000) NOT NULL,
-	[ResidenceStatus] [nvarchar](2000) NOT NULL,
-	[ResidenceType] [nvarchar](2000) NOT NULL,
-	[ResidenceSince] [nvarchar](2000) NOT NULL,
-	[SgbJobPrev] [nvarchar](2000) NOT NULL,
-	[SgbCrsTaxDt] [nvarchar](2000) NOT NULL,
-	[SgbCrsCancel] [nvarchar](2000) NOT NULL,
-	[SgbCrsCancDt] [nvarchar](2000) NOT NULL,
-	[SgbCrsSource] [nvarchar](2000) NOT NULL,
-	[SgbClosureRef] [nvarchar](2000) NOT NULL,
-	[SgbKycNewewal] [nvarchar](2000) NOT NULL,
-	[SgbPepTitle] [nvarchar](2000) NOT NULL,
-	[CompanyBook] [nvarchar](2000) NOT NULL,
-	[SgbDtRevRmi] [nvarchar](2000) NOT NULL,
-	[LbmbAreaCode] [nvarchar](2000) NOT NULL,
-	[LbmbMobilenb] [nvarchar](2000) NOT NULL,
-	[Email1] [nvarchar](2000) NOT NULL,
-	[ShortName] [nvarchar](2000) NOT NULL,
-	[LegalHolderName] [nvarchar](2000) NOT NULL,
-	[LegalExpDate] [nvarchar](2000) NOT NULL,
-	[GreenCardNo] [nvarchar](2000) NOT NULL,
-	[FCntryCode] [nvarchar](2000) NOT NULL,
-	[FAreaCode] [nvarchar](2000) NOT NULL,
-	[Faxnb] [nvarchar](2000) NOT NULL,
-	[SgbSrcWealth] [nvarchar](2000) NOT NULL,
-	[StatusId] [int] NOT NULL,
-	[CreatedBy] [nvarchar](2000) NOT NULL,
-	[CreatedDate] [datetime] NOT NULL,
-	[LastModifiedBy] [nvarchar](2000) NOT NULL,
-	[LastModifiedDate] [datetime] NOT NULL,
-	[ComputedSearchColumn]  AS (lower(concat([GivenNames],' ',[FatherName],' ',[FamilyName],' ',[ArFirstName],' ',[ArFFirstName],' ',[ArLastName]))),
-	[BirthRegNo] [nvarchar](2000) NOT NULL,
- CONSTRAINT [PK_t_T24Customer] PRIMARY KEY CLUSTERED 
-(
-	[Id] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-) ON [PRIMARY]
-
-GO
-
-ALTER TABLE [dbo].[t_T24Customer] ADD  CONSTRAINT [DF_t_T24Customer_GreenCardNo]  DEFAULT ('') FOR [GreenCardNo]
-GO
-
-ALTER TABLE [dbo].[t_T24Customer] ADD  CONSTRAINT [DF__t_T24Cust__SgbSr__082D9F89]  DEFAULT ('') FOR [SgbSrcWealth]
-GO
-
-ALTER TABLE [dbo].[t_T24Customer] ADD  CONSTRAINT [DF_t_T24Customer_StatusId]  DEFAULT ((-2)) FOR [StatusId]
-GO
-
-ALTER TABLE [dbo].[t_T24Customer] ADD  CONSTRAINT [DF_T24Customer_CreatedBy]  DEFAULT ('AlternaSysUser') FOR [CreatedBy]
-GO
-
-ALTER TABLE [dbo].[t_T24Customer] ADD  CONSTRAINT [DF_t_T24Customer_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
-GO
-
-ALTER TABLE [dbo].[t_T24Customer] ADD  CONSTRAINT [DF_T24Customer_LastModifiedBy]  DEFAULT ('AlternaSysUser') FOR [LastModifiedBy]
-GO
-
-ALTER TABLE [dbo].[t_T24Customer] ADD  CONSTRAINT [DF_T24Customer_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
-GO
-
-ALTER TABLE [dbo].[t_T24Customer] ADD  CONSTRAINT [DF__t_T24Cust__Birth__45F4312A]  DEFAULT ('') FOR [BirthRegNo]
-GO
-
-
-
-
-
---------------------------
---------------------------
---------------------------
-
-Id,GivenNames,FamilyName,MaritalStatus,SpFirstName,SpLastName,SgbChildren,NoOfChildren,SgbChildName,SgbDtOfBirth,SgbEducation,SgbOccupation,SgbEmployer,SpouseProf,SpofDetails,SgbSpAnlSal,Nationality,SgbHldOthNat,SgbOthrNat,SgbOthrDocNm,SgbOthrDocNr,EmploymentStatus,SgbSalaryDom,SgbClientFunc,Occupation,JobTitle,EmployersBuss,EmployersName,EmploymentStart,Salary,SalaryDateFreq,SgbFinTwnCty,SgbFinMohfaz,SgbFinCaza,SgbFinCity,SgbFinLoc,SgbFinStreet,SgbFinDistrct,SgbFinBld,SgbFinFlrNo,SgbFinAptNo,SgbFinNextTo,SgbFinPoBox,SgbFinDept,SgbFinRegion,SgbFinPstOff,SgbCrsTaxRes,SgbCrsTaxId,SgbSpouseName,SgbNoOfSrcs,SgbSrcFunds,SgbFinDets,EstWealth,SglProsCoGrp,AnlSalary,SgbEstWealth,SgbReaEsProp,SgbReaEsRegn,AnnualVolIn,AnnualVolOut,Residence,CusCity,City,CusCaza,CusMohafaza,Department,Province,Street,CustDistrict,CusBuilding,FloorNo,ApartmentNo,NextTo,PoBox,CusRegion,PCntryCode,MCntryCode,LastKycReviewDate,SgbRbaClassif,AutoNextKycReviewDate,ManualNextKycReviewDate,Title,ArFirstName,ArLastName,ArFFirstName,ArMoLName,ArMoFName,FatherName,MoFirstName,MoLastName,Target,Industry,AccountOfficer,DateOfBirth,Gender,SgbCnEcSectr,CustomerStatus,BirthRegister,LegalId,LegalDocName,LegalIssDate,MainAdd,MailAddress,PhoneNo,PhoneAreaCode,ProfDetails,KycUpToDate,SgbHouseHead,SglArabicName,SgbEstablmnt,SgbEduLevel,SgbBnRgtOwnr,SgbOpFrCntry,SgbAcOpnCnxt,SgbPep,SgbAcctType,SgbMotAcOpen,SgbAcOpnAbrd,SgbAcNonResi,SgbCusAflGrp,SgbMnlIndicia,SgbPlDelivery,SgbCrsTestDt,SgbCrsIndSt,SgbCrsCoc,SgbCrsStDate,SgbCrsDoc,SgbCrsTestRt,SgbTransOrder,SgbBirthCnt,OthFinRel,OtFinInst,ResidenceStatus,ResidenceType,ResidenceSince,SgbJobPrev,SgbCrsTaxDt,SgbCrsCancel,SgbCrsCancDt,SgbCrsSource,SgbClosureRef,SgbKycNewewal,SgbPepTitle,CompanyBook,SgbDtRevRmi,LbmbAreaCode,LbmbMobilenb,Email1,ShortName,LegalHolderName,LegalExpDate,GreenCardNo,FCntryCode,FAreaCode,Faxnb,SgbSrcWealth,StatusId,CreatedBy,CreatedDate,LastModifiedBy,LastModifiedDate,ComputedSearchColumn,BirthRegNo
-1260165,PIERRE,ABOU SERHAL,SINGLE,,,No,,,,,,,999,NEANT,,LB,No,,,,ACTIVE,Private Sec.-Salary Domiciliated,,393,EMPLOYEE,BANKING,SGBL,20231017,1250.00,20231101M0101,LB,10000,16000,SIN EL FIL,16074,SALOUMEH,,SGBL,,,,,,,,LB,.,NEANT,01,06,SALAIRE DE SON TRAVAIL,,,,06,1,,15000,,LB,16024,,16000,10000,,,12-A,BAABDATE,30,2,,MUNICIPALITE BAABDAT,,BAABDATE,961,961,20231017,L,20271017,,M,بيار,ابو سرحال,جميل,سركيس,ميراي,JAMIL,MIREILLE,SARKIS,1101,9710,600,20010203,MALE,R01,52,13058,000044795115,3,20070414,PRINT.1,CARE.OF.BANK,820872,24,SOFTWARE DEVELOPER,YES,No,بيار جميل ابو سرحال,No,UNIVERSITY,Yes,No,Spontaneously,No,Individual,Salary domiciliation,No,No,No,No,LB,20231017,001,NO,20231017,YES,OK,Yes,LB,SAL.DOM,73,LIVING.WTH.PAR,RESIDENTIAL.APT,20010203,SOFTW,20231017,NO,,SELF.CERTIFICATION,[None],VISIT,,LB0010060,,76,331287,,"PIERRE JAMIL ABOU SERHAL ",,,,,,,SALAIRE,-2,AlternaSysUser,2024-11-04 16:15:17.073,AlternaSysUser,2024-11-04 16:15:17.073,pierre jamil abou serhal بيار جميل ابو سرحال,
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-app.UseCors(corsOptions => corsOptions
-    .AllowAnyOrigin()
-    .AllowAnyHeader()
-    .AllowAnyMethod());
-
-
-https://github.com/Pierre-Abou-Serhal/MPGS-Web
-
-https://localhost:7049/3ds-demo/index.html
-
-    public class DuplicateCustomerDto
-    {
-        public Int32 CustomerId { get; set; }
-
-        public String DateOfBirth { get; set; }
-
-        // First Name
-        public String GivenNames { get; set; }
-
-        public String FamilyName { get; set; }
-
-        public String FatherName { get; set; }
-
-        public String MoFirstName { get; set; }
-
-        public String BirthRegister { get; set; }
-
-        public String BirthRegNo { get; set; }
-    }
-
-
-----------------
-----------------
-----------------
 CREATE OR ALTER PROCEDURE dbo.GetDuplicateCandidates
 (
-  @NewCustomers dbo.NewCustomerTVP READONLY,
   @MaxCandidatesPerNew int = 500
 )
 AS
@@ -566,19 +9,20 @@ BEGIN
   ;WITH NC AS
   (
     SELECT
-      NewCustomerId,
-      NULLIF(LTRIM(RTRIM(DateOfBirth)),   '') AS DateOfBirth,
-      NULLIF(LTRIM(RTRIM(GivenNames)),    '') AS GivenNames,
-      NULLIF(LTRIM(RTRIM(FamilyName)),    '') AS FamilyName,
-      NULLIF(LTRIM(RTRIM(FatherName)),    '') AS FatherName,
-      NULLIF(LTRIM(RTRIM(MoFirstName)),   '') AS MoFirstName,
-      NULLIF(LTRIM(RTRIM(BirthRegister)), '') AS BirthRegister,
-      NULLIF(LTRIM(RTRIM(BirthRegNo)),    '') AS BirthRegNo,
-      NULLIF(LTRIM(RTRIM(Gender)),        '') AS Gender
-    FROM @NewCustomers
+      T24C.Id								       AS NewCustomerId,
+      NULLIF(LTRIM(RTRIM(T24C.DateOfBirth)),   '') AS DateOfBirth,
+      NULLIF(LTRIM(RTRIM(T24C.GivenNames)),    '') AS GivenNames,
+      NULLIF(LTRIM(RTRIM(T24C.FamilyName)),    '') AS FamilyName,
+      NULLIF(LTRIM(RTRIM(T24C.FatherName)),    '') AS FatherName,
+      NULLIF(LTRIM(RTRIM(T24C.MoFirstName)),   '') AS MoFirstName,
+      NULLIF(LTRIM(RTRIM(T24C.BirthRegister)), '') AS BirthRegister,
+      NULLIF(LTRIM(RTRIM(T24C.BirthRegNo)),    '') AS BirthRegNo,
+      NULLIF(LTRIM(RTRIM(T24C.Gender)),        '') AS Gender
+    FROM [dbo].[t_NewT24Customers] AS NT24C
+	JOIN t_T24Customer AS T24C ON NT24C.CustomerId = T24C.Id
   )
   SELECT
-    x.NewCustomerId,
+    x.,
     x.CustomerId,
     x.CandidateRank,
     x.Reason,
@@ -664,3 +108,47 @@ BEGIN
   ORDER BY x.NewCustomerId, x.CandidateRank, x.CustomerId;
 END
 GO
+
+
+USE [Alterna_KYC]
+GO
+
+/****** Object:  Table [dbo].[t_NewT24Customers]    Script Date: 12/18/2025 1:48:39 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[t_NewT24Customers](
+	[Id] [int] IDENTITY(1,1) NOT NULL,
+	[CustomerId] [int] NOT NULL,
+	[StatusCode] [nvarchar](250) NOT NULL,
+	[MatchingCustomerId] [int] NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedAt] [datetime2](3) NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime2](3) NOT NULL,
+ CONSTRAINT [PK_t_NewT24Customers] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+ALTER TABLE [dbo].[t_NewT24Customers] ADD  CONSTRAINT [DF_t_NewT24Customers_Status]  DEFAULT (N'PENDING') FOR [StatusCode]
+GO
+
+ALTER TABLE [dbo].[t_NewT24Customers] ADD  CONSTRAINT [DF_t_NewT24Customers_CreatedBy]  DEFAULT ('AlternaSysUser') FOR [CreatedBy]
+GO
+
+ALTER TABLE [dbo].[t_NewT24Customers] ADD  CONSTRAINT [DF_t_NewT24Customers_AddedAt]  DEFAULT (getdate()) FOR [CreatedAt]
+GO
+
+ALTER TABLE [dbo].[t_NewT24Customers] ADD  CONSTRAINT [DF_t_NewT24Customers_LastModifiedBy]  DEFAULT ('AlternaSysUser') FOR [LastModifiedBy]
+GO
+
+ALTER TABLE [dbo].[t_NewT24Customers] ADD  CONSTRAINT [DF_t_NewT24Customers_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+
