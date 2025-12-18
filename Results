@@ -549,3 +549,118 @@ https://localhost:7049/3ds-demo/index.html
 
         public String BirthRegNo { get; set; }
     }
+
+
+----------------
+----------------
+----------------
+CREATE OR ALTER PROCEDURE dbo.GetDuplicateCandidates
+(
+  @NewCustomers dbo.NewCustomerTVP READONLY,
+  @MaxCandidatesPerNew int = 500
+)
+AS
+BEGIN
+  SET NOCOUNT ON;
+
+  ;WITH NC AS
+  (
+    SELECT
+      NewCustomerId,
+      NULLIF(LTRIM(RTRIM(DateOfBirth)),   '') AS DateOfBirth,
+      NULLIF(LTRIM(RTRIM(GivenNames)),    '') AS GivenNames,
+      NULLIF(LTRIM(RTRIM(FamilyName)),    '') AS FamilyName,
+      NULLIF(LTRIM(RTRIM(FatherName)),    '') AS FatherName,
+      NULLIF(LTRIM(RTRIM(MoFirstName)),   '') AS MoFirstName,
+      NULLIF(LTRIM(RTRIM(BirthRegister)), '') AS BirthRegister,
+      NULLIF(LTRIM(RTRIM(BirthRegNo)),    '') AS BirthRegNo,
+      NULLIF(LTRIM(RTRIM(Gender)),        '') AS Gender
+    FROM @NewCustomers
+  )
+  SELECT
+    x.NewCustomerId,
+    x.CustomerId,
+    x.CandidateRank,
+    x.Reason,
+
+    -- bring back fields you’ll need for .NET scoring
+    x.Db_DateOfBirth,
+    x.Db_GivenNames,
+    x.Db_FamilyName,
+    x.Db_FatherName,
+    x.Db_MoFirstName,
+    x.Db_BirthRegister,
+    x.Db_BirthRegNo,
+    x.Db_Gender
+  FROM NC
+  CROSS APPLY
+  (
+    SELECT TOP (@MaxCandidatesPerNew)
+      c.Id AS CustomerId,
+
+      -- lower is better; you can keep this just for ordering
+      MIN(v.CandidateRank) AS CandidateRank,
+
+      -- helpful for debugging / explaining why it was pulled as a candidate
+      STRING_AGG(v.Reason, '; ') WITHIN GROUP (ORDER BY v.CandidateRank) AS Reason,
+
+      -- db-side values (you’ll compute real similarity in .NET)
+      c.DateOfBirth   AS Db_DateOfBirth,
+      c.GivenNames    AS Db_GivenNames,
+      c.FamilyName    AS Db_FamilyName,
+      c.FatherName    AS Db_FatherName,
+      c.MoFirstName   AS Db_MoFirstName,
+      c.BirthRegister AS Db_BirthRegister,
+      c.BirthRegNo    AS Db_BirthRegNo,
+      c.Gender        AS Db_Gender
+    FROM dbo.t_T24Customer c
+    CROSS APPLY
+    (
+      -- Strategy 1: exact BirthRegNo (usually strongest identifier)
+      SELECT 10 AS CandidateRank, 'BirthRegNo exact' AS Reason
+      WHERE NC.BirthRegNo IS NOT NULL
+        AND c.BirthRegNo = NC.BirthRegNo
+
+      UNION ALL
+
+      -- Strategy 2: exact DOB + exact Gender + FamilyName SOUNDEX (strong block, still cheap)
+      SELECT 20, 'DOB+Gender exact + Family SOUNDEX'
+      WHERE NC.DateOfBirth IS NOT NULL AND NC.Gender IS NOT NULL AND NC.FamilyName IS NOT NULL
+        AND c.DateOfBirth = NC.DateOfBirth
+        AND c.Gender = NC.Gender
+        AND SOUNDEX(c.FamilyName) = SOUNDEX(NC.FamilyName)
+
+      UNION ALL
+
+      -- Strategy 3: exact DOB + FamilyName first letter (very cheap block)
+      SELECT 30, 'DOB exact + Family initial'
+      WHERE NC.DateOfBirth IS NOT NULL AND NC.FamilyName IS NOT NULL
+        AND c.DateOfBirth = NC.DateOfBirth
+        AND LEFT(c.FamilyName, 1) = LEFT(NC.FamilyName, 1)
+
+      UNION ALL
+
+      -- Strategy 4: exact BirthRegister + DOB + Family initial
+      SELECT 40, 'BirthRegister exact + DOB exact + Family initial'
+      WHERE NC.BirthRegister IS NOT NULL AND NC.DateOfBirth IS NOT NULL AND NC.FamilyName IS NOT NULL
+        AND c.BirthRegister = NC.BirthRegister
+        AND c.DateOfBirth = NC.DateOfBirth
+        AND LEFT(c.FamilyName, 1) = LEFT(NC.FamilyName, 1)
+
+      UNION ALL
+
+      -- Strategy 5: (optional) exact DOB only (keep rank weaker; can still help recall)
+      SELECT 60, 'DOB exact only'
+      WHERE NC.DateOfBirth IS NOT NULL
+        AND c.DateOfBirth = NC.DateOfBirth
+
+    ) v
+    GROUP BY
+      c.Id, c.DateOfBirth, c.GivenNames, c.FamilyName, c.FatherName, c.MoFirstName, c.BirthRegister, c.BirthRegNo, c.Gender
+    ORDER BY
+      MIN(v.CandidateRank) ASC,
+      c.Id ASC
+  ) x
+  ORDER BY x.NewCustomerId, x.CandidateRank, x.CustomerId;
+END
+GO
