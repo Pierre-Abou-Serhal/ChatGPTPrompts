@@ -1,111 +1,117 @@
 CREATE OR ALTER PROCEDURE dbo.GetDuplicateCandidates
 (
-    @MaxCandidatesPerNew int = 500,
-    @StatusCode nvarchar(250) = N'PENDING'
+  @MaxCandidatesPerNew int = 500,
+  @StatusCode nvarchar(250) = N'PENDING'
 )
 AS
 BEGIN
-    SET NOCOUNT ON;
+  SET NOCOUNT ON;
 
-    ;WITH NC AS
-    (
-        SELECT
-            T24C.Id AS NewCustomerId,
-            NULLIF(LTRIM(RTRIM(T24C.DateOfBirth)),   '') AS DateOfBirth,
-            NULLIF(LTRIM(RTRIM(T24C.GivenNames)),    '') AS GivenNames,
-            NULLIF(LTRIM(RTRIM(T24C.FamilyName)),    '') AS FamilyName,
-            NULLIF(LTRIM(RTRIM(T24C.FatherName)),    '') AS FatherName,
-            NULLIF(LTRIM(RTRIM(T24C.MoFirstName)),   '') AS MoFirstName,
-            NULLIF(LTRIM(RTRIM(T24C.BirthRegister)), '') AS BirthRegister,
-            NULLIF(LTRIM(RTRIM(T24C.BirthRegNo)),    '') AS BirthRegNo,
-            NULLIF(LTRIM(RTRIM(T24C.Gender)),        '') AS Gender
-        FROM dbo.t_NewT24Customers AS NT24C
-        JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
-        WHERE NT24C.StatusCode = @StatusCode
-    )
+  ;WITH NC AS
+  (
     SELECT
-        nc.NewCustomerId,
-        x.CustomerId,
-        x.CandidateRank,
-        x.Reason,
+      T24C.Id AS NewCustomerId,
+      NULLIF(LTRIM(RTRIM(T24C.DateOfBirth)),   '') AS DateOfBirth,
+      NULLIF(LTRIM(RTRIM(T24C.FamilyName)),    '') AS FamilyName,
+      NULLIF(LTRIM(RTRIM(T24C.BirthRegister)), '') AS BirthRegister,
+      NULLIF(LTRIM(RTRIM(T24C.BirthRegNo)),    '') AS BirthRegNo,
+      NULLIF(LTRIM(RTRIM(T24C.Gender)),        '') AS Gender
+    FROM dbo.t_NewT24Customers AS NT24C
+    JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
+    WHERE NT24C.StatusCode = @StatusCode
+  )
+  SELECT
+    nc.NewCustomerId,
+    x.CustomerId,
 
-        -- DB-side values you'll need for .NET scoring
-        x.Db_DateOfBirth,
-        x.Db_GivenNames,
-        x.Db_FamilyName,
-        x.Db_FatherName,
-        x.Db_MoFirstName,
-        x.Db_BirthRegister,
-        x.Db_BirthRegNo,
-        x.Db_Gender
-    FROM NC AS nc
-    CROSS APPLY
-    (
-        SELECT TOP (@MaxCandidatesPerNew)
-            c.Id AS CustomerId,
+    x.CandidateRank,
 
-            MIN(v.CandidateRank) AS CandidateRank,
+    -- Flags (your .NET will convert to "reasons")
+    x.Match_BirthRegNoExact,
+    x.Match_DobGenderFamilySoundex,
+    x.Match_DobFamilyInitial,
+    x.Match_BirthRegisterDobFamilyInitial,
+    x.Match_DobOnly,
 
-            STRING_AGG(v.Reason, '; ') WITHIN GROUP (ORDER BY v.CandidateRank) AS Reason,
+    -- Fields for .NET similarity scoring
+    x.Db_DateOfBirth,
+    x.Db_GivenNames,
+    x.Db_FamilyName,
+    x.Db_FatherName,
+    x.Db_MoFirstName,
+    x.Db_BirthRegister,
+    x.Db_BirthRegNo,
+    x.Db_Gender
+  FROM NC AS nc
+  CROSS APPLY
+  (
+    SELECT TOP (@MaxCandidatesPerNew)
+      c.Id AS CustomerId,
 
-            c.DateOfBirth   AS Db_DateOfBirth,
-            c.GivenNames    AS Db_GivenNames,
-            c.FamilyName    AS Db_FamilyName,
-            c.FatherName    AS Db_FatherName,
-            c.MoFirstName   AS Db_MoFirstName,
-            c.BirthRegister AS Db_BirthRegister,
-            c.BirthRegNo    AS Db_BirthRegNo,
-            c.Gender        AS Db_Gender
-        FROM dbo.t_T24Customer AS c
-        CROSS APPLY
-        (
-            -- Strategy 1: exact BirthRegNo (usually strongest identifier)
-            SELECT 10 AS CandidateRank, 'BirthRegNo exact' AS Reason
-            WHERE nc.BirthRegNo IS NOT NULL
-              AND c.BirthRegNo = nc.BirthRegNo
+      -- Flags
+      CASE WHEN nc.BirthRegNo IS NOT NULL AND c.BirthRegNo = nc.BirthRegNo THEN 1 ELSE 0 END AS Match_BirthRegNoExact,
 
-            UNION ALL
+      CASE WHEN nc.DateOfBirth IS NOT NULL AND nc.Gender IS NOT NULL AND nc.FamilyName IS NOT NULL
+             AND c.DateOfBirth = nc.DateOfBirth
+             AND c.Gender = nc.Gender
+             AND SOUNDEX(c.FamilyName) = SOUNDEX(nc.FamilyName)
+           THEN 1 ELSE 0 END AS Match_DobGenderFamilySoundex,
 
-            -- Strategy 2: exact DOB + exact Gender + FamilyName SOUNDEX
-            SELECT 20, 'DOB+Gender exact + Family SOUNDEX'
-            WHERE nc.DateOfBirth IS NOT NULL AND nc.Gender IS NOT NULL AND nc.FamilyName IS NOT NULL
-              AND c.DateOfBirth = nc.DateOfBirth
-              AND c.Gender      = nc.Gender
-              AND SOUNDEX(c.FamilyName) = SOUNDEX(nc.FamilyName)
+      CASE WHEN nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
+             AND c.DateOfBirth = nc.DateOfBirth
+             AND LEFT(c.FamilyName,1) = LEFT(nc.FamilyName,1)
+           THEN 1 ELSE 0 END AS Match_DobFamilyInitial,
 
-            UNION ALL
+      CASE WHEN nc.BirthRegister IS NOT NULL AND nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
+             AND c.BirthRegister = nc.BirthRegister
+             AND c.DateOfBirth = nc.DateOfBirth
+             AND LEFT(c.FamilyName,1) = LEFT(nc.FamilyName,1)
+           THEN 1 ELSE 0 END AS Match_BirthRegisterDobFamilyInitial,
 
-            -- Strategy 3: exact DOB + FamilyName first letter
-            SELECT 30, 'DOB exact + Family initial'
-            WHERE nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
-              AND c.DateOfBirth = nc.DateOfBirth
-              AND LEFT(c.FamilyName, 1) = LEFT(nc.FamilyName, 1)
+      CASE WHEN nc.DateOfBirth IS NOT NULL AND c.DateOfBirth = nc.DateOfBirth
+           THEN 1 ELSE 0 END AS Match_DobOnly,
 
-            UNION ALL
+      -- Best rank (lowest) among the flags above
+      (SELECT MIN(r) FROM (VALUES
+        (CASE WHEN nc.BirthRegNo IS NOT NULL AND c.BirthRegNo = nc.BirthRegNo THEN 10 END),
+        (CASE WHEN nc.DateOfBirth IS NOT NULL AND nc.Gender IS NOT NULL AND nc.FamilyName IS NOT NULL
+                AND c.DateOfBirth = nc.DateOfBirth AND c.Gender = nc.Gender
+                AND SOUNDEX(c.FamilyName) = SOUNDEX(nc.FamilyName)
+              THEN 20 END),
+        (CASE WHEN nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
+                AND c.DateOfBirth = nc.DateOfBirth
+                AND LEFT(c.FamilyName,1) = LEFT(nc.FamilyName,1)
+              THEN 30 END),
+        (CASE WHEN nc.BirthRegister IS NOT NULL AND nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
+                AND c.BirthRegister = nc.BirthRegister
+                AND c.DateOfBirth = nc.DateOfBirth
+                AND LEFT(c.FamilyName,1) = LEFT(nc.FamilyName,1)
+              THEN 40 END),
+        (CASE WHEN nc.DateOfBirth IS NOT NULL AND c.DateOfBirth = nc.DateOfBirth THEN 60 END)
+      ) AS ranks(r)) AS CandidateRank,
 
-            -- Strategy 4: exact BirthRegister + DOB + Family initial
-            SELECT 40, 'BirthRegister exact + DOB exact + Family initial'
-            WHERE nc.BirthRegister IS NOT NULL AND nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
-              AND c.BirthRegister = nc.BirthRegister
-              AND c.DateOfBirth   = nc.DateOfBirth
-              AND LEFT(c.FamilyName, 1) = LEFT(nc.FamilyName, 1)
+      c.DateOfBirth   AS Db_DateOfBirth,
+      c.GivenNames    AS Db_GivenNames,
+      c.FamilyName    AS Db_FamilyName,
+      c.FatherName    AS Db_FatherName,
+      c.MoFirstName   AS Db_MoFirstName,
+      c.BirthRegister AS Db_BirthRegister,
+      c.BirthRegNo    AS Db_BirthRegNo,
+      c.Gender        AS Db_Gender
 
-            UNION ALL
-
-            -- Strategy 5: exact DOB only
-            SELECT 60, 'DOB exact only'
-            WHERE nc.DateOfBirth IS NOT NULL
-              AND c.DateOfBirth = nc.DateOfBirth
-        ) v
-        -- Optional: avoid self-match if the "new" customer is also in the same table
-        WHERE c.Id <> nc.NewCustomerId
-        GROUP BY
-            c.Id, c.DateOfBirth, c.GivenNames, c.FamilyName, c.FatherName,
-            c.MoFirstName, c.BirthRegister, c.BirthRegNo, c.Gender
-        ORDER BY
-            MIN(v.CandidateRank) ASC,
-            c.Id ASC
-    ) x
-    ORDER BY nc.NewCustomerId, x.CandidateRank, x.CustomerId;
+    FROM dbo.t_T24Customer AS c
+    WHERE
+      c.Id <> nc.NewCustomerId
+      AND
+      (
+        (nc.BirthRegNo IS NOT NULL AND c.BirthRegNo = nc.BirthRegNo)
+        OR
+        (nc.DateOfBirth IS NOT NULL AND c.DateOfBirth = nc.DateOfBirth)
+        OR
+        (nc.BirthRegister IS NOT NULL AND c.BirthRegister = nc.BirthRegister)
+      )
+    ORDER BY CandidateRank ASC, c.Id ASC
+  ) x
+  ORDER BY nc.NewCustomerId, x.CandidateRank, x.CustomerId;
 END
 GO
