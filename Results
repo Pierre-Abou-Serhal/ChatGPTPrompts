@@ -529,3 +529,23 @@ app.UseCors(corsOptions => corsOptions
 https://github.com/Pierre-Abou-Serhal/MPGS-Web
 
 https://localhost:7049/3ds-demo/index.html
+
+    public class DuplicateCustomerDto
+    {
+        public Int32 CustomerId { get; set; }
+
+        public String DateOfBirth { get; set; }
+
+        // First Name
+        public String GivenNames { get; set; }
+
+        public String FamilyName { get; set; }
+
+        public String FatherName { get; set; }
+
+        public String MoFirstName { get; set; }
+
+        public String BirthRegister { get; set; }
+
+        public String BirthRegNo { get; set; }
+    }
