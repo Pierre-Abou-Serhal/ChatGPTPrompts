@@ -151,4 +151,3 @@ GO
 
 ALTER TABLE [dbo].[t_NewT24Customers] ADD  CONSTRAINT [DF_t_NewT24Customers_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
 GO
-
