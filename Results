@@ -1,47 +1,27 @@
-CROSS APPLY
-(
-    SELECT TOP (@MaxCandidatesPerNew)
-        t.Id AS CustomerId,
+CREATE OR ALTER FUNCTION dbo.ufn_NormalizeName(@s NVARCHAR(4000))
+RETURNS NVARCHAR(4000)
+AS
+BEGIN
+    IF @s IS NULL RETURN NULL;
 
-        t.DateOfBirth   AS Db_DateOfBirth,
-        t.GivenNames    AS Db_GivenNames,
-        t.FamilyName    AS Db_FamilyName,
-        t.FatherName    AS Db_FatherName,
-        t.MoFirstName   AS Db_MoFirstName,
-        t.BirthRegister AS Db_BirthRegister,
-        t.BirthRegNo    AS Db_BirthRegNo,
-        t.Gender        AS Db_Gender,
+    -- Turn non-breaking spaces into normal spaces
+    SET @s = REPLACE(@s, NCHAR(160), N' ');
 
-        -- Exact match flags
-        CAST(CASE WHEN nc.DateOfBirth   IS NOT NULL AND t.DateOfBirth   = nc.DateOfBirth   THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
-        CAST(CASE WHEN nc.BirthRegNo    IS NOT NULL AND t.BirthRegNo    = nc.BirthRegNo    THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
-        CAST(CASE WHEN nc.BirthRegister IS NOT NULL AND t.BirthRegister = nc.BirthRegister THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
-        CAST(CASE WHEN nc.Gender        IS NOT NULL AND t.Gender        = nc.Gender        THEN 1 ELSE 0 END AS bit) AS Match_Gender,
+    -- Trim
+    SET @s = LTRIM(RTRIM(@s));
 
-        -- Fuzzy flags
-        CAST(CASE WHEN nc.GivenNames  IS NOT NULL AND t.GivenNames  IS NOT NULL
-                  AND DIFFERENCE(nc.GivenNames,  t.GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
-        CAST(CASE WHEN nc.FamilyName IS NOT NULL AND t.FamilyName IS NOT NULL
-                  AND DIFFERENCE(nc.FamilyName, t.FamilyName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
-        CAST(CASE WHEN nc.FatherName IS NOT NULL AND t.FatherName IS NOT NULL
-                  AND DIFFERENCE(nc.FatherName, t.FatherName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
-        CAST(CASE WHEN nc.MoFirstName IS NOT NULL AND t.MoFirstName IS NOT NULL
-                  AND DIFFERENCE(nc.MoFirstName,t.MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
+    -- Replace tabs / line breaks with spaces
+    SET @s = REPLACE(@s, CHAR(9),  N' ');
+    SET @s = REPLACE(@s, CHAR(10), N' ');
+    SET @s = REPLACE(@s, CHAR(13), N' ');
 
-    FROM dbo.t_T24Customer AS t
-    WHERE
-        t.Id <> nc.NewCustomerId
+    -- Collapse multiple spaces to a single space
+    WHILE CHARINDEX(N'  ', @s) > 0
+        SET @s = REPLACE(@s, N'  ', N' ');
 
-        -- ✅ put the “inside filter” here (same logic, not aliases)
-        AND nc.GivenNames  IS NOT NULL AND t.GivenNames  IS NOT NULL
-        AND nc.FamilyName  IS NOT NULL AND t.FamilyName  IS NOT NULL
-        AND nc.FatherName  IS NOT NULL AND t.FatherName  IS NOT NULL
-        AND nc.MoFirstName IS NOT NULL AND t.MoFirstName IS NOT NULL
+    -- Optional: unify case (pick one)
+    -- SET @s = UPPER(@s);
 
-        AND DIFFERENCE(nc.GivenNames,  t.GivenNames)  >= @DifferenceThreshold
-        AND DIFFERENCE(nc.FamilyName,  t.FamilyName)  >= @DifferenceThreshold
-        AND DIFFERENCE(nc.FatherName,  t.FatherName)  >= @DifferenceThreshold
-        AND DIFFERENCE(nc.MoFirstName, t.MoFirstName) >= @DifferenceThreshold
-
-    ORDER BY t.Id
-) AS c
+    RETURN NULLIF(@s, N'');
+END
+GO
