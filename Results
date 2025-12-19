@@ -1,102 +1,47 @@
-CREATE OR ALTER PROCEDURE dbo.usp_Alterna_GetDuplicateCustomers
+CROSS APPLY
 (
-  @MaxCandidatesPerNew int = 500,
-  @StatusCode NVARCHAR(250) = N'PENDING',
-  @DifferenceThreshold tinyint = 1  -- 1 -- Can have a value between 1 and 4 the higher, the stricter
-)
-AS
-BEGIN
-  SET NOCOUNT ON;
-
-  ;WITH NC AS
-  (
-    SELECT
-      T24C.Id AS NewCustomerId,
-      NULLIF(LTRIM(RTRIM(T24C.DateOfBirth)),   '') AS DateOfBirth,
-      NULLIF(LTRIM(RTRIM(T24C.GivenNames)),    '') AS GivenNames,
-      NULLIF(LTRIM(RTRIM(T24C.FamilyName)),    '') AS FamilyName,
-      NULLIF(LTRIM(RTRIM(T24C.FatherName)),    '') AS FatherName,
-      NULLIF(LTRIM(RTRIM(T24C.MoFirstName)),   '') AS MoFirstName,
-      NULLIF(LTRIM(RTRIM(T24C.BirthRegister)), '') AS BirthRegister,
-      NULLIF(LTRIM(RTRIM(T24C.BirthRegNo)),    '') AS BirthRegNo,
-      NULLIF(LTRIM(RTRIM(T24C.Gender)),        '') AS Gender
-    FROM dbo.t_NewT24Customers AS NT24C
-    JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
-    WHERE NT24C.StatusCode = @StatusCode
-  )
-  SELECT
-    nc.NewCustomerId,
-    c.CustomerId,
-
-    -- New values (optional)
-    nc.DateOfBirth   AS New_DateOfBirth,
-    nc.GivenNames    AS New_GivenNames,
-    nc.FamilyName    AS New_FamilyName,
-    nc.FatherName    AS New_FatherName,
-    nc.MoFirstName   AS New_MoFirstName,
-    nc.BirthRegister AS New_BirthRegister,
-    nc.BirthRegNo    AS New_BirthRegNo,
-    nc.Gender        AS New_Gender,
-
-    -- Candidate values
-    c.Db_DateOfBirth,
-    c.Db_GivenNames,
-    c.Db_FamilyName,
-    c.Db_FatherName,
-    c.Db_MoFirstName,
-    c.Db_BirthRegister,
-    c.Db_BirthRegNo,
-    c.Db_Gender,
-
-    -- Exact flags
-    c.Match_DateOfBirth,
-    c.Match_BirthRegNo,
-    c.Match_BirthRegister,
-    c.Match_Gender,
-
-    -- Fuzzy flags (DIFFERENCE only)
-    c.Match_GivenNames,
-    c.Match_FamilyName,
-    c.Match_FatherName,
-    c.Match_MoFirstName
-  FROM NC AS nc
-  CROSS APPLY
-  (
     SELECT TOP (@MaxCandidatesPerNew)
-      t.Id AS CustomerId,
+        t.Id AS CustomerId,
 
-      t.DateOfBirth   AS Db_DateOfBirth,
-      t.GivenNames    AS Db_GivenNames,
-      t.FamilyName    AS Db_FamilyName,
-      t.FatherName    AS Db_FatherName,
-      t.MoFirstName   AS Db_MoFirstName,
-      t.BirthRegister AS Db_BirthRegister,
-      t.BirthRegNo    AS Db_BirthRegNo,
-      t.Gender        AS Db_Gender,
+        t.DateOfBirth   AS Db_DateOfBirth,
+        t.GivenNames    AS Db_GivenNames,
+        t.FamilyName    AS Db_FamilyName,
+        t.FatherName    AS Db_FatherName,
+        t.MoFirstName   AS Db_MoFirstName,
+        t.BirthRegister AS Db_BirthRegister,
+        t.BirthRegNo    AS Db_BirthRegNo,
+        t.Gender        AS Db_Gender,
 
-      -- Exact match flags
-      CAST(CASE WHEN nc.DateOfBirth   IS NOT NULL AND t.DateOfBirth   = nc.DateOfBirth   THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
-      CAST(CASE WHEN nc.BirthRegNo    IS NOT NULL AND t.BirthRegNo    = nc.BirthRegNo    THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
-      CAST(CASE WHEN nc.BirthRegister IS NOT NULL AND t.BirthRegister = nc.BirthRegister THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
-      CAST(CASE WHEN nc.Gender        IS NOT NULL AND t.Gender        = nc.Gender        THEN 1 ELSE 0 END AS bit) AS Match_Gender,
+        -- Exact match flags
+        CAST(CASE WHEN nc.DateOfBirth   IS NOT NULL AND t.DateOfBirth   = nc.DateOfBirth   THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
+        CAST(CASE WHEN nc.BirthRegNo    IS NOT NULL AND t.BirthRegNo    = nc.BirthRegNo    THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
+        CAST(CASE WHEN nc.BirthRegister IS NOT NULL AND t.BirthRegister = nc.BirthRegister THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
+        CAST(CASE WHEN nc.Gender        IS NOT NULL AND t.Gender        = nc.Gender        THEN 1 ELSE 0 END AS bit) AS Match_Gender,
 
-      -- Fuzzy flags: DIFFERENCE returns 0..4
-      CAST(CASE WHEN nc.GivenNames  IS NOT NULL AND t.GivenNames  IS NOT NULL AND DIFFERENCE(nc.GivenNames,  t.GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
-      CAST(CASE WHEN nc.FamilyName IS NOT NULL AND t.FamilyName IS NOT NULL AND DIFFERENCE(nc.FamilyName, t.FamilyName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
-      CAST(CASE WHEN nc.FatherName IS NOT NULL AND t.FatherName IS NOT NULL AND DIFFERENCE(nc.FatherName, t.FatherName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
-      CAST(CASE WHEN nc.MoFirstName IS NOT NULL AND t.MoFirstName IS NOT NULL AND DIFFERENCE(nc.MoFirstName,t.MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
+        -- Fuzzy flags
+        CAST(CASE WHEN nc.GivenNames  IS NOT NULL AND t.GivenNames  IS NOT NULL
+                  AND DIFFERENCE(nc.GivenNames,  t.GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
+        CAST(CASE WHEN nc.FamilyName IS NOT NULL AND t.FamilyName IS NOT NULL
+                  AND DIFFERENCE(nc.FamilyName, t.FamilyName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
+        CAST(CASE WHEN nc.FatherName IS NOT NULL AND t.FatherName IS NOT NULL
+                  AND DIFFERENCE(nc.FatherName, t.FatherName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
+        CAST(CASE WHEN nc.MoFirstName IS NOT NULL AND t.MoFirstName IS NOT NULL
+                  AND DIFFERENCE(nc.MoFirstName,t.MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
 
     FROM dbo.t_T24Customer AS t
     WHERE
-      t.Id <> nc.NewCustomerId
+        t.Id <> nc.NewCustomerId
+
+        -- ✅ put the “inside filter” here (same logic, not aliases)
+        AND nc.GivenNames  IS NOT NULL AND t.GivenNames  IS NOT NULL
+        AND nc.FamilyName  IS NOT NULL AND t.FamilyName  IS NOT NULL
+        AND nc.FatherName  IS NOT NULL AND t.FatherName  IS NOT NULL
+        AND nc.MoFirstName IS NOT NULL AND t.MoFirstName IS NOT NULL
+
+        AND DIFFERENCE(nc.GivenNames,  t.GivenNames)  >= @DifferenceThreshold
+        AND DIFFERENCE(nc.FamilyName,  t.FamilyName)  >= @DifferenceThreshold
+        AND DIFFERENCE(nc.FatherName,  t.FatherName)  >= @DifferenceThreshold
+        AND DIFFERENCE(nc.MoFirstName, t.MoFirstName) >= @DifferenceThreshold
+
     ORDER BY t.Id
-  ) AS c
-  WHERE
-    -- Candidate blockers (keep set small)
-	c.Match_GivenNames = 1 
-	AND c.Match_FamilyName = 1
-	AND c.Match_FatherName = 1
-	AND c.Match_MoFirstName = 1
-  ORDER BY nc.NewCustomerId, c.CustomerId;
-END
-GO
+) AS c
