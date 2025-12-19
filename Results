@@ -1,8 +1,8 @@
-CREATE OR ALTER PROCEDURE dbo.GetDuplicateCandidates_FieldFlags
+CREATE OR ALTER PROCEDURE dbo.usp_Alterna_GetDuplicateCustomers
 (
   @MaxCandidatesPerNew int = 500,
-  @StatusCode nvarchar(250) = N'PENDING',
-  @DifferenceThreshold tinyint = 1  -- 1 means >0; try 2 or 3 to be stricter
+  @StatusCode NVARCHAR(250) = N'PENDING',
+  @DifferenceThreshold tinyint = 1  -- 1 -- Can have a value between 1 and 4 the higher, the stricter
 )
 AS
 BEGIN
@@ -89,22 +89,14 @@ BEGIN
     FROM dbo.t_T24Customer AS t
     WHERE
       t.Id <> nc.NewCustomerId
-      AND
-      (
-        -- Candidate blockers (keep set small)
-        (nc.BirthRegNo IS NOT NULL AND t.BirthRegNo = nc.BirthRegNo)
-        OR (nc.DateOfBirth IS NOT NULL AND t.DateOfBirth = nc.DateOfBirth)
-        OR (nc.BirthRegister IS NOT NULL AND t.BirthRegister = nc.BirthRegister)
-      )
-    ORDER BY
-      CASE
-        WHEN nc.BirthRegNo IS NOT NULL AND t.BirthRegNo = nc.BirthRegNo THEN 1
-        WHEN nc.DateOfBirth IS NOT NULL AND t.DateOfBirth = nc.DateOfBirth THEN 2
-        WHEN nc.BirthRegister IS NOT NULL AND t.BirthRegister = nc.BirthRegister THEN 3
-        ELSE 9
-      END,
-      t.Id
+    ORDER BY t.Id
   ) AS c
+  WHERE
+    -- Candidate blockers (keep set small)
+	c.Match_GivenNames = 1 
+	AND c.Match_FamilyName = 1
+	AND c.Match_FatherName = 1
+	AND c.Match_MoFirstName = 1
   ORDER BY nc.NewCustomerId, c.CustomerId;
 END
 GO
