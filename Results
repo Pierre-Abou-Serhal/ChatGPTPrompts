@@ -1,7 +1,8 @@
-CREATE OR ALTER PROCEDURE dbo.GetDuplicateCandidates_Ordered
+CREATE OR ALTER PROCEDURE dbo.GetDuplicateCandidates_FieldFlags
 (
   @MaxCandidatesPerNew int = 500,
-  @StatusCode nvarchar(250) = N'PENDING'
+  @StatusCode nvarchar(250) = N'PENDING',
+  @DifferenceThreshold tinyint = 1  -- 1 means >0; try 2 or 3 to be stricter
 )
 AS
 BEGIN
@@ -12,7 +13,10 @@ BEGIN
     SELECT
       T24C.Id AS NewCustomerId,
       NULLIF(LTRIM(RTRIM(T24C.DateOfBirth)),   '') AS DateOfBirth,
+      NULLIF(LTRIM(RTRIM(T24C.GivenNames)),    '') AS GivenNames,
       NULLIF(LTRIM(RTRIM(T24C.FamilyName)),    '') AS FamilyName,
+      NULLIF(LTRIM(RTRIM(T24C.FatherName)),    '') AS FatherName,
+      NULLIF(LTRIM(RTRIM(T24C.MoFirstName)),   '') AS MoFirstName,
       NULLIF(LTRIM(RTRIM(T24C.BirthRegister)), '') AS BirthRegister,
       NULLIF(LTRIM(RTRIM(T24C.BirthRegNo)),    '') AS BirthRegNo,
       NULLIF(LTRIM(RTRIM(T24C.Gender)),        '') AS Gender
@@ -22,68 +26,85 @@ BEGIN
   )
   SELECT
     nc.NewCustomerId,
-    x.CustomerId,
-    x.PreRank,
+    c.CustomerId,
 
-    -- candidate fields for .NET scoring
-    x.Db_DateOfBirth,
-    x.Db_GivenNames,
-    x.Db_FamilyName,
-    x.Db_FatherName,
-    x.Db_MoFirstName,
-    x.Db_BirthRegister,
-    x.Db_BirthRegNo,
-    x.Db_Gender
+    -- New values (optional)
+    nc.DateOfBirth   AS New_DateOfBirth,
+    nc.GivenNames    AS New_GivenNames,
+    nc.FamilyName    AS New_FamilyName,
+    nc.FatherName    AS New_FatherName,
+    nc.MoFirstName   AS New_MoFirstName,
+    nc.BirthRegister AS New_BirthRegister,
+    nc.BirthRegNo    AS New_BirthRegNo,
+    nc.Gender        AS New_Gender,
+
+    -- Candidate values
+    c.Db_DateOfBirth,
+    c.Db_GivenNames,
+    c.Db_FamilyName,
+    c.Db_FatherName,
+    c.Db_MoFirstName,
+    c.Db_BirthRegister,
+    c.Db_BirthRegNo,
+    c.Db_Gender,
+
+    -- Exact flags
+    c.Match_DateOfBirth,
+    c.Match_BirthRegNo,
+    c.Match_BirthRegister,
+    c.Match_Gender,
+
+    -- Fuzzy flags (DIFFERENCE only)
+    c.Match_GivenNames,
+    c.Match_FamilyName,
+    c.Match_FatherName,
+    c.Match_MoFirstName
   FROM NC AS nc
   CROSS APPLY
   (
     SELECT TOP (@MaxCandidatesPerNew)
-      c.Id AS CustomerId,
+      t.Id AS CustomerId,
 
-      -- Smaller = stronger match (you define these)
-      CASE
-        WHEN nc.BirthRegNo IS NOT NULL AND c.BirthRegNo = nc.BirthRegNo
-          THEN 10
-        WHEN nc.DateOfBirth IS NOT NULL AND nc.Gender IS NOT NULL AND nc.FamilyName IS NOT NULL
-          AND c.DateOfBirth = nc.DateOfBirth
-          AND c.Gender      = nc.Gender
-          AND SOUNDEX(c.FamilyName) = SOUNDEX(nc.FamilyName)
-          THEN 20
-        WHEN nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
-          AND c.DateOfBirth = nc.DateOfBirth
-          AND LEFT(c.FamilyName,1) = LEFT(nc.FamilyName,1)
-          THEN 30
-        WHEN nc.BirthRegister IS NOT NULL AND nc.DateOfBirth IS NOT NULL
-          AND c.BirthRegister = nc.BirthRegister
-          AND c.DateOfBirth   = nc.DateOfBirth
-          THEN 40
-        WHEN nc.DateOfBirth IS NOT NULL AND c.DateOfBirth = nc.DateOfBirth
-          THEN 60
-        ELSE 999
-      END AS PreRank,
+      t.DateOfBirth   AS Db_DateOfBirth,
+      t.GivenNames    AS Db_GivenNames,
+      t.FamilyName    AS Db_FamilyName,
+      t.FatherName    AS Db_FatherName,
+      t.MoFirstName   AS Db_MoFirstName,
+      t.BirthRegister AS Db_BirthRegister,
+      t.BirthRegNo    AS Db_BirthRegNo,
+      t.Gender        AS Db_Gender,
 
-      c.DateOfBirth   AS Db_DateOfBirth,
-      c.GivenNames    AS Db_GivenNames,
-      c.FamilyName    AS Db_FamilyName,
-      c.FatherName    AS Db_FatherName,
-      c.MoFirstName   AS Db_MoFirstName,
-      c.BirthRegister AS Db_BirthRegister,
-      c.BirthRegNo    AS Db_BirthRegNo,
-      c.Gender        AS Db_Gender
-    FROM dbo.t_T24Customer AS c
+      -- Exact match flags
+      CAST(CASE WHEN nc.DateOfBirth   IS NOT NULL AND t.DateOfBirth   = nc.DateOfBirth   THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
+      CAST(CASE WHEN nc.BirthRegNo    IS NOT NULL AND t.BirthRegNo    = nc.BirthRegNo    THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
+      CAST(CASE WHEN nc.BirthRegister IS NOT NULL AND t.BirthRegister = nc.BirthRegister THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
+      CAST(CASE WHEN nc.Gender        IS NOT NULL AND t.Gender        = nc.Gender        THEN 1 ELSE 0 END AS bit) AS Match_Gender,
+
+      -- Fuzzy flags: DIFFERENCE returns 0..4
+      CAST(CASE WHEN nc.GivenNames  IS NOT NULL AND t.GivenNames  IS NOT NULL AND DIFFERENCE(nc.GivenNames,  t.GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
+      CAST(CASE WHEN nc.FamilyName IS NOT NULL AND t.FamilyName IS NOT NULL AND DIFFERENCE(nc.FamilyName, t.FamilyName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
+      CAST(CASE WHEN nc.FatherName IS NOT NULL AND t.FatherName IS NOT NULL AND DIFFERENCE(nc.FatherName, t.FatherName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
+      CAST(CASE WHEN nc.MoFirstName IS NOT NULL AND t.MoFirstName IS NOT NULL AND DIFFERENCE(nc.MoFirstName,t.MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
+
+    FROM dbo.t_T24Customer AS t
     WHERE
-      c.Id <> nc.NewCustomerId
+      t.Id <> nc.NewCustomerId
       AND
       (
-        (nc.BirthRegNo IS NOT NULL AND c.BirthRegNo = nc.BirthRegNo)
-        OR (nc.DateOfBirth IS NOT NULL AND c.DateOfBirth = nc.DateOfBirth)
-        OR (nc.BirthRegister IS NOT NULL AND c.BirthRegister = nc.BirthRegister)
+        -- Candidate blockers (keep set small)
+        (nc.BirthRegNo IS NOT NULL AND t.BirthRegNo = nc.BirthRegNo)
+        OR (nc.DateOfBirth IS NOT NULL AND t.DateOfBirth = nc.DateOfBirth)
+        OR (nc.BirthRegister IS NOT NULL AND t.BirthRegister = nc.BirthRegister)
       )
     ORDER BY
-      PreRank ASC,
-      c.Id ASC
-  ) x
-  WHERE x.PreRank <> 999
-  ORDER BY nc.NewCustomerId, x.PreRank, x.CustomerId;
+      CASE
+        WHEN nc.BirthRegNo IS NOT NULL AND t.BirthRegNo = nc.BirthRegNo THEN 1
+        WHEN nc.DateOfBirth IS NOT NULL AND t.DateOfBirth = nc.DateOfBirth THEN 2
+        WHEN nc.BirthRegister IS NOT NULL AND t.BirthRegister = nc.BirthRegister THEN 3
+        ELSE 9
+      END,
+      t.Id
+  ) AS c
+  ORDER BY nc.NewCustomerId, c.CustomerId;
 END
 GO
