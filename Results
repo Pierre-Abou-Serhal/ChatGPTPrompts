@@ -1,117 +1,233 @@
-CREATE OR ALTER PROCEDURE dbo.GetDuplicateCandidates
-(
-  @MaxCandidatesPerNew int = 500,
-  @StatusCode nvarchar(250) = N'PENDING'
-)
-AS
-BEGIN
-  SET NOCOUNT ON;
-
-  ;WITH NC AS
-  (
-    SELECT
-      T24C.Id AS NewCustomerId,
-      NULLIF(LTRIM(RTRIM(T24C.DateOfBirth)),   '') AS DateOfBirth,
-      NULLIF(LTRIM(RTRIM(T24C.FamilyName)),    '') AS FamilyName,
-      NULLIF(LTRIM(RTRIM(T24C.BirthRegister)), '') AS BirthRegister,
-      NULLIF(LTRIM(RTRIM(T24C.BirthRegNo)),    '') AS BirthRegNo,
-      NULLIF(LTRIM(RTRIM(T24C.Gender)),        '') AS Gender
-    FROM dbo.t_NewT24Customers AS NT24C
-    JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
-    WHERE NT24C.StatusCode = @StatusCode
-  )
-  SELECT
-    nc.NewCustomerId,
-    x.CustomerId,
-
-    x.CandidateRank,
-
-    -- Flags (your .NET will convert to "reasons")
-    x.Match_BirthRegNoExact,
-    x.Match_DobGenderFamilySoundex,
-    x.Match_DobFamilyInitial,
-    x.Match_BirthRegisterDobFamilyInitial,
-    x.Match_DobOnly,
-
-    -- Fields for .NET similarity scoring
-    x.Db_DateOfBirth,
-    x.Db_GivenNames,
-    x.Db_FamilyName,
-    x.Db_FatherName,
-    x.Db_MoFirstName,
-    x.Db_BirthRegister,
-    x.Db_BirthRegNo,
-    x.Db_Gender
-  FROM NC AS nc
-  CROSS APPLY
-  (
-    SELECT TOP (@MaxCandidatesPerNew)
-      c.Id AS CustomerId,
-
-      -- Flags
-      CASE WHEN nc.BirthRegNo IS NOT NULL AND c.BirthRegNo = nc.BirthRegNo THEN 1 ELSE 0 END AS Match_BirthRegNoExact,
-
-      CASE WHEN nc.DateOfBirth IS NOT NULL AND nc.Gender IS NOT NULL AND nc.FamilyName IS NOT NULL
-             AND c.DateOfBirth = nc.DateOfBirth
-             AND c.Gender = nc.Gender
-             AND SOUNDEX(c.FamilyName) = SOUNDEX(nc.FamilyName)
-           THEN 1 ELSE 0 END AS Match_DobGenderFamilySoundex,
-
-      CASE WHEN nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
-             AND c.DateOfBirth = nc.DateOfBirth
-             AND LEFT(c.FamilyName,1) = LEFT(nc.FamilyName,1)
-           THEN 1 ELSE 0 END AS Match_DobFamilyInitial,
-
-      CASE WHEN nc.BirthRegister IS NOT NULL AND nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
-             AND c.BirthRegister = nc.BirthRegister
-             AND c.DateOfBirth = nc.DateOfBirth
-             AND LEFT(c.FamilyName,1) = LEFT(nc.FamilyName,1)
-           THEN 1 ELSE 0 END AS Match_BirthRegisterDobFamilyInitial,
-
-      CASE WHEN nc.DateOfBirth IS NOT NULL AND c.DateOfBirth = nc.DateOfBirth
-           THEN 1 ELSE 0 END AS Match_DobOnly,
-
-      -- Best rank (lowest) among the flags above
-      (SELECT MIN(r) FROM (VALUES
-        (CASE WHEN nc.BirthRegNo IS NOT NULL AND c.BirthRegNo = nc.BirthRegNo THEN 10 END),
-        (CASE WHEN nc.DateOfBirth IS NOT NULL AND nc.Gender IS NOT NULL AND nc.FamilyName IS NOT NULL
-                AND c.DateOfBirth = nc.DateOfBirth AND c.Gender = nc.Gender
-                AND SOUNDEX(c.FamilyName) = SOUNDEX(nc.FamilyName)
-              THEN 20 END),
-        (CASE WHEN nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
-                AND c.DateOfBirth = nc.DateOfBirth
-                AND LEFT(c.FamilyName,1) = LEFT(nc.FamilyName,1)
-              THEN 30 END),
-        (CASE WHEN nc.BirthRegister IS NOT NULL AND nc.DateOfBirth IS NOT NULL AND nc.FamilyName IS NOT NULL
-                AND c.BirthRegister = nc.BirthRegister
-                AND c.DateOfBirth = nc.DateOfBirth
-                AND LEFT(c.FamilyName,1) = LEFT(nc.FamilyName,1)
-              THEN 40 END),
-        (CASE WHEN nc.DateOfBirth IS NOT NULL AND c.DateOfBirth = nc.DateOfBirth THEN 60 END)
-      ) AS ranks(r)) AS CandidateRank,
-
-      c.DateOfBirth   AS Db_DateOfBirth,
-      c.GivenNames    AS Db_GivenNames,
-      c.FamilyName    AS Db_FamilyName,
-      c.FatherName    AS Db_FatherName,
-      c.MoFirstName   AS Db_MoFirstName,
-      c.BirthRegister AS Db_BirthRegister,
-      c.BirthRegNo    AS Db_BirthRegNo,
-      c.Gender        AS Db_Gender
-
-    FROM dbo.t_T24Customer AS c
-    WHERE
-      c.Id <> nc.NewCustomerId
-      AND
-      (
-        (nc.BirthRegNo IS NOT NULL AND c.BirthRegNo = nc.BirthRegNo)
-        OR
-        (nc.DateOfBirth IS NOT NULL AND c.DateOfBirth = nc.DateOfBirth)
-        OR
-        (nc.BirthRegister IS NOT NULL AND c.BirthRegister = nc.BirthRegister)
-      )
-    ORDER BY CandidateRank ASC, c.Id ASC
-  ) x
-  ORDER BY nc.NewCustomerId, x.CandidateRank, x.CustomerId;
-END
-GO
+{
+  "3dsAcsEci": "05",
+  "amount": 200,
+  "authentication": {
+    "3ds": {
+      "acsEci": "05",
+      "authenticationToken": "AAICB2NZZAAAAE4ghANTdQAAAAA=",
+      "transactionId": "59035f38-c679-4d54-814c-7ee83ae5b024"
+    }
+  },
+  "authenticationStatus": "AUTHENTICATION_SUCCESSFUL",
+  "authenticationVersion": "3DS2",
+  "billing": {
+    "address": {
+      "city": "Riyadh",
+      "postcodeZip": "40782",
+      "stateProvince": "Sulaimaniyah",
+      "street": "Tahliya street"
+    }
+  },
+  "chargeback": { "amount": 0, "currency": "USD" },
+  "creationTime": "2025-12-19T05:27:03.562Z",
+  "currency": "USD",
+  "customer": {
+    "email": "george@brandit.sa",
+    "firstName": "George",
+    "lastName": "Radhi"
+  },
+  "customerOrderDate": "2025-12-19",
+  "description": "GiveWP donation via Donate form",
+  "device": {
+    "browser": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1",
+    "ipAddress": "51.252.245.243"
+  },
+  "id": "100697",
+  "lastUpdatedTime": "2025-12-19T05:27:22.341Z",
+  "merchant": "002M7053",
+  "merchantAmount": 200,
+  "merchantCategoryCode": "8398",
+  "merchantCurrency": "USD",
+  "reference": "8bc5955050547363e70e68a377149988",
+  "result": "SUCCESS",
+  "sourceOfFunds": {
+    "provided": {
+      "card": {
+        "brand": "VISA",
+        "expiry": { "month": "12", "year": "28" },
+        "fundingMethod": "CREDIT",
+        "nameOnCard": "George Radhi",
+        "number": "483432xxxxxx6234",
+        "scheme": "VISA",
+        "storedOnFile": "NOT_STORED"
+      }
+    },
+    "type": "CARD"
+  },
+  "status": "FAILED",
+  "totalAuthorizedAmount": 0,
+  "totalCapturedAmount": 0,
+  "totalRefundedAmount": 0,
+  "transaction": [
+    {
+      "authentication": {
+        "3ds": {
+          "acsEci": "05",
+          "authenticationToken": "AAICB2NZZAAAAE4ghANTdQAAAAA=",
+          "transactionId": "59035f38-c679-4d54-814c-7ee83ae5b024"
+        },
+        "3ds2": {
+          "acsTransactionId": "a76b36be-da0b-493c-94df-e0d658d562d7",
+          "directoryServerId": "A000000003",
+          "dsTransactionId": "59035f38-c679-4d54-814c-7ee83ae5b024",
+          "methodCompleted": true,
+          "methodSupported": "SUPPORTED",
+          "protocolVersion": "2.2.0",
+          "requestorId": "10065253*EU002M7053_MPGS",
+          "requestorName": "MOUTAJAZIROUN",
+          "transactionStatus": "Y"
+        },
+        "acceptVersions": "3DS1,3DS2",
+        "channel": "PAYER_BROWSER",
+        "method": "DYNAMIC",
+        "payerInteraction": "REQUIRED",
+        "purpose": "PAYMENT_TRANSACTION",
+        "redirect": { "domainName": "vs3d2verify.alinma.com" },
+        "version": "3DS2"
+      },
+      "billing": {
+        "address": {
+          "city": "Riyadh",
+          "postcodeZip": "40782",
+          "stateProvince": "Sulaimaniyah",
+          "street": "Tahliya street"
+        }
+      },
+      "customer": {
+        "email": "george@brandit.sa",
+        "firstName": "George",
+        "lastName": "Radhi"
+      },
+      "device": {
+        "browser": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1",
+        "ipAddress": "51.252.245.233"
+      },
+      "merchant": "002M7053",
+      "order": {
+        "amount": 200,
+        "authenticationStatus": "AUTHENTICATION_SUCCESSFUL",
+        "chargeback": { "amount": 0, "currency": "USD" },
+        "creationTime": "2025-12-19T05:27:03.562Z",
+        "currency": "USD",
+        "id": "100697",
+        "lastUpdatedTime": "2025-12-19T05:27:22.341Z",
+        "merchantAmount": 200,
+        "merchantCategoryCode": "8398",
+        "merchantCurrency": "USD",
+        "reference": "8bc5955050547363e70e68a377149988",
+        "status": "FAILED",
+        "totalAuthorizedAmount": 0,
+        "totalCapturedAmount": 0,
+        "totalRefundedAmount": 0,
+        "valueTransfer": { "accountType": "NOT_A_TRANSFER" }
+      },
+      "response": {
+        "gatewayCode": "APPROVED",
+        "gatewayRecommendation": "PROCEED"
+      },
+      "result": "SUCCESS",
+      "sourceOfFunds": {
+        "provided": {
+          "card": {
+            "brand": "VISA",
+            "expiry": { "month": "12", "year": "28" },
+            "fundingMethod": "CREDIT",
+            "nameOnCard": "George Radhi",
+            "number": "483432xxxxxx6234",
+            "scheme": "VISA"
+          }
+        },
+        "type": "CARD"
+      },
+      "timeOfLastUpdate": "2025-12-19T05:27:19.806Z",
+      "timeOfRecord": "2025-12-19T05:26:52.933Z",
+      "transaction": {
+        "acquirer": { "merchantId": "000422705399099" },
+        "amount": 200,
+        "authenticationStatus": "AUTHENTICATION_SUCCESSFUL",
+        "currency": "USD",
+        "id": "trans-421",
+        "stan": "0",
+        "type": "AUTHENTICATION"
+      },
+      "version": "57"
+    },
+    {
+      "authentication": { "transactionId": "trans-421" },
+      "billing": {
+        "address": {
+          "city": "Riyadh",
+          "postcodeZip": "40782",
+          "stateProvince": "Sulaimaniyah",
+          "street": "Tahliya street"
+        }
+      },
+      "customer": {
+        "email": "george@brandit.sa",
+        "firstName": "George",
+        "lastName": "Radhi"
+      },
+      "device": {
+        "browser": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1",
+        "ipAddress": "51.252.245.243"
+      },
+      "gatewayEntryPoint": "AUTO",
+      "merchant": "002M7053",
+      "order": {
+        "amount": 200,
+        "chargeback": { "amount": 0, "currency": "USD" },
+        "creationTime": "2025-12-19T05:27:03.562Z",
+        "currency": "USD",
+        "customerOrderDate": "2025-12-19",
+        "description": "GiveWP donation via Donate form",
+        "id": "100697",
+        "lastUpdatedTime": "2025-12-19T05:27:22.341Z",
+        "merchantAmount": 200,
+        "merchantCategoryCode": "8398",
+        "merchantCurrency": "USD",
+        "reference": "8bc5955050547363e70e68a377149988",
+        "status": "FAILED",
+        "totalAuthorizedAmount": 0,
+        "totalCapturedAmount": 0,
+        "totalRefundedAmount": 0
+      },
+      "response": {
+        "acquirerCode": "05",
+        "cardSecurityCode": { "acquirerCode": "M", "gatewayCode": "MATCH" },
+        "cardholderVerification": {
+          "avs": { "acquirerCode": "U", "gatewayCode": "NOT_AVAILABLE" }
+        },
+        "gatewayCode": "DECLINED"
+      },
+      "result": "FAILURE",
+      "sourceOfFunds": {
+        "provided": {
+          "card": {
+            "brand": "VISA",
+            "expiry": { "month": "12", "year": "28" },
+            "fundingMethod": "CREDIT",
+            "nameOnCard": "George Radhi",
+            "number": "483432xxxxxx6234",
+            "scheme": "VISA",
+            "storedOnFile": "NOT_STORED"
+          }
+        },
+        "type": "CARD"
+      },
+      "timeOfLastUpdate": "2025-12-19T05:27:22.341Z",
+      "timeOfRecord": "2025-12-19T05:27:21.572Z",
+      "transaction": {
+        "acquirer": { "id": "SGBL_S2I", "merchantId": "000422705399099" },
+        "amount": 0,
+        "currency": "USD",
+        "id": "1",
+        "receipt": "535305193840",
+        "source": "INTERNET",
+        "stan": "193840",
+        "terminal": "SGBL0002",
+        "type": "VERIFICATION"
+      },
+      "version": "57"
+    }
+  ]
+}
