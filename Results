@@ -1,12 +1,4 @@
-USE [Alterna_KYC]
-GO
-/****** Object:  StoredProcedure [dbo].[usp_Alterna_GetDuplicateCustomers]    Script Date: 12/22/2025 10:46:51 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-
-ALTER   PROCEDURE [dbo].[usp_Alterna_GetDuplicateCustomers]
+ALTER PROCEDURE [dbo].[usp_Alterna_GetDuplicateCustomers]
 (
     @MaxCandidatesPerNew   int           = 500,
     @StatusCode            nvarchar(250)  = N'PENDING',
@@ -27,7 +19,10 @@ BEGIN
             dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
             dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
             dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
-            dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegister,
+
+            -- IMPORTANT: this is still the ID (as text) and used for matching
+            dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegisterId,
+
             dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
             dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender,
 
@@ -50,17 +45,25 @@ BEGIN
         nc.FamilyName    AS New_FamilyName,
         nc.FatherName    AS New_FatherName,
         nc.MoFirstName   AS New_MoFirstName,
-        nc.BirthRegister AS New_BirthRegister,
+
+        -- Return description for display (and also return ID if you want)
+        nc.BirthRegisterId            AS New_BirthRegisterId,
+        brNew.New_BirthRegisterDesc   AS New_BirthRegister,
+
         nc.BirthRegNo    AS New_BirthRegNo,
         nc.Gender        AS New_Gender,
 
-        -- Candidate values (from computed columns)
+        -- Candidate values
         c.Db_DateOfBirth,
         c.Db_GivenNames,
         c.Db_FamilyName,
         c.Db_FatherName,
         c.Db_MoFirstName,
-        c.Db_BirthRegister,
+
+        -- Return description for display (and also return ID if you want)
+        c.Db_BirthRegisterId          AS Db_BirthRegisterId,
+        brDb.Db_BirthRegisterDesc     AS Db_BirthRegister,
+
         c.Db_BirthRegNo,
         c.Db_Gender,
 
@@ -76,6 +79,16 @@ BEGIN
         c.Match_FatherName,
         c.Match_MoFirstName
     FROM NC AS nc
+
+    -- Lookup description for NEW customer BirthRegisterId
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            b.BirthRegister AS New_BirthRegisterDesc   -- or b.DescriptionFR
+        FROM [Lookup].[CusBirth] b
+        WHERE b.Id = TRY_CONVERT(int, nc.BirthRegisterId)
+    ) brNew
+
     CROSS APPLY
     (
         SELECT TOP (@MaxCandidatesPerNew)
@@ -87,17 +100,20 @@ BEGIN
             t.Norm_FamilyName    AS Db_FamilyName,
             t.Norm_FatherName    AS Db_FatherName,
             t.Norm_MoFirstName   AS Db_MoFirstName,
-            t.Norm_BirthRegister AS Db_BirthRegister,
+
+            -- IMPORTANT: still the ID (as text) used for matching
+            t.Norm_BirthRegister AS Db_BirthRegisterId,
+
             t.Norm_BirthRegNo    AS Db_BirthRegNo,
             t.Norm_Gender        AS Db_Gender,
 
-            -- Exact match flags
-            CAST(CASE WHEN t.Norm_DateOfBirth   = nc.DateOfBirth   THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
-            CAST(CASE WHEN t.Norm_BirthRegNo    = nc.BirthRegNo    THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
-            CAST(CASE WHEN t.Norm_BirthRegister = nc.BirthRegister THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
-            CAST(CASE WHEN t.Norm_Gender        = nc.Gender        THEN 1 ELSE 0 END AS bit) AS Match_Gender,
+            -- Exact match flags (still compares IDs)
+            CAST(CASE WHEN t.Norm_DateOfBirth   = nc.DateOfBirth       THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
+            CAST(CASE WHEN t.Norm_BirthRegNo    = nc.BirthRegNo        THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
+            CAST(CASE WHEN t.Norm_BirthRegister = nc.BirthRegisterId   THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
+            CAST(CASE WHEN t.Norm_Gender        = nc.Gender            THEN 1 ELSE 0 END AS bit) AS Match_Gender,
 
-            -- Fuzzy flags (DIFFERENCE on normalized values)
+            -- Fuzzy flags
             CAST(CASE WHEN DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
             CAST(CASE WHEN DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
             CAST(CASE WHEN DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
@@ -105,10 +121,8 @@ BEGIN
 
         FROM dbo.t_T24Customer AS t
         WHERE
-            -- avoid matching the same customer
             t.Id <> nc.NewCustomerId
 
-            -- ignore empty/blank names (NormalizeWord returns NULL for blanks)
             AND nc.GivenNames  IS NOT NULL
             AND nc.FamilyName  IS NOT NULL
             AND nc.FatherName  IS NOT NULL
@@ -119,18 +133,15 @@ BEGIN
             AND t.Norm_FatherName  IS NOT NULL
             AND t.Norm_MoFirstName IS NOT NULL
 
-            -- FAST prefilter (INDEX SEEK if you created IX_T24Customer_DedupeSeek)
             AND t.Sdx_GivenNames  = nc.Sdx_GivenNames
             AND t.Sdx_FamilyName  = nc.Sdx_FamilyName
             AND t.Sdx_FatherName  = nc.Sdx_FatherName
             AND t.Sdx_MoFirstName = nc.Sdx_MoFirstName
 
-            -- Optional extra narrowing (keeps correctness because only applied when new value exists)
-            AND (nc.DateOfBirth IS NULL OR t.Norm_DateOfBirth = nc.DateOfBirth)
-            AND (nc.Gender      IS NULL OR t.Norm_Gender      = nc.Gender)
-            AND (nc.BirthRegNo  IS NULL OR t.Norm_BirthRegNo  = nc.BirthRegNo)
+            AND (nc.DateOfBirth     IS NULL OR t.Norm_DateOfBirth  = nc.DateOfBirth)
+            AND (nc.Gender          IS NULL OR t.Norm_Gender       = nc.Gender)
+            AND (nc.BirthRegNo      IS NULL OR t.Norm_BirthRegNo   = nc.BirthRegNo)
 
-            -- Expensive checks now run on a small candidate set
             AND DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold
             AND DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold
             AND DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold
@@ -138,11 +149,17 @@ BEGIN
 
         ORDER BY t.Id
     ) AS c
+
+    -- Lookup description for DB candidate BirthRegisterId
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            b.BirthRegister AS Db_BirthRegisterDesc   -- or b.DescriptionFR
+        FROM [Lookup].[CusBirth] b
+        WHERE b.Id = TRY_CONVERT(int, c.Db_BirthRegisterId)
+    ) brDb
+
     ORDER BY nc.NewCustomerId, c.CustomerId
     OPTION (RECOMPILE);
 END
-
-I Habe a table that contains the actual description of the BirtRegister column.
-The table is: Lookup.CusBirth and the column is "BirthRegister"
-
-I still want to compute based on the Id, but dor display, I want to return the Birth Register Description
+GO
