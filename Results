@@ -28,6 +28,17 @@
         return formattedDateString;
     }
 }
+
+<style>
+    .bold-underline-title {
+        font-weight: bold;
+        display: block;
+        width: 100%;
+        border-bottom: 2px solid black;
+        padding-bottom: 5px;
+    }
+</style>
+
 <div class="app-content content container center-layout">
     <div class="content-wrapper">
         <div class="content-header row">
@@ -68,6 +79,8 @@
                                     </div>
                                 </div>
 
+                                <div class="bold-underline-title mb-2">New Customers</div>
+
                                 <table id="CustomerDuplicateDetectionDiv" class="table table-striped table-bordered" style="width:100%">
 
                                     <thead>
@@ -89,41 +102,30 @@
 
                                         @foreach (DuplicateCustomerDto customer in Model.NewCustomersToCheck)
                                         {
-                                            String elementId = $"customer_id_{customer.CustomerId}_new_customer_id_{customer.NewCustomerId}";
-
                                             String newCstViewParam = "customerID=" + customer.NewCustomerId + "&tab=tab1";
-                                            String cstViewParam = "customerID=" + customer.CustomerId + "&tab=tab1";
 
                                             <tr>
                                                 <td style="white-space: nowrap;">
-                                                    <i id="@elementId"
-                                                       onclick="linkCustomer(this)"
-                                                       class="fa fa-check-circle fa-1x icon-validate"
-                                                       title="Link Customer"
-                                                       style="color: green; cursor: pointer; font-size: 1.5em;"></i>
-                                                    <span>&nbsp;</span>
 
                                                     @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
                                                     CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
                                                     {
                                                         <a href="/Customer/ViewCustomer/@Global.EncodeParameters(newCstViewParam)"
                                                            title="View New Customer"
-                                                           style="color: cornflowerblue; text-decoration: none; cursor: pointer; font-size: 1.5em;"><i class="fa fa-eye fa-1x"></i>&nbsp;</a>
-
-                                                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(cstViewParam)"
-                                                           title="View Customer"
                                                            style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;"><i class="fa fa-eye fa-1x"></i>&nbsp;</a>
+
                                                     }
 
                                                 </td>
-                                                <td>@customer.New_GivenNames</td>
-                                                <td>@customer.New_FamilyName</td>
-                                                <td>@customer.New_FatherName</td>
-                                                <td>@customer.New_MoFirstName</td>
-                                                <td>@FormatDateString(customer.New_DateOfBirth)</td>
-                                                <td>@customer.New_Gender</td>
-                                                <td>@customer.New_BirthRegister</td>
-                                                <td>@customer.New_BirthRegNo</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.NewCustomerId</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_GivenNames</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_FamilyName</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_FatherName</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_MoFirstName</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@FormatDateString(customer.New_DateOfBirth)</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_Gender</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_BirthRegister</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_BirthRegNo</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -131,8 +133,12 @@
                             </div>
                         </div>
                     </div>
-                    <div id="GetCustomerDuplicateDetection">
-                        @Html.Action("GetCustomerDuplicateDetection", "Customer", new { customers = Model.DuplicateCustomerDtos })
+                    <div class="card-content p-2">
+                        <div class="card-body">
+                            <div id="GetCustomerDuplicateDetectionDiv">
+                                @Html.Action("GetCustomerDuplicateDetection", "Customer", new { newCustomerId = 0 })
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -165,8 +171,11 @@
                         data: { newCustomerId: newCustomerId },
                         dataType: 'html',
                         success: function (data) {
-                            $('#GetCustomerDuplicateDetection').html(data);
-                            $('#GetCustomerDuplicateDetectionRows').DataTable();
+                            $('#GetCustomerDuplicateDetectionDiv').html(data);
+                            $('#GetCustomerDuplicateDetectionRows').DataTable({
+                                scrollX: true,
+                                autoWidth: false
+                            });
                             HideLoader();
                         },
                         error: function (xhr) {
