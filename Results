@@ -1,2 +1,5 @@
-
-  update t_T24Customer SET BirthRegister = (SELECT DescriptionFR FROM [Lookup.CusBirth] WHERE t_T24Customer.BirthRegister = [Lookup.CusBirth].Id)
+UPDATE c
+SET c.BirthRegister = b.DescriptionFR
+FROM dbo.t_T24Customer c
+JOIN [Lookup.CusBirth] b
+  ON TRY_CONVERT(int, c.BirthRegister) = b.Id;
