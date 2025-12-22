@@ -1,199 +1,54 @@
-@model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionViewModel
-@using SGBL.DIGITAL.KYC.Models;
-@using SGBL.DIGITAL.KYC.CrossCutting
-
-@{
-    var param = string.Empty;
-}
-
-@{
-    ViewBag.Title = "CustomerDuplicateDetection";
-}
-@{
-    String FormatDateString(String date)
-    {
-        String formattedDateString = String.Empty;
-
-        if (!String.IsNullOrWhiteSpace(date))
-        {
-            // Extract year, month, and day substrings
-            String year = date.Substring(0, 4);
-            String month = date.Substring(4, 2);
-            String day = date.Substring(6);
-
-            // Combine formatted parts with hyphens
-            formattedDateString = $"{year}-{month}-{day}";
-        }
-
-        return formattedDateString;
-    }
-}
-
 <style>
-    .bold-underline-title {
-        font-weight: bold;
-        display: block;
-        width: 100%;
-        border-bottom: 2px solid black;
-        padding-bottom: 5px;
-    }
+  /* highlight selected new customer row */
+  #CustomerDuplicateDetectionDiv tbody tr.row-selected td {
+    background-color: #d9edf7 !important; /* light blue */
+  }
 </style>
 
-<div class="app-content content container center-layout">
-    <div class="content-wrapper">
-        <div class="content-header row">
-            <div class="content-header-left col-md-10 col-12 mb-2">
-                <h3 class="content-header-title mb-0">LINK DUPLICATE CUSTOMER</h3>
-                <div class="row breadcrumbs-top">
-                    <div class="breadcrumb-wrapper col-12">
-                        <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="/Customer/CustomerDashboard">DASHBOARD</a></li>
-                            <li class="breadcrumb-item">View</li>
-                        </ol>
-                    </div>
-                </div>
-            </div>
-            <div class="content-header-right col-md-2 col-12 mb-2" style="text-align:end; font-size:larger">
-            </div>
-        </div>
-
-        <div class="content-body">
-            <section class="users-info">
-                <div class="card">
-
-                    <div id="CardTitle" class="card-header bg-secondary text-white text-bold-500 font-large-1" style="padding-top:0px;padding-bottom:0px;">
-                        <i id="CardIcon" class="fa fa-info-circle mr-1" aria-hidden="true"></i> Customer Duplicate Detection
-                    </div>
-
-                    <div class="card-content p-2">
-                        <div class="card-body">
-                            <div id="CustomerDuplicateDetectionInfo">
-
-                                <div id="CustomDataTableButtonsWrapper">
-                                    <div class="row">
-                                        <div class="col">
-                                            <div class="float-right">
-                                                <div id="CustomDataTableButtons"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="bold-underline-title mb-2">New Customers</div>
-
-                                <table id="CustomerDuplicateDetectionDiv" class="table table-striped table-bordered" style="width:100%">
-
-                                    <thead>
-                                        <tr>
-                                            <th></th>
-                                            <th>New Customer ID</th>
-                                            <th>First Name</th>
-                                            <th>Family Name</th>
-                                            <th>Father Name</th>
-                                            <th>Mother Name</th>
-                                            <th>Date Of Birth</th>
-                                            <th>Gender</th>
-                                            <th>Register Place</th>
-                                            <th>Register Number</th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody>
-
-                                        @foreach (DuplicateCustomerDto customer in Model.NewCustomersToCheck)
-                                        {
-                                            String newCstViewParam = "customerID=" + customer.NewCustomerId + "&tab=tab1";
-
-                                            <tr>
-                                                <td style="white-space: nowrap;">
-
-                                                    @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
-                                                    CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
-                                                    {
-                                                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(newCstViewParam)"
-                                                           title="View New Customer"
-                                                           style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;"><i class="fa fa-eye fa-1x"></i>&nbsp;</a>
-
-                                                    }
-
-                                                </td>
-                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.NewCustomerId</td>
-                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_GivenNames</td>
-                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_FamilyName</td>
-                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_FatherName</td>
-                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_MoFirstName</td>
-                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@FormatDateString(customer.New_DateOfBirth)</td>
-                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_Gender</td>
-                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_BirthRegister</td>
-                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId)" style="cursor: pointer">@customer.New_BirthRegNo</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-content p-2">
-                        <div class="card-body">
-                            <div id="GetCustomerDuplicateDetectionDiv">
-                                @Html.Action("GetCustomerDuplicateDetection", "Customer", new { newCustomerId = 0 })
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </div>
-</div>
 
 
-@section Scripts{
 
-    <script>
+function getCustomerDuplicateDetection(newCustomerId, el) {
 
-        $(document).ready(function () {
-            $('#CustomerDuplicateDetectionDiv').DataTable({
-                scrollX: true,
-                autoWidth: false
-            });
+  // Highlight selected row
+  if (el) {
+    $('#CustomerDuplicateDetectionDiv tbody tr').removeClass('row-selected');
+    $(el).closest('tr').addClass('row-selected');
+  }
 
-            HideLoader();
-        });
+  if (newCustomerId) {
+    try {
+      ShowLoader();
+      $.ajax({
+        type: 'POST',
+        url: '/Customer/GetCustomerDuplicateDetection/',
+        data: { newCustomerId: newCustomerId },
+        dataType: 'html',
+        success: function (data) {
+          $('#GetCustomerDuplicateDetectionDiv').html(data);
 
-        function getCustomerDuplicateDetection(newCustomerId) {
+          // Destroy if already initialized, then re-init
+          if ($.fn.DataTable.isDataTable('#GetCustomerDuplicateDetectionRows')) {
+            $('#GetCustomerDuplicateDetectionRows').DataTable().destroy();
+          }
 
-            if (newCustomerId) {
-                try {
-                    ShowLoader();
-                    $.ajax({
-                        type: 'POST',
-                        url: '/Customer/GetCustomerDuplicateDetection/',
-                        data: { newCustomerId: newCustomerId },
-                        dataType: 'html',
-                        success: function (data) {
-                            $('#GetCustomerDuplicateDetectionDiv').html(data);
-                            $('#GetCustomerDuplicateDetectionRows').DataTable({
-                                scrollX: true,
-                                autoWidth: false
-                            });
-                            HideLoader();
-                        },
-                        error: function (xhr) {
-                            HideLoader();
-                            window.location.href = "@Global.DashboardLink";
-                        }
-                    });
-                } catch (ex) {
-                    console.error(ex);
-                    HideLoader();
-                }
+          $('#GetCustomerDuplicateDetectionRows').DataTable({
+            scrollX: true,
+            autoWidth: false
+          });
 
-            }
-            else {
-                alert('New Customer ID not valid!');
-            }
+          HideLoader();
+        },
+        error: function () {
+          HideLoader();
+          window.location.href = "@Global.DashboardLink";
         }
-
-    </script>
+      });
+    } catch (ex) {
+      console.error(ex);
+      HideLoader();
+    }
+  } else {
+    alert('New Customer ID not valid!');
+  }
 }
-
