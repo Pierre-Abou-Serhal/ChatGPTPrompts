@@ -1,165 +1,190 @@
-ALTER PROCEDURE [dbo].[usp_Alterna_GetDuplicateCustomers]
-(
-    @MaxCandidatesPerNew   int           = 500,
-    @StatusCode            nvarchar(250)  = N'PENDING',
-    @DifferenceThreshold   tinyint        = 1  -- 1..4 (higher = stricter)
-)
-AS
-BEGIN
-    SET NOCOUNT ON;
+@model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionViewModel
+@using SGBL.DIGITAL.KYC.Models;
+@using SGBL.DIGITAL.KYC.CrossCutting
 
-    ;WITH NC AS
-    (
-        SELECT
-            T24C.Id AS NewCustomerId,
+@{
+    var param = string.Empty;
+}
 
-            -- New customer normalized values (computed once)
-            dbo.Fn_NormalizeWord(T24C.DateOfBirth)   AS DateOfBirth,
-            dbo.Fn_NormalizeWord(T24C.GivenNames)    AS GivenNames,
-            dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
-            dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
-            dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
+@{
+    ViewBag.Title = "CustomerDuplicateDetection";
+}
+@{
+    String FormatDateString(String date)
+    {
+        String formattedDateString = String.Empty;
 
-            -- IMPORTANT: this is still the ID (as text) and used for matching
-            dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegisterId,
+        if (!String.IsNullOrWhiteSpace(date))
+        {
+            // Extract year, month, and day substrings
+            String year = date.Substring(0, 4);
+            String month = date.Substring(4, 2);
+            String day = date.Substring(6);
 
-            dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
-            dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender,
+            // Combine formatted parts with hyphens
+            formattedDateString = $"{year}-{month}-{day}";
+        }
 
-            -- New customer SOUNDEX keys (computed once)
-            SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.GivenNames), 200)))   AS Sdx_GivenNames,
-            SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.FamilyName), 200)))   AS Sdx_FamilyName,
-            SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.FatherName), 200)))   AS Sdx_FatherName,
-            SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.MoFirstName), 200)))  AS Sdx_MoFirstName
-        FROM dbo.t_NewT24Customers AS NT24C
-        JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
-        WHERE NT24C.StatusCode = @StatusCode
-    )
-    SELECT
-        nc.NewCustomerId,
-        c.CustomerId,
+        return formattedDateString;
+    }
+}
+<div class="app-content content container center-layout">
+    <div class="content-wrapper">
+        <div class="content-header row">
+            <div class="content-header-left col-md-10 col-12 mb-2">
+                <h3 class="content-header-title mb-0">LINK DUPLICATE CUSTOMER</h3>
+                <div class="row breadcrumbs-top">
+                    <div class="breadcrumb-wrapper col-12">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="/Customer/CustomerDashboard">DASHBOARD</a></li>
+                            <li class="breadcrumb-item">View</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="content-header-right col-md-2 col-12 mb-2" style="text-align:end; font-size:larger">
+            </div>
+        </div>
 
-        -- New customer values
-        nc.DateOfBirth   AS New_DateOfBirth,
-        nc.GivenNames    AS New_GivenNames,
-        nc.FamilyName    AS New_FamilyName,
-        nc.FatherName    AS New_FatherName,
-        nc.MoFirstName   AS New_MoFirstName,
+        <div class="content-body">
+            <section class="users-info">
+                <div class="card">
 
-        -- Return description for display (and also return ID if you want)
-        nc.BirthRegisterId            AS New_BirthRegisterId,
-        brNew.New_BirthRegisterDesc   AS New_BirthRegister,
+                    <div id="CardTitle" class="card-header bg-secondary text-white text-bold-500 font-large-1" style="padding-top:0px;padding-bottom:0px;">
+                        <i id="CardIcon" class="fa fa-info-circle mr-1" aria-hidden="true"></i> Customer Duplicate Detection
+                    </div>
 
-        nc.BirthRegNo    AS New_BirthRegNo,
-        nc.Gender        AS New_Gender,
+                    <div class="card-content p-2">
+                        <div class="card-body">
+                            <div id="CustomerDuplicateDetectionInfo">
 
-        -- Candidate values
-        c.Db_DateOfBirth,
-        c.Db_GivenNames,
-        c.Db_FamilyName,
-        c.Db_FatherName,
-        c.Db_MoFirstName,
+                                <div id="CustomDataTableButtonsWrapper">
+                                    <div class="row">
+                                        <div class="col">
+                                            <div class="float-right">
+                                                <div id="CustomDataTableButtons"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
-        -- Return description for display (and also return ID if you want)
-        c.Db_BirthRegisterId          AS Db_BirthRegisterId,
-        brDb.Db_BirthRegisterDesc     AS Db_BirthRegister,
+                                <table id="CustomerDuplicateDetectionDiv" class="table table-striped table-bordered" style="width:100%">
 
-        c.Db_BirthRegNo,
-        c.Db_Gender,
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>New Customer ID</th>
+                                            <th>First Name</th>
+                                            <th>Family Name</th>
+                                            <th>Father Name</th>
+                                            <th>Mother Name</th>
+                                            <th>Date Of Birth</th>
+                                            <th>Gender</th>
+                                            <th>Register Place</th>
+                                            <th>Register Number</th>
+                                        </tr>
+                                    </thead>
 
-        -- Exact flags
-        c.Match_DateOfBirth,
-        c.Match_BirthRegNo,
-        c.Match_BirthRegister,
-        c.Match_Gender,
+                                    <tbody>
 
-        -- Fuzzy flags
-        c.Match_GivenNames,
-        c.Match_FamilyName,
-        c.Match_FatherName,
-        c.Match_MoFirstName
-    FROM NC AS nc
+                                        @foreach (DuplicateCustomerDto customer in Model.NewCustomersToCheck)
+                                        {
+                                            String elementId = $"customer_id_{customer.CustomerId}_new_customer_id_{customer.NewCustomerId}";
 
-    -- Lookup description for NEW customer BirthRegisterId
-    OUTER APPLY
-    (
-        SELECT TOP (1)
-            b.BirthRegister AS New_BirthRegisterDesc   -- or b.DescriptionFR
-        FROM [Lookup].[CusBirth] b
-        WHERE b.Id = TRY_CONVERT(int, nc.BirthRegisterId)
-    ) brNew
+                                            String newCstViewParam = "customerID=" + customer.NewCustomerId + "&tab=tab1";
+                                            String cstViewParam = "customerID=" + customer.CustomerId + "&tab=tab1";
 
-    CROSS APPLY
-    (
-        SELECT TOP (@MaxCandidatesPerNew)
-            t.Id AS CustomerId,
+                                            <tr>
+                                                <td style="white-space: nowrap;">
+                                                    <i id="@elementId"
+                                                       onclick="linkCustomer(this)"
+                                                       class="fa fa-check-circle fa-1x icon-validate"
+                                                       title="Link Customer"
+                                                       style="color: green; cursor: pointer; font-size: 1.5em;"></i>
+                                                    <span>&nbsp;</span>
 
-            -- Candidate normalized values (already persisted)
-            t.Norm_DateOfBirth   AS Db_DateOfBirth,
-            t.Norm_GivenNames    AS Db_GivenNames,
-            t.Norm_FamilyName    AS Db_FamilyName,
-            t.Norm_FatherName    AS Db_FatherName,
-            t.Norm_MoFirstName   AS Db_MoFirstName,
+                                                    @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
+                                                    CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
+                                                    {
+                                                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(newCstViewParam)"
+                                                           title="View New Customer"
+                                                           style="color: cornflowerblue; text-decoration: none; cursor: pointer; font-size: 1.5em;"><i class="fa fa-eye fa-1x"></i>&nbsp;</a>
 
-            -- IMPORTANT: still the ID (as text) used for matching
-            t.Norm_BirthRegister AS Db_BirthRegisterId,
+                                                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(cstViewParam)"
+                                                           title="View Customer"
+                                                           style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;"><i class="fa fa-eye fa-1x"></i>&nbsp;</a>
+                                                    }
 
-            t.Norm_BirthRegNo    AS Db_BirthRegNo,
-            t.Norm_Gender        AS Db_Gender,
+                                                </td>
+                                                <td>@customer.New_GivenNames</td>
+                                                <td>@customer.New_FamilyName</td>
+                                                <td>@customer.New_FatherName</td>
+                                                <td>@customer.New_MoFirstName</td>
+                                                <td>@FormatDateString(customer.New_DateOfBirth)</td>
+                                                <td>@customer.New_Gender</td>
+                                                <td>@customer.New_BirthRegister</td>
+                                                <td>@customer.New_BirthRegNo</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="GetCustomerDuplicateDetection">
+                        @Html.Action("GetCustomerDuplicateDetection", "Customer", new { customers = Model.DuplicateCustomerDtos })
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
 
-            -- Exact match flags (still compares IDs)
-            CAST(CASE WHEN t.Norm_DateOfBirth   = nc.DateOfBirth       THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
-            CAST(CASE WHEN t.Norm_BirthRegNo    = nc.BirthRegNo        THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
-            CAST(CASE WHEN t.Norm_BirthRegister = nc.BirthRegisterId   THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
-            CAST(CASE WHEN t.Norm_Gender        = nc.Gender            THEN 1 ELSE 0 END AS bit) AS Match_Gender,
 
-            -- Fuzzy flags
-            CAST(CASE WHEN DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
-            CAST(CASE WHEN DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
-            CAST(CASE WHEN DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
-            CAST(CASE WHEN DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
+@section Scripts{
 
-        FROM dbo.t_T24Customer AS t
-        WHERE
-            t.Id <> nc.NewCustomerId
+    <script>
 
-            AND nc.GivenNames  IS NOT NULL
-            AND nc.FamilyName  IS NOT NULL
-            AND nc.FatherName  IS NOT NULL
-            AND nc.MoFirstName IS NOT NULL
+        $(document).ready(function () {
+            $('#CustomerDuplicateDetectionDiv').DataTable({
+                scrollX: true,
+                autoWidth: false
+            });
 
-            AND t.Norm_GivenNames  IS NOT NULL
-            AND t.Norm_FamilyName  IS NOT NULL
-            AND t.Norm_FatherName  IS NOT NULL
-            AND t.Norm_MoFirstName IS NOT NULL
+            HideLoader();
+        });
 
-            AND t.Sdx_GivenNames  = nc.Sdx_GivenNames
-            AND t.Sdx_FamilyName  = nc.Sdx_FamilyName
-            AND t.Sdx_FatherName  = nc.Sdx_FatherName
-            AND t.Sdx_MoFirstName = nc.Sdx_MoFirstName
+        function getCustomerDuplicateDetection(newCustomerId) {
 
-            AND (nc.DateOfBirth     IS NULL OR t.Norm_DateOfBirth  = nc.DateOfBirth)
-            AND (nc.Gender          IS NULL OR t.Norm_Gender       = nc.Gender)
-            AND (nc.BirthRegNo      IS NULL OR t.Norm_BirthRegNo   = nc.BirthRegNo)
+            if (newCustomerId) {
+                try {
+                    ShowLoader();
+                    $.ajax({
+                        type: 'POST',
+                        url: '/Customer/GetCustomerDuplicateDetection/',
+                        data: { newCustomerId: newCustomerId },
+                        dataType: 'html',
+                        success: function (data) {
+                            $('#GetCustomerDuplicateDetection').html(data);
+                            $('#GetCustomerDuplicateDetectionRows').DataTable();
+                            HideLoader();
+                        },
+                        error: function (xhr) {
+                            HideLoader();
+                            window.location.href = "@Global.DashboardLink";
+                        }
+                    });
+                } catch (ex) {
+                    console.error(ex);
+                    HideLoader();
+                }
 
-            AND DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold
-            AND DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold
-            AND DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold
-            AND DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold
+            }
+            else {
+                alert('New Customer ID not valid!');
+            }
+        }
 
-        ORDER BY t.Id
-    ) AS c
+    </script>
+}
 
-    -- Lookup description for DB candidate BirthRegisterId
-    OUTER APPLY
-    (
-        SELECT TOP (1)
-            b.BirthRegister AS Db_BirthRegisterDesc   -- or b.DescriptionFR
-        FROM [Lookup].[CusBirth] b
-        WHERE b.Id = TRY_CONVERT(int, c.Db_BirthRegisterId)
-    ) brDb
-
-    ORDER BY nc.NewCustomerId, c.CustomerId
-    OPTION (RECOMPILE);
-END
-GO
