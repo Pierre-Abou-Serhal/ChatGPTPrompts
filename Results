@@ -1,207 +1,140 @@
-CREATE OR ALTER FUNCTION dbo.Fn_NormalizeWord(@s NVARCHAR(4000))
-RETURNS NVARCHAR(4000)
-WITH SCHEMABINDING, RETURNS NULL ON NULL INPUT
-AS
-BEGIN
-    -- Turn non-breaking spaces into normal spaces
-    SET @s = REPLACE(@s, NCHAR(160), N' ');
+@model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionViewModel
+@using SGBL.DIGITAL.KYC.Models;
 
-    -- Trim
-    SET @s = LTRIM(RTRIM(@s));
+@{
+    var param = string.Empty;
+}
 
-    -- Replace tabs / line breaks with spaces
-    SET @s = REPLACE(@s, CHAR(9),  N' ');
-    SET @s = REPLACE(@s, CHAR(10), N' ');
-    SET @s = REPLACE(@s, CHAR(13), N' ');
+@{
+    ViewBag.Title = "CustomerDuplicateDetection";
+}
+@{ 
+    String FormatDateString(String date)
+    {
+        String formattedDateString = String.Empty;
 
-    -- Collapse multiple spaces to a single space (loop is OK here since we'll PERSIST)
-    WHILE CHARINDEX(N'  ', @s) > 0
-        SET @s = REPLACE(@s, N'  ', N' ');
+        if (!String.IsNullOrWhiteSpace(date))
+        {
+            // Extract year, month, and day substrings
+            String year = date.Substring(0, 4);
+            String month = date.Substring(4, 2);
+            String day = date.Substring(6);
 
-    -- unify case
-    SET @s = UPPER(@s);
+            // Combine formatted parts with hyphens
+            formattedDateString = $"{year}-{month}-{day}";
+        }
 
-    RETURN NULLIF(@s, N'');
-END
-GO
+        return formattedDateString;
+    }
+}
+<div class="app-content content container center-layout">
+    <div class="content-wrapper">
+        <div class="content-header row">
+            <div class="content-header-left col-md-10 col-12 mb-2">
+                <h3 class="content-header-title mb-0">LINK DUPLICATE CUSTOMER</h3>
+                <div class="row breadcrumbs-top">
+                    <div class="breadcrumb-wrapper col-12">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="/Customer/CustomerDashboard">DASHBOARD</a></li>
+                            <li class="breadcrumb-item">View</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="content-header-right col-md-2 col-12 mb-2" style="text-align:end; font-size:larger">
+            </div>
+        </div>
+
+        <div class="content-body">
+            <section class="users-info">
+                <div class="card">
+
+                    <div id="CardTitle" class="card-header bg-secondary text-white text-bold-500 font-large-1" style="padding-top:0px;padding-bottom:0px;">
+                        <i id="CardIcon" class="fa fa-info-circle mr-1" aria-hidden="true"></i> Customer Duplicate Detection
+                    </div>
+
+                    <div class="card-content p-2">
+                        <div class="card-body">
+                            <div id="CustomerDuplicateDetectionInfo">
+
+                                <div id="CustomDataTableButtonsWrapper">
+                                    <div class="row">
+                                        <div class="col">
+                                            <div class="float-right">
+                                                <div id="CustomDataTableButtons"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <table id="CustomerDuplicateDetectionDiv" class="table table-striped table-bordered" style="width:100%">
+
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>Customer ID</th>
+                                            <th>New Customer ID</th>
+                                            <th>First Name</th>
+                                            <th>Family Name</th>
+                                            <th>Father Name</th>
+                                            <th>Mother Name</th>
+                                            <th>Date Of Birth</th>
+                                            <th>Gender</th>
+                                            <th>Register Number</th>
+                                            <th>Register Place</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+
+                                        @foreach (DuplicateCustomerDto customer in Model.DuplicateCustomerDtos)
+                                        {
+                                            String elementId = $"customer_id_{customer.CustomerId}_new_customer_id_{customer.NewCustomerId}";
+
+                                            <tr>
+                                                <td style="white-space: nowrap;">
+                                                    <i id="@elementId"
+                                                       onclick="linkCustomer(this)"
+                                                       class="fa fa-check-circle fa-1x icon-validate"
+                                                       title="Link Customer"
+                                                       style="color: green; cursor: pointer; font-size: 1.5em;"></i>
+                                                    <span>&nbsp;</span>
+
+                                                </td>
+                                                <td>@customer.CustomerId</td>
+                                                <td>@customer.NewCustomerId</td>
+                                                <td>@customer.New_GivenNames</td>
+                                                <td>@customer.New_FamilyName</td>
+                                                <td>@customer.New_FatherName</td>
+                                                <td>@customer.New_MoFirstName</td>
+                                                <td>@FormatDateString(customer.New_DateOfBirth)</td>
+                                                <td>@customer.New_Gender</td>
+                                                <td>@customer.New_BirthRegister</td>
+                                                <td>@customer.New_BirthRegNo</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
 
 
-----------------------------------------
-----------------------------------------
-----------------------------------------
+@section Scripts{
 
-ALTER TABLE dbo.t_T24Customer ADD
-  Norm_GivenNames    AS CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(GivenNames), 200)) PERSISTED,
-  Norm_FamilyName    AS CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(FamilyName), 200)) PERSISTED,
-  Norm_FatherName    AS CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(FatherName), 200)) PERSISTED,
-  Norm_MoFirstName   AS CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(MoFirstName), 200)) PERSISTED,
-  Norm_DateOfBirth   AS CONVERT(nvarchar(50),  dbo.Fn_NormalizeWord(DateOfBirth)) PERSISTED,
-  Norm_BirthRegister AS CONVERT(nvarchar(100), dbo.Fn_NormalizeWord(BirthRegister)) PERSISTED,
-  Norm_BirthRegNo    AS CONVERT(nvarchar(100), dbo.Fn_NormalizeWord(BirthRegNo)) PERSISTED,
-  Norm_Gender        AS CONVERT(nvarchar(20),  dbo.Fn_NormalizeWord(Gender)) PERSISTED,
+    <script>
 
-  Sdx_GivenNames     AS SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(GivenNames), 200))) PERSISTED,
-  Sdx_FamilyName     AS SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(FamilyName), 200))) PERSISTED,
-  Sdx_FatherName     AS SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(FatherName), 200))) PERSISTED,
-  Sdx_MoFirstName    AS SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(MoFirstName), 200))) PERSISTED;
-GO
+        $(document).ready(function () {
+            $('#CustomerDuplicateDetectionDiv').DataTable();
 
+            HideLoader();
+        });
 
-----------------------------------------
-----------------------------------------
-----------------------------------------
+    </script>
+}
 
-CREATE INDEX IX_T24Customer_DedupeSeek
-ON dbo.t_T24Customer (Sdx_GivenNames, Sdx_FamilyName, Sdx_FatherName, Sdx_MoFirstName, Id)
-INCLUDE
-(
-  Norm_GivenNames, Norm_FamilyName, Norm_FatherName, Norm_MoFirstName,
-  Norm_DateOfBirth, Norm_BirthRegister, Norm_BirthRegNo, Norm_Gender
-);
-GO
-
-CREATE INDEX IX_NewT24Customers_Status
-ON dbo.t_NewT24Customers (StatusCode, CustomerId);
-GO
-
-
-----------------------------------------
-----------------------------------------
-----------------------------------------
-
-CREATE OR ALTER PROCEDURE dbo.usp_Alterna_GetDuplicateCustomers
-(
-    @MaxCandidatesPerNew   int           = 500,
-    @StatusCode            nvarchar(250)  = N'PENDING',
-    @DifferenceThreshold   tinyint        = 1  -- 1..4 (higher = stricter)
-)
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    ;WITH NC AS
-    (
-        SELECT
-            T24C.Id AS NewCustomerId,
-
-            -- New customer normalized values (computed once)
-            dbo.Fn_NormalizeWord(T24C.DateOfBirth)   AS DateOfBirth,
-            dbo.Fn_NormalizeWord(T24C.GivenNames)    AS GivenNames,
-            dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
-            dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
-            dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
-            dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegister,
-            dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
-            dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender,
-
-            -- New customer SOUNDEX keys (computed once)
-            SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.GivenNames), 200)))   AS Sdx_GivenNames,
-            SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.FamilyName), 200)))   AS Sdx_FamilyName,
-            SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.FatherName), 200)))   AS Sdx_FatherName,
-            SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.MoFirstName), 200)))  AS Sdx_MoFirstName
-        FROM dbo.t_NewT24Customers AS NT24C
-        JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
-        WHERE NT24C.StatusCode = @StatusCode
-    )
-    SELECT
-        nc.NewCustomerId,
-        c.CustomerId,
-
-        -- New customer values
-        nc.DateOfBirth   AS New_DateOfBirth,
-        nc.GivenNames    AS New_GivenNames,
-        nc.FamilyName    AS New_FamilyName,
-        nc.FatherName    AS New_FatherName,
-        nc.MoFirstName   AS New_MoFirstName,
-        nc.BirthRegister AS New_BirthRegister,
-        nc.BirthRegNo    AS New_BirthRegNo,
-        nc.Gender        AS New_Gender,
-
-        -- Candidate values (from computed columns)
-        c.Db_DateOfBirth,
-        c.Db_GivenNames,
-        c.Db_FamilyName,
-        c.Db_FatherName,
-        c.Db_MoFirstName,
-        c.Db_BirthRegister,
-        c.Db_BirthRegNo,
-        c.Db_Gender,
-
-        -- Exact flags
-        c.Match_DateOfBirth,
-        c.Match_BirthRegNo,
-        c.Match_BirthRegister,
-        c.Match_Gender,
-
-        -- Fuzzy flags
-        c.Match_GivenNames,
-        c.Match_FamilyName,
-        c.Match_FatherName,
-        c.Match_MoFirstName
-    FROM NC AS nc
-    CROSS APPLY
-    (
-        SELECT TOP (@MaxCandidatesPerNew)
-            t.Id AS CustomerId,
-
-            -- Candidate normalized values (already persisted)
-            t.Norm_DateOfBirth   AS Db_DateOfBirth,
-            t.Norm_GivenNames    AS Db_GivenNames,
-            t.Norm_FamilyName    AS Db_FamilyName,
-            t.Norm_FatherName    AS Db_FatherName,
-            t.Norm_MoFirstName   AS Db_MoFirstName,
-            t.Norm_BirthRegister AS Db_BirthRegister,
-            t.Norm_BirthRegNo    AS Db_BirthRegNo,
-            t.Norm_Gender        AS Db_Gender,
-
-            -- Exact match flags
-            CAST(CASE WHEN t.Norm_DateOfBirth   = nc.DateOfBirth   THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
-            CAST(CASE WHEN t.Norm_BirthRegNo    = nc.BirthRegNo    THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
-            CAST(CASE WHEN t.Norm_BirthRegister = nc.BirthRegister THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
-            CAST(CASE WHEN t.Norm_Gender        = nc.Gender        THEN 1 ELSE 0 END AS bit) AS Match_Gender,
-
-            -- Fuzzy flags (DIFFERENCE on normalized values)
-            CAST(CASE WHEN DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
-            CAST(CASE WHEN DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
-            CAST(CASE WHEN DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
-            CAST(CASE WHEN DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
-
-        FROM dbo.t_T24Customer AS t
-        WHERE
-            -- avoid matching the same customer
-            t.Id <> nc.NewCustomerId
-
-            -- ignore empty/blank names (NormalizeWord returns NULL for blanks)
-            AND nc.GivenNames  IS NOT NULL
-            AND nc.FamilyName  IS NOT NULL
-            AND nc.FatherName  IS NOT NULL
-            AND nc.MoFirstName IS NOT NULL
-
-            AND t.Norm_GivenNames  IS NOT NULL
-            AND t.Norm_FamilyName  IS NOT NULL
-            AND t.Norm_FatherName  IS NOT NULL
-            AND t.Norm_MoFirstName IS NOT NULL
-
-            -- FAST prefilter (INDEX SEEK if you created IX_T24Customer_DedupeSeek)
-            AND t.Sdx_GivenNames  = nc.Sdx_GivenNames
-            AND t.Sdx_FamilyName  = nc.Sdx_FamilyName
-            AND t.Sdx_FatherName  = nc.Sdx_FatherName
-            AND t.Sdx_MoFirstName = nc.Sdx_MoFirstName
-
-            -- Optional extra narrowing (keeps correctness because only applied when new value exists)
-            AND (nc.DateOfBirth IS NULL OR t.Norm_DateOfBirth = nc.DateOfBirth)
-            AND (nc.Gender      IS NULL OR t.Norm_Gender      = nc.Gender)
-            AND (nc.BirthRegNo  IS NULL OR t.Norm_BirthRegNo  = nc.BirthRegNo)
-
-            -- Expensive checks now run on a small candidate set
-            AND DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold
-            AND DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold
-            AND DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold
-            AND DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold
-
-        ORDER BY t.Id
-    ) AS c
-    ORDER BY nc.NewCustomerId, c.CustomerId
-    OPTION (RECOMPILE);
-END
-GO
