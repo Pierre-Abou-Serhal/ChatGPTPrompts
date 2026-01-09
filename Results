@@ -1,38 +1,115 @@
 @model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionViewModel
-@using SGBL.DIGITAL.KYC.Models;
+@using SGBL.DIGITAL.KYC.Models
 @using SGBL.DIGITAL.KYC.CrossCutting
-
-@{
-    var param = string.Empty;
-}
 
 @{
     ViewBag.Title = "CustomerDuplicateDetection";
 }
-@{
-    String FormatDateString(String date)
-    {
-        String formattedDateString = String.Empty;
 
-        if (!String.IsNullOrWhiteSpace(date))
-        {
-            // Extract year, month, and day substrings
-            String year = date.Substring(0, 4);
-            String month = date.Substring(4, 2);
-            String day = date.Substring(6);
-
-            // Combine formatted parts with hyphens
-            formattedDateString = $"{year}-{month}-{day}";
-        }
-
-        return formattedDateString;
+<style>
+    .dc-value {
+        font-weight: 600;
+        line-height: 1.2;
+        margin-bottom: .35rem;
     }
+
+    .dc-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem .5rem;
+        align-items: center;
+        font-size: .78rem;
+        color: #6c757d;
+    }
+
+    .dc-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .12rem .5rem;
+        border-radius: 999px;
+        background: #f6f7f9;
+        border: 1px solid #e6e9ee;
+        white-space: nowrap;
+    }
+
+    .dc-pill b {
+        color: #495057;
+        font-weight: 600;
+    }
+
+    .dc-pill--pct {
+        background: #eef6ff;
+        border-color: #d7eaff;
+    }
+
+    .dc-pct-low {
+        background: #fff1f1;
+        border-color: #ffd6d6;
+        color: #b42318;
+    }
+
+    .dc-pct-mid {
+        background: #fff7e6;
+        border-color: #ffe1b3;
+        color: #8a6100;
+    }
+
+    .dc-pct-high {
+        background: #ecfdf3;
+        border-color: #c7f0d8;
+        color: #067647;
+    }
+
+    #GetCustomerDuplicateDetectionRows td {
+        vertical-align: top;
+    }
+</style>
+
+@functions {
+    string FormatDateString(string date)
+    {
+        if (string.IsNullOrWhiteSpace(date)) return string.Empty;
+        if (date.Length < 8) return date; // fallback if unexpected format
+
+        var year = date.Substring(0, 4);
+        var month = date.Substring(4, 2);
+        var day = date.Substring(6, 2);
+
+        return $"{year}-{month}-{day}";
+    }
+
+    decimal CalcPct(decimal mark, decimal total)
+        => total == 0 ? 0 : Math.Round((mark / total) * 100m, 2);
+
+    string PctClass(decimal pct)
+    {
+        if (pct < 50) return "dc-pct-low";
+        if (pct < 80) return "dc-pct-mid";
+        return "dc-pct-high";
+    }
+}
+
+@helper GradeMeta(decimal mark, decimal total)
+{
+    var pct = CalcPct(mark, total);
+
+    <div class="dc-meta">
+        <span class="dc-pill">
+            <b>Grade</b>
+            <span>@mark / @total</span>
+        </span>
+
+        <span class="dc-pill dc-pill--pct @PctClass(pct)">
+            <b>%</b>
+            <span>@pct</span>
+        </span>
+    </div>
 }
 
 <div class="bold-underline-title mb-2">Matched Customers</div>
 
 <table id="GetCustomerDuplicateDetectionRows" class="table table-striped table-bordered" style="width:100%">
-
     <thead>
         <tr>
             <th></th>
@@ -50,13 +127,30 @@
     </thead>
 
     <tbody>
-
         @foreach (DuplicateCustomerDto customer in Model.DuplicateCustomerDtos)
-            {
-                String cstViewParam = "customerID=" + customer.CustomerId + "&tab=tab1";
-                Decimal totalMarkedGrade = customer.Mark_MoFirstName + customer.Mark_FamilyName + customer.Mark_FatherName + customer.Mark_MoFirstName + customer.Mark_DateOfBirth + customer.Mark_Gender + customer.Mark_BirthRegister + customer.Mark_BirthRegNo;
+        {
+            string cstViewParam = "customerID=" + customer.CustomerId + "&tab=tab1";
 
-                Decimal totalGrade = customer.Total_Mark_MoFirstName + customer.Total_Mark_FamilyName + customer.Total_Mark_FatherName + customer.Total_Mark_MoFirstName + customer.Total_Mark_DateOfBirth + customer.Total_Mark_Gender + customer.Total_Mark_BirthRegister + customer.Total_Mark_BirthRegNo;
+            // FIXED: include GivenNames and remove duplicate MoFirstName
+            decimal totalMarkedGrade =
+                customer.Mark_GivenNames +
+                customer.Mark_FamilyName +
+                customer.Mark_FatherName +
+                customer.Mark_MoFirstName +
+                customer.Mark_DateOfBirth +
+                customer.Mark_Gender +
+                customer.Mark_BirthRegister +
+                customer.Mark_BirthRegNo;
+
+            decimal totalGrade =
+                customer.Total_Mark_GivenNames +
+                customer.Total_Mark_FamilyName +
+                customer.Total_Mark_FatherName +
+                customer.Total_Mark_MoFirstName +
+                customer.Total_Mark_DateOfBirth +
+                customer.Total_Mark_Gender +
+                customer.Total_Mark_BirthRegister +
+                customer.Total_Mark_BirthRegNo;
 
             <tr>
                 <td style="white-space: nowrap;">
@@ -64,172 +158,65 @@
                        class="fa fa-check-circle fa-1x icon-validate"
                        title="Link Customer"
                        style="color: green; cursor: pointer; font-size: 1.5em;"></i>
+
                     <span>&nbsp;</span>
 
                     @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
-CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
+                         CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
                     {
                         <a href="/Customer/ViewCustomer/@Global.EncodeParameters(cstViewParam)"
                            title="View Customer"
-                           style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;"><i class="fa fa-eye fa-1x"></i>&nbsp;</a>
-
+                           style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;">
+                            <i class="fa fa-eye fa-1x"></i>&nbsp;
+                        </a>
                     }
+                </td>
 
-                </td>
+                <td>@customer.CustomerId</td>
+
                 <td>
-                    @customer.CustomerId
+                    <div class="dc-value">@customer.Db_GivenNames</div>
+                    @GradeMeta(customer.Mark_GivenNames, customer.Total_Mark_GivenNames)
                 </td>
+
                 <td>
-                    @customer.Db_GivenNames
-                    <div>
-                        <div>
-                            Grade:
-                        </div>
-                        <div>
-                            @customer.Mark_GivenNames / @customer.Total_Mark_GivenNames
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                           Percentage:
-                        </div>
-                        <div>@Math.Round((customer.Mark_GivenNames / customer.Total_Mark_GivenNames) * 100, 2) %</div>
-                    </div> 
+                    <div class="dc-value">@customer.Db_FamilyName</div>
+                    @GradeMeta(customer.Mark_FamilyName, customer.Total_Mark_FamilyName)
                 </td>
+
                 <td>
-                    @customer.Db_FamilyName
-                    <div>
-                        <div>
-                            Grade:
-                        </div>
-                        <div>
-                            @customer.Mark_FamilyName / @customer.Total_Mark_FamilyName
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            Percentage:
-                        </div>
-                        <div>@Math.Round((customer.Mark_FamilyName / customer.Total_Mark_FamilyName) * 100, 2) %</div>
-                    </div>
+                    <div class="dc-value">@customer.Db_FatherName</div>
+                    @GradeMeta(customer.Mark_FatherName, customer.Total_Mark_FatherName)
                 </td>
+
                 <td>
-                    @customer.Db_FatherName
-                    <div>
-                        <div>
-                            Grade:
-                        </div>
-                        <div>
-                            @customer.Mark_FatherName / @customer.Total_Mark_FatherName
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            Percentage:
-                        </div>
-                        <div>@Math.Round((customer.Mark_FatherName / customer.Total_Mark_FatherName) * 100, 2) %</div>
-                    </div>
+                    <div class="dc-value">@customer.Db_MoFirstName</div>
+                    @GradeMeta(customer.Mark_MoFirstName, customer.Total_Mark_MoFirstName)
                 </td>
+
                 <td>
-                    @customer.Db_MoFirstName
-                    <div>
-                        <div>
-                            Grade:
-                        </div>
-                        <div>
-                            @customer.Mark_MoFirstName / @customer.Total_Mark_MoFirstName
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            Percentage:
-                        </div>
-                        <div>@Math.Round((customer.Mark_MoFirstName / customer.Total_Mark_MoFirstName) * 100, 2) %</div>
-                    </div>
+                    <div class="dc-value">@FormatDateString(customer.Db_DateOfBirth)</div>
+                    @GradeMeta(customer.Mark_DateOfBirth, customer.Total_Mark_DateOfBirth)
                 </td>
+
                 <td>
-                    @FormatDateString(customer.Db_DateOfBirth)
-                    <div>
-                        <div>
-                            Grade:
-                        </div>
-                        <div>
-                            @customer.Mark_DateOfBirth / @customer.Total_Mark_DateOfBirth
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            Percentage:
-                        </div>
-                        <div>@Math.Round((customer.Mark_DateOfBirth / customer.Total_Mark_DateOfBirth) * 100, 2) %</div>
-                    </div>
+                    <div class="dc-value">@customer.Db_Gender</div>
+                    @GradeMeta(customer.Mark_Gender, customer.Total_Mark_Gender)
                 </td>
+
                 <td>
-                    @customer.Db_Gender
-                    <div>
-                        <div>
-                            Grade:
-                        </div>
-                        <div>
-                            @customer.Mark_Gender / @customer.Total_Mark_Gender
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            Percentage:
-                        </div>
-                        <div>@Math.Round((customer.Mark_Gender / customer.Total_Mark_Gender) * 100, 2) %</div>
-                    </div>
+                    <div class="dc-value">@customer.Db_BirthRegister</div>
+                    @GradeMeta(customer.Mark_BirthRegister, customer.Total_Mark_BirthRegister)
                 </td>
+
                 <td>
-                    @customer.Db_BirthRegister
-                    <div>
-                        <div>
-                            Grade:
-                        </div>
-                        <div>
-                            @customer.Mark_BirthRegister / @customer.Total_Mark_BirthRegister
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            Percentage:
-                        </div>
-                        <div>@Math.Round((customer.Mark_BirthRegister / customer.Total_Mark_BirthRegister) * 100, 2) %</div>
-                    </div>
+                    <div class="dc-value">@customer.Db_BirthRegNo</div>
+                    @GradeMeta(customer.Mark_BirthRegNo, customer.Total_Mark_BirthRegNo)
                 </td>
+
                 <td>
-                    @customer.Db_BirthRegNo
-                    <div>
-                        <div>
-                            Grade:
-                        </div>
-                        <div>
-                            @customer.Mark_BirthRegNo / @customer.Total_Mark_BirthRegNo
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            Percentage:
-                        </div>
-                        <div>@Math.Round((customer.Mark_BirthRegNo / customer.Total_Mark_BirthRegNo) * 100, 2) %</div>
-                    </div>
-                </td>
-                <td>
-                    <div>
-                        <div>
-                            Total Grade:
-                        </div>
-                        <div>
-                            @totalMarkedGrade / @totalMarkedGrade
-                        </div>
-                    </div>
-                    <div>
-                        <div>
-                            Total Percentage:
-                        </div>
-                        <div>@Math.Round((totalMarkedGrade/ totalMarkedGrade) * 100, 2) %</div>
-                    </div>
+                    <div class="dc-value">Total</div>
+                    @GradeMeta(totalMarkedGrade, totalGrade)
                 </td>
             </tr>
         }
