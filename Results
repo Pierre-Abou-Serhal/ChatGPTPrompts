@@ -1,224 +1,153 @@
-@model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionViewModel
-@using SGBL.DIGITAL.KYC.Models
+@model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionHistoryViewModel
+@using SGBL.DIGITAL.KYC.Models;
 @using SGBL.DIGITAL.KYC.CrossCutting
 
 @{
-    ViewBag.Title = "CustomerDuplicateDetection";
+    ViewBag.Title = "CustomerDuplicateDetectionHistory";
 }
-
-<style>
-    .dc-value {
-        font-weight: 600;
-        line-height: 1.2;
-        margin-bottom: .35rem;
-    }
-
-    .dc-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .35rem .5rem;
-        align-items: center;
-        font-size: .78rem;
-        color: #6c757d;
-    }
-
-    .dc-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: .35rem;
-        padding: .12rem .5rem;
-        border-radius: 999px;
-        background: #f6f7f9;
-        border: 1px solid #e6e9ee;
-        white-space: nowrap;
-    }
-
-    .dc-pill b {
-        color: #495057;
-        font-weight: 600;
-    }
-
-    .dc-pill--pct {
-        background: #eef6ff;
-        border-color: #d7eaff;
-    }
-
-    .dc-pct-low {
-        background: #fff1f1;
-        border-color: #ffd6d6;
-        color: #b42318;
-    }
-
-    .dc-pct-mid {
-        background: #fff7e6;
-        border-color: #ffe1b3;
-        color: #8a6100;
-    }
-
-    .dc-pct-high {
-        background: #ecfdf3;
-        border-color: #c7f0d8;
-        color: #067647;
-    }
-
-    #GetCustomerDuplicateDetectionRows td {
-        vertical-align: top;
-    }
-</style>
-
-@functions {
-    string FormatDateString(string date)
+@{
+    String FormatDateString(String date)
     {
-        if (string.IsNullOrWhiteSpace(date)) return string.Empty;
-        if (date.Length < 8) return date; // fallback if unexpected format
+        String formattedDateString = String.Empty;
 
-        var year = date.Substring(0, 4);
-        var month = date.Substring(4, 2);
-        var day = date.Substring(6, 2);
-
-        return $"{year}-{month}-{day}";
-    }
-
-    decimal CalcPct(decimal mark, decimal total)
-        => total == 0 ? 0 : Math.Round((mark / total) * 100m, 2);
-
-    string PctClass(decimal pct)
-    {
-        if (pct < 50) return "dc-pct-low";
-        if (pct < 80) return "dc-pct-mid";
-        return "dc-pct-high";
-    }
-}
-
-@helper GradeMeta(decimal mark, decimal total)
-{
-    var pct = CalcPct(mark, total);
-
-    <div class="dc-meta">
-        <span class="dc-pill">
-            <b>Grade</b>
-            <span>@mark / @total</span>
-        </span>
-
-        <span class="dc-pill dc-pill--pct @PctClass(pct)">
-            <b>%</b>
-            <span>@pct</span>
-        </span>
-    </div>
-}
-
-<div class="bold-underline-title mb-2">Matched Customers</div>
-
-<table id="GetCustomerDuplicateDetectionRows" class="table table-striped table-bordered" style="width:100%">
-    <thead>
-        <tr>
-            <th></th>
-            <th>Customer ID</th>
-            <th>First Name</th>
-            <th>Family Name</th>
-            <th>Father Name</th>
-            <th>Mother Name</th>
-            <th>Date Of Birth</th>
-            <th>Gender</th>
-            <th>Register Place</th>
-            <th>Register Number</th>
-            <th>Total Grade</th>
-        </tr>
-    </thead>
-
-    <tbody>
-        @foreach (DuplicateCustomerDto customer in Model.DuplicateCustomerDtos)
+        if (!String.IsNullOrWhiteSpace(date))
         {
-            string cstViewParam = "customerID=" + customer.CustomerId + "&tab=tab1";
+            // Extract year, month, and day substrings
+            String year = date.Substring(0, 4);
+            String month = date.Substring(4, 2);
+            String day = date.Substring(6);
 
-            // FIXED: include GivenNames and remove duplicate MoFirstName
-            decimal totalMarkedGrade =
-                customer.Mark_GivenNames +
-                customer.Mark_FamilyName +
-                customer.Mark_FatherName +
-                customer.Mark_MoFirstName +
-                customer.Mark_DateOfBirth +
-                customer.Mark_Gender +
-                customer.Mark_BirthRegister +
-                customer.Mark_BirthRegNo;
-
-            decimal totalGrade =
-                customer.Total_Mark_GivenNames +
-                customer.Total_Mark_FamilyName +
-                customer.Total_Mark_FatherName +
-                customer.Total_Mark_MoFirstName +
-                customer.Total_Mark_DateOfBirth +
-                customer.Total_Mark_Gender +
-                customer.Total_Mark_BirthRegister +
-                customer.Total_Mark_BirthRegNo;
-
-            <tr>
-                <td style="white-space: nowrap;">
-                    <i onclick="linkCustomer(@customer.CustomerId, @customer.NewCustomerId)"
-                       class="fa fa-check-circle fa-1x icon-validate"
-                       title="Link Customer"
-                       style="color: green; cursor: pointer; font-size: 1.5em;"></i>
-
-                    <span>&nbsp;</span>
-
-                    @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
-                         CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
-                    {
-                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(cstViewParam)"
-                           title="View Customer"
-                           style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;">
-                            <i class="fa fa-eye fa-1x"></i>&nbsp;
-                        </a>
-                    }
-                </td>
-
-                <td>@customer.CustomerId</td>
-
-                <td>
-                    <div class="dc-value">@customer.Db_GivenNames</div>
-                    @GradeMeta(customer.Mark_GivenNames, customer.Total_Mark_GivenNames)
-                </td>
-
-                <td>
-                    <div class="dc-value">@customer.Db_FamilyName</div>
-                    @GradeMeta(customer.Mark_FamilyName, customer.Total_Mark_FamilyName)
-                </td>
-
-                <td>
-                    <div class="dc-value">@customer.Db_FatherName</div>
-                    @GradeMeta(customer.Mark_FatherName, customer.Total_Mark_FatherName)
-                </td>
-
-                <td>
-                    <div class="dc-value">@customer.Db_MoFirstName</div>
-                    @GradeMeta(customer.Mark_MoFirstName, customer.Total_Mark_MoFirstName)
-                </td>
-
-                <td>
-                    <div class="dc-value">@FormatDateString(customer.Db_DateOfBirth)</div>
-                    @GradeMeta(customer.Mark_DateOfBirth, customer.Total_Mark_DateOfBirth)
-                </td>
-
-                <td>
-                    <div class="dc-value">@customer.Db_Gender</div>
-                    @GradeMeta(customer.Mark_Gender, customer.Total_Mark_Gender)
-                </td>
-
-                <td>
-                    <div class="dc-value">@customer.Db_BirthRegister</div>
-                    @GradeMeta(customer.Mark_BirthRegister, customer.Total_Mark_BirthRegister)
-                </td>
-
-                <td>
-                    <div class="dc-value">@customer.Db_BirthRegNo</div>
-                    @GradeMeta(customer.Mark_BirthRegNo, customer.Total_Mark_BirthRegNo)
-                </td>
-
-                <td>
-                    <div class="dc-value">Total</div>
-                    @GradeMeta(totalMarkedGrade, totalGrade)
-                </td>
-            </tr>
+            // Combine formatted parts with hyphens
+            formattedDateString = $"{year}-{month}-{day}";
         }
-    </tbody>
-</table>
+
+        return formattedDateString;
+    }
+}
+
+<div class="app-content content container center-layout">
+    <div class="content-wrapper">
+        <div class="content-header row">
+            <div class="content-header-left col-md-10 col-12 mb-2">
+                <h3 class="content-header-title mb-0">CUSTOMER DUPLICATES HISTORY</h3>
+                <div class="row breadcrumbs-top">
+                    <div class="breadcrumb-wrapper col-12">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="/Customer/CustomerDashboard">DASHBOARD</a></li>
+                            <li class="breadcrumb-item">History</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="content-header-right col-md-2 col-12 mb-2" style="text-align:end; font-size:larger">
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link" href="/Customer/CustomerDuplicateDetection/">
+                    Detect
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" aria-current="page" href="/Customer/CustomerDuplicateDetectionHistory/">
+                    History
+                </a>
+            </li>
+        </ul>
+
+        <div class="content-body">
+            <section class="users-info">
+                <div class="card">
+
+                    <div id="CardTitle" class="card-header bg-secondary text-white text-bold-500 font-large-1" style="padding-top:0px;padding-bottom:0px;">
+                        <i id="CardIcon" class="fa fa-info-circle mr-1" aria-hidden="true"></i> Customer Duplicate Detection History
+                    </div>
+
+                    <div class="card-content p-2">
+                        <div class="card-body">
+                            <div id="CustomerDuplicateDetectionHistoryInfo">
+
+                                <div id="CustomDataTableButtonsWrapper">
+                                    <div class="row">
+                                        <div class="col">
+                                            <div class="float-right">
+                                                <div id="CustomDataTableButtons"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bold-underline-title mb-2">New Customers</div>
+
+                                <table id="CustomerDuplicateDetectionHistoryDiv" class="table table-striped table-bordered" style="width:100%">
+
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>Customer ID</th>
+                                            <th>First Name</th>
+                                            <th>Family Name</th>
+                                            <th>Father Name</th>
+                                            <th>Mother Name</th>
+                                            <th>Date Of Birth</th>
+                                            <th>Gender</th>
+                                            <th>Register Place</th>
+                                            <th>Register Number</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+
+                                        @foreach (DuplicateCustomerHistoryDto customer in Model.DuplicateCustomers)
+                                        {
+                                            String newCstViewParam = "customerID=" + customer.NewCustomerId + "&tab=tab1";
+                                            String originalCstViewParam = "customerID=" + customer.CustomerId + "&tab=tab1";
+
+                                            <tr>
+                                                <td style="white-space: nowrap;">
+
+                                                    @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
+                                                    CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
+                                                    {
+                                                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(newCstViewParam)"
+                                                           title="View New Customer"
+                                                           style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;"><i class="fa fa-eye fa-1x"></i>&nbsp;</a>
+
+                                                    }
+
+                                                </td>
+                                                <td>@customer.NewCustomerId</td>
+                                                <td>@customer.New_GivenNames</td>
+                                                <td>@customer.New_FamilyName</td>
+                                                <td>@customer.New_FatherName</td>
+                                                <td>@customer.New_MoFirstName</td>
+                                                <td>@FormatDateString(customer.New_DateOfBirth)</td>
+                                                <td>@customer.New_Gender</td>
+                                                <td>@customer.New_BirthRegister</td>
+                                                <td>@customer.New_BirthRegNo</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts{
+
+    <script>
+
+        $(document).ready(function () {
+            HideLoader();
+        });
+
+    </script>
+}
+
