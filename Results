@@ -1,170 +1,58 @@
-<table id="CustomerDuplicateDetectionHistoryDiv" class="table table-striped table-bordered" style="width:100%">
-    <thead>
-        <tr>
-            <th></th>
-            <th>Customer ID</th>
-            <th>First Name</th>
-            <th>Family Name</th>
-            <th>Father Name</th>
-            <th>Mother Name</th>
-            <th>Date Of Birth</th>
-            <th>Gender</th>
-            <th>Register Place</th>
-            <th>Register Number</th>
-            <th>Total Grade</th>
-        </tr>
-    </thead>
+public Int32 LinkCustomer(DuplicateCustomerDto DuplicateCustomerDto, String User)
+{
+    DynamicParameters param = new DynamicParameters();
 
-    <tbody>
-    @foreach (DuplicateCustomerHistoryDto customer in Model.DuplicateCustomers)  // <-- LIST
+    param.Add("NewCustomerId", DuplicateCustomerDto.NewCustomerId, dbType: DbType.Int64, direction: ParameterDirection.Input);
+
+    if (DuplicateCustomerDto.CustomerId == 0)
     {
-        string newCstViewParam = "customerID=" + customer.NewCustomerId + "&tab=tab1";
-        string originalCstViewParam = "customerID=" + customer.CustomerId + "&tab=tab1";
-
-        decimal totalMarkedGrade =
-            customer.Mark_GivenNames +
-            customer.Mark_FamilyName +
-            customer.Mark_FatherName +
-            customer.Mark_MoFirstName +
-            customer.Mark_DateOfBirth +
-            customer.Mark_Gender +
-            customer.Mark_BirthRegister +
-            customer.Mark_BirthRegNo;
-
-        decimal totalGrade =
-            customer.Total_Mark_GivenNames +
-            customer.Total_Mark_FamilyName +
-            customer.Total_Mark_FatherName +
-            customer.Total_Mark_MoFirstName +
-            customer.Total_Mark_DateOfBirth +
-            customer.Total_Mark_Gender +
-            customer.Total_Mark_BirthRegister +
-            customer.Total_Mark_BirthRegNo;
-
-        <tr>
-            <td style="white-space: nowrap;">
-                @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
-                     CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
-                {
-                    <a href="/Customer/ViewCustomer/@Global.EncodeParameters(newCstViewParam)"
-                       title="View New Customer"
-                       style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;">
-                        <i class="fa fa-eye fa-1x"></i>
-                    </a>
-                    <span>&nbsp;</span>
-                    <a href="/Customer/ViewCustomer/@Global.EncodeParameters(originalCstViewParam)"
-                       title="View Original Customer"
-                       style="color: #495057; text-decoration: none; cursor: pointer; font-size: 1.5em;">
-                        <i class="fa fa-eye fa-1x"></i>
-                    </a>
-                }
-            </td>
-
-            <!-- Customer IDs in pills -->
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-dual-row">
-                        <span class="dc-pill"><b>New</b><span>@customer.NewCustomerId</span></span>
-                        <span class="dc-pill"><b>Original</b><span>@customer.CustomerId</span></span>
-                    </div>
-                </div>
-            </td>
-
-            <!-- First Name (New + Original) + grade pills -->
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-dual-row">
-                        <div class="dc-box">
-                            <span class="dc-label">New</span>
-                            <div class="dc-value">@customer.New_GivenNames</div>
-                        </div>
-                        <div class="dc-box">
-                            <span class="dc-label">Original</span>
-                            <div class="dc-value">@customer.Db_GivenNames</div>
-                        </div>
-                    </div>
-                    @GradeMeta(customer.Mark_GivenNames, customer.Total_Mark_GivenNames)
-                </div>
-            </td>
-
-            <!-- Repeat same pattern for other columns -->
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-dual-row">
-                        <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_FamilyName</div></div>
-                        <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_FamilyName</div></div>
-                    </div>
-                    @GradeMeta(customer.Mark_FamilyName, customer.Total_Mark_FamilyName)
-                </div>
-            </td>
-
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-dual-row">
-                        <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_FatherName</div></div>
-                        <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_FatherName</div></div>
-                    </div>
-                    @GradeMeta(customer.Mark_FatherName, customer.Total_Mark_FatherName)
-                </div>
-            </td>
-
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-dual-row">
-                        <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_MoFirstName</div></div>
-                        <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_MoFirstName</div></div>
-                    </div>
-                    @GradeMeta(customer.Mark_MoFirstName, customer.Total_Mark_MoFirstName)
-                </div>
-            </td>
-
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-dual-row">
-                        <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@FormatDateString(customer.New_DateOfBirth)</div></div>
-                        <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@FormatDateString(customer.Db_DateOfBirth)</div></div>
-                    </div>
-                    @GradeMeta(customer.Mark_DateOfBirth, customer.Total_Mark_DateOfBirth)
-                </div>
-            </td>
-
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-dual-row">
-                        <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_Gender</div></div>
-                        <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_Gender</div></div>
-                    </div>
-                    @GradeMeta(customer.Mark_Gender, customer.Total_Mark_Gender)
-                </div>
-            </td>
-
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-dual-row">
-                        <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_BirthRegister</div></div>
-                        <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_BirthRegister</div></div>
-                    </div>
-                    @GradeMeta(customer.Mark_BirthRegister, customer.Total_Mark_BirthRegister)
-                </div>
-            </td>
-
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-dual-row">
-                        <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_BirthRegNo</div></div>
-                        <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_BirthRegNo</div></div>
-                    </div>
-                    @GradeMeta(customer.Mark_BirthRegNo, customer.Total_Mark_BirthRegNo)
-                </div>
-            </td>
-
-            <td>
-                <div class="dc-dual">
-                    <div class="dc-value">Total</div>
-                    @GradeMeta(totalMarkedGrade, totalGrade)
-                </div>
-            </td>
-        </tr>
+        param.Add("CustomerId", null, dbType: DbType.Int64, direction: ParameterDirection.Input);
     }
-    </tbody>
-</table>
+    else
+    {
+        param.Add("CustomerId", DuplicateCustomerDto.CustomerId, dbType: DbType.Int64, direction: ParameterDirection.Input);
+    }
+
+    param.Add("New_DateOfBirth", DuplicateCustomerDto.New_DateOfBirth, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("New_GivenNames", DuplicateCustomerDto.New_GivenNames, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("New_FamilyName", DuplicateCustomerDto.New_FamilyName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("New_FatherName", DuplicateCustomerDto.New_FatherName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("New_MoFirstName", DuplicateCustomerDto.New_MoFirstName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("New_BirthRegister", DuplicateCustomerDto.New_BirthRegister, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("New_BirthRegNo", DuplicateCustomerDto.New_BirthRegNo, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("New_Gender", DuplicateCustomerDto.New_Gender, dbType: DbType.String, direction: ParameterDirection.Input);
+
+    param.Add("Db_DateOfBirth", DuplicateCustomerDto.Db_DateOfBirth, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Db_GivenNames", DuplicateCustomerDto.Db_GivenNames, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Db_FamilyName", DuplicateCustomerDto.Db_FamilyName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Db_FatherName", DuplicateCustomerDto.Db_FatherName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Db_MoFirstName", DuplicateCustomerDto.Db_MoFirstName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Db_BirthRegister", DuplicateCustomerDto.Db_BirthRegister, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Db_BirthRegNo", DuplicateCustomerDto.Db_BirthRegNo, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Db_Gender", DuplicateCustomerDto.Db_Gender, dbType: DbType.String, direction: ParameterDirection.Input);
+
+    param.Add("Total_Mark_DateOfBirth", DuplicateCustomerDto.Total_Mark_DateOfBirth, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Total_Mark_GivenNames", DuplicateCustomerDto.Total_Mark_GivenNames, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Total_Mark_FamilyName", DuplicateCustomerDto.Total_Mark_FamilyName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Total_Mark_FatherName", DuplicateCustomerDto.Total_Mark_FatherName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Total_Mark_MoFirstName", DuplicateCustomerDto.Total_Mark_MoFirstName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Total_Mark_BirthRegister", DuplicateCustomerDto.Total_Mark_BirthRegister, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Total_Mark_BirthRegNo", DuplicateCustomerDto.Total_Mark_BirthRegNo, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Total_Mark_Gender", DuplicateCustomerDto.Total_Mark_Gender, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("MinimumPassingMark", DuplicateCustomerDto.MinimumPassingMark, dbType: DbType.String, direction: ParameterDirection.Input);
+
+    param.Add("Mark_DateOfBirth", DuplicateCustomerDto.Mark_DateOfBirth, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Mark_GivenNames", DuplicateCustomerDto.Mark_GivenNames, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Mark_FamilyName", DuplicateCustomerDto.Mark_FamilyName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Mark_FatherName", DuplicateCustomerDto.Mark_FatherName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Mark_MoFirstName", DuplicateCustomerDto.Mark_MoFirstName, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Mark_BirthRegister", DuplicateCustomerDto.Mark_BirthRegister, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Mark_BirthRegNo", DuplicateCustomerDto.Mark_BirthRegNo, dbType: DbType.String, direction: ParameterDirection.Input);
+    param.Add("Mark_Gender", DuplicateCustomerDto.Mark_Gender, dbType: DbType.String, direction: ParameterDirection.Input);
+
+    param.Add("User", User, DbType.String, direction: ParameterDirection.Input);
+
+    Int32 newCustomerId = DapperDBAccess.ExecuteSelectCommand<Int32>("usp_Alterna_LinkCustomer", param, CommandType.StoredProcedure).First();
+
+    return newCustomerId;
+}
