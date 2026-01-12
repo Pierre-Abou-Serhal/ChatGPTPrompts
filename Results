@@ -1,19 +1,20 @@
 @model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionHistoryViewModel
 @using SGBL.DIGITAL.KYC.Models;
 @using SGBL.DIGITAL.KYC.CrossCutting
+@using System
+@using System.Linq
 
 @{
     ViewBag.Title = "CustomerDuplicateDetectionHistory";
-}
-@{
-    ViewBag.Title = "CustomerDuplicateDetection";
 }
 
 <style>
     .dc-value {
         font-weight: 600;
-        line-height: 1.2;
-        margin-bottom: .35rem;
+        line-height: 1.25;
+        margin: 0;
+        white-space: normal;
+        word-break: break-word;
     }
 
     .dc-meta {
@@ -36,10 +37,10 @@
         white-space: nowrap;
     }
 
-        .dc-pill b {
-            color: #495057;
-            font-weight: 600;
-        }
+    .dc-pill b {
+        color: #495057;
+        font-weight: 600;
+    }
 
     .dc-pill--pct {
         background: #eef6ff;
@@ -64,8 +65,51 @@
         color: #067647;
     }
 
-    #GetCustomerDuplicateDetectionRows td {
+    .dc-pill--nodup {
+        background: #f8f9fa;
+        border-color: #e9ecef;
+        color: #6c757d;
+    }
+
+    /* Make table breathing room */
+    #CustomerDuplicateDetectionHistoryDiv th,
+    #CustomerDuplicateDetectionHistoryDiv td {
+        padding: .75rem .85rem;
         vertical-align: top;
+    }
+
+    /* Dual field layout */
+    .dc-dual {
+        display: flex;
+        flex-direction: column;
+        gap: .45rem;
+        min-width: 220px;
+    }
+
+    .dc-dual-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: .5rem;
+    }
+
+    .dc-dual-row--single {
+        grid-template-columns: 1fr;
+    }
+
+    .dc-box {
+        background: #fff;
+        border: 1px solid #e6e9ee;
+        border-radius: .6rem;
+        padding: .5rem .6rem;
+    }
+
+    .dc-label {
+        display: block;
+        font-size: .68rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        margin-bottom: .2rem;
     }
 </style>
 
@@ -73,7 +117,7 @@
     string FormatDateString(string date)
     {
         if (string.IsNullOrWhiteSpace(date)) return string.Empty;
-        if (date.Length < 8) return date; // fallback if unexpected format
+        if (date.Length < 8) return date;
 
         var year = date.Substring(0, 4);
         var month = date.Substring(4, 2);
@@ -110,6 +154,15 @@
     </div>
 }
 
+@helper NoDuplicateMeta()
+{
+    <div class="dc-meta">
+        <span class="dc-pill dc-pill--nodup">
+            <b>Status</b>
+            <span>No duplicate detected</span>
+        </span>
+    </div>
+}
 
 <div class="app-content content container center-layout">
     <div class="content-wrapper">
@@ -131,14 +184,10 @@
 
         <ul class="nav nav-tabs">
             <li class="nav-item">
-                <a class="nav-link" href="/Customer/CustomerDuplicateDetection/">
-                    Detect
-                </a>
+                <a class="nav-link" href="/Customer/CustomerDuplicateDetection/">Detect</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link active" aria-current="page" href="/Customer/CustomerDuplicateDetectionHistory/">
-                    History
-                </a>
+                <a class="nav-link active" aria-current="page" href="/Customer/CustomerDuplicateDetectionHistory/">History</a>
             </li>
         </ul>
 
@@ -166,6 +215,19 @@
 
                                 <div class="bold-underline-title mb-2">New Customers</div>
 
+                                @{
+                                    // Optional: show a global message if none of the rows has a duplicate
+                                    var anyDuplicate = (Model?.DuplicateCustomers ?? Enumerable.Empty<DuplicateCustomerHistoryDto>())
+                                        .Any(x => Convert.ToInt32(x.CustomerId) > 0);
+                                }
+
+                                @if (!anyDuplicate && (Model?.DuplicateCustomers?.Any() ?? false))
+                                {
+                                    <div class="alert alert-info">
+                                        No duplicate detection found for the listed customers.
+                                    </div>
+                                }
+
                                 <table id="CustomerDuplicateDetectionHistoryDiv" class="table table-striped table-bordered" style="width:100%">
                                     <thead>
                                         <tr>
@@ -184,10 +246,13 @@
                                     </thead>
 
                                     <tbody>
-                                        @foreach (DuplicateCustomerHistoryDto customer in Model.DuplicateCustomers)  // <-- LIST
+                                        @foreach (DuplicateCustomerHistoryDto customer in Model.DuplicateCustomers)
                                         {
+                                            var originalId = Convert.ToInt32(customer.CustomerId); // null -> 0
+                                            var hasDuplicate = originalId > 0;
+
                                             string newCstViewParam = "customerID=" + customer.NewCustomerId + "&tab=tab1";
-                                            string originalCstViewParam = "customerID=" + customer.CustomerId + "&tab=tab1";
+                                            string originalCstViewParam = "customerID=" + originalId + "&tab=tab1";
 
                                             decimal totalMarkedGrade =
                                                 customer.Mark_GivenNames +
@@ -219,123 +284,258 @@
                                                            style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;">
                                                             <i class="fa fa-eye fa-1x"></i>
                                                         </a>
-                                                        <span>&nbsp;</span>
-                                                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(originalCstViewParam)"
-                                                           title="View Original Customer"
-                                                           style="color: #495057; text-decoration: none; cursor: pointer; font-size: 1.5em;">
-                                                            <i class="fa fa-eye fa-1x"></i>
-                                                        </a>
+
+                                                        @if (hasDuplicate)
+                                                        {
+                                                            <span>&nbsp;</span>
+                                                            <a href="/Customer/ViewCustomer/@Global.EncodeParameters(originalCstViewParam)"
+                                                               title="View Original Customer"
+                                                               style="color: #495057; text-decoration: none; cursor: pointer; font-size: 1.5em;">
+                                                                <i class="fa fa-eye fa-1x"></i>
+                                                            </a>
+                                                        }
                                                     }
                                                 </td>
 
-                                                <!-- Customer IDs in pills -->
+                                                <!-- Customer IDs -->
                                                 <td>
                                                     <div class="dc-dual">
-                                                        <div class="dc-dual-row">
-                                                            <span class="dc-pill"><b>New</b><span>@customer.NewCustomerId</span></span>
-                                                            <span class="dc-pill"><b>Original</b><span>@customer.CustomerId</span></span>
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.NewCustomerId</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@originalId</div>
+                                                                </div>
+                                                            }
                                                         </div>
+
+                                                        @if (!hasDuplicate) { @NoDuplicateMeta() }
                                                     </div>
                                                 </td>
 
-                                                <!-- First Name (New + Original) + grade pills -->
+                                                <!-- First Name -->
                                                 <td>
                                                     <div class="dc-dual">
-                                                        <div class="dc-dual-row">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
                                                             <div class="dc-box">
                                                                 <span class="dc-label">New</span>
                                                                 <div class="dc-value">@customer.New_GivenNames</div>
                                                             </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_GivenNames</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate) { @GradeMeta(customer.Mark_GivenNames, customer.Total_Mark_GivenNames) }
+                                                        else { @NoDuplicateMeta() }
+                                                    </div>
+                                                </td>
+
+                                                <!-- Family Name -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
                                                             <div class="dc-box">
-                                                                <span class="dc-label">Original</span>
-                                                                <div class="dc-value">@customer.Db_GivenNames</div>
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_FamilyName</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_FamilyName</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate) { @GradeMeta(customer.Mark_FamilyName, customer.Total_Mark_FamilyName) }
+                                                        else { @NoDuplicateMeta() }
+                                                    </div>
+                                                </td>
+
+                                                <!-- Father Name -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_FatherName</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_FatherName</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate) { @GradeMeta(customer.Mark_FatherName, customer.Total_Mark_FatherName) }
+                                                        else { @NoDuplicateMeta() }
+                                                    </div>
+                                                </td>
+
+                                                <!-- Mother Name -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_MoFirstName</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_MoFirstName</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate) { @GradeMeta(customer.Mark_MoFirstName, customer.Total_Mark_MoFirstName) }
+                                                        else { @NoDuplicateMeta() }
+                                                    </div>
+                                                </td>
+
+                                                <!-- DOB -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@FormatDateString(customer.New_DateOfBirth)</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@FormatDateString(customer.Db_DateOfBirth)</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate) { @GradeMeta(customer.Mark_DateOfBirth, customer.Total_Mark_DateOfBirth) }
+                                                        else { @NoDuplicateMeta() }
+                                                    </div>
+                                                </td>
+
+                                                <!-- Gender -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_Gender</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_Gender</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate) { @GradeMeta(customer.Mark_Gender, customer.Total_Mark_Gender) }
+                                                        else { @NoDuplicateMeta() }
+                                                    </div>
+                                                </td>
+
+                                                <!-- Register Place -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_BirthRegister</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_BirthRegister</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate) { @GradeMeta(customer.Mark_BirthRegister, customer.Total_Mark_BirthRegister) }
+                                                        else { @NoDuplicateMeta() }
+                                                    </div>
+                                                </td>
+
+                                                <!-- Register Number -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_BirthRegNo</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_BirthRegNo</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate) { @GradeMeta(customer.Mark_BirthRegNo, customer.Total_Mark_BirthRegNo) }
+                                                        else { @NoDuplicateMeta() }
+                                                    </div>
+                                                </td>
+
+                                                <!-- Total Grade -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-box">
+                                                            <span class="dc-label">Total</span>
+                                                            <div class="dc-value">
+                                                                @if (hasDuplicate)
+                                                                {
+                                                                    @Math.Round(totalMarkedGrade, 2) <text> / </text> @Math.Round(totalGrade, 2)
+                                                                }
+                                                                else
+                                                                {
+                                                                    <text>N/A</text>
+                                                                }
                                                             </div>
                                                         </div>
-                                                        @GradeMeta(customer.Mark_GivenNames, customer.Total_Mark_GivenNames)
-                                                    </div>
-                                                </td>
 
-                                                <!-- Repeat same pattern for other columns -->
-                                                <td>
-                                                    <div class="dc-dual">
-                                                        <div class="dc-dual-row">
-                                                            <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_FamilyName</div></div>
-                                                            <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_FamilyName</div></div>
-                                                        </div>
-                                                        @GradeMeta(customer.Mark_FamilyName, customer.Total_Mark_FamilyName)
-                                                    </div>
-                                                </td>
-
-                                                <td>
-                                                    <div class="dc-dual">
-                                                        <div class="dc-dual-row">
-                                                            <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_FatherName</div></div>
-                                                            <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_FatherName</div></div>
-                                                        </div>
-                                                        @GradeMeta(customer.Mark_FatherName, customer.Total_Mark_FatherName)
-                                                    </div>
-                                                </td>
-
-                                                <td>
-                                                    <div class="dc-dual">
-                                                        <div class="dc-dual-row">
-                                                            <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_MoFirstName</div></div>
-                                                            <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_MoFirstName</div></div>
-                                                        </div>
-                                                        @GradeMeta(customer.Mark_MoFirstName, customer.Total_Mark_MoFirstName)
-                                                    </div>
-                                                </td>
-
-                                                <td>
-                                                    <div class="dc-dual">
-                                                        <div class="dc-dual-row">
-                                                            <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@FormatDateString(customer.New_DateOfBirth)</div></div>
-                                                            <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@FormatDateString(customer.Db_DateOfBirth)</div></div>
-                                                        </div>
-                                                        @GradeMeta(customer.Mark_DateOfBirth, customer.Total_Mark_DateOfBirth)
-                                                    </div>
-                                                </td>
-
-                                                <td>
-                                                    <div class="dc-dual">
-                                                        <div class="dc-dual-row">
-                                                            <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_Gender</div></div>
-                                                            <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_Gender</div></div>
-                                                        </div>
-                                                        @GradeMeta(customer.Mark_Gender, customer.Total_Mark_Gender)
-                                                    </div>
-                                                </td>
-
-                                                <td>
-                                                    <div class="dc-dual">
-                                                        <div class="dc-dual-row">
-                                                            <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_BirthRegister</div></div>
-                                                            <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_BirthRegister</div></div>
-                                                        </div>
-                                                        @GradeMeta(customer.Mark_BirthRegister, customer.Total_Mark_BirthRegister)
-                                                    </div>
-                                                </td>
-
-                                                <td>
-                                                    <div class="dc-dual">
-                                                        <div class="dc-dual-row">
-                                                            <div class="dc-box"><span class="dc-label">New</span><div class="dc-value">@customer.New_BirthRegNo</div></div>
-                                                            <div class="dc-box"><span class="dc-label">Original</span><div class="dc-value">@customer.Db_BirthRegNo</div></div>
-                                                        </div>
-                                                        @GradeMeta(customer.Mark_BirthRegNo, customer.Total_Mark_BirthRegNo)
-                                                    </div>
-                                                </td>
-
-                                                <td>
-                                                    <div class="dc-dual">
-                                                        <div class="dc-value">Total</div>
-                                                        @GradeMeta(totalMarkedGrade, totalGrade)
+                                                        @if (hasDuplicate) { @GradeMeta(totalMarkedGrade, totalGrade) }
+                                                        else { @NoDuplicateMeta() }
                                                     </div>
                                                 </td>
                                             </tr>
                                         }
                                     </tbody>
                                 </table>
+
+                                @if (!(Model?.DuplicateCustomers?.Any() ?? false))
+                                {
+                                    <div class="alert alert-warning mt-2">
+                                        No records found.
+                                    </div>
+                                }
+
                             </div>
                         </div>
                     </div>
@@ -345,20 +545,21 @@
     </div>
 </div>
 
-
 @section Scripts{
-
     <script>
-
         $(document).ready(function () {
             HideLoader();
-        });
 
-        var table = $('#CustomerDuplicateDetectionHistoryDiv').DataTable({
-            scrollX: true,
-            autoWidth: false
+            $('#CustomerDuplicateDetectionHistoryDiv').DataTable({
+                scrollX: true,
+                autoWidth: false,
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                fixedHeader: true,
+                columnDefs: [
+                    { targets: 0, orderable: false, width: "70px" }
+                ]
+            });
         });
-
     </script>
 }
-
