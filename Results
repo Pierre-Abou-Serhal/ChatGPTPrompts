@@ -1,49 +1,160 @@
-;WITH NC AS
+USE [Alterna_KYC]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_Alterna_GetDuplicateCustomers]    Script Date: 1/13/2026 2:36:08 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE [dbo].[usp_Alterna_GetCustomDuplicateCustomer]
 (
-    -- Default behavior: only customers from t_NewT24Customers
-    SELECT
-        T24C.Id AS NewCustomerId,
-
-        dbo.Fn_NormalizeWord(T24C.DateOfBirth)   AS DateOfBirth,
-        dbo.Fn_NormalizeWord(T24C.GivenNames)    AS GivenNames,
-        dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
-        dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
-        dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
-        dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegisterId,
-        dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
-        dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender,
-
-        SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.GivenNames), 200)))   AS Sdx_GivenNames,
-        SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.FamilyName), 200)))   AS Sdx_FamilyName,
-        SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.FatherName), 200)))   AS Sdx_FatherName,
-        SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.MoFirstName), 200)))  AS Sdx_MoFirstName
-    FROM dbo.t_NewT24Customers AS NT24C
-    JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
-    WHERE
-        @CustomerId IS NULL
-        AND NT24C.StatusCode = @StatusCode
-
-    UNION ALL
-
-    -- Optional behavior: direct pick from t_T24Customer (ignores t_NewT24Customers)
-    SELECT
-        T24C.Id AS NewCustomerId,
-
-        dbo.Fn_NormalizeWord(T24C.DateOfBirth)   AS DateOfBirth,
-        dbo.Fn_NormalizeWord(T24C.GivenNames)    AS GivenNames,
-        dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
-        dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
-        dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
-        dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegisterId,
-        dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
-        dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender,
-
-        SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.GivenNames), 200)))   AS Sdx_GivenNames,
-        SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.FamilyName), 200)))   AS Sdx_FamilyName,
-        SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.FatherName), 200)))   AS Sdx_FatherName,
-        SOUNDEX(CONVERT(nvarchar(200), LEFT(dbo.Fn_NormalizeWord(T24C.MoFirstName), 200)))  AS Sdx_MoFirstName
-    FROM dbo.t_T24Customer AS T24C
-    WHERE
-        @CustomerId IS NOT NULL
-        AND T24C.Id = @CustomerId
+	@CustomerId INT,
+	@NewCustomerId INT
 )
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    ;WITH NC AS
+    (
+        SELECT
+            T24C.Id AS NewCustomerId,
+
+            -- New customer normalized values (computed once)
+            dbo.Fn_NormalizeWord(T24C.DateOfBirth)   AS DateOfBirth,
+            dbo.Fn_NormalizeWord(T24C.GivenNames)    AS GivenNames,
+            dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
+            dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
+            dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
+            dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegisterId,
+            dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
+            dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender
+        FROM dbo.t_T24Customer AS T24C
+        WHERE T24C.Id = @CustomerId
+    )
+    SELECT
+        nc.NewCustomerId,
+        c.CustomerId,
+
+        -- New customer values
+        nc.DateOfBirth   AS New_DateOfBirth,
+        nc.GivenNames    AS New_GivenNames,
+        nc.FamilyName    AS New_FamilyName,
+        nc.FatherName    AS New_FatherName,
+        nc.MoFirstName   AS New_MoFirstName,
+
+        -- Return description for display
+        nc.BirthRegisterId            AS New_BirthRegisterId,
+        brNew.New_BirthRegisterDesc   AS New_BirthRegister,
+
+        nc.BirthRegNo    AS New_BirthRegNo,
+        nc.Gender        AS New_Gender,
+
+        -- Candidate values
+        c.Db_DateOfBirth,
+        c.Db_GivenNames,
+        c.Db_FamilyName,
+        c.Db_FatherName,
+        c.Db_MoFirstName,
+
+        -- Return description for display
+        c.Db_BirthRegisterId          AS Db_BirthRegisterId,
+        brDb.Db_BirthRegisterDesc     AS Db_BirthRegister,
+
+        c.Db_BirthRegNo,
+        c.Db_Gender,
+
+        -- Exact flags
+        c.Match_DateOfBirth,
+        c.Match_BirthRegNo,
+        c.Match_BirthRegister,
+        c.Match_Gender,
+
+        -- Fuzzy flags
+        c.Match_GivenNames,
+        c.Match_FamilyName,
+        c.Match_FatherName,
+        c.Match_MoFirstName
+    FROM NC AS nc
+
+    -- Lookup description for NEW customer BirthRegisterId
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            b.DescriptionFR AS New_BirthRegisterDesc   -- or b.DescriptionFR
+        FROM [Lookup.CusBirth] b
+        WHERE b.Id = TRY_CONVERT(int, nc.BirthRegisterId)
+    ) brNew
+
+    OUTER APPLY
+    (
+        SELECT TOP (@MaxCandidatesPerNew)
+            t.Id AS CustomerId,
+
+            -- Candidate normalized values (already persisted)
+            t.Norm_DateOfBirth   AS Db_DateOfBirth,
+            t.Norm_GivenNames    AS Db_GivenNames,
+            t.Norm_FamilyName    AS Db_FamilyName,
+            t.Norm_FatherName    AS Db_FatherName,
+            t.Norm_MoFirstName   AS Db_MoFirstName,
+
+            -- IMPORTANT: still the ID (as text) used for matching
+            t.Norm_BirthRegister AS Db_BirthRegisterId,
+
+            t.Norm_BirthRegNo    AS Db_BirthRegNo,
+            t.Norm_Gender        AS Db_Gender,
+
+            -- Exact match flags (still compares IDs)
+            CAST(CASE WHEN t.Norm_DateOfBirth   = nc.DateOfBirth       THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
+            CAST(CASE WHEN t.Norm_BirthRegNo    = nc.BirthRegNo        THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
+            CAST(CASE WHEN t.Norm_BirthRegister = nc.BirthRegisterId   THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
+            CAST(CASE WHEN t.Norm_Gender        = nc.Gender            THEN 1 ELSE 0 END AS bit) AS Match_Gender,
+
+            -- Fuzzy flags
+            CAST(CASE WHEN DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
+            CAST(CASE WHEN DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
+            CAST(CASE WHEN DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
+            CAST(CASE WHEN DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
+
+        FROM dbo.t_T24Customer AS t
+        WHERE
+            t.Id <> nc.NewCustomerId
+
+            AND nc.GivenNames  IS NOT NULL
+            AND nc.FamilyName  IS NOT NULL
+            AND nc.FatherName  IS NOT NULL
+            AND nc.MoFirstName IS NOT NULL
+
+            AND t.Norm_GivenNames  IS NOT NULL
+            AND t.Norm_FamilyName  IS NOT NULL
+            AND t.Norm_FatherName  IS NOT NULL
+            AND t.Norm_MoFirstName IS NOT NULL
+
+            AND t.Sdx_GivenNames  = nc.Sdx_GivenNames
+            AND t.Sdx_FamilyName  = nc.Sdx_FamilyName
+            AND t.Sdx_FatherName  = nc.Sdx_FatherName
+            AND t.Sdx_MoFirstName = nc.Sdx_MoFirstName
+
+            AND (nc.DateOfBirth     IS NULL OR t.Norm_DateOfBirth  = nc.DateOfBirth)
+            AND (nc.Gender          IS NULL OR t.Norm_Gender       = nc.Gender)
+            AND (nc.BirthRegNo      IS NULL OR t.Norm_BirthRegNo   = nc.BirthRegNo)
+
+            AND DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold
+            AND DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold
+            AND DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold
+            AND DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold
+
+        ORDER BY t.Id
+    ) AS c
+
+    -- Lookup description for DB candidate BirthRegisterId
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            b.DescriptionFR AS Db_BirthRegisterDesc 
+        FROM [Lookup.CusBirth] b
+        WHERE b.Id = TRY_CONVERT(int, c.Db_BirthRegisterId)
+    ) brDb
+
+    ORDER BY nc.NewCustomerId, c.CustomerId
+    OPTION (RECOMPILE);
+END
