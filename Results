@@ -1,6 +1,15 @@
-AND (
-    (CASE WHEN t.Sdx_GivenNames  = nc.Sdx_GivenNames  THEN 1 ELSE 0 END) +
-    (CASE WHEN t.Sdx_FamilyName  = nc.Sdx_FamilyName  THEN 1 ELSE 0 END) +
-    (CASE WHEN t.Sdx_FatherName  = nc.Sdx_FatherName  THEN 1 ELSE 0 END) +
-    (CASE WHEN t.Sdx_MoFirstName = nc.Sdx_MoFirstName THEN 1 ELSE 0 END)
-) >= 2
+function parseValidNumber(word) {
+  if (word === null || word === undefined) return null;
+
+  const s = String(word).trim();
+
+  // not empty, digits only, max 7 digits
+  if (!/^\d{1,7}$/.test(s)) return null;
+
+  const n = Number(s);
+
+  // not zero (also rejects "0", "00", etc.)
+  if (n === 0) return null;
+
+  return n; // number type
+}
