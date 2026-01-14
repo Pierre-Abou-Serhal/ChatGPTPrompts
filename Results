@@ -1,45 +1,1481 @@
-CREATE OR ALTER PROCEDURE [dbo].[usp_Alterna_GetCustomDuplicateCustomer]
+@model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionViewModel
+@using SGBL.DIGITAL.KYC.Models;
+@using SGBL.DIGITAL.KYC.CrossCutting
+
+@{
+    var param = string.Empty;
+}
+
+@{
+    ViewBag.Title = "CustomerDuplicateDetection";
+}
+@{
+    String FormatDateString(String date)
+    {
+        String formattedDateString = String.Empty;
+
+        if (!String.IsNullOrWhiteSpace(date))
+        {
+            // Extract year, month, and day substrings
+            String year = date.Substring(0, 4);
+            String month = date.Substring(4, 2);
+            String day = date.Substring(6);
+
+            // Combine formatted parts with hyphens
+            formattedDateString = $"{year}-{month}-{day}";
+        }
+
+        return formattedDateString;
+    }
+}
+
+<style>
+    .bold-underline-title {
+        font-weight: bold;
+        display: block;
+        width: 100%;
+        border-bottom: 2px solid black;
+        padding-bottom: 5px;
+    }
+
+    /* highlight selected new customer row */
+    #CustomerDuplicateDetectionDiv tbody tr.row-selected td {
+        background-color: #d9edf7 !important; /* light blue */
+    }
+</style>
+
+<div class="app-content content container center-layout">
+    <div class="content-wrapper">
+        <div class="content-header row">
+            <div class="content-header-left col-md-10 col-12 mb-2">
+                <h3 class="content-header-title mb-0">LINK DUPLICATE CUSTOMER</h3>
+                <div class="row breadcrumbs-top">
+                    <div class="breadcrumb-wrapper col-12">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="/Customer/CustomerDashboard">DASHBOARD</a></li>
+                            <li class="breadcrumb-item">Link</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="content-header-right col-md-2 col-12 mb-2" style="text-align:end; font-size:larger">
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link active" aria-current="page" onclick="ShowLoader();" href="/Customer/CustomerDuplicateDetection/">
+                    Detect
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" onclick="ShowLoader();" href="/Customer/CustomerDuplicateDetectionHistory/">
+                    History
+                </a>
+            </li>
+        </ul>
+
+        <div class="content-body">
+            <section class="users-info">
+                <div class="card">
+
+                    <div id="CardTitle" class="card-header bg-secondary text-white text-bold-500 font-large-1" style="padding-top:0px;padding-bottom:0px;">
+                        <i id="CardIcon" class="fa fa-info-circle mr-1" aria-hidden="true"></i> Customer Duplicate Detection
+                    </div>
+
+                    <div class="card-content p-2">
+                        <div class="card-body">
+                            <div id="CustomerDuplicateDetectionInfo">
+
+                                <div id="CustomDataTableButtonsWrapper">
+                                    <div class="row">
+                                        <div class="col">
+                                            <div class="float-right">
+                                                <div id="CustomDataTableButtons"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bold-underline-title mb-2">New Customers</div>
+
+                                <table id="CustomerDuplicateDetectionDiv" class="table table-striped table-bordered" style="width:100%">
+
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>New Customer ID</th>
+                                            <th>First Name</th>
+                                            <th>Family Name</th>
+                                            <th>Father Name</th>
+                                            <th>Mother Name</th>
+                                            <th>Date Of Birth</th>
+                                            <th>Gender</th>
+                                            <th>Register Place</th>
+                                            <th>Register Number</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+
+                                        @foreach (DuplicateCustomerDto customer in Model.NewCustomersToCheck)
+                                        {
+                                            String newCstViewParam = "customerID=" + customer.NewCustomerId + "&tab=tab1";
+                                            String trElementId = "NewCustomerTr" + customer.NewCustomerId;
+
+                                            <tr id="@trElementId">
+                                                <td style="white-space: nowrap;">
+
+                                                    @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
+                                                    CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
+                                                    {
+                                                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(newCstViewParam)"
+                                                           title="View New Customer"
+                                                           style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;"><i class="fa fa-eye fa-1x"></i>&nbsp;</a>
+
+                                                    }
+
+                                                </td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId, this)" style="cursor: pointer">@customer.NewCustomerId</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId, this)" style="cursor: pointer">@customer.New_GivenNames</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId, this)" style="cursor: pointer">@customer.New_FamilyName</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId, this)" style="cursor: pointer">@customer.New_FatherName</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId, this)" style="cursor: pointer">@customer.New_MoFirstName</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId, this)" style="cursor: pointer">@FormatDateString(customer.New_DateOfBirth)</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId, this)" style="cursor: pointer">@customer.New_Gender</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId, this)" style="cursor: pointer">@customer.New_BirthRegister</td>
+                                                <td onclick="getCustomerDuplicateDetection(@customer.NewCustomerId, this)" style="cursor: pointer">@customer.New_BirthRegNo</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-content p-2">
+                        <div class="card-body">
+                            <div id="GetCustomerDuplicateDetectionDiv">
+                                @Html.Action("GetCustomerDuplicateDetection", "Customer", new { newCustomerId = 0 })
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts{
+
+    <script>
+
+        $(document).ready(function () {
+            HideLoader();
+        });
+
+        var table = $('#CustomerDuplicateDetectionDiv').DataTable({
+            scrollX: true,
+            autoWidth: false
+        });
+
+        function getCustomerDuplicateDetection(newCustomerId, el) {
+
+          // Highlight selected row
+          if (el) {
+            $('#CustomerDuplicateDetectionDiv tbody tr').removeClass('row-selected');
+            $(el).closest('tr').addClass('row-selected');
+          }
+
+          if (newCustomerId) {
+            try {
+              ShowLoader();
+              $.ajax({
+                type: 'POST',
+                url: '/Customer/GetCustomerDuplicateDetection/',
+                data: { newCustomerId: newCustomerId },
+                dataType: 'html',
+                success: function (data) {
+                  $('#GetCustomerDuplicateDetectionDiv').html(data);
+
+                  // Destroy if already initialized, then re-init
+                  if ($.fn.DataTable.isDataTable('#GetCustomerDuplicateDetectionRows')) {
+                    $('#GetCustomerDuplicateDetectionRows').DataTable().destroy();
+                  }
+
+                  $('#GetCustomerDuplicateDetectionRows').DataTable({
+                    scrollX: true,
+                    autoWidth: false
+                  });
+
+                  HideLoader();
+                },
+                error: function () {
+                    HideLoader();
+                    let controller = 'Message';
+                    let action = 'DisplayMessage';
+                    let url = '/' + controller + '/' + action;
+
+                    window.location.href = url;
+                }
+              });
+            } catch (ex) {
+              console.error(ex);
+              HideLoader();
+            }
+          } else {
+            alert('New Customer ID not valid!');
+          }
+        }
+
+        function linkCustomer(customerId, newCustomerId) {
+            const swalWithBootstrapButtons = Swal.mixin({
+                customClass: {
+                    confirmButton: "btn btn-success",
+                    cancelButton: "btn btn-danger mr-3"
+                },
+                buttonsStyling: false
+            });
+
+            let title = !customerId ?
+                `Are you sure you don't want to link the new customer: ${newCustomerId} to any one ?` :
+                `Are you sure you want to link the new customer: ${newCustomerId} to customer: ${customerId} ?`;
+
+            swalWithBootstrapButtons.fire({
+                title: "Link Customer Confirmation",
+                text: title,
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "Yes",
+                cancelButtonText: "No",
+                reverseButtons: true,
+                allowOutsideClick: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    try {
+                      ShowLoader();
+                        $.ajax({
+                            type: 'POST',
+                            url: '/Customer/LinkCustomer/',
+                            data: {
+                                customerId: customerId,
+                                newCustomerId: newCustomerId
+                            },
+                            dataType: 'json',
+                            success: function (data) {
+                                console.log(data);
+
+                                if (data.NewCustomerId === 0) {
+                                    swalWithBootstrapButtons.fire(`The Inputted Customer ID Does not Exist!`, '', 'danger'); 
+                                }
+                                else {
+                                    let trId = "#NewCustomerTr" + data.NewCustomerId;
+                                    let jQuerytrElement = $(trId);
+
+                                    console.log(jQuerytrElement);
+
+                                    table
+                                        .row(jQuerytrElement)
+                                        .remove()
+                                        .draw();
+
+                                    let duplicateCstTable = $('#GetCustomerDuplicateDetectionRows').DataTable();
+                                    console.log(duplicateCstTable);
+                                    duplicateCstTable.clear().draw();
+
+                                    $("#noCustomerLinkFoundBtn").remove();
+                                }
+
+                                HideLoader();
+                        },
+                        error: function () {
+                            HideLoader();
+                            let controller = 'Message';
+                            let action = 'DisplayMessage';
+                            let url = '/' + controller + '/' + action;
+
+                            window.location.href = url;
+                        }
+                      });
+                    } catch (ex) {
+                      console.error(ex);
+                      HideLoader();
+                    }
+                } else if (result.dismiss === Swal.DismissReason.cancel) { }
+            });
+        }
+
+        function parseValidNumber(word) {
+            if (word === null || word === undefined) return null;
+
+            const s = String(word).trim();
+
+            // not empty, digits only, max 7 digits
+            if (!/^\d{1,7}$/.test(s)) return null;
+
+            const n = Number(s);
+
+            // not zero (also rejects "0", "00", etc.)
+            if (n === 0) return null;
+
+            return n; // number type
+        }
+
+        function getCustomUserId(newCustomerId) {
+            const swalWithBootstrapButtons = Swal.mixin({
+                customClass: {
+                    confirmButton: "btn btn-success mr-3",
+                    cancelButton: "btn btn-danger"
+                },
+                buttonsStyling: false
+            });
+
+            swalWithBootstrapButtons.fire({
+                title: 'Enter the custom user ID',
+                input: 'text',
+                inputPlaceholder: 'Customer ID',
+                showCancelButton: true,
+                inputValidator: (value) => {
+                    if (parseValidNumber(value) === null) {
+                        return 'Invalid Customer ID!'
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const inputValue = result.value;
+                    linkCustomer(inputValue, newCustomerId);
+                }
+            });
+        }
+
+    </script>
+}
+
+@model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionHistoryViewModel
+@using SGBL.DIGITAL.KYC.Models;
+@using SGBL.DIGITAL.KYC.CrossCutting
+@using System
+@using System.Linq
+
+@{
+    ViewBag.Title = "CustomerDuplicateDetectionHistory";
+}
+
+<style>
+    .dc-value {
+        font-weight: 600;
+        line-height: 1.25;
+        margin: 0;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .dc-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem .5rem;
+        align-items: center;
+        font-size: .78rem;
+        color: #6c757d;
+    }
+
+    .dc-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .12rem .5rem;
+        border-radius: 999px;
+        background: #f6f7f9;
+        border: 1px solid #e6e9ee;
+        white-space: nowrap;
+    }
+
+        .dc-pill b {
+            color: #495057;
+            font-weight: 600;
+        }
+
+    .dc-pill--pct {
+        background: #eef6ff;
+        border-color: #d7eaff;
+    }
+
+    .dc-pct-low {
+        background: #fff1f1;
+        border-color: #ffd6d6;
+        color: #b42318;
+    }
+
+    .dc-pct-mid {
+        background: #fff7e6;
+        border-color: #ffe1b3;
+        color: #8a6100;
+    }
+
+    .dc-pct-high {
+        background: #ecfdf3;
+        border-color: #c7f0d8;
+        color: #067647;
+    }
+
+    .dc-pill--nodup {
+        background: #f8f9fa;
+        border-color: #e9ecef;
+        color: #6c757d;
+    }
+
+    /* Make table breathing room */
+    #CustomerDuplicateDetectionHistoryDiv th,
+    #CustomerDuplicateDetectionHistoryDiv td {
+        vertical-align: top;
+    }
+
+    /* Dual field layout */
+    .dc-dual {
+        display: flex;
+        flex-direction: column;
+        gap: .45rem;
+        min-width: 220px;
+    }
+
+    .dc-dual-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: .5rem;
+    }
+
+    .dc-dual-row--single {
+        grid-template-columns: 1fr;
+    }
+
+    .dc-box {
+        background: #fff;
+        border: 1px solid #e6e9ee;
+        border-radius: .6rem;
+        padding: .5rem .6rem;
+    }
+
+    .dc-label {
+        display: block;
+        font-size: .68rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        margin-bottom: .2rem;
+    }
+</style>
+
+@functions {
+    string FormatDateString(string date)
+    {
+        if (string.IsNullOrWhiteSpace(date)) return string.Empty;
+        if (date.Length < 8) return date;
+
+        var year = date.Substring(0, 4);
+        var month = date.Substring(4, 2);
+        var day = date.Substring(6, 2);
+
+        return $"{year}-{month}-{day}";
+    }
+
+    decimal CalcPct(decimal mark, decimal total)
+        => total == 0 ? 0 : Math.Round((mark / total) * 100m, 2);
+
+    string PctClass(decimal pct)
+    {
+        if (pct < 50) return "dc-pct-low";
+        if (pct < 80) return "dc-pct-mid";
+        return "dc-pct-high";
+    }
+}
+
+@helper GradeMeta(decimal mark, decimal total)
+{
+    var pct = CalcPct(mark, total);
+
+    <div class="dc-meta">
+        <span class="dc-pill">
+            <b>Grade</b>
+            <span>@Math.Round(mark, 2) / @Math.Round(total, 2)</span>
+        </span>
+
+        <span class="dc-pill dc-pill--pct @PctClass(pct)">
+            <b>%</b>
+            <span>@pct</span>
+        </span>
+    </div>
+}
+
+@helper NoDuplicateMeta()
+{
+    <div class="dc-meta">
+        <span class="dc-pill dc-pill--nodup">
+            <b>Status</b>
+            <span>No duplicate detected</span>
+        </span>
+    </div>
+}
+
+<div class="app-content content container center-layout">
+    <div class="content-wrapper">
+        <div class="content-header row">
+            <div class="content-header-left col-md-10 col-12 mb-2">
+                <h3 class="content-header-title mb-0">CUSTOMER DUPLICATES HISTORY</h3>
+                <div class="row breadcrumbs-top">
+                    <div class="breadcrumb-wrapper col-12">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="/Customer/CustomerDashboard">DASHBOARD</a></li>
+                            <li class="breadcrumb-item">History</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="content-header-right col-md-2 col-12 mb-2" style="text-align:end; font-size:larger">
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link" onclick="ShowLoader();" href="/Customer/CustomerDuplicateDetection/">Detect</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" onclick="ShowLoader();" aria-current="page" href="/Customer/CustomerDuplicateDetectionHistory/">History</a>
+            </li>
+        </ul>
+
+        <div class="content-body">
+            <section class="users-info">
+                <div class="card">
+
+                    <div id="CardTitle" class="card-header bg-secondary text-white text-bold-500 font-large-1" style="padding-top:0px;padding-bottom:0px;">
+                        <i id="CardIcon" class="fa fa-info-circle mr-1" aria-hidden="true"></i> Customer Duplicate Detection History
+                    </div>
+
+                    <div class="card-content p-2">
+                        <div class="card-body">
+                            <div id="CustomerDuplicateDetectionHistoryInfo">
+
+                                <div id="CustomDataTableButtonsWrapper">
+                                    <div class="row">
+                                        <div class="col">
+                                            <div class="float-right">
+                                                <div id="CustomDataTableButtons"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <table id="CustomerDuplicateDetectionHistoryDiv" class="table table-striped table-bordered" style="width:100%">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>Customer ID</th>
+                                            <th>First Name</th>
+                                            <th>Family Name</th>
+                                            <th>Father Name</th>
+                                            <th>Mother Name</th>
+                                            <th>Date Of Birth</th>
+                                            <th>Gender</th>
+                                            <th>Register Place</th>
+                                            <th>Register Number</th>
+                                            <th>Total Grade</th>
+                                            <th>Detected By</th>
+                                            <th>Detected At</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        @foreach (DuplicateCustomerHistoryDto customer in Model.DuplicateCustomers)
+                                        {
+                                            var originalId = Convert.ToInt32(customer.CustomerId); // null -> 0
+                                            var hasDuplicate = originalId > 0;
+
+                                            string newCstViewParam = "customerID=" + customer.NewCustomerId + "&tab=tab1";
+                                            string originalCstViewParam = "customerID=" + originalId + "&tab=tab1";
+
+                                            decimal totalMarkedGrade =
+                                                customer.Mark_GivenNames +
+                                                customer.Mark_FamilyName +
+                                                customer.Mark_FatherName +
+                                                customer.Mark_MoFirstName +
+                                                customer.Mark_DateOfBirth +
+                                                customer.Mark_Gender +
+                                                customer.Mark_BirthRegister +
+                                                customer.Mark_BirthRegNo;
+
+                                            decimal totalGrade =
+                                                customer.Total_Mark_GivenNames +
+                                                customer.Total_Mark_FamilyName +
+                                                customer.Total_Mark_FatherName +
+                                                customer.Total_Mark_MoFirstName +
+                                                customer.Total_Mark_DateOfBirth +
+                                                customer.Total_Mark_Gender +
+                                                customer.Total_Mark_BirthRegister +
+                                                customer.Total_Mark_BirthRegNo;
+
+                                            <tr>
+                                                <td>
+                                                    @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
+                                                         CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
+                                                    {
+                                                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(newCstViewParam)"
+                                                           title="View New Customer"
+                                                           style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;">
+                                                            <i class="fa fa-eye fa-1x"></i>
+                                                        </a>
+
+                                                        if (hasDuplicate)
+                                                        {
+                                                            <span>&nbsp;</span>
+                                                            <a href="/Customer/ViewCustomer/@Global.EncodeParameters(originalCstViewParam)"
+                                                               title="View Original Customer"
+                                                               style="color: #495057; text-decoration: none; cursor: pointer; font-size: 1.5em;">
+                                                                <i class="fa fa-eye fa-1x"></i>
+                                                            </a>
+                                                        }
+                                                    }
+                                                </td>
+
+                                                <!-- Customer IDs -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.NewCustomerId</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@originalId</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (!hasDuplicate)
+                                                        {@NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+
+                                                <!-- First Name -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_GivenNames</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_GivenNames</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate)
+                                                        {@GradeMeta(customer.Mark_GivenNames, customer.Total_Mark_GivenNames) }
+                                                    else
+                                                    { @NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+
+                                                <!-- Family Name -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_FamilyName</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_FamilyName</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate)
+                                                        {@GradeMeta(customer.Mark_FamilyName, customer.Total_Mark_FamilyName) }
+                                                    else
+                                                    { @NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+
+                                                <!-- Father Name -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_FatherName</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_FatherName</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate)
+                                                        {@GradeMeta(customer.Mark_FatherName, customer.Total_Mark_FatherName) }
+                                                    else
+                                                    { @NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+
+                                                <!-- Mother Name -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_MoFirstName</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_MoFirstName</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate)
+                                                        {@GradeMeta(customer.Mark_MoFirstName, customer.Total_Mark_MoFirstName) }
+                                                    else
+                                                    { @NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+
+                                                <!-- DOB -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@FormatDateString(customer.New_DateOfBirth)</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@FormatDateString(customer.Db_DateOfBirth)</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate)
+                                                        {@GradeMeta(customer.Mark_DateOfBirth, customer.Total_Mark_DateOfBirth) }
+                                                    else
+                                                    { @NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+
+                                                <!-- Gender -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_Gender</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_Gender</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate)
+                                                        {@GradeMeta(customer.Mark_Gender, customer.Total_Mark_Gender) }
+                                                    else
+                                                    { @NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+
+                                                <!-- Register Place -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_BirthRegister</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_BirthRegister</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate)
+                                                        {@GradeMeta(customer.Mark_BirthRegister, customer.Total_Mark_BirthRegister) }
+                                                    else
+                                                    { @NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+
+                                                <!-- Register Number -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-dual-row @(hasDuplicate ? "" : "dc-dual-row--single")">
+                                                            <div class="dc-box">
+                                                                <span class="dc-label">New</span>
+                                                                <div class="dc-value">@customer.New_BirthRegNo</div>
+                                                            </div>
+
+                                                            @if (hasDuplicate)
+                                                            {
+                                                                <div class="dc-box">
+                                                                    <span class="dc-label">Original</span>
+                                                                    <div class="dc-value">@customer.Db_BirthRegNo</div>
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        @if (hasDuplicate)
+                                                        {@GradeMeta(customer.Mark_BirthRegNo, customer.Total_Mark_BirthRegNo) }
+                                                    else
+                                                    { @NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+
+                                                <!-- Total Grade -->
+                                                <td>
+                                                    <div class="dc-dual">
+                                                        <div class="dc-box">
+                                                            <span class="dc-label">Total</span>
+                                                            <div class="dc-value">
+                                                                @if (hasDuplicate)
+                                                                {
+                                                                    @Math.Round(totalMarkedGrade, 2) <text> / </text> @Math.Round(totalGrade, 2)
+                                                                }
+                                                                else
+                                                                {
+                                                                    <text>N/A</text>
+                                                                }
+                                                            </div>
+                                                        </div>
+
+                                                        @if (hasDuplicate)
+                                                        {@GradeMeta(totalMarkedGrade, totalGrade) }
+                                                    else
+                                                    { @NoDuplicateMeta()}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    @customer.LastModifiedBy
+                                                </td>
+                                                <td>
+                                                    @customer.LastModifiedDate.ToString("MM-dd-yyyy HH:mm:ss")
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+    <script>
+        $(document).ready(function () {
+            HideLoader();
+
+            $('#CustomerDuplicateDetectionHistoryDiv').DataTable({
+                scrollX: true,
+                autoWidth: false,
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                fixedHeader: true,
+                columnDefs: [
+                    { targets: 0, orderable: false, width: "70px" }
+                ]
+            });
+        });
+    </script>
+}
+
+@model SGBL.DIGITAL.KYC.Models.ViewModels.CustomerDuplicateDetectionViewModel
+@using SGBL.DIGITAL.KYC.Models
+@using SGBL.DIGITAL.KYC.CrossCutting
+
+@{
+    ViewBag.Title = "CustomerDuplicateDetection";
+}
+
+<style>
+    .dc-value {
+        font-weight: 600;
+        line-height: 1.2;
+        margin-bottom: .35rem;
+    }
+
+    .dc-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem .5rem;
+        align-items: center;
+        font-size: .78rem;
+        color: #6c757d;
+    }
+
+    .dc-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .12rem .5rem;
+        border-radius: 999px;
+        background: #f6f7f9;
+        border: 1px solid #e6e9ee;
+        white-space: nowrap;
+    }
+
+        .dc-pill b {
+            color: #495057;
+            font-weight: 600;
+        }
+
+    .dc-pill--pct {
+        background: #eef6ff;
+        border-color: #d7eaff;
+    }
+
+    .dc-pct-low {
+        background: #fff1f1;
+        border-color: #ffd6d6;
+        color: #b42318;
+    }
+
+    .dc-pct-mid {
+        background: #fff7e6;
+        border-color: #ffe1b3;
+        color: #8a6100;
+    }
+
+    .dc-pct-high {
+        background: #ecfdf3;
+        border-color: #c7f0d8;
+        color: #067647;
+    }
+
+    #GetCustomerDuplicateDetectionRows td {
+        vertical-align: top;
+    }
+</style>
+
+@functions {
+    string FormatDateString(string date)
+    {
+        if (string.IsNullOrWhiteSpace(date)) return string.Empty;
+        if (date.Length < 8) return date; // fallback if unexpected format
+
+        var year = date.Substring(0, 4);
+        var month = date.Substring(4, 2);
+        var day = date.Substring(6, 2);
+
+        return $"{year}-{month}-{day}";
+    }
+
+    decimal CalcPct(decimal mark, decimal total)
+        => total == 0 ? 0 : Math.Round((mark / total) * 100m, 2);
+
+    string PctClass(decimal pct)
+    {
+        if (pct < 50) return "dc-pct-low";
+        if (pct < 80) return "dc-pct-mid";
+        return "dc-pct-high";
+    }
+}
+
+@helper GradeMeta(decimal mark, decimal total)
+{
+    var pct = CalcPct(mark, total);
+
+    <div class="dc-meta">
+        <span class="dc-pill">
+            <b>Grade</b>
+            <span>@Math.Round(mark, 2) / @Math.Round(total, 2)</span>
+        </span>
+
+        <span class="dc-pill dc-pill--pct @PctClass(pct)">
+            <b>%</b>
+            <span>@pct</span>
+        </span>
+    </div>
+}
+
+<div class="bold-underline-title mb-2">Matched Customers</div>
+
+@if (Model.NewCustomerId != 0)
+{
+    if (Model.DuplicateCustomerDtos.Count > 0)
+    {
+        <h3 class="content-header-title mb-2">Selected New Customer #@Model.NewCustomerId</h3>
+        <div class="row" style="clear:both;">
+            <div class="form-group col-md-3 col-12">
+                <label class="control-label">First Name</label>
+                <input value="@Model.DuplicateCustomerDtos[0].New_GivenNames"
+                       type="text"
+                       class="form-control"
+                       disabled>
+            </div>
+            <div class="form-group col-md-3 col-12">
+                <label class="control-label">Family Name</label>
+                <input value="@Model.DuplicateCustomerDtos[0].New_FamilyName"
+                       type="text"
+                       class="form-control"
+                       disabled>
+            </div>
+            <div class="form-group col-md-3 col-12">
+                <label class="control-label">Father Name</label>
+                <input value="@Model.DuplicateCustomerDtos[0].New_FatherName"
+                       type="text"
+                       class="form-control"
+                       disabled>
+            </div>
+            <div class="form-group col-md-3 col-12">
+                <label class="control-label">Mother Name</label>
+                <input value="@Model.DuplicateCustomerDtos[0].New_MoFirstName"
+                       type="text"
+                       class="form-control"
+                       disabled>
+            </div>
+        </div>
+        <div class="row" style="clear:both;">
+            <div class="form-group col-md-3 col-12">
+                <label class="control-label">Date Of Birth</label>
+                <input value="@Model.DuplicateCustomerDtos[0].New_DateOfBirth"
+                       type="text"
+                       class="form-control"
+                       disabled>
+            </div>
+            <div class="form-group col-md-3 col-12">
+                <label class="control-label">Gender</label>
+                <input value="@Model.DuplicateCustomerDtos[0].New_Gender"
+                       type="text"
+                       class="form-control"
+                       disabled>
+            </div>
+            <div class="form-group col-md-3 col-12">
+                <label class="control-label">Register Place</label>
+                <input value="@Model.DuplicateCustomerDtos[0].New_BirthRegister"
+                       type="text"
+                       class="form-control"
+                       disabled>
+            </div>
+            <div class="form-group col-md-3 col-12">
+                <label class="control-label">Register Number</label>
+                <input value="@Model.DuplicateCustomerDtos[0].New_BirthRegNo"
+                       type="text"
+                       class="form-control"
+                       disabled>
+            </div>
+        </div>
+    }
+
+    <button id="noCustomerLinkFoundBtn"
+            class="btn btn-outline-red mt-1"
+            style="border-radius: 10px;
+            margin-right: 10px;
+            margin-bottom:20px;
+            height: 40px;"
+            type="button"
+            onclick="linkCustomer(null, @Model.NewCustomerId)">
+        No Matching Customer Found
+    </button>
+
+    <button id="noCustomerLinkFoundBtn"
+            class="btn btn-outline-grey-blue mt-1"
+            style="border-radius: 10px;
+            margin-right: 10px;
+            margin-bottom:20px;
+            height: 40px;"
+            type="button"
+            onclick="getCustomUserId(@Model.NewCustomerId)">
+        Match a Custom Customer ID
+    </button>
+}
+
+
+<table id="GetCustomerDuplicateDetectionRows" class="table table-striped table-bordered" style="width:100%">
+    <thead>
+        <tr>
+            <th></th>
+            <th>Customer ID</th>
+            <th>First Name</th>
+            <th>Family Name</th>
+            <th>Father Name</th>
+            <th>Mother Name</th>
+            <th>Date Of Birth</th>
+            <th>Gender</th>
+            <th>Register Place</th>
+            <th>Register Number</th>
+            <th>Total Grade</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        @foreach (DuplicateCustomerDto customer in Model.DuplicateCustomerDtos)
+        {
+            string cstViewParam = "customerID=" + customer.CustomerId + "&tab=tab1";
+
+            decimal totalMarkedGrade =
+                customer.Mark_GivenNames +
+                customer.Mark_FamilyName +
+                customer.Mark_FatherName +
+                customer.Mark_MoFirstName +
+                customer.Mark_DateOfBirth +
+                customer.Mark_Gender +
+                customer.Mark_BirthRegister +
+                customer.Mark_BirthRegNo;
+
+            decimal totalGrade =
+                customer.Total_Mark_GivenNames +
+                customer.Total_Mark_FamilyName +
+                customer.Total_Mark_FatherName +
+                customer.Total_Mark_MoFirstName +
+                customer.Total_Mark_DateOfBirth +
+                customer.Total_Mark_Gender +
+                customer.Total_Mark_BirthRegister +
+                customer.Total_Mark_BirthRegNo;
+
+            <tr>
+                <td style="white-space: nowrap;">
+                    <i onclick="linkCustomer(@customer.CustomerId, @customer.NewCustomerId)"
+                       class="fa fa-check-circle fa-1x icon-validate"
+                       title="Link Customer"
+                       style="color: green; cursor: pointer; font-size: 1.5em;"></i>
+
+                    <span>&nbsp;</span>
+
+                    @if (CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomer) ||
+                         CustomAuthorizeAttribute.UserHaveAccessToActivity(Constants.KycActivities.ViewCustomerBranch))
+                    {
+                        <a href="/Customer/ViewCustomer/@Global.EncodeParameters(cstViewParam)"
+                           title="View Customer"
+                           style="color: blue; text-decoration: none; cursor: pointer; font-size: 1.5em;">
+                            <i class="fa fa-eye fa-1x"></i>&nbsp;
+                        </a>
+                    }
+                </td>
+
+                <td>@customer.CustomerId</td>
+
+                <td>
+                    <div class="dc-value">@customer.Db_GivenNames</div>
+                    @GradeMeta(customer.Mark_GivenNames, customer.Total_Mark_GivenNames)
+                </td>
+
+                <td>
+                    <div class="dc-value">@customer.Db_FamilyName</div>
+                    @GradeMeta(customer.Mark_FamilyName, customer.Total_Mark_FamilyName)
+                </td>
+
+                <td>
+                    <div class="dc-value">@customer.Db_FatherName</div>
+                    @GradeMeta(customer.Mark_FatherName, customer.Total_Mark_FatherName)
+                </td>
+
+                <td>
+                    <div class="dc-value">@customer.Db_MoFirstName</div>
+                    @GradeMeta(customer.Mark_MoFirstName, customer.Total_Mark_MoFirstName)
+                </td>
+
+                <td>
+                    <div class="dc-value">@FormatDateString(customer.Db_DateOfBirth)</div>
+                    @GradeMeta(customer.Mark_DateOfBirth, customer.Total_Mark_DateOfBirth)
+                </td>
+
+                <td>
+                    <div class="dc-value">@customer.Db_Gender</div>
+                    @GradeMeta(customer.Mark_Gender, customer.Total_Mark_Gender)
+                </td>
+
+                <td>
+                    <div class="dc-value">@customer.Db_BirthRegister</div>
+                    @GradeMeta(customer.Mark_BirthRegister, customer.Total_Mark_BirthRegister)
+                </td>
+
+                <td>
+                    <div class="dc-value">@customer.Db_BirthRegNo</div>
+                    @GradeMeta(customer.Mark_BirthRegNo, customer.Total_Mark_BirthRegNo)
+                </td>
+
+                <td>
+                    <div class="dc-value">Total</div>
+                    @GradeMeta(totalMarkedGrade, totalGrade)
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+
+        [HttpPost]
+        [Route("api/Host/CustomerDuplicateDetection")]
+        public IHttpActionResult CustomerDuplicateDetection([FromBody] CustomerDuplicateDetectionRequest request)
+        {
+            CustomerDuplicateDetectionResponse response = new CustomerDuplicateDetectionResponse();
+
+            CorrelationInfo correlationInfo = new CorrelationInfo()
+            {
+                CorrelationId = request.CorrelationId,
+                RDirection = RequestDirection.Request,
+                RequestURL = "CustomerDuplicateDetection",
+                UserName = request.Username
+            };
+
+            #region Data Guard
+            if (String.IsNullOrEmpty(request.CorrelationId))
+            {
+                String correlationId = Guid.NewGuid().ToString();
+
+                correlationInfo.CorrelationId = correlationId;
+                correlationInfo.RDirection = RequestDirection.Response;
+
+                response.CorrelationId = correlationId;
+                response.HttpStatus = HttpStatusCode.BadRequest;
+                response.Message = $"Invalid {nameof(request.CorrelationId)}";
+                response.MessageSource = $"{nameof(request.CorrelationId)} Cannot be null or empty";
+
+                correlationInfo.Reserved = "CustomerDuplicateDetection Has Replied with the Following response Due to Invalid CorrelationId";
+                LogErrorJson(response, correlationInfo, new Exception("CustomerDuplicateDetection Has Replied with the Following response Due to Invalid CorrelationId"));
+
+                return Ok(response);
+            }
+            #endregion
+
+            try
+            {
+                response.CorrelationId = request.CorrelationId;
+
+                correlationInfo.RDirection = RequestDirection.Processing;
+                correlationInfo.Reserved = "CustomerDuplicateDetection Has been called with the following Request";
+                LogInfoJson(request, correlationInfo);
+
+                response.DuplicateCustomerDtos = InstManagerAccessPoint.GetNewAccessPoint().CustomerDuplicateDetection();
+
+                correlationInfo.RDirection = RequestDirection.Response;
+                correlationInfo.Reserved = "CustomerDuplicateDetection Has Replied with the Following response";
+                LogInfoJson(response, correlationInfo);
+            }
+            catch (Exception ex)
+            {
+                correlationInfo.RDirection = RequestDirection.Response;
+
+                response.HttpStatus = HttpStatusCode.InternalServerError;
+                response.Message = "Exception Occured in CustomerDuplicateDetection";
+                response.MessageSource = "CorrelationId: " + request.CorrelationId + Environment.NewLine + ex;
+
+                correlationInfo.Reserved = "Exception Occured in CustomerDuplicateDetection API Controller";
+                LogError("Exception Occured in CustomerDuplicateDetection API Controller", correlationInfo, ex);
+
+                return Ok(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost]
+        [Route("api/Host/LinkCustomer")]
+        public IHttpActionResult LinkCustomer([FromBody] LinkCustomerRequest request)
+        {
+            LinkCustomerResponse response = new LinkCustomerResponse();
+
+            CorrelationInfo correlationInfo = new CorrelationInfo()
+            {
+                CorrelationId = request.CorrelationId,
+                RDirection = RequestDirection.Request,
+                RequestURL = "LinkCustomer",
+                UserName = request.Username
+            };
+
+            #region Data Guard
+            if (String.IsNullOrEmpty(request.CorrelationId))
+            {
+                String correlationId = Guid.NewGuid().ToString();
+
+                correlationInfo.CorrelationId = correlationId;
+                correlationInfo.RDirection = RequestDirection.Response;
+
+                response.CorrelationId = correlationId;
+                response.HttpStatus = HttpStatusCode.BadRequest;
+                response.Message = $"Invalid {nameof(request.CorrelationId)}";
+                response.MessageSource = $"{nameof(request.CorrelationId)} Cannot be null or empty";
+
+                correlationInfo.Reserved = "LinkCustomer Has Replied with the Following response Due to Invalid CorrelationId";
+                LogErrorJson(response, correlationInfo, new Exception("LinkCustomer Has Replied with the Following response Due to Invalid CorrelationId"));
+
+                return Ok(response);
+            }
+            #endregion
+
+            try
+            {
+                response.CorrelationId = request.CorrelationId;
+
+                correlationInfo.RDirection = RequestDirection.Processing;
+                correlationInfo.Reserved = "LinkCustomer Has been called with the following Request";
+                LogInfoJson(request, correlationInfo);
+
+                response.NewCustomerId = InstManagerAccessPoint.GetNewAccessPoint().LinkCustomer(request);
+
+                correlationInfo.RDirection = RequestDirection.Response;
+                correlationInfo.Reserved = "LinkCustomer Has Replied with the Following response";
+                LogInfoJson(response, correlationInfo);
+            }
+            catch (Exception ex)
+            {
+                correlationInfo.RDirection = RequestDirection.Response;
+
+                response.HttpStatus = HttpStatusCode.InternalServerError;
+                response.Message = "Exception Occured in LinkCustomer";
+                response.MessageSource = "CorrelationId: " + request.CorrelationId + Environment.NewLine + ex;
+
+                correlationInfo.Reserved = "Exception Occured in LinkCustomer API Controller";
+                LogError("Exception Occured in LinkCustomer API Controller", correlationInfo, ex);
+
+                return Ok(response);
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost]
+        [Route("api/Host/CustomerDuplicateDetectionHistory")]
+        public IHttpActionResult CustomerDuplicateDetectionHistory([FromBody] CustomerDuplicateDetectionHistoryRequest request)
+        {
+            CustomerDuplicateDetectionHistoryResponse response = new CustomerDuplicateDetectionHistoryResponse();
+
+            CorrelationInfo correlationInfo = new CorrelationInfo()
+            {
+                CorrelationId = request.CorrelationId,
+                RDirection = RequestDirection.Request,
+                RequestURL = "CustomerDuplicateDetectionHistory",
+                UserName = request.Username
+            };
+
+            #region Data Guard
+            if (String.IsNullOrEmpty(request.CorrelationId))
+            {
+                String correlationId = Guid.NewGuid().ToString();
+
+                correlationInfo.CorrelationId = correlationId;
+                correlationInfo.RDirection = RequestDirection.Response;
+
+                response.CorrelationId = correlationId;
+                response.HttpStatus = HttpStatusCode.BadRequest;
+                response.Message = $"Invalid {nameof(request.CorrelationId)}";
+                response.MessageSource = $"{nameof(request.CorrelationId)} Cannot be null or empty";
+
+                correlationInfo.Reserved = "CustomerDuplicateDetectionHistory Has Replied with the Following response Due to Invalid CorrelationId";
+                LogErrorJson(response, correlationInfo, new Exception("CustomerDuplicateDetectionHistory Has Replied with the Following response Due to Invalid CorrelationId"));
+
+                return Ok(response);
+            }
+            #endregion
+
+            try
+            {
+                response.CorrelationId = request.CorrelationId;
+
+                correlationInfo.RDirection = RequestDirection.Processing;
+                correlationInfo.Reserved = "CustomerDuplicateDetectionHistory Has been called with the following Request";
+                LogInfoJson(request, correlationInfo);
+
+                response.DuplicateCustomerHistoryDto = InstManagerAccessPoint.GetNewAccessPoint().CustomerDuplicateDetectionHistory();
+
+                correlationInfo.RDirection = RequestDirection.Response;
+                correlationInfo.Reserved = "CustomerDuplicateDetectionHistory Has Replied with the Following response";
+                LogInfoJson(response, correlationInfo);
+            }
+            catch (Exception ex)
+            {
+                correlationInfo.RDirection = RequestDirection.Response;
+
+                response.HttpStatus = HttpStatusCode.InternalServerError;
+                response.Message = "Exception Occured in CustomerDuplicateDetectionHistory";
+                response.MessageSource = "CorrelationId: " + request.CorrelationId + Environment.NewLine + ex;
+
+                correlationInfo.Reserved = "Exception Occured in CustomerDuplicateDetectionHistory API Controller";
+                LogError("Exception Occured in CustomerDuplicateDetectionHistory API Controller", correlationInfo, ex);
+
+                return Ok(response);
+            }
+
+            return Ok(response);
+        }
+
+    }
+
+
+USE [Alterna_KYC]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_Alterna_GetDuplicateCustomers]    Script Date: 1/14/2026 11:20:34 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_Alterna_GetDuplicateCustomers]
 (
-    @CustomerId     INT, -- Candidate (existing)
-    @NewCustomerId  INT  -- New (the one we compare against)
+    @MaxCandidatesPerNew   int           = 500,
+    @StatusCode            nvarchar(250)  = N'PENDING',
+    @DifferenceThreshold   tinyint        = 4  -- 1..4 (higher = stricter)
 )
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    ;WITH nc AS
+    ;WITH NC AS
     (
         SELECT
-            t.Id AS NewCustomerId,
+            T24C.Id AS NewCustomerId,
 
-            dbo.Fn_NormalizeWord(t.DateOfBirth)   AS DateOfBirth,
-            dbo.Fn_NormalizeWord(t.GivenNames)    AS GivenNames,
-            dbo.Fn_NormalizeWord(t.FamilyName)    AS FamilyName,
-            dbo.Fn_NormalizeWord(t.FatherName)    AS FatherName,
-            dbo.Fn_NormalizeWord(t.MoFirstName)   AS MoFirstName,
-            dbo.Fn_NormalizeWord(t.BirthRegister) AS BirthRegisterId,
-            dbo.Fn_NormalizeWord(t.BirthRegNo)    AS BirthRegNo,
-            dbo.Fn_NormalizeWord(t.Gender)        AS Gender
-        FROM dbo.t_T24Customer t
-        WHERE t.Id = @NewCustomerId
-    ),
-    c AS
-    (
-        SELECT
-            t.Id AS CustomerId,
+            -- New customer normalized values (computed once)
+            dbo.Fn_NormalizeWord(T24C.DateOfBirth)   AS DateOfBirth,
+            dbo.Fn_NormalizeWord(T24C.GivenNames)    AS GivenNames,
+            dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
+            dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
+            dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
+            dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegisterId,
+            dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
+            dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender,
 
-            -- Candidate normalized values (already persisted)
-            t.Norm_DateOfBirth   AS Db_DateOfBirth,
-            t.Norm_GivenNames    AS Db_GivenNames,
-            t.Norm_FamilyName    AS Db_FamilyName,
-            t.Norm_FatherName    AS Db_FatherName,
-            t.Norm_MoFirstName   AS Db_MoFirstName,
-
-            t.Norm_BirthRegister AS Db_BirthRegisterId,
-            t.Norm_BirthRegNo    AS Db_BirthRegNo,
-            t.Norm_Gender        AS Db_Gender
-        FROM dbo.t_T24Customer t
-        WHERE t.Id = @CustomerId
+            -- New customer SOUNDEX keys
+            T24C.Sdx_GivenNames,
+            T24C.Sdx_FamilyName,
+            T24C.Sdx_FatherName,
+            T24C.Sdx_MoFirstName
+        FROM dbo.t_NewT24Customers AS NT24C
+        JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
+        WHERE NT24C.StatusCode = @StatusCode
     )
     SELECT
         nc.NewCustomerId,
@@ -52,9 +1488,9 @@ BEGIN
         nc.FatherName    AS New_FatherName,
         nc.MoFirstName   AS New_MoFirstName,
 
-        -- Return description for display (NEW)
-        nc.BirthRegisterId           AS New_BirthRegisterId,
-        brNew.New_BirthRegisterDesc  AS New_BirthRegister,
+        -- Return description for display
+        nc.BirthRegisterId            AS New_BirthRegisterId,
+        brNew.New_BirthRegisterDesc   AS New_BirthRegister,
 
         nc.BirthRegNo    AS New_BirthRegNo,
         nc.Gender        AS New_Gender,
@@ -66,40 +1502,123 @@ BEGIN
         c.Db_FatherName,
         c.Db_MoFirstName,
 
-        -- Return description for display (DB)
-        c.Db_BirthRegisterId         AS Db_BirthRegisterId,
-        brDb.Db_BirthRegisterDesc    AS Db_BirthRegister,
+        -- Return description for display
+        c.Db_BirthRegisterId          AS Db_BirthRegisterId,
+        brDb.Db_BirthRegisterDesc     AS Db_BirthRegister,
 
         c.Db_BirthRegNo,
         c.Db_Gender,
 
         -- Exact flags
-        CAST(CASE WHEN c.Db_DateOfBirth      = nc.DateOfBirth      THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
-        CAST(CASE WHEN c.Db_BirthRegNo       = nc.BirthRegNo       THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
-        CAST(CASE WHEN c.Db_BirthRegisterId  = nc.BirthRegisterId  THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
-        CAST(CASE WHEN c.Db_Gender           = nc.Gender           THEN 1 ELSE 0 END AS bit) AS Match_Gender,
+        c.Match_DateOfBirth,
+        c.Match_BirthRegNo,
+        c.Match_BirthRegister,
+        c.Match_Gender,
 
-        -- Fuzzy flags (keep same logic, fixed threshold=4 here)
-        CAST(CASE WHEN DIFFERENCE(nc.GivenNames,  c.Db_GivenNames)  >= 4 THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
-        CAST(CASE WHEN DIFFERENCE(nc.FamilyName,  c.Db_FamilyName)  >= 4 THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
-        CAST(CASE WHEN DIFFERENCE(nc.FatherName,  c.Db_FatherName)  >= 4 THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
-        CAST(CASE WHEN DIFFERENCE(nc.MoFirstName, c.Db_MoFirstName) >= 4 THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
-    FROM nc
-    FULL OUTER JOIN c
-        ON 1 = 1
+        -- Fuzzy flags
+        c.Match_GivenNames,
+        c.Match_FamilyName,
+        c.Match_FatherName,
+        c.Match_MoFirstName
+    FROM NC AS nc
 
+    -- Lookup description for NEW customer BirthRegisterId
     OUTER APPLY
     (
-        SELECT TOP (1) b.DescriptionFR AS New_BirthRegisterDesc
+        SELECT TOP (1)
+            b.DescriptionFR AS New_BirthRegisterDesc   -- or b.DescriptionFR
         FROM [Lookup.CusBirth] b
         WHERE b.Id = TRY_CONVERT(int, nc.BirthRegisterId)
     ) brNew
 
     OUTER APPLY
     (
-        SELECT TOP (1) b.DescriptionFR AS Db_BirthRegisterDesc
+        SELECT TOP (@MaxCandidatesPerNew)
+            t.Id AS CustomerId,
+
+            -- Candidate normalized values (already persisted)
+            t.Norm_DateOfBirth   AS Db_DateOfBirth,
+            t.Norm_GivenNames    AS Db_GivenNames,
+            t.Norm_FamilyName    AS Db_FamilyName,
+            t.Norm_FatherName    AS Db_FatherName,
+            t.Norm_MoFirstName   AS Db_MoFirstName,
+
+            -- IMPORTANT: still the ID (as text) used for matching
+            t.Norm_BirthRegister AS Db_BirthRegisterId,
+
+            t.Norm_BirthRegNo    AS Db_BirthRegNo,
+            t.Norm_Gender        AS Db_Gender,
+
+            -- Exact match flags (still compares IDs)
+            CAST(CASE WHEN t.Norm_DateOfBirth   = nc.DateOfBirth       THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
+            CAST(CASE WHEN t.Norm_BirthRegNo    = nc.BirthRegNo        THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
+            CAST(CASE WHEN t.Norm_BirthRegister = nc.BirthRegisterId   THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
+            CAST(CASE WHEN t.Norm_Gender        = nc.Gender            THEN 1 ELSE 0 END AS bit) AS Match_Gender,
+
+            -- Fuzzy flags
+            CAST(CASE WHEN DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
+            CAST(CASE WHEN DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
+            CAST(CASE WHEN DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
+            CAST(CASE WHEN DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
+
+        FROM dbo.t_T24Customer AS t
+        WHERE
+            t.Id <> nc.NewCustomerId
+
+            AND nc.GivenNames  IS NOT NULL
+            AND nc.FamilyName  IS NOT NULL
+            AND nc.FatherName  IS NOT NULL
+            AND nc.MoFirstName IS NOT NULL
+
+            AND t.Norm_GivenNames  IS NOT NULL
+            AND t.Norm_FamilyName  IS NOT NULL
+            AND t.Norm_FatherName  IS NOT NULL
+            AND t.Norm_MoFirstName IS NOT NULL
+
+            AND t.Sdx_GivenNames  = nc.Sdx_GivenNames
+            AND t.Sdx_FamilyName  = nc.Sdx_FamilyName
+            AND t.Sdx_FatherName  = nc.Sdx_FatherName
+            AND t.Sdx_MoFirstName = nc.Sdx_MoFirstName
+
+            AND (nc.DateOfBirth     IS NULL OR t.Norm_DateOfBirth   = nc.DateOfBirth)
+            AND (nc.Gender          IS NULL OR t.Norm_Gender        = nc.Gender)
+            AND (nc.BirthRegNo      IS NULL OR t.Norm_BirthRegNo    = nc.BirthRegNo)
+			AND (nc.BirthRegNo      IS NULL OR t.Norm_BirthRegister = nc.BirthRegisterId)
+
+            AND DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold
+            AND DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold
+            AND DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold
+            AND DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold
+
+        ORDER BY t.Id
+    ) AS c
+
+    -- Lookup description for DB candidate BirthRegisterId
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            b.DescriptionFR AS Db_BirthRegisterDesc 
         FROM [Lookup.CusBirth] b
         WHERE b.Id = TRY_CONVERT(int, c.Db_BirthRegisterId)
-    ) brDb;
+    ) brDb
+
+    ORDER BY nc.NewCustomerId, c.CustomerId
+    OPTION (RECOMPILE);
 END
+
+
+USE [Alterna_KYC]
 GO
+/****** Object:  StoredProcedure [dbo].[usp_Alterna_GetDuplicateCustomerHistory]    Script Date: 1/14/2026 1:16:37 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_Alterna_GetDuplicateCustomerHistory]
+AS
+BEGIN
+    SET NOCOUNT ON;
+	
+	SELECT * FROM [dbo].[t_DuplicateCustomerHistory];
+
+END
