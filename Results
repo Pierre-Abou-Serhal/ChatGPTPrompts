@@ -1,44 +1,102 @@
-# Customer Duplicate Detection & Linking (KYC)
+Subject: Customer Duplicate Detection – Non-Technical Explanation (How it works + Grading)
 
-This feature helps KYC/Operations teams detect potential duplicate customers and **link a new customer to an existing (original) customer**, or explicitly confirm that **no match exists**. It also provides a **history screen** to audit what happened and who validated it.
+Hi all,
 
----
-
-## 1) What the feature does
-
-### Detect screen
-- Loads a list of **“New Customers”** that are pending duplicate verification.
-- When the user clicks a row, the system fetches and displays **matched customers (candidates)** from the existing customer database.
-- For each candidate, the UI shows:
-  - Customer identity fields (name parts, DOB, gender, register place/number)
-  - Per-field **grade** + **percentage**
-  - A **Total Grade** aggregation for the candidate
-
-### Linking actions
-For the selected new customer, the user can:
-
-1) **Link to a suggested candidate**  
-   - Click the ✅ icon on a candidate row.
-   - System links the new customer to that selected existing customer.
-
-2) **Confirm “No Matching Customer Found”**  
-   - Click **No Matching Customer Found**.
-   - System records that the new customer has no duplicate match.
-
-3) **Match a Custom Customer ID**  
-   - Click **Match a Custom Customer ID**.
-   - A popup asks the user to enter a Customer ID manually.
-   - The input is validated (digits only, 1–7 digits, not zero).
-   - If valid, the system links the new customer to that entered customer ID.
+We’ve added a new feature in the KYC application to help detect **potential duplicate customers** and ensure we don’t create multiple profiles for the same person. Below is a non-technical explanation of **how the detection works** and **how the grading (score) is calculated**.
 
 ---
 
-## 2) Screens overview
+## 1) How duplicate detection works (in simple terms)
 
-### A) Detect tab (CustomerDuplicateDetection)
-**Main table: New Customers**
-- Displays customers coming from `Model.NewCustomersToCheck`.
-- Clicking any cell in a row calls:
+When a **new customer** is created, the system automatically checks if this person might already exist in the bank records.
+This helps avoid:
 
-```js
-getCustomerDuplicateDetection(newCustomerId, this)
+* creating the same customer twice,
+* splitting a customer’s information across multiple profiles,
+* compliance/KYC duplication risks.
+
+### Step 1 — “New customers to check”
+
+Only customers that are still **pending validation** appear in the “New Customers” list.
+
+### Step 2 — The system searches for possible matches
+
+For each new customer, the system searches existing customers and compares the following information:
+
+* First Name
+* Family Name
+* Father Name
+* Mother Name
+* Date of Birth
+* Gender
+* Register Place
+* Register Number
+
+### Step 3 — Smart comparison (not only exact match)
+
+People’s names can be written differently (spelling variations, missing spaces, minor typos).
+So the system performs two kinds of checks:
+
+1. **Exact match checks**
+   Certain fields must match exactly when present (for example: Date of Birth, Gender, Register Number).
+
+2. **Similarity checks (for names)**
+   Names are compared using a similarity approach that tolerates small spelling differences and minor errors.
+
+### Step 4 — The system shows candidates for human validation
+
+When a user selects a new customer, the system displays a list of **possible matching customers (candidates)**.
+The user reviews the results and decides whether to link the new customer to an existing one, or confirm that no match exists.
+
+Important note: **The system does not automatically merge customers.**
+It suggests candidates and provides scoring, but **the final decision is always made by the user**.
+
+---
+
+## 2) How the grading system works
+
+The grading is there to explain **how strong the match is** between the **New Customer** and each **Candidate Customer**.
+
+### Grades per field
+
+Each field shows a grade like:
+
+**Grade = (earned points) / (maximum points)**
+and also a **percentage (%)**
+
+Meaning:
+
+* If the field matches perfectly (or is very similar), it receives a high score.
+* If it does not match, it receives a low score.
+* Some fields may be more important than others, so they can have a higher maximum score.
+
+### Total Grade
+
+The system then calculates an overall score:
+
+**Total Grade = sum of earned points / sum of maximum points**
+
+So the Total Grade represents the overall match strength.
+
+### How to interpret the % (general guidance)
+
+* **High %** → very likely the same person
+* **Medium %** → possible match, needs review
+* **Low %** → likely not the same person
+
+---
+
+## 3) History tracking (audit)
+
+All decisions are recorded in the “History” tab, including:
+
+* whether a match was linked or “No match found” was selected,
+* who validated it,
+* and when it was done.
+
+---
+
+If you’d like, I can also provide a short one-page PDF version or add a quick real-life example (with typical spelling variations) to make the grading even easier to interpret.
+
+Best regards,
+Pierre Abou Serhal
