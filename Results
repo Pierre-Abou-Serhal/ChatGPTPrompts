@@ -1,4 +1,80 @@
-CLR: Assert failure(PID 38268 [0x0000957c], Thread: 26368 [0x6700]): !AreShadowStacksEnabled() || UseSpecialUserModeApc()
-    File: D:\a\_work\1\s\src\coreclr\vm\threads.cpp:7938 Image:
-D:\@Workspace\deve-repo\alterna-services-dotnet8\Logger\API\bin\Debug\net9.0\API.exe
-One or more errors occurred. (Started a process for debugging, but it has exited before any CLR were loaded into that process.)
+using System.Reflection;
+using BLL;
+using Newtonsoft.Json.Serialization;
+
+internal class Program
+{
+    private static void Main(string[] args)
+    {
+        // Detect if the app is running as a Windows service
+        var isWindowsService = !Environment.UserInteractive;
+
+        if (isWindowsService)
+        {
+            var pathToContentRoot = AppContext.BaseDirectory;
+            Directory.SetCurrentDirectory(pathToContentRoot);
+        }
+
+        var builder = WebApplication.CreateBuilder(args);
+
+        // Add the Windows service integration
+        builder.Host.UseWindowsService();
+
+        // The builder.Configuration is already set up and supports reloadOnChange by default
+        // Configure AppConfig to reload on changes
+        builder.Services.Configure<AppConfig>(builder.Configuration.GetSection("AppConfig"));
+
+        // Register BLL with Dependency Injection
+        builder.Services.AddScoped<BLL.BLL>();
+
+        // Configure Controllers with Newtonsoft.Json
+        builder.Services.AddControllers()
+            .AddNewtonsoftJson(options =>
+            {
+                options.SerializerSettings.ContractResolver = new DefaultContractResolver();
+            })
+            .AddJsonOptions(options => { options.JsonSerializerOptions.PropertyNamingPolicy = null; });
+
+        // Configure Swagger with XML comments and annotations
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen(c =>
+        {
+            // Set the comments path for the Swagger JSON and UI.
+            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+            if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
+
+            // Enable annotations (e.g., [SwaggerOperation], [SwaggerResponse])
+            c.EnableAnnotations();
+        });
+
+        // Configure CORS
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("DefaultCors", policyBuilder => policyBuilder
+                .AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod());
+        });
+
+        var app = builder.Build();
+
+        // Configure the HTTP request pipeline.
+        if (app.Environment.IsDevelopment()) app.UseDeveloperExceptionPage();
+
+        app.UseSwagger();
+        app.UseSwaggerUI(c =>
+        {
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "Logger API V1");
+            c.RoutePrefix = string.Empty; // Set Swagger UI at the app's root
+        });
+
+        app.UseRouting();
+        app.UseCors("DefaultCors");
+        app.UseAuthorization();
+
+        app.MapControllers();
+
+        app.Run();
+    }
+}
