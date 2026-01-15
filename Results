@@ -1,21 +1,15 @@
-    public String GetOAuthHeader(String methodParam, String requestUriParam, JsonElement? contentParam)
-    {
-        // Loading the Signing Key
-        var certificate = new X509Certificate2(
-            Path.Combine(AppContext.BaseDirectory, "Keys", _globalSettings.MasterCardRsaKeyName),
-            _globalSettings.MasterCardRsaKeyPassword,
-            X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.Exportable
-        );
+ServerCertificateCustomValidationCallback
 
-        RSA signingKey = certificate.GetRSAPrivateKey()!;
-        
-        // Signing Request In Order To Create The OAuth Authorization Header
-        String consumerKey = _globalSettings.MasterCardConsumerKey;
-        String uri = requestUriParam;
-        String method = methodParam;
+ServerCertificateValidationCallback
 
-        String? payload = contentParam?.ToString() ?? null;
-        Encoding encoding = Encoding.UTF8;
-        
-        return OAuth.GetAuthorizationHeader(uri, method, payload, encoding, consumerKey, signingKey);
-    }
+Thumbprint
+
+Fingerprint
+
+SerialNumber
+
+X509Chain
+
+SslPolicyErrors
+
+ServicePointManager
