@@ -1,15 +1,124 @@
-ServerCertificateCustomValidationCallback
+using System.Xml.Linq;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 
-ServerCertificateValidationCallback
+public class BLL(IOptionsMonitor<AppConfig> optionsMonitor)
+{
+    public async Task CallProcedureAsync(ParamsCallProcedure callParams)
+    {
+        var isError = false;
 
-Thumbprint
+        if (callParams.MsgXML != "N/A")
+            try
+            {
+                // Parse the XML string into an XDocument
+                var xdoc = XDocument.Parse(callParams.MsgXML);
 
-Fingerprint
+                // Remove namespaces and prefixes
+                var root = RemoveAllNamespaces(xdoc.Root!);
 
-SerialNumber
+                // Serialize to JSON
+                callParams.MsgJSON = JsonConvert.SerializeXNode(root, Formatting.Indented, true);
+            }
+            catch (Exception ex)
+            {
+                isError = true;
+                callParams.MsgJSON = ex.Message + "\n" + ex.StackTrace;
+            }
 
-X509Chain
+        // Get the latest configuration values
+        var currentOptions = optionsMonitor.CurrentValue;
 
-SslPolicyErrors
+        DAL.AppConfig dalOptions = new()
+        {
+            ConnectionString = currentOptions.ConnectionString,
+            InfoLogSp = currentOptions.InfoLogSp,
+            ErrorLogSp = currentOptions.ErrorLogSp,
+            InternalLogSp = currentOptions.InternalLogSp,
+            FileLogs = currentOptions.FileLogs
+        };
 
-ServicePointManager
+        DAL dal = new(dalOptions);
+
+        if (!isError)
+            await dal.DatabaseLogAsync(
+                callParams.CorolationId,
+                callParams.AppName,
+                callParams.AppUser,
+                callParams.LoggingEntity,
+                callParams.RequestDirection,
+                callParams.RequestType,
+                callParams.Operation,
+                callParams.Path,
+                callParams.URL,
+                callParams.ReservedOne,
+                callParams.ReservedTwo,
+                callParams.MsgXML,
+                callParams.MsgJSON,
+                callParams.ErrorCode,
+                callParams.IsError
+            );
+        else
+            await dal.InternalErrorLogAsync(
+                callParams.CorolationId,
+                callParams.AppName,
+                callParams.AppUser,
+                callParams.LoggingEntity,
+                callParams.RequestDirection,
+                callParams.RequestType,
+                callParams.Operation,
+                callParams.Path,
+                callParams.URL,
+                callParams.ReservedOne,
+                callParams.ReservedTwo,
+                callParams.MsgXML,
+                callParams.MsgJSON,
+                "XML Parsing Error",
+                callParams.MsgJSON
+            );
+    }
+
+    private static XElement RemoveAllNamespaces(XElement element)
+    {
+        if (element.HasElements)
+            return new XElement(element.Name.LocalName,
+                element.Elements().Select(RemoveAllNamespaces),
+                element.Attributes().Where(a => !a.IsNamespaceDeclaration));
+
+        return new XElement(element.Name.LocalName,
+            element.Attributes().Where(a => !a.IsNamespaceDeclaration),
+            element.Value);
+    }
+}
+
+
+public class AppConfig
+{
+    public string ConnectionString { get; init; } = string.Empty;
+    public string InfoLogSp { get; set; } = "usp_LogInfo";
+    public string ErrorLogSp { get; set; } = "usp_LogError";
+    public string InternalLogSp { get; set; } = "usp_LogInternal";
+    public string FileLogs { get; init; } = "InternalLogFallBack.txt";
+}
+
+/// <summary>
+///     Represents the parameters required to execute the logging stored procedure.
+/// </summary>
+public class ParamsCallProcedure
+{
+    public required string CorolationId { get; set; }
+    public required string AppName { get; set; }
+    public required string AppUser { get; set; }
+    public required string LoggingEntity { get; set; }
+    public string RequestDirection { get; set; } = "N/A";
+    public string RequestType { get; set; } = "N/A";
+    public string Operation { get; set; } = "N/A";
+    public string Path { get; set; } = "N/A";
+    public string URL { get; set; } = "N/A";
+    public string ReservedOne { get; set; } = "N/A";
+    public string ReservedTwo { get; set; } = "N/A";
+    public string MsgXML { get; set; } = "N/A";
+    public string MsgJSON { get; set; } = "N/A";
+    public string? ErrorCode { get; set; } = null;
+    public bool IsError { get; set; } = false;
+}
