@@ -1,102 +1,80 @@
-Subject: Customer Duplicate Detection – Non-Technical Explanation (How it works + Grading)
+	Date: 09 January 2026
+	
 
-Hi all,
+ 
 
-We’ve added a new feature in the KYC application to help detect **potential duplicate customers** and ensure we don’t create multiple profiles for the same person. Below is a non-technical explanation of **how the detection works** and **how the grading (score) is calculated**.
+	To: Cross-border Payments  contacts
 
----
 
-## 1) How duplicate detection works (in simple terms)
+ 
 
-When a **new customer** is created, the system automatically checks if this person might already exist in the bank records.
-This helps avoid:
+	Dear Valued Partner, 
+This communication provides important information regarding the renewal of the server certificate for the domain api.mastercard.com. Please review the details below to ensure uninterrupted connectivity. 
+Q1. What is being done? 
+Mastercard will renew the server certificate for the domain api.mastercard.com.
 
-* creating the same customer twice,
-* splitting a customer’s information across multiple profiles,
-* compliance/KYC duplication risks.
+Q2. Why is this change needed? 
+The current server certificate for api.mastercard.com expires on February 17, 2026. To ensure uninterrupted service, Mastercard will renew the certificate on February 10, 2026.
 
-### Step 1 — “New customers to check”
+Q3. Are you impacted by this change? 
+Please review the following criteria:
+•    If you do not consume Mastercard APIs exposed on api.mastercard.com, you are NOT impacted.
+•    If you consume api.mastercard.com but do not pin the public certificate using properties like serial number or fingerprint, you are NOT impacted.
+•    If you consume api.mastercard.com and perform specific checks or validations based on the current certificate properties (e.g., serial number, fingerprint), you ARE impacted and action is required.
+Q4. What action is needed from you? 
+•    Mastercard strongly recommends to remove any checks and validations using current public certificate immediately. This will remove any tight coupling between server and client.
+•    This will allow Mastercard to seamlessly renew its server certificate for the domain "api.mastercard.com" and save this effort around keeping the clients aligned with the changes.
+•    However, if you as customer must have the public certificate of the server explicitly validated, then align to have your client updated with the new public certificate, provided below.
+Q5. Can I update/trust the new certificate now? 
+Depends on the client implementation. Any update/addition should be implemented using appropriate methods determined based on your specific implementation. 
+•    If updating before our change window, ensure both old and new server certificate are allowed.
+•    If you are looking to update, during or after our change window, please note, there could be service disruptions, due to TLS handshake failures.
+Important: Only one certificate will be active on the server at any given time.
+Q6. New Certificate Details: 
+The certificate can be accessed via the Key Management Portal (KMP) in MCC.
+Key details:
+Subject: CN=api.mastercard.com, O=MasterCard International Incorporated, L=Waterloo, C=BE
+Serial Number: 047DE5F8218D3AE743B9735490DC2590
+SHA256 Fingerprint: 93:B2:81:7C:CF:DF:AA:26:D8:71:56:25:0C:66:49:E9:D6:45:25:0D:B2:37:89:DF:27:95:E1:49:DF:58:B5:10
+SHA1 Fingerprint: 6E:E0:BB:CA:FB:80:06:D5:76:31:E8:63:E6:4B:19:4F:79:59:4D:DE
+Note: Subject CN remains unchanged.
 
-Only customers that are still **pending validation** appear in the “New Customers” list.
+Q7. When the change will be activated on Mastercard end? 
+The change will be deployed incrementally on the network upon the approval on Tue February 10th , 2026 between 9:00am - 5:00pm EDT (US Eastern) / 2:00pm - 10:00pm UTC.
 
-### Step 2 — The system searches for possible matches
+Customers must update certificate before Tue February 10, 2026.
 
-For each new customer, the system searches existing customers and compares the following information:
+If customer fails to update certificate details all requests will begin to fail.
 
-* First Name
-* Family Name
-* Father Name
-* Mother Name
-* Date of Birth
-* Gender
-* Register Place
-* Register Number
+Q8. What should you do if you face errors during or after implementation window i.e., Tue February 10, 2026 between 9:00am - 5:00pm EDT (US Eastern) / 2:00pm - 10:00pm UTC? 
+•    If clients fail to update the new certificate on their clients to be trusted/allowed for connecting with api.mastercard.com, then after the change on Mastercard servers, your client may start failing due to "TLS Handshake Failures".
+Troubleshooting tip : Please enable detailed SSL/TLS handshake logging on your client, and observe the certificates being exchanged between your client and server. Please ensure the server certificate is being allowed in your client application.
+•    For questions or concerns upon reception of this communication, reach Mastercard support team through Teams channel or Edge_as_a_Service_Support@mastercard.com.
+Q9. Why can’t external clients download the new certificate from KMP? 
+To enable certificate download, submit a Work Order to the Infosec team using this template:
+Dear KMD Team,
+Please share the below certificate(s) / CA(s) with External Customer:
 
-### Step 3 — Smart comparison (not only exact match)
+Company name:
+Processor Name (if applicable): NA
+Who exchanges the cert + CID:
+Environment(s): PRD
+Certificate Venafi reference/NickName / CA Name: {20210824150456-api-mastercard-com}	
 
-People’s names can be written differently (spelling variations, missing spaces, minor typos).
-So the system performs two kinds of checks:
 
-1. **Exact match checks**
-   Certain fields must match exactly when present (for example: Date of Birth, Gender, Register Number).
+ 
 
-2. **Similarity checks (for names)**
-   Names are compared using a similarity approach that tolerates small spelling differences and minor errors.
+	Mastercard Reference Number: WO0000013468465
+	
 
-### Step 4 — The system shows candidates for human validation
+ 
 
-When a user selects a new customer, the system displays a list of **possible matching customers (candidates)**.
-The user reviews the results and decides whether to link the new customer to an existing one, or confirm that no match exists.
+	Communications Reference ID: 220909
+	
 
-Important note: **The system does not automatically merge customers.**
-It suggests candidates and provides scoring, but **the final decision is always made by the user**.
+ 
 
----
+	Support: 
+If you have questions, contact your Mastercard Customer Support team or call +1 3127416871, menu option 1 for English, option 2 for Mandarin, option 3 for Spanish, or option 4 for French.  For customers in China, call +86 4006399171.
+	
 
-## 2) How the grading system works
-
-The grading is there to explain **how strong the match is** between the **New Customer** and each **Candidate Customer**.
-
-### Grades per field
-
-Each field shows a grade like:
-
-**Grade = (earned points) / (maximum points)**
-and also a **percentage (%)**
-
-Meaning:
-
-* If the field matches perfectly (or is very similar), it receives a high score.
-* If it does not match, it receives a low score.
-* Some fields may be more important than others, so they can have a higher maximum score.
-
-### Total Grade
-
-The system then calculates an overall score:
-
-**Total Grade = sum of earned points / sum of maximum points**
-
-So the Total Grade represents the overall match strength.
-
-### How to interpret the % (general guidance)
-
-* **High %** → very likely the same person
-* **Medium %** → possible match, needs review
-* **Low %** → likely not the same person
-
----
-
-## 3) History tracking (audit)
-
-All decisions are recorded in the “History” tab, including:
-
-* whether a match was linked or “No match found” was selected,
-* who validated it,
-* and when it was done.
-
----
-
-If you’d like, I can also provide a short one-page PDF version or add a quick real-life example (with typical spelling variations) to make the grading even easier to interpret.
-
-Best regards,
-Pierre Abou Serhal
