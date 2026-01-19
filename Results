@@ -1,8 +1,14 @@
-The issue was:
-This customer have on T24 his Residence country set to "Canada".
-Master card will make the field "country_subdivision" mandatory.
-That's why we were receiving : MISSING_REQUIRED_INPUT for: sender.address.country_subdivision
+Here’s what we found and how we fixed it.
 
-The fix is to detect the senders Residence Country. If it is equal to USA or CAN, we automatically fill the sender country subdivision with the following values:
-- USA: IL
-- CAN: QC
+Root cause
+The customer’s Residence Country in T24 is set to Canada. Mastercard is enforcing country_subdivision as mandatory for certain countries (including USA and CAN).
+Because we weren’t sending that field, we received the error:
+
+MISSING_REQUIRED_INPUT for: sender.address.country_subdivision
+
+Fix
+We now detect the sender’s Residence Country. If it is USA or CAN, we automatically populate sender.address.country_subdivision as follows:
+
+USA → IL
+
+CAN → QC
