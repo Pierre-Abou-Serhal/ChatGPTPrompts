@@ -1,121 +1,60 @@
-public static class XmlMasker
+Cool — that’s just a small tweak in the `MaskKeepLast` helper.
+
+Right now your logic does this:
+
+```csharp
+if (input.Length <= keepLast) return input;
+```
+
+That means “keep as-is if shorter/equal”.
+
+You want the opposite behavior: **mask anyway**, even if shorter.
+In that case, the “keep last N” operation should do this:
+
+* If `len <= keepLast` → **mask all characters** (or mask all but keep last `len` which is the whole string… but that would keep everything, so not desired)
+* If `len > keepLast` → mask all but last `keepLast`
+
+So the rule becomes:
+
+✅ `maskedCount = max(1? or 0?, len - keepLast)` but with “mask anyway” we want:
+
+* when `len <= keepLast` → maskedCount = len (mask everything)
+* when `len > keepLast` → maskedCount = len - keepLast
+
+### Replace your `MaskKeepLast` in BOTH JsonMasker and XmlMasker with this version:
+
+```csharp
+private static string MaskKeepLast(string input, int keepLast, char maskChar)
 {
-    public static string MaskXml(string xml, IEnumerable<MaskRule> rules)
-    {
-        if (string.IsNullOrWhiteSpace(xml) || xml == "N/A") return xml;
+    if (input is null) return string.Empty;
 
-        var doc = XDocument.Parse(xml);
-        if (doc.Root is null) return xml;
+    // Normalize
+    if (keepLast < 0) keepLast = 0;
 
-        foreach (var rule in rules)
-        {
-            ApplyRule(doc.Root, rule);
-        }
+    // If keepLast == 0 => mask everything
+    if (keepLast == 0)
+        return new string(maskChar, input.Length);
 
-        return doc.ToString(SaveOptions.DisableFormatting);
-    }
+    // Mask anyway even if shorter:
+    if (input.Length <= keepLast)
+        return new string(maskChar, input.Length);
 
-    private static void ApplyRule(XElement root, MaskRule rule)
-    {
-        if (string.IsNullOrWhiteSpace(rule.Path)) return;
-
-        // Optional: allow "**." to mean "match anywhere" for XML too
-        var path = rule.Path;
-        if (path.StartsWith("**.", StringComparison.Ordinal))
-            path = path[3..];
-
-        // If path is just "password": mask any element named password anywhere
-        if (!path.Contains('.') && !path.Contains('[') && !path.StartsWith("@"))
-        {
-            foreach (var el in root.DescendantsAndSelf().Where(e =>
-                         string.Equals(e.Name.LocalName, path, StringComparison.OrdinalIgnoreCase)))
-            {
-                el.Value = ApplyRuleToText(el.Value, rule);
-            }
-            return;
-        }
-
-        var tokens = MaskPath.Parse(path);
-
-        // If the original rule started with "**.", try applying from every node
-        if (rule.Path.StartsWith("**.", StringComparison.Ordinal))
-        {
-            foreach (var start in root.DescendantsAndSelf())
-                ApplyTokens(start, tokens, 0, rule);
-
-            return;
-        }
-
-        ApplyTokens(root, tokens, 0, rule);
-    }
-
-    private static void ApplyTokens(XElement current, List<PathToken> tokens, int i, MaskRule rule)
-    {
-        if (i >= tokens.Count)
-        {
-            current.Value = ApplyRuleToText(current.Value, rule);
-            return;
-        }
-
-        var t = tokens[i];
-
-        // Attribute support: token like "@id"
-        if (t.Name.StartsWith("@"))
-        {
-            var attrName = t.Name[1..];
-            var attr = current.Attribute(attrName);
-            if (attr is not null)
-                attr.Value = ApplyRuleToText(attr.Value, rule);
-            return;
-        }
-
-        // find matching children by local name
-        var matches = current.Elements()
-            .Where(e => string.Equals(e.Name.LocalName, t.Name, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        if (matches.Count == 0) return;
-
-        if (t.AllItems)
-        {
-            foreach (var m in matches)
-                ApplyTokens(m, tokens, i + 1, rule);
-            return;
-        }
-
-        if (t.Index is not null)
-        {
-            var idx = t.Index.Value;
-            if (idx >= 0 && idx < matches.Count)
-                ApplyTokens(matches[idx], tokens, i + 1, rule);
-            return;
-        }
-
-        // normal element step (if multiple matches, apply to all)
-        foreach (var m in matches)
-            ApplyTokens(m, tokens, i + 1, rule);
-    }
-
-    private static string MaskKeepLast(string input, int keepLast, char maskChar)
-    {
-        if (string.IsNullOrEmpty(input)) return input;
-
-        if (keepLast <= 0)
-            return new string(maskChar, input.Length);
-
-        if (input.Length <= keepLast)
-            return input;
-
-        return new string(maskChar, input.Length - keepLast) + input[^keepLast..];
-    }
-
-    private static string ApplyRuleToText(string? currentText, MaskRule rule)
-    {
-        if (currentText is null) return rule.Replacement;
-
-        if (rule.KeepLast is > 0)
-            return MaskKeepLast(currentText, (int)rule.KeepLast.Value, rule.MaskChar);
-
-        return rule.Replacement;
-    }
+    // Normal case
+    return new string(maskChar, input.Length - keepLast) + input[^keepLast..];
 }
+```
+
+That’s it.
+
+### What changes in behavior
+
+* `"ABC"` with `KeepLast = 4` becomes `"***"` (masked), not `"ABC"`
+* `"1234567890124128"` with `KeepLast = 4` becomes `"************4128"` (same as before)
+
+---
+
+### Optional: If you want to still keep *something* visible even if shorter
+
+Some teams prefer “keep last min(len, keepLast)” but still mask at least 1 char. If that’s your intent instead, tell me and I’ll adjust.
+
+But for your request (“mask anyway even if shorter”), the snippet above is the correct change.
