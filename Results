@@ -1,14 +1,186 @@
-Here’s what we found and how we fixed it.
+You can add this cleanly by extending your `MaskRule` with a “keep last N” option, and then making `ReplaceValue(...)` use it.
 
-Root cause
-The customer’s Residence Country in T24 is set to Canada. Mastercard is enforcing country_subdivision as mandatory for certain countries (including USA and CAN).
-Because we weren’t sending that field, we received the error:
+Key points for your case:
 
-MISSING_REQUIRED_INPUT for: sender.address.country_subdivision
+* `card.number` might be **number** (123456) or **string** ("123456") → handle both.
+* If value length ≤ N, don’t mask (or mask fully—your choice; below I keep it as-is).
+* Let the mask character be configurable (default `*`).
 
-Fix
-We now detect the sender’s Residence Country. If it is USA or CAN, we automatically populate sender.address.country_subdivision as follows:
+---
 
-USA → IL
+## 1) Update your rule model
 
-CAN → QC
+```csharp
+public class MaskRule
+{
+    public string Path { get; init; } = "";
+    public string Replacement { get; init; } = "***";
+
+    // New:
+    public int? KeepLast { get; init; } = null;     // e.g. 4
+    public char MaskChar { get; init; } = '*';      // optional
+}
+```
+
+### appsettings.json example
+
+```json
+{
+  "Path": "WSSOGEIBMBGETADDRESSResponse.ESGBGLOBALBBType.gESGBGLOBALBBDetailType.card.number",
+  "Replacement": "*",
+  "KeepLast": 4
+}
+```
+
+(Here `Replacement` is used as the mask fill; you can keep it separate if you prefer.)
+
+---
+
+## 2) Add a helper that builds “********4128”
+
+```csharp
+private static string MaskKeepLast(string input, int keepLast, char maskChar)
+{
+    if (string.IsNullOrEmpty(input)) return input;
+    if (keepLast <= 0) return new string(maskChar, input.Length);
+
+    // If shorter than keepLast, keep as-is (common)
+    if (input.Length <= keepLast) return input;
+
+    var maskedLen = input.Length - keepLast;
+    return new string(maskChar, maskedLen) + input[^keepLast..];
+}
+```
+
+---
+
+## 3) Update JSON ReplaceValue to respect KeepLast
+
+Change your `ReplaceValue(...)` to accept the rule, not just replacement:
+
+```csharp
+private static void ReplaceValue(JToken token, MaskRule rule)
+{
+    string? currentText = token switch
+    {
+        JValue v => v.Value?.ToString(),
+        _ when token.Parent is JProperty p => p.Value?.ToString(),
+        _ => null
+    };
+
+    if (currentText is null) return;
+
+    string newValue;
+
+    if (rule.KeepLast is > 0)
+    {
+        // Use MaskChar (or first char of Replacement if you like)
+        var maskChar = rule.MaskChar;
+        newValue = MaskKeepLast(currentText, rule.KeepLast.Value, maskChar);
+    }
+    else
+    {
+        newValue = rule.Replacement;
+    }
+
+    // Apply back
+    if (token is JValue v)
+        v.Value = newValue;
+    else if (token.Parent is JProperty p)
+        p.Value = newValue;
+}
+```
+
+Then update the call site inside `ApplyTokens`:
+
+```csharp
+if (i >= tokens.Count)
+{
+    ReplaceValue(current, rule);
+    return;
+}
+```
+
+And change the signature chain so `ApplyTokens` receives `MaskRule rule` instead of `string replacement`:
+
+* `ApplyTokens(JToken current, List<PathToken> tokens, int i, MaskRule rule)`
+* `HandleChild(..., MaskRule rule, PathToken t)`
+
+So it can pass the whole rule down to `ReplaceValue`.
+
+---
+
+## 4) Also support “keep last” for the “mask-anywhere” case
+
+In `MaskAllPropertiesNamed`, when you match the property, apply the same logic:
+
+```csharp
+private static void MaskAllPropertiesNamed(JToken root, string propName, MaskRule rule)
+{
+    switch (root)
+    {
+        case JObject obj:
+        {
+            foreach (var property in obj.Properties().ToList())
+            {
+                if (string.Equals(property.Name, propName, StringComparison.OrdinalIgnoreCase))
+                {
+                    var text = property.Value?.ToString();
+                    if (text is null) continue;
+
+                    if (rule.KeepLast is > 0)
+                        property.Value = MaskKeepLast(text, rule.KeepLast.Value, rule.MaskChar);
+                    else
+                        property.Value = rule.Replacement;
+                }
+                else
+                {
+                    MaskAllPropertiesNamed(property.Value, propName, rule);
+                }
+            }
+            break;
+        }
+        case JArray arr:
+        {
+            foreach (var item in arr)
+                MaskAllPropertiesNamed(item, propName, rule);
+            break;
+        }
+    }
+}
+```
+
+And in `ApplyRule` call it like:
+
+```csharp
+MaskAllPropertiesNamed(root, rule.Path, rule);
+```
+
+---
+
+## 5) What about XML?
+
+Same approach: when you hit the target element/attribute, do:
+
+* if `KeepLast` is set → `MaskKeepLast(element.Value, KeepLast, MaskChar)`
+* else → `Replacement`
+
+(If you want, I’ll paste the exact XML changes too, but it’s the same idea.)
+
+---
+
+## Result
+
+If `card.number` is `"1234567890124128"` and `KeepLast=4`, you’ll log:
+
+`************4128`
+
+Works even if the original value is numeric, because we `ToString()` it first.
+
+---
+
+If you tell me whether you want the mask length to be based on:
+
+* the original **string length**, or
+* a **fixed length** (e.g., always 16 for card numbers),
+  I can adjust the helper to support both.
