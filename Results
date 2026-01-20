@@ -1,281 +1,491 @@
-Below is your code **with “keep last X characters” applied**, supporting:
+Correct me this code:
 
-* normal rooted paths
-* `**.` “anywhere” paths
-* arrays `[*]`
-* “mask any property name anywhere” (the no-dot rule)
-* works when value is **string or number** (card number can be `123456`)
+using System.Xml.Linq;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
-I kept your structure and changed the minimum necessary.
+namespace BLL;
 
----
 
-## ✅ What changes you need
-
-### 1) Add these helpers inside `JsonMasker` (or as private methods)
-
-```csharp
-private static string MaskKeepLast(string input, int keepLast, char maskChar)
+public class BLL(IOptionsMonitor<AppConfig> optionsMonitor)
 {
-    if (string.IsNullOrEmpty(input)) return input;
-
-    if (keepLast <= 0)
-        return new string(maskChar, input.Length);
-
-    if (input.Length <= keepLast)
-        return input;
-
-    return new string(maskChar, input.Length - keepLast) + input[^keepLast..];
-}
-
-private static string ApplyRuleToText(string? currentText, MaskRule rule)
-{
-    if (currentText is null) return rule.Replacement;
-
-    if (rule.KeepLast is > 0)
-        return MaskKeepLast(currentText, (int)rule.KeepLast.Value, rule.MaskChar);
-
-    return rule.Replacement;
-}
-```
-
----
-
-### 2) Modify `ApplyRule` so it passes the whole rule, not just `replacement`
-
-Replace your `ApplyRule` with this:
-
-```csharp
-private static void ApplyRule(JToken root, MaskRule rule)
-{
-    if (string.IsNullOrWhiteSpace(rule.Path)) return;
-
-    // If path has no dots/brackets: treat as "mask any property with this name anywhere"
-    if (!rule.Path.Contains('.') && !rule.Path.Contains('[') && !rule.Path.StartsWith("**.", StringComparison.Ordinal))
+    public async Task CallProcedureAsync(ParamsCallProcedure callParams)
     {
-        MaskAllPropertiesNamed(root, rule.Path, rule);
-        return;
-    }
+        var isError = false;
 
-    if (rule.Path.StartsWith("**.", StringComparison.Ordinal))
-    {
-        var trimmed = rule.Path[3..]; // remove "**."
-        var tokens = MaskPath.Parse(trimmed);
-        ApplyTokensFromAnywhere(root, tokens, rule);
-        return;
-    }
+        AppConfig currentOptions = optionsMonitor.CurrentValue;
+        List<MaskRule> rules = currentOptions.Masking.Rules;
 
-    var normalTokens = MaskPath.Parse(rule.Path);
-    ApplyTokens(root, normalTokens, 0, rule);
-}
-```
-
----
-
-### 3) Update `ApplyTokens / HandleChild / ReplaceValue` signatures
-
-Replace your `ApplyTokens`, `HandleChild`, `ReplaceValue`, `ApplyTokensFromAnywhere` with these:
-
-```csharp
-private static void ApplyTokens(JToken current, List<PathToken> tokens, int i, MaskRule rule)
-{
-    if (i >= tokens.Count)
-    {
-        ReplaceValue(current, rule);
-        return;
-    }
-
-    var t = tokens[i];
-
-    if (current is JObject obj)
-    {
-        if (!obj.TryGetValue(t.Name, out var child))
-            return;
-
-        HandleChild(child, tokens, i, rule, t);
-        return;
-    }
-
-    if (current is JArray arr)
-    {
-        foreach (var item in arr)
-            ApplyTokens(item, tokens, i, rule);
-    }
-}
-
-private static void HandleChild(JToken child, List<PathToken> tokens, int i, MaskRule rule, PathToken t)
-{
-    if (t.AllItems)
-    {
-        if (child is JArray a)
-            foreach (var item in a) ApplyTokens(item, tokens, i + 1, rule);
-        return;
-    }
-
-    if (t.Index is not null)
-    {
-        if (child is JArray a && t.Index.Value >= 0 && t.Index.Value < a.Count)
-            ApplyTokens(a[t.Index.Value]!, tokens, i + 1, rule);
-        return;
-    }
-
-    ApplyTokens(child, tokens, i + 1, rule);
-}
-
-private static void ReplaceValue(JToken token, MaskRule rule)
-{
-    // If the token itself is a value (e.g. array items)
-    if (token is JValue v)
-    {
-        var currentText = v.Value?.ToString();
-        v.Value = ApplyRuleToText(currentText, rule);
-        return;
-    }
-
-    // If the token is owned by a property, mask that property's value
-    if (token.Parent is JProperty p)
-    {
-        var currentText = p.Value?.ToString();
-        p.Value = ApplyRuleToText(currentText, rule);
-    }
-}
-
-private static void ApplyTokensFromAnywhere(JToken root, List<PathToken> tokens, MaskRule rule)
-{
-    // Try applying at the root
-    ApplyTokens(root, tokens, 0, rule);
-
-    // Then try applying at every object/array node
-    foreach (var node in root.DescendantsAndSelfJson())
-    {
-        if (node is JObject || node is JArray)
-            ApplyTokens(node, tokens, 0, rule);
-    }
-}
-```
-
----
-
-### 4) Update “mask any property name anywhere” to use the rule
-
-Replace your `MaskAllPropertiesNamed` with this:
-
-```csharp
-private static void MaskAllPropertiesNamed(JToken root, string propName, MaskRule rule)
-{
-    switch (root)
-    {
-        case JObject obj:
+        if (callParams.MsgXML != "N/A")
         {
-            foreach (var property in obj.Properties().ToList())
+            try
             {
-                if (string.Equals(property.Name, propName, StringComparison.OrdinalIgnoreCase))
-                {
-                    var currentText = property.Value?.ToString();
-                    property.Value = ApplyRuleToText(currentText, rule);
-                }
-                else
-                {
-                    MaskAllPropertiesNamed(property.Value, propName, rule);
-                }
+                var xdoc = XDocument.Parse(callParams.MsgXML);
+                var root = RemoveAllNamespaces(xdoc.Root!);
+
+                // Mask XML
+                var maskedXml = XmlMasker.MaskXml(root.ToString(SaveOptions.DisableFormatting), rules);
+                callParams.MsgXML = maskedXml;
+
+                // Recompute JSON from masked XML (so JSON matches what was logged)
+                var maskedRoot = XDocument.Parse(maskedXml).Root!;
+                callParams.MsgJSON = JsonConvert.SerializeXNode(maskedRoot, Formatting.Indented, true);
+
+                // If you also want to apply JSON-only rules (when MsgJSON comes from elsewhere), do:
+                callParams.MsgJSON = JsonMasker.MaskJson(callParams.MsgJSON, rules);
             }
-            break;
+            catch (Exception ex)
+            {
+                isError = true;
+                callParams.MsgJSON = ex.Message + "\n" + ex.StackTrace;
+            }
+        }
+        else
+        {
+            // if MsgJSON is populated independently sometimes:
+            callParams.MsgJSON = JsonMasker.MaskJson(callParams.MsgJSON, rules);
         }
 
-        case JArray arr:
+        DAL.DAL.AppConfig dalOptions = new()
+        {
+            ConnectionString = currentOptions.ConnectionString,
+            InfoLogSp = currentOptions.InfoLogSp,
+            ErrorLogSp = currentOptions.ErrorLogSp,
+            InternalLogSp = currentOptions.InternalLogSp,
+            FileLogs = currentOptions.FileLogs
+        };
+
+        DAL.DAL dal = new(dalOptions);
+
+        if (!isError)
+            await dal.DatabaseLogAsync(
+                callParams.CorolationId,
+                callParams.AppName,
+                callParams.AppUser,
+                callParams.LoggingEntity,
+                callParams.RequestDirection,
+                callParams.RequestType,
+                callParams.Operation,
+                callParams.Path,
+                callParams.URL,
+                callParams.ReservedOne,
+                callParams.ReservedTwo,
+                callParams.MsgXML,
+                callParams.MsgJSON,
+                callParams.ErrorCode,
+                callParams.IsError
+            );
+        else
+            await dal.InternalErrorLogAsync(
+                callParams.CorolationId,
+                callParams.AppName,
+                callParams.AppUser,
+                callParams.LoggingEntity,
+                callParams.RequestDirection,
+                callParams.RequestType,
+                callParams.Operation,
+                callParams.Path,
+                callParams.URL,
+                callParams.ReservedOne,
+                callParams.ReservedTwo,
+                callParams.MsgXML,
+                callParams.MsgJSON,
+                "XML Parsing Error",
+                callParams.MsgJSON
+            );
+    }
+
+    private static XElement RemoveAllNamespaces(XElement element)
+    {
+        if (element.HasElements)
+            return new XElement(element.Name.LocalName,
+                element.Elements().Select(RemoveAllNamespaces),
+                element.Attributes().Where(a => !a.IsNamespaceDeclaration));
+
+        return new XElement(element.Name.LocalName,
+            element.Attributes().Where(a => !a.IsNamespaceDeclaration),
+            element.Value);
+    }
+}
+
+
+public class AppConfig
+{
+    public String ConnectionString { get; init; } = string.Empty;
+    public String InfoLogSp { get; set; } = "usp_LogInfo";
+    public String ErrorLogSp { get; set; } = "usp_LogError";
+    public String InternalLogSp { get; set; } = "usp_LogInternal";
+    public String FileLogs { get; init; } = "InternalLogFallBack.txt";
+    
+    public MaskingOptions Masking { get; init; } = new();
+}
+
+public class MaskingOptions
+{
+    public List<MaskRule> Rules { get; init; } = [];
+}
+
+public class MaskRule
+{
+    public String Path { get; init; } = "";
+    public String Replacement { get; init; } = "***";
+    public Int64? KeepLast { get; init; } = null;     // e.g. 4
+    public Char MaskChar { get; init; } = '*';      // optional
+}
+
+/// <summary>
+///     Represents the parameters required to execute the logging stored procedure.
+/// </summary>
+public class ParamsCallProcedure
+{
+    public required string CorolationId { get; set; }
+    public required string AppName { get; set; }
+    public required string AppUser { get; set; }
+    public required string LoggingEntity { get; set; }
+    public string RequestDirection { get; set; } = "N/A";
+    public string RequestType { get; set; } = "N/A";
+    public string Operation { get; set; } = "N/A";
+    public string Path { get; set; } = "N/A";
+    public string URL { get; set; } = "N/A";
+    public string ReservedOne { get; set; } = "N/A";
+    public string ReservedTwo { get; set; } = "N/A";
+    public string MsgXML { get; set; } = "N/A";
+    public string MsgJSON { get; set; } = "N/A";
+    public string? ErrorCode { get; set; } = null;
+    public bool IsError { get; set; } = false;
+}
+
+
+#region Mask properties
+internal readonly record struct PathToken(string Name, int? Index, bool AllItems);
+
+internal static class MaskPath
+{
+    public static List<PathToken> Parse(string path)
+    {
+        // "cards[*].holder.name" -> ["cards[*]", "holder", "name"]
+        var parts = path.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var tokens = new List<PathToken>(parts.Length);
+        foreach (var part in parts)
+        {
+            // attribute token for XML: "@id" or "card.@id"
+            if (part.StartsWith("@"))
+            {
+                tokens.Add(new PathToken(part, null, false));
+                continue;
+            }
+
+            var open = part.IndexOf('[');
+            if (open < 0)
+            {
+                tokens.Add(new PathToken(part, null, false));
+                continue;
+            }
+
+            var close = part.IndexOf(']', open + 1);
+            if (close < 0) throw new FormatException($"Invalid path token: {part}");
+
+            var name = part[..open];
+            var idxText = part[(open + 1)..close];
+
+            if (idxText == "*" || idxText == "")
+            {
+                tokens.Add(new PathToken(name, null, true));
+            }
+            else if (int.TryParse(idxText, out var idx))
+            {
+                tokens.Add(new PathToken(name, idx, false));
+            }
+            else
+            {
+                throw new FormatException($"Invalid array index in token: {part}");
+            }
+        }
+
+        return tokens;
+    }
+}
+
+public static class JsonMasker
+{
+    public static string MaskJson(string json, IEnumerable<MaskRule> rules)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json == "N/A") return json;
+
+        var root = JToken.Parse(json);
+
+        foreach (var rule in rules)
+        {
+            ApplyRule(root, rule);
+        }
+
+        return root.ToString(Formatting.Indented);
+    }
+
+    private static void ApplyRule(JToken root, MaskRule rule)
+    {
+        if (string.IsNullOrWhiteSpace(rule.Path)) return;
+
+        // If path has no dots/brackets: treat as "mask any property with this name anywhere"
+        if (!rule.Path.Contains('.') && !rule.Path.Contains('[') && !rule.Path.StartsWith("**.", StringComparison.Ordinal))
+        {
+            MaskAllPropertiesNamed(root, rule.Path, rule);
+            return;
+        }
+
+        if (rule.Path.StartsWith("**.", StringComparison.Ordinal))
+        {
+            var trimmed = rule.Path[3..]; // remove "**."
+            var tokens = MaskPath.Parse(trimmed);
+            ApplyTokensFromAnywhere(root, tokens, rule);
+            return;
+        }
+
+        var normalTokens = MaskPath.Parse(rule.Path);
+        ApplyTokens(root, normalTokens, 0, rule);
+    }
+
+    private static void ApplyTokens(JToken current, List<PathToken> tokens, int i, MaskRule rule)
+    {
+        if (i >= tokens.Count)
+        {
+            ReplaceValue(current, rule);
+            return;
+        }
+
+        var t = tokens[i];
+
+        if (current is JObject obj)
+        {
+            if (!obj.TryGetValue(t.Name, out var child))
+                return;
+
+            HandleChild(child, tokens, i, rule, t);
+            return;
+        }
+
+        if (current is JArray arr)
         {
             foreach (var item in arr)
-                MaskAllPropertiesNamed(item, propName, rule);
-            break;
+                ApplyTokens(item, tokens, i, rule);
         }
     }
+
+    private static void ApplyTokensFromAnywhere(JToken root, List<PathToken> tokens, MaskRule rule)
+    {
+        // Try applying at the root
+        ApplyTokens(root, tokens, 0, rule);
+
+        // Then try applying at every object/array node
+        foreach (var node in root.DescendantsAndSelfJson())
+        {
+            if (node is JObject || node is JArray)
+                ApplyTokens(node, tokens, 0, rule);
+        }
+    }
+
+    private static IEnumerable<JToken> DescendantsAndSelfJson(this JToken node)
+    {
+        yield return node;
+        foreach (var child in node.Children())
+        foreach (var d in child.DescendantsAndSelfJson())
+            yield return d;
+    }
+    
+    private static void HandleChild(JToken child, List<PathToken> tokens, int i, MaskRule rule, PathToken t)
+    {
+        if (t.AllItems)
+        {
+            if (child is JArray a)
+                foreach (var item in a) ApplyTokens(item, tokens, i + 1, rule);
+            return;
+        }
+
+        if (t.Index is not null)
+        {
+            if (child is JArray a && t.Index.Value >= 0 && t.Index.Value < a.Count)
+                ApplyTokens(a[t.Index.Value]!, tokens, i + 1, rule);
+            return;
+        }
+
+        ApplyTokens(child, tokens, i + 1, rule);
+    }
+
+    private static void ReplaceValue(JToken token, MaskRule rule)
+    {
+        // If the token itself is a value (e.g. array items)
+        if (token is JValue v)
+        {
+            var currentText = v.Value?.ToString();
+            v.Value = ApplyRuleToText(currentText, rule);
+            return;
+        }
+
+        // If the token is owned by a property, mask that property's value
+        if (token.Parent is JProperty p)
+        {
+            var currentText = p.Value?.ToString();
+            p.Value = ApplyRuleToText(currentText, rule);
+        }
+    }
+
+    private static void MaskAllPropertiesNamed(JToken root, string propName, MaskRule rule)
+    {
+        switch (root)
+        {
+            case JObject obj:
+            {
+                foreach (var property in obj.Properties().ToList())
+                {
+                    if (string.Equals(property.Name, propName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var currentText = property.Value?.ToString();
+                        property.Value = ApplyRuleToText(currentText, rule);
+                    }
+                    else
+                    {
+                        MaskAllPropertiesNamed(property.Value, propName, rule);
+                    }
+                }
+                break;
+            }
+
+            case JArray arr:
+            {
+                foreach (var item in arr)
+                    MaskAllPropertiesNamed(item, propName, rule);
+                break;
+            }
+        }
+    }
+    
+    private static string MaskKeepLast(string input, int keepLast, char maskChar)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+
+        if (keepLast <= 0)
+            return new string(maskChar, input.Length);
+
+        if (input.Length <= keepLast)
+            return input;
+
+        return new string(maskChar, input.Length - keepLast) + input[^keepLast..];
+    }
+
+    private static string ApplyRuleToText(string? currentText, MaskRule rule)
+    {
+        if (currentText is null) return rule.Replacement;
+
+        if (rule.KeepLast is > 0)
+            return MaskKeepLast(currentText, (int)rule.KeepLast.Value, rule.MaskChar);
+
+        return rule.Replacement;
+    }
 }
-```
 
----
-
-## ✅ XML support (same KeepLast feature)
-
-Right now your XML masker always does `el.Value = rule.Replacement`.
-Update the “set value” parts to use the same keep-last logic.
-
-Add helpers inside `XmlMasker`:
-
-```csharp
-private static string MaskKeepLast(string input, int keepLast, char maskChar)
+public static class XmlMasker
 {
-    if (string.IsNullOrEmpty(input)) return input;
+    public static string MaskXml(string xml, IEnumerable<MaskRule> rules)
+    {
+        if (string.IsNullOrWhiteSpace(xml) || xml == "N/A") return xml;
 
-    if (keepLast <= 0)
-        return new string(maskChar, input.Length);
+        var doc = XDocument.Parse(xml);
+        if (doc.Root is null) return xml;
 
-    if (input.Length <= keepLast)
-        return input;
+        foreach (var rule in rules)
+        {
+            ApplyRule(doc.Root, rule);
+        }
 
-    return new string(maskChar, input.Length - keepLast) + input[^keepLast..];
+        return doc.ToString(SaveOptions.DisableFormatting);
+    }
+
+    private static void ApplyRule(XElement root, MaskRule rule)
+    {
+        if (string.IsNullOrWhiteSpace(rule.Path)) return;
+
+        // If path is just "password": mask any element named password anywhere
+        if (!rule.Path.Contains('.') && !rule.Path.Contains('[') && !rule.Path.StartsWith("@"))
+        {
+            foreach (var el in root.DescendantsAndSelf().Where(e =>
+                         string.Equals(e.Name.LocalName, rule.Path, StringComparison.OrdinalIgnoreCase)))
+            {
+                el.Value = rule.Replacement;
+            }
+            return;
+        }
+
+        var tokens = MaskPath.Parse(rule.Path);
+        ApplyTokens(root, tokens, 0, rule.Replacement);
+    }
+
+    private static void ApplyTokens(XElement current, List<PathToken> tokens, int i, MaskRule rule)
+    {
+        if (i >= tokens.Count)
+        {
+            current.Value = ApplyRuleToText(current.Value, rule);
+            return;
+        }
+
+        var t = tokens[i];
+
+        // Attribute support: token like "@id"
+        if (t.Name.StartsWith("@"))
+        {
+            var attrName = t.Name[1..];
+            var attr = current.Attribute(attrName);
+            if (attr is not null) attr.Value = replacement;
+            return;
+        }
+
+        // find matching children by local name
+        var matches = current.Elements().Where(e => string.Equals(e.Name.LocalName, t.Name, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0) return;
+
+        if (t.AllItems)
+        {
+            foreach (var m in matches)
+                ApplyTokens(m, tokens, i + 1, replacement);
+            return;
+        }
+
+        if (t.Index is not null)
+        {
+            var idx = t.Index.Value;
+            if (idx >= 0 && idx < matches.Count)
+                ApplyTokens(matches[idx], tokens, i + 1, replacement);
+            return;
+        }
+
+        // normal element step (if multiple matches, apply to all)
+        foreach (var m in matches)
+            ApplyTokens(m, tokens, i + 1, replacement);
+    }
+    
+    private static string MaskKeepLast(string input, int keepLast, char maskChar)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+
+        if (keepLast <= 0)
+            return new string(maskChar, input.Length);
+
+        if (input.Length <= keepLast)
+            return input;
+
+        return new string(maskChar, input.Length - keepLast) + input[^keepLast..];
+    }
+
+    private static string ApplyRuleToText(string? currentText, MaskRule rule)
+    {
+        if (currentText is null) return rule.Replacement;
+
+        if (rule.KeepLast is > 0)
+            return MaskKeepLast(currentText, (int)rule.KeepLast.Value, rule.MaskChar);
+
+        return rule.Replacement;
+    }
 }
 
-private static string ApplyRuleToText(string? currentText, MaskRule rule)
-{
-    if (currentText is null) return rule.Replacement;
-
-    if (rule.KeepLast is > 0)
-        return MaskKeepLast(currentText, (int)rule.KeepLast.Value, rule.MaskChar);
-
-    return rule.Replacement;
-}
-```
-
-Then change two spots:
-
-### A) In the “mask any element named X anywhere” block:
-
-```csharp
-el.Value = ApplyRuleToText(el.Value, rule);
-```
-
-### B) In `ApplyTokens`, when you reach the final token:
-
-Replace:
-
-```csharp
-current.Value = replacement;
-```
-
-with:
-
-```csharp
-current.Value = ApplyRuleToText(current.Value, rule);
-```
-
-And update signatures so `ApplyTokens(..., MaskRule rule)` instead of `replacement`.
-
----
-
-## 🔥 Important note about your appsettings rules
-
-You currently have:
-
-```json
-{ "Path": "token", "Replacement": "***", "KeepLast": 100 }
-```
-
-If the token length is **less than 100**, my logic returns it unchanged (since “keep last 100” = keep all).
-That’s usually what you want, but if you want “mask anyway even if shorter”, tell me and I’ll adjust.
-
----
-
-## Example result
-
-For:
-
-* `"number": 1234567890124128`
-* rule `{ KeepLast: 4, MaskChar: '*' }`
-
-Logged value becomes:
-
-`************4128`
-
----
-
-If you want, I can paste the **full updated JsonMasker + XmlMasker classes as complete blocks** (so you can copy/paste without manually editing).
+#endregionkll
