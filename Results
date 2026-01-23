@@ -1,5 +1,22 @@
-Rule:
-{ "Path": "**.CARDISSUESGBNEWVIRTUALCARDREQUESTType.@id", "Replacement": "**********" },
-
-For Json, it will mask all elements name = “@id” (already doing it)
-For XML it will mask the xml attribute  named “id” of the element CARDISSUESGBNEWVIRTUALCARDREQUESTType
+{
+  "WebRequestCommon": { "company": "", "password": "", "userName": "TWSUSER" },
+  "OfsFunction": {
+    "activityName": "",
+    "assignReason": "",
+    "dueDate": "",
+    "extProcess": "",
+    "extProcessID": "",
+    "gtsControl": "",
+    "messageId": "",
+    "noOfAuth": "",
+    "owner": "",
+    "replace": "",
+    "startDate": "",
+    "user": ""
+  },
+  "CARDISSUESGBNEWVIRTUALCARDREQUESTType": {
+    "@id": "5175777006297809/TCIB.REG-123456",
+    "CARDSTATUS": "20",
+    "SGBREPLACERSN": "1"
+  }
+}
