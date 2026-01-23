@@ -1,22 +1,25 @@
-{
-  "WebRequestCommon": { "company": "", "password": "", "userName": "TWSUSER" },
-  "OfsFunction": {
-    "activityName": "",
-    "assignReason": "",
-    "dueDate": "",
-    "extProcess": "",
-    "extProcessID": "",
-    "gtsControl": "",
-    "messageId": "",
-    "noOfAuth": "",
-    "owner": "",
-    "replace": "",
-    "startDate": "",
-    "user": ""
-  },
-  "CARDISSUESGBNEWVIRTUALCARDREQUESTType": {
-    "@id": "5175777006297809/TCIB.REG-123456",
-    "CARDSTATUS": "20",
-    "SGBREPLACERSN": "1"
-  }
-}
+<ns1:WSSOGECARDTWSCREATENEW xmlns:ns1="http://temenos.com/SOGE-TWS-CUS-OB-WS">
+	<WebRequestCommon>
+		<company />
+		<password />
+		<userName>TWSUSER</userName>
+	</WebRequestCommon>
+	<OfsFunction>
+		<activityName />
+		<assignReason />
+		<dueDate />
+		<extProcess />
+		<extProcessID />
+		<gtsControl />
+		<messageId />
+		<noOfAuth />
+		<owner />
+		<replace />
+		<startDate />
+		<user />
+	</OfsFunction>
+	<CARDISSUESGBNEWVIRTUALCARDREQUESTType id="5175777006297809/TCIB.REG-123456">
+		<car:CARDSTATUS xmlns:car="http://temenos.com/CARDISSUESGBNEWVIRTUALCARDREQUEST">20</car:CARDSTATUS>
+		<car:SGBREPLACERSN xmlns:car="http://temenos.com/CARDISSUESGBNEWVIRTUALCARDREQUEST">1</car:SGBREPLACERSN>
+	</CARDISSUESGBNEWVIRTUALCARDREQUESTType>
+</ns1:WSSOGECARDTWSCREATENEW>
