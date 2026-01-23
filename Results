@@ -1,25 +1,176 @@
-<ns1:WSSOGECARDTWSCREATENEW xmlns:ns1="http://temenos.com/SOGE-TWS-CUS-OB-WS">
-	<WebRequestCommon>
-		<company />
-		<password />
-		<userName>TWSUSER</userName>
-	</WebRequestCommon>
-	<OfsFunction>
-		<activityName />
-		<assignReason />
-		<dueDate />
-		<extProcess />
-		<extProcessID />
-		<gtsControl />
-		<messageId />
-		<noOfAuth />
-		<owner />
-		<replace />
-		<startDate />
-		<user />
-	</OfsFunction>
-	<CARDISSUESGBNEWVIRTUALCARDREQUESTType id="5175777006297809/TCIB.REG-123456">
-		<car:CARDSTATUS xmlns:car="http://temenos.com/CARDISSUESGBNEWVIRTUALCARDREQUEST">20</car:CARDSTATUS>
-		<car:SGBREPLACERSN xmlns:car="http://temenos.com/CARDISSUESGBNEWVIRTUALCARDREQUEST">1</car:SGBREPLACERSN>
-	</CARDISSUESGBNEWVIRTUALCARDREQUESTType>
-</ns1:WSSOGECARDTWSCREATENEW>
+You’re 95% there — your XML masker already supports `@id`, but **only when it’s the final token or when you’re sitting on the correct element already**.
+
+What you want now is:
+
+* `**.@id` → mask **any attribute named `id` anywhere** (regardless of element)
+* `**.SomeElement.@id` → find `SomeElement` anywhere, then mask its `id` attribute
+* `**.A.B.@id` → find path anywhere, then mask the attribute on the last element
+* and generally: any rule containing `@` should be treated as **attribute masking** when that token is reached.
+
+### The core missing feature
+
+Your current “simple name anywhere” branch only handles **elements** (`password`, `token`…), not **attributes**.
+So `**.@id` won’t work unless you add a special case for “attribute-only path”.
+
+---
+
+## ✅ Fix: Add “mask attribute anywhere” support to `XmlMasker.ApplyRule`
+
+Replace your `ApplyRule` in `XmlMasker` with this corrected version (keep the rest of your `XmlMasker` as-is):
+
+```csharp
+private static void ApplyRule(XElement root, MaskRule rule)
+{
+    if (String.IsNullOrWhiteSpace(rule.Path)) return;
+
+    var originalPath = rule.Path;
+    var path = originalPath;
+
+    // allow "**." = match anywhere
+    var isAnywhere = path.StartsWith("**.", StringComparison.Ordinal);
+    if (isAnywhere)
+        path = path[3..];
+
+    // ✅ NEW: attribute-only rule like "@id"
+    if (path.StartsWith("@", StringComparison.Ordinal) &&
+        !path.Contains('.') && !path.Contains('['))
+    {
+        var attrName = path[1..]; // remove '@'
+
+        foreach (var el in root.DescendantsAndSelf())
+        {
+            var attr = el.Attribute(attrName);
+            if (attr is not null)
+                attr.Value = ApplyRuleToText(attr.Value, rule);
+        }
+
+        return;
+    }
+
+    // Existing: element-only rule like "password"
+    if (!path.Contains('.') && !path.Contains('[') && !path.StartsWith("@", StringComparison.Ordinal))
+    {
+        foreach (var el in root.DescendantsAndSelf().Where(e =>
+                     String.Equals(e.Name.LocalName, path, StringComparison.OrdinalIgnoreCase)))
+        {
+            el.Value = ApplyRuleToText(el.Value, rule);
+        }
+        return;
+    }
+
+    var tokens = MaskPath.Parse(path);
+
+    // If original rule started with "**.", try applying from every node
+    if (isAnywhere)
+    {
+        foreach (var start in root.DescendantsAndSelf())
+            ApplyTokens(start, tokens, 0, rule);
+
+        return;
+    }
+
+    ApplyTokens(root, tokens, 0, rule);
+}
+```
+
+### Why this works
+
+* If the rule is `**.@id`, after trimming `**.` it becomes `@id`.
+* That triggers the new branch that iterates all elements and masks `id` attributes.
+
+---
+
+## ✅ Also adjust attribute matching to ignore namespaces (optional but recommended)
+
+Right now you use:
+
+```csharp
+var attr = current.Attribute(attrName);
+```
+
+This matches attributes by *exact XName*. If your attribute is namespaced (rare for `id`, but possible), you might miss it.
+
+Safer version:
+
+Replace inside `ApplyTokens` (attribute section) with:
+
+```csharp
+if (t.Name.StartsWith("@"))
+{
+    var attrName = t.Name[1..];
+
+    var attr = current.Attributes()
+        .FirstOrDefault(a => String.Equals(a.Name.LocalName, attrName, StringComparison.OrdinalIgnoreCase));
+
+    if (attr is not null)
+        attr.Value = ApplyRuleToText(attr.Value, rule);
+
+    return;
+}
+```
+
+This guarantees `@id` matches `id` even if there’s an attribute namespace.
+
+---
+
+## ✅ Your example will now mask correctly
+
+Rule:
+
+```json
+{ "Path": "**.@id", "Replacement": "***" }
+```
+
+Input:
+
+```xml
+<CARDISSUESGBNEWVIRTUALCARDREQUESTType id="5175777006297809/TCIB.REG-123456">
+```
+
+Output:
+
+```xml
+<CARDISSUESGBNEWVIRTUALCARDREQUESTType id="***">
+```
+
+And if you want keep-last masking on the attribute too:
+
+```json
+{ "Path": "**.@id", "KeepLast": 4, "MaskChar": "*", "Replacement": "***" }
+```
+
+Would produce:
+
+```xml
+id="************************3456"
+```
+
+(“mask anyway even if shorter” is already handled by your `MaskKeepLast`.)
+
+---
+
+## One tiny improvement (your `MaskChar` type)
+
+You changed `MaskChar` to `string`. That’s fine, but make it safer:
+
+```csharp
+var maskChar = !string.IsNullOrEmpty(rule.MaskChar) ? rule.MaskChar[0] : '*';
+```
+
+Use that instead of `FirstOrDefault()` (which can return `\0`).
+
+So in both `ApplyRuleToText` methods (JSON + XML), change:
+
+```csharp
+rule.MaskChar.ToCharArray().FirstOrDefault()
+```
+
+to:
+
+```csharp
+!string.IsNullOrEmpty(rule.MaskChar) ? rule.MaskChar[0] : '*'
+```
+
+---
+
+If you want, I can paste the **full corrected `XmlMasker` class** with all of the above changes merged (so you can drop it in without hunting for lines).
