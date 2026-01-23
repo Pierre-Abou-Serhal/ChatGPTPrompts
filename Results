@@ -1,65 +1,255 @@
-```csharp
-private static void ApplyTokens(XElement current, List<PathToken> tokens, int i, MaskRule rule)
-{
-    if (i >= tokens.Count)
-    {
-        // We reached the target element
-        current.Value = ApplyRuleToText(current.Value, rule);
-        return;
-    }
+# Logger API – Payload Masking Rules
 
-    var t = tokens[i];
+This project supports masking sensitive data in **JSON** and **XML** payloads before they are logged to the database/file.  
+Masking is configured through `AppConfig:Masking:Rules` in `appsettings.json`.
 
-    // 1) Attribute support: token like "@id"
-    if (t.Name.StartsWith("@", StringComparison.Ordinal))
-    {
-        var attrName = t.Name[1..];
+The goal is to allow teams to safely log payloads while preventing exposure of sensitive information (card numbers, CVV, tokens, passwords, IDs, etc.).
 
-        // Match attribute by LocalName (namespace-safe)
-        var attr = current.Attributes()
-            .FirstOrDefault(a => string.Equals(a.Name.LocalName, attrName, StringComparison.OrdinalIgnoreCase));
+---
 
-        if (attr is not null)
-            attr.Value = ApplyRuleToText(attr.Value, rule);
+## Configuration Location
 
-        return;
-    }
+All masking rules live under:
 
-    // 2) ✅ Self-match support:
-    // If the current element itself matches this token, consume it and continue.
-    // This is required for paths like "ReissueCard.ContractIdentifier" when ReissueCard is the XML root.
-    if (string.Equals(current.Name.LocalName, t.Name, StringComparison.OrdinalIgnoreCase))
-    {
-        ApplyTokens(current, tokens, i + 1, rule);
-        return;
-    }
-
-    // 3) Find matching child elements by LocalName (namespace-safe)
-    var matches = current.Elements()
-        .Where(e => string.Equals(e.Name.LocalName, t.Name, StringComparison.OrdinalIgnoreCase))
-        .ToList();
-
-    if (matches.Count == 0) return;
-
-    // 4) Handle [*] (all items)
-    if (t.AllItems)
-    {
-        foreach (var m in matches)
-            ApplyTokens(m, tokens, i + 1, rule);
-        return;
-    }
-
-    // 5) Handle [index]
-    if (t.Index is not null)
-    {
-        var idx = t.Index.Value;
-        if (idx >= 0 && idx < matches.Count)
-            ApplyTokens(matches[idx], tokens, i + 1, rule);
-        return;
-    }
-
-    // 6) Normal step (apply to all matches)
-    foreach (var m in matches)
-        ApplyTokens(m, tokens, i + 1, rule);
+```json
+"AppConfig": {
+  "Masking": {
+    "Rules": [ ... ]
+  }
 }
+````
+
+---
+
+## Rule Format
+
+Each rule is a JSON object with a required `Path` plus **one** masking mode:
+
+### Mode A — Full Replacement
+
+Use **`Replacement`** to replace the entire value.
+
+✅ Use:
+
+* `Path`
+* `Replacement`
+
+❌ Do **not** include:
+
+* `KeepLast`
+* `MaskChar`
+
+Example:
+
+```json
+{ "Path": "password", "Replacement": "***" }
+```
+
+---
+
+### Mode B — Keep Last N Characters
+
+Use **`KeepLast` + `MaskChar`** to keep the last N characters and mask the rest.
+
+✅ Use:
+
+* `Path`
+* `KeepLast`
+* `MaskChar`
+
+❌ Do **not** include:
+
+* `Replacement`
+
+Example:
+
+```json
+{ "Path": "**.card.number", "KeepLast": 4, "MaskChar": "*" }
+```
+
+Result example:
+
+* Original: `5111111111117809`
+* Masked: `************7809`
+
+> **Important:** Masking is applied **even if the input is shorter than `KeepLast`** (it will still be masked).
+
+---
+
+## Path Syntax
+
+Rules target fields using dot-separated paths with support for:
+
+* nested paths
+* arrays
+* match-anywhere prefix (`**.`)
+* XML attributes (`@`)
+
+### 1) Mask by Name Anywhere (Global Name Rule)
+
+If `Path` contains **no** dots (`.`) and **no** array tokens (`[]`), it is treated as:
+
+> “Mask any field/element with this name anywhere in the payload.”
+
+Example:
+
+```json
+{ "Path": "token", "Replacement": "***" }
+{ "Path": "password", "Replacement": "***" }
+```
+
+This masks:
+
+* any JSON property named `token` / `password` at any depth
+* any XML element `<token>` / `<password>` at any depth
+
+---
+
+### 2) Rooted/Nested Path
+
+Use dot notation to target a specific nested field:
+
+```json
+{ "Path": "A.B.C.password", "Replacement": "***" }
+```
+
+Only masks `password` under `A → B → C`.
+
+---
+
+### 3) Match Anywhere in the Tree with `**.`
+
+Prefix a path with `**.` to apply it from any depth.
+This is recommended when root wrappers differ between messages.
+
+Example:
+
+```json
+{ "Path": "**.card.details.name", "Replacement": "***" }
+{ "Path": "**.cards[*].holder.name", "Replacement": "***" }
+```
+
+Meaning:
+
+> “Find this path anywhere in the payload and mask it.”
+
+---
+
+### 4) Arrays with `[*]`
+
+Arrays are supported using `[*]`:
+
+```json
+{ "Path": "**.cards[*].cvv", "Replacement": "***" }
+```
+
+* **JSON**: masks all items inside the `cards` array
+* **XML**: repeated elements with the same name behave like array items
+
+---
+
+### 5) XML Attributes with `@`
+
+To mask **XML attributes**, use `@attributeName`.
+
+#### Mask a specific attribute on a specific element:
+
+```json
+{ "Path": "**.CARDISSUESGBNEWVIRTUALCARDREQUESTType.@id", "Replacement": "***" }
+```
+
+#### Mask an attribute anywhere:
+
+```json
+{ "Path": "**.@id", "Replacement": "***" }
+```
+
+Example input:
+
+```xml
+<CARDISSUESGBNEWVIRTUALCARDREQUESTType id="5111111111117809/TCIB.REG-123456">
+```
+
+Rule:
+
+```json
+{ "Path": "**.@id", "KeepLast": 4, "MaskChar": "*" }
+```
+
+Output:
+
+```xml
+<CARDISSUESGBNEWVIRTUALCARDREQUESTType id="************************3456">
+```
+
+> Notes:
+>
+> * `@` syntax is for **XML attributes** and will also mask **JSON elements**.
+> * Ex: ```"CARDISSUESGBNEWVIRTUALCARDREQUESTType": { "@id": "5111111111117809/TCIB.REG-123456" }``` @id will also be masked
+
+---
+
+## Example appsettings.json
+
+```json
+{
+  "AppConfig": {
+    "Masking": {
+      "Rules": [
+        { "Path": "**.card.details.name", "Replacement": "***" },
+        { "Path": "**.cards[*].holder.name", "Replacement": "***" },
+        { "Path": "**.cards[*].cvv", "Replacement": "***" },
+
+        { "Path": "password", "Replacement": "***" },
+        { "Path": "token", "Replacement": "***" },
+
+        { "Path": "**.card.number", "KeepLast": 4, "MaskChar": "*" },
+        { "Path": "**.@id", "KeepLast": 4, "MaskChar": "*" }
+      ]
+    }
+  }
+}
+```
+
+---
+
+## Best Practices
+
+* Use `**.` when root object names vary between services/integrations.
+* Use global name rules (`"password"`, `"token"`, `"cvv"`) to ensure broad coverage.
+* Use `KeepLast` for identifiers where you still need partial visibility (card number last 4, transaction id suffix, etc.).
+* Avoid logging sensitive values in any non-masked field (even temporarily).
+
+---
+
+## Troubleshooting
+
+### “Only password/token are masked”
+
+If your rule uses a rooted path like `card.number` but your JSON has a wrapper root (e.g. `Response.card.number`), it won’t match unless:
+
+* you use the full rooted path, **or**
+* you prefix it with `**.` to match from anywhere.
+
+✅ Prefer:
+
+```json
+{ "Path": "**.card.number", "KeepLast": 4, "MaskChar": "*" }
+```
+
+---
+
+## Summary Cheat Sheet
+
+| Goal                        | Example Path                  |
+|-----------------------------|-------------------------------|
+| Mask by name anywhere       | `password`                    |
+| Mask nested field           | `A.B.C.password`              |
+| Match anywhere              | `**.card.details.name`        |
+| Mask all array items        | `**.cards[*].cvv`             |
+| Mask XML attribute anywhere | `**.@id`                      |
+| Keep last digits            | `**.card.number` + `KeepLast` |
+
+---
+
 ```
