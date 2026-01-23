@@ -1,3 +1,4 @@
+````md
 # Logger API – Payload Masking Rules
 
 This project supports masking sensitive data in **JSON** and **XML** payloads before they are logged to the database/file.  
@@ -23,7 +24,43 @@ All masking rules live under:
 
 ## Rule Format
 
-Each rule is a JSON object with a required `Path` plus **one** masking mode:
+Each rule is a JSON object with a required `Path`, optional `Operations`, plus **one** masking mode.
+
+### Optional — Restrict a rule to specific operations (`Operations`)
+
+You can restrict a masking rule to only apply for certain request operations (based on the value of `request.Operation`).
+
+✅ Use:
+
+* `Operations`: an array of operation names
+
+Example:
+
+```json
+{ "Path": "ContractIdentifier", "KeepLast": 4, "MaskChar": "*", "Operations": ["SetCardStatus", "ActivateCard"] }
+```
+
+Notes:
+
+* If `Operations` is **missing** or an **empty array**, the rule applies to **all** operations.
+* Operation matching is **case-insensitive** and must match the operation name **exactly**.
+
+### Precedence (important)
+
+If you have:
+
+* a **generic rule** (no `Operations`) for the same `Path`, and
+* an **operation-specific rule** (with `Operations`) for that same `Path`
+
+Then:
+
+* when the request operation matches the operation-specific rule, the **operation-specific rule overrides**, and the generic rule for that `Path` will **not** be applied.
+
+---
+
+## Masking Modes (choose one)
+
+Each rule must use **exactly one** of the following modes:
 
 ### Mode A — Full Replacement
 
@@ -184,8 +221,8 @@ Output:
 
 > Notes:
 >
-> * `@` syntax is for **XML attributes** and will also mask **JSON elements**.
-> * Ex: ```"CARDISSUESGBNEWVIRTUALCARDREQUESTType": { "@id": "5111111111117809/TCIB.REG-123456" }``` @id will also be masked
+> * `@` syntax is for **XML attributes** and will also mask **JSON properties** named like `@id`.
+> * Example JSON: `"CARDISSUESGBNEWVIRTUALCARDREQUESTType": { "@id": "5111111111117809/TCIB.REG-123456" }` → `@id` will be masked.
 
 ---
 
@@ -204,7 +241,9 @@ Output:
         { "Path": "token", "Replacement": "***" },
 
         { "Path": "**.card.number", "KeepLast": 4, "MaskChar": "*" },
-        { "Path": "**.@id", "KeepLast": 4, "MaskChar": "*" }
+        { "Path": "**.@id", "KeepLast": 4, "MaskChar": "*" },
+
+        { "Path": "ContractIdentifier", "KeepLast": 4, "MaskChar": "*", "Operations": ["SetCardStatus"] }
       ]
     }
   }
@@ -218,7 +257,7 @@ Output:
 * Use `**.` when root object names vary between services/integrations.
 * Use global name rules (`"password"`, `"token"`, `"cvv"`) to ensure broad coverage.
 * Use `KeepLast` for identifiers where you still need partial visibility (card number last 4, transaction id suffix, etc.).
-* Avoid logging sensitive values in any non-masked field (even temporarily).
+* Use `Operations` when masking requirements differ by operation.
 
 ---
 
@@ -237,19 +276,26 @@ If your rule uses a rooted path like `card.number` but your JSON has a wrapper r
 { "Path": "**.card.number", "KeepLast": 4, "MaskChar": "*" }
 ```
 
+### “My operation-specific rule isn’t applied”
+
+* Ensure `request.Operation` matches one of the values in `Operations` exactly (case-insensitive).
+* If you have both a generic rule and an operation-specific rule for the same `Path`, the operation-specific rule overrides the generic rule when it matches.
+
 ---
 
 ## Summary Cheat Sheet
 
-| Goal                        | Example Path                  |
-|-----------------------------|-------------------------------|
-| Mask by name anywhere       | `password`                    |
-| Mask nested field           | `A.B.C.password`              |
-| Match anywhere              | `**.card.details.name`        |
-| Mask all array items        | `**.cards[*].cvv`             |
-| Mask XML attribute anywhere | `**.@id`                      |
-| Keep last digits            | `**.card.number` + `KeepLast` |
+| Goal                                    | Example Path                                           |
+| --------------------------------------- | ------------------------------------------------------ |
+| Mask by name anywhere                   | `password`                                             |
+| Mask nested field                       | `A.B.C.password`                                       |
+| Match anywhere                          | `**.card.details.name`                                 |
+| Mask all array items                    | `**.cards[*].cvv`                                      |
+| Mask XML attribute anywhere             | `**.@id`                                               |
+| Keep last digits                        | `**.card.number` + `KeepLast`                          |
+| Apply rule only for specific operations | `ContractIdentifier` + `Operations: ["SetCardStatus"]` |
 
 ---
 
+```
 ```
