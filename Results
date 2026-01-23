@@ -1,60 +1,21 @@
-The problem is in your **XML path traversal**, not in the `**.` logic.
-
-Even with:
-
-```json
-{ "Path": "**.ReissueCard.ContractIdentifier", "MaskChar": "*", "KeepLast": 4 }
-```
-
-your XML code still won’t match because `ApplyTokens()` **only searches children**, and it does **not allow the current element to satisfy the current token**.
-
-### What happens today
-
-* You start from `<ReissueCard ...>` (good)
-* First token = `"ReissueCard"`
-* Your code does:
-
-```csharp
-var matches = current.Elements().Where(e => e.Name.LocalName == "ReissueCard")
-```
-
-But `current` *is already* `ReissueCard`, so there is no child `<ReissueCard>` inside it ⇒ `matches.Count == 0` ⇒ it stops.
-
-So `**.` doesn’t fix it because the traversal logic can’t consume the first token on the node itself.
-
----
-
-## ✅ Fix in code: allow “self match” for element tokens
-
-Add this block at the beginning of `XmlMasker.ApplyTokens()` **right after** `var t = tokens[i];` and **after** the attribute token check (or before searching children):
-
-```csharp
-// ✅ NEW: allow the current element itself to match the current token
-if (!t.Name.StartsWith("@", StringComparison.Ordinal) &&
-    string.Equals(current.Name.LocalName, t.Name, StringComparison.OrdinalIgnoreCase))
-{
-    ApplyTokens(current, tokens, i + 1, rule);
-    return;
-}
-```
-
-Your `ApplyTokens()` becomes like this (showing only the important part):
-
 ```csharp
 private static void ApplyTokens(XElement current, List<PathToken> tokens, int i, MaskRule rule)
 {
     if (i >= tokens.Count)
     {
+        // We reached the target element
         current.Value = ApplyRuleToText(current.Value, rule);
         return;
     }
 
     var t = tokens[i];
 
-    // Attribute support: token like "@id"
-    if (t.Name.StartsWith("@"))
+    // 1) Attribute support: token like "@id"
+    if (t.Name.StartsWith("@", StringComparison.Ordinal))
     {
         var attrName = t.Name[1..];
+
+        // Match attribute by LocalName (namespace-safe)
         var attr = current.Attributes()
             .FirstOrDefault(a => string.Equals(a.Name.LocalName, attrName, StringComparison.OrdinalIgnoreCase));
 
@@ -64,47 +25,41 @@ private static void ApplyTokens(XElement current, List<PathToken> tokens, int i,
         return;
     }
 
-    // ✅ NEW: self-match
+    // 2) ✅ Self-match support:
+    // If the current element itself matches this token, consume it and continue.
+    // This is required for paths like "ReissueCard.ContractIdentifier" when ReissueCard is the XML root.
     if (string.Equals(current.Name.LocalName, t.Name, StringComparison.OrdinalIgnoreCase))
     {
         ApplyTokens(current, tokens, i + 1, rule);
         return;
     }
 
-    // existing child matching...
+    // 3) Find matching child elements by LocalName (namespace-safe)
     var matches = current.Elements()
         .Where(e => string.Equals(e.Name.LocalName, t.Name, StringComparison.OrdinalIgnoreCase))
         .ToList();
 
     if (matches.Count == 0) return;
 
-    ...
+    // 4) Handle [*] (all items)
+    if (t.AllItems)
+    {
+        foreach (var m in matches)
+            ApplyTokens(m, tokens, i + 1, rule);
+        return;
+    }
+
+    // 5) Handle [index]
+    if (t.Index is not null)
+    {
+        var idx = t.Index.Value;
+        if (idx >= 0 && idx < matches.Count)
+            ApplyTokens(matches[idx], tokens, i + 1, rule);
+        return;
+    }
+
+    // 6) Normal step (apply to all matches)
+    foreach (var m in matches)
+        ApplyTokens(m, tokens, i + 1, rule);
 }
 ```
-
----
-
-## After this fix
-
-These will both work:
-
-* `ReissueCard.ContractIdentifier`
-* `**.ReissueCard.ContractIdentifier`
-
-And your sample XML:
-
-```xml
-<ns2:ReissueCard ...>
-  <ns2:ContractIdentifier>5175771007280914</ns2:ContractIdentifier>
-</ns2:ReissueCard>
-```
-
-will correctly mask `ContractIdentifier`.
-
----
-
-## Quick extra: your `Operation` filter is NOT involved here
-
-This specific rule has **no `Operations`**, so `GetEffectiveRules()` will keep it. So yes: “Regardless of operation, it should have masked it” — and it will once the traversal bug is fixed.
-
-If you want, I can also adjust the XML logic so `**.ContractIdentifier` works *without* specifying the parent element name (which is usually nicer).
