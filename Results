@@ -1,11 +1,12 @@
+Subject: Monitoring/Alerting for Alterna Logger Windows Service
+
 Dears,
 
-Since the Alterna Logger API is now being used by multiple applications, it is now crucial for debugging any issue that might occur on any application on PROD.
+As the Alterna Logger API is now used by multiple applications, it has become a critical dependency for production troubleshooting and incident investigation.
 
-We need a way to know if for whatever reason the Alterna Logger Windows Service might stop. 
+To ensure continuity, we would like to set up a way to be notified if the Alterna Logger Windows Service stops for any reason (e.g., crash, unexpected shutdown, server issue).
 
-Can you assit us with this ?
+Could you please assist us with implementing an alert/monitoring mechanism for this service?
 
-Best Regards,
-Pierre Abou Serhal.
-
+Best regards,
+Pierre Abou Serhal
