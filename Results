@@ -1,301 +1,180 @@
-````md
-# Logger API – Payload Masking Rules
-
-This project supports masking sensitive data in **JSON** and **XML** payloads before they are logged to the database/file.  
-Masking is configured through `AppConfig:Masking:Rules` in `appsettings.json`.
-
-The goal is to allow teams to safely log payloads while preventing exposure of sensitive information (card numbers, CVV, tokens, passwords, IDs, etc.).
-
----
-
-## Configuration Location
-
-All masking rules live under:
-
-```json
-"AppConfig": {
-  "Masking": {
-    "Rules": [ ... ]
-  }
-}
-````
-
----
-
-## Rule Format
-
-Each rule is a JSON object with a required `Path`, optional `Operations`, plus **one** masking mode.
-
-### Optional — Restrict a rule to specific operations (`Operations`)
-
-You can restrict a masking rule to only apply for certain request operations (based on the value of `request.Operation`).
-
-✅ Use:
-
-* `Operations`: an array of operation names
-
-Example:
-
-```json
-{ "Path": "ContractIdentifier", "KeepLast": 4, "MaskChar": "*", "Operations": ["SetCardStatus", "ActivateCard"] }
-```
-
-Notes:
-
-* If `Operations` is **missing** or an **empty array**, the rule applies to **all** operations.
-* Operation matching is **case-insensitive** and must match the operation name **exactly**.
-
-### Precedence (important)
-
-If you have:
-
-* a **generic rule** (no `Operations`) for the same `Path`, and
-* an **operation-specific rule** (with `Operations`) for that same `Path`
-
-Then:
-
-* when the request operation matches the operation-specific rule, the **operation-specific rule overrides**, and the generic rule for that `Path` will **not** be applied.
-
----
-
-## Masking Modes (choose one)
-
-Each rule must use **exactly one** of the following modes:
-
-### Mode A — Full Replacement
-
-Use **`Replacement`** to replace the entire value.
-
-✅ Use:
-
-* `Path`
-* `Replacement`
-
-❌ Do **not** include:
-
-* `KeepLast`
-* `MaskChar`
-
-Example:
-
-```json
-{ "Path": "password", "Replacement": "***" }
-```
-
----
-
-### Mode B — Keep Last N Characters
-
-Use **`KeepLast` + `MaskChar`** to keep the last N characters and mask the rest.
-
-✅ Use:
-
-* `Path`
-* `KeepLast`
-* `MaskChar`
-
-❌ Do **not** include:
-
-* `Replacement`
-
-Example:
-
-```json
-{ "Path": "**.card.number", "KeepLast": 4, "MaskChar": "*" }
-```
-
-Result example:
-
-* Original: `5111111111117809`
-* Masked: `************7809`
-
-> **Important:** Masking is applied **even if the input is shorter than `KeepLast`** (it will still be masked).
-
----
-
-## Path Syntax
-
-Rules target fields using dot-separated paths with support for:
-
-* nested paths
-* arrays
-* match-anywhere prefix (`**.`)
-* XML attributes (`@`)
-
-### 1) Mask by Name Anywhere (Global Name Rule)
-
-If `Path` contains **no** dots (`.`) and **no** array tokens (`[]`), it is treated as:
-
-> “Mask any field/element with this name anywhere in the payload.”
-
-Example:
-
-```json
-{ "Path": "token", "Replacement": "***" }
-{ "Path": "password", "Replacement": "***" }
-```
-
-This masks:
-
-* any JSON property named `token` / `password` at any depth
-* any XML element `<token>` / `<password>` at any depth
-
----
-
-### 2) Rooted/Nested Path
-
-Use dot notation to target a specific nested field:
-
-```json
-{ "Path": "A.B.C.password", "Replacement": "***" }
-```
-
-Only masks `password` under `A → B → C`.
-
----
-
-### 3) Match Anywhere in the Tree with `**.`
-
-Prefix a path with `**.` to apply it from any depth.
-This is recommended when root wrappers differ between messages.
-
-Example:
-
-```json
-{ "Path": "**.card.details.name", "Replacement": "***" }
-{ "Path": "**.cards[*].holder.name", "Replacement": "***" }
-```
-
-Meaning:
-
-> “Find this path anywhere in the payload and mask it.”
-
----
-
-### 4) Arrays with `[*]`
-
-Arrays are supported using `[*]`:
-
-```json
-{ "Path": "**.cards[*].cvv", "Replacement": "***" }
-```
-
-* **JSON**: masks all items inside the `cards` array
-* **XML**: repeated elements with the same name behave like array items
-
----
-
-### 5) XML Attributes with `@`
-
-To mask **XML attributes**, use `@attributeName`.
-
-#### Mask a specific attribute on a specific element:
-
-```json
-{ "Path": "**.CARDISSUESGBNEWVIRTUALCARDREQUESTType.@id", "Replacement": "***" }
-```
-
-#### Mask an attribute anywhere:
-
-```json
-{ "Path": "**.@id", "Replacement": "***" }
-```
-
-Example input:
-
-```xml
-<CARDISSUESGBNEWVIRTUALCARDREQUESTType id="5111111111117809/TCIB.REG-123456">
-```
-
-Rule:
-
-```json
-{ "Path": "**.@id", "KeepLast": 4, "MaskChar": "*" }
-```
-
-Output:
-
-```xml
-<CARDISSUESGBNEWVIRTUALCARDREQUESTType id="************************3456">
-```
-
-> Notes:
->
-> * `@` syntax is for **XML attributes** and will also mask **JSON properties** named like `@id`.
-> * Example JSON: `"CARDISSUESGBNEWVIRTUALCARDREQUESTType": { "@id": "5111111111117809/TCIB.REG-123456" }` → `@id` will be masked.
-
----
-
-## Example appsettings.json
-
-```json
-{
-  "AppConfig": {
-    "Masking": {
-      "Rules": [
-        { "Path": "**.card.details.name", "Replacement": "***" },
-        { "Path": "**.cards[*].holder.name", "Replacement": "***" },
-        { "Path": "**.cards[*].cvv", "Replacement": "***" },
-
-        { "Path": "password", "Replacement": "***" },
-        { "Path": "token", "Replacement": "***" },
-
-        { "Path": "**.card.number", "KeepLast": 4, "MaskChar": "*" },
-        { "Path": "**.@id", "KeepLast": 4, "MaskChar": "*" },
-
-        { "Path": "ContractIdentifier", "KeepLast": 4, "MaskChar": "*", "Operations": ["SetCardStatus"] }
-      ]
-    }
-  }
-}
-```
-
----
-
-## Best Practices
-
-* Use `**.` when root object names vary between services/integrations.
-* Use global name rules (`"password"`, `"token"`, `"cvv"`) to ensure broad coverage.
-* Use `KeepLast` for identifiers where you still need partial visibility (card number last 4, transaction id suffix, etc.).
-* Use `Operations` when masking requirements differ by operation.
-
----
-
-## Troubleshooting
-
-### “Only password/token are masked”
-
-If your rule uses a rooted path like `card.number` but your JSON has a wrapper root (e.g. `Response.card.number`), it won’t match unless:
-
-* you use the full rooted path, **or**
-* you prefix it with `**.` to match from anywhere.
-
-✅ Prefer:
-
-```json
-{ "Path": "**.card.number", "KeepLast": 4, "MaskChar": "*" }
-```
-
-### “My operation-specific rule isn’t applied”
-
-* Ensure `request.Operation` matches one of the values in `Operations` exactly (case-insensitive).
-* If you have both a generic rule and an operation-specific rule for the same `Path`, the operation-specific rule overrides the generic rule when it matches.
-
----
-
-## Summary Cheat Sheet
-
-| Goal                                    | Example Path                                           |
-| --------------------------------------- | ------------------------------------------------------ |
-| Mask by name anywhere                   | `password`                                             |
-| Mask nested field                       | `A.B.C.password`                                       |
-| Match anywhere                          | `**.card.details.name`                                 |
-| Mask all array items                    | `**.cards[*].cvv`                                      |
-| Mask XML attribute anywhere             | `**.@id`                                               |
-| Keep last digits                        | `**.card.number` + `KeepLast`                          |
-| Apply rule only for specific operations | `ContractIdentifier` + `Operations: ["SetCardStatus"]` |
-
----
-
-```
-```
+case FileType.EXCEL:
+                {
+                    Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+                    using MemoryStream excelMemoryStream = new MemoryStream(fileBytes);
+                    
+                    ExcelReaderConfiguration? excelReaderConfiguration = null;
+
+                    if (!String.IsNullOrWhiteSpace(req.FileInfo.ExcelPassword))
+                    {
+                        excelReaderConfiguration =  new ()
+                        {
+                            Password = req.FileInfo.ExcelPassword
+                        };
+                    }
+                    
+                    using IExcelDataReader? reader = ExcelReaderFactory.CreateReader(excelMemoryStream, excelReaderConfiguration);
+                    
+                    DataSet? result = reader.AsDataSet(new ExcelDataSetConfiguration
+                    {
+                        ConfigureDataTable = (_) => new ExcelDataTableConfiguration
+                        {
+                            UseHeaderRow = false // Read raw data first
+                        }
+                    });
+
+                    Int32 sheetNumber = 0;
+
+                    if (req.FileInfo.SheetNumber is not null && req.FileInfo.SheetNumber > 0)
+                    {
+                        if (req.FileInfo.SheetNumber.Value > result.Tables.Count)
+                        {
+                            throw new SGBLBadRequestException($"Excel file does not contain the passed sheet number: {req.FileInfo.SheetNumber.Value}.");
+                        }
+            
+                        sheetNumber = req.FileInfo.SheetNumber.Value - 1;
+                    }
+        
+                    DataTable table = result.Tables[sheetNumber];
+
+                    // Parsed Data List that will be returned to client
+                    List<ParsedData> parsedDataList = [];
+
+                    foreach (Column column in req.FileInfo.Columns)
+                    {
+                        List<Int32> injestFilePropertyIds = [];
+                        List<ColumnData> columnData = [];
+                        Int32 headerNameColumnIndex = -1;
+
+                        ParsedData parsedData = new();
+                        parsedData.ColumnIndex = column.ColumnNumber;
+
+                        // Read End Condition Variables
+                        Int32 whiteLineCount = 0;
+
+                        // Extracting Header Data
+                        if (req.FileInfo.ValidateHeader)
+                        {
+                            if (req.FileInfo.HeaderRowNumber >= table.Rows.Count)
+                            {
+                                throw new SGBLBadRequestException($"Invalid Header Row Number. Excel Contains {table.Rows.Count} and Configured Header Row Number: {req.FileInfo.HeaderRowNumber}");
+                            }
+                            
+                            List<String> rowValues = table.Rows[req.FileInfo.HeaderRowNumber - 1].ItemArray.Select(cell => cell?.ToString()?.Trim() ?? String.Empty).ToList();
+                            
+                            for (Int32 i = 0; i < rowValues.Count; i++)
+                            {
+                                String cell = rowValues[i];
+
+                                if (cell.Equals(column.HeaderColumnName))
+                                {
+                                    headerNameColumnIndex = i;
+                                    parsedData.ColumnName = column.HeaderColumnName; // Header Name Was Found
+                                }
+
+                                headerList.Add(cell);
+                            }
+
+                            // Check if header contains the values in "ValidateHeaderContainsFields" array
+                            OnCheckHeaderEvent?.Invoke(headerList,
+                                req.FileInfo.ValidateHeaderContainsFields, ref res);
+
+                            // Header did not pass checking event
+                            if (res.WebResp.Errors.Count > 0)
+                            {
+                                throw new SGBLBadRequestException("Invalid Header Fields");
+                            }
+                            
+                        }
+                        
+                        foreach (DataRow row in table.Rows)
+                        {
+                            Int32 rowNumber = table.Rows.IndexOf(row) + 1; // IndexOf(row) is zero based
+
+                            // Checking if End Condition is reached
+                            List<String> rowValues = row.ItemArray
+                                .Select(cell => cell?.ToString()?.Trim() ?? String.Empty).ToList();
+
+                            if (CustomCodes.IsReadEndConditionReached(
+                                    column.ReadEndCondition,
+                                    rowValues,
+                                    whiteLineCount,
+                                    rowNumber,
+                                    column.ReadEndConditionValue))
+                            {
+                                break;
+                            }
+                            
+                            // Extracting Row Data
+                            if (rowNumber < column.StartRowNumber)
+                            {
+                                continue;
+                            }
+
+                            // Checking if a value in a row match any skip string value
+                            Boolean skipRow = false;
+
+                            foreach (SkipRowString skipRowString in req.FileInfo.SkipRowStrings)
+                            {
+                                foreach (var cell in rowValues)
+                                {
+                                    if (skipRowString.IsRegExp)
+                                    {
+                                        if (Regex.IsMatch(cell, skipRowString.SkipString))
+                                        {
+                                            skipRow = true;
+                                            break;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (cell.Contains(skipRowString.SkipString))
+                                        {
+                                            skipRow = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (skipRow)
+                            {
+                                continue;
+                            }
+
+                            String cellValue = column.FindFromHeader
+                                ? row[headerNameColumnIndex]?.ToString() ?? String.Empty
+                                : row[column.ColumnNumber == 0 ? column.ColumnNumber : column.ColumnNumber - 1]
+                                    ?.ToString() ?? String.Empty;
+
+                            injestFilePropertyIds =
+                                column.CustomDataValidation.Select(i => i.InjestFilePropertyId).ToList();
+                            
+                            columnData.Add(new ()
+                            {
+                                Data = cellValue,
+                                RowNumber = rowNumber,
+                            });
+                            
+                            if (rowValues.All(String.IsNullOrWhiteSpace))
+                            {
+                                whiteLineCount++;
+                            }
+                        }
+
+                        OnCheckRowsDataEvent?.Invoke(injestFilePropertyIds, columnData, ref res);
+
+                        if (res.WebResp.Errors.Count > 0)
+                        {
+                            throw new SGBLBadRequestException($"Invalid Column {column.ColumnNumber} Fields");
+                        }
+
+                        parsedData.ColumnData = columnData;
+                        parsedDataList.Add(parsedData);
+                    }
+
+                    res.ParsedDataList = parsedDataList;
+
+                    break;
+                }
