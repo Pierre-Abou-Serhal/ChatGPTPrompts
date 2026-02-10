@@ -1,7 +1,38 @@
-UPDATE fic
-SET fic.SourceAccountNumber = f.SourceAccountNumber
-FROM t_File_Import_Content AS fic
-JOIN t_File_Import        AS fi ON fi.Id   = fic.t_File_Import_Id   -- change col name
-JOIN t_File               AS f  ON f.Id    = fi.t_File_Id           -- change col name
-WHERE fic.SourceAccountNumber <> f.SourceAccountNumber
-   OR fic.SourceAccountNumber IS NULL;
+# ASP.NET Core (.NET Framework)
+# Build and test ASP.NET Core projects targeting the full .NET Framework.
+# Add steps that publish symbols, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+trigger:
+- master
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  solution: '**/*.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+
+steps:
+- task: NuGetToolInstaller@1
+
+- task: NuGetCommand@2
+  inputs:
+    restoreSolution: '$(solution)'
+
+- task: VSBuild@1
+  inputs:
+    solution: '$(solution)'
+    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:DesktopBuildPackageLocation="$(build.artifactStagingDirectory)\WebApp.zip" /p:DeployIisAppPath="Default Web Site"'
+    platform: '$(buildPlatform)'
+    configuration: '$(buildConfiguration)'
+
+- task: VSTest@2
+  inputs:
+    platform: '$(buildPlatform)'
+    configuration: '$(buildConfiguration)'
+
+
+
+There was a resource authorization issue: "The pipeline is not valid. Could not find a pool with name Azure Pipelines. The pool does not exist or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz."
