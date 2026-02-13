@@ -1,1 +1,8 @@
-  const lines = dupes.map(d => `• ${d.accNbr} (x${d.count})`);
+I have this in MVC .Net Framework 4.5.2
+
+<a href="#" onclick="Redirect('../../Reporting/frmDisplayRdlcPdf.aspx?Report=CardMailer&CardPinId=@item.CardPinId.ToString()');">
+
+The @item.CardPinId value was 253614
+
+Could the URI be structured in a way that can cause: 
+Redirect URI cannot contain newline characters ?
