@@ -1,8 +1,1 @@
-I have this in MVC .Net Framework 4.5.2
-
-<a href="#" onclick="Redirect('../../Reporting/frmDisplayRdlcPdf.aspx?Report=CardMailer&CardPinId=@item.CardPinId.ToString()');">
-
-The @item.CardPinId value was 253614
-
-Could the URI be structured in a way that can cause: 
-Redirect URI cannot contain newline characters ?
+https://vstsagentpackage.azureedge.net/agent/3.238.0/vsts-agent-win-x64-3.238.0.zip
