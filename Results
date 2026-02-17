@@ -3,29 +3,31 @@ trigger:
     include:
     - sit
     - uat
-    - prod
+    - master
 
 variables:
   buildConfiguration: 'Release'
 
 stages:
 # =========================
-# BUILD (always runs)
+# BUILD (runs for sit/uat/master)
 # =========================
 - stage: Build
   displayName: Build & Publish Artifact
   jobs:
   - job: BuildJob
+    displayName: Build (ASP.NET Core)
     pool:
-      name: 'BUILD'
+      name: 'BUILD'   # <-- self-hosted build agent pool
     steps:
     - checkout: self
       clean: true
 
     - task: UseDotNet@2
+      displayName: 'Use .NET SDK'
       inputs:
         packageType: 'sdk'
-        version: '8.x'   # change to your SDK version
+        version: '8.x'   # <-- change to your project's SDK (6.x/7.x/8.x)
 
     - task: DotNetCoreCLI@2
       displayName: Restore
@@ -49,6 +51,7 @@ stages:
         zipAfterPublish: false
 
     - task: ArchiveFiles@2
+      displayName: 'Zip publish output'
       inputs:
         rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish'
         includeRootFolder: false
@@ -59,141 +62,167 @@ stages:
     - publish: '$(Build.ArtifactStagingDirectory)\WebApp.zip'
       artifact: drop
 
+
 # =========================
-# DEPLOY SIT (only on sit branch)
+# DEPLOY SIT (only when branch == sit)
 # =========================
 - stage: Deploy_SIT
   displayName: Deploy to SIT
   dependsOn: Build
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
   jobs:
-  - job: Deploy
+  - deployment: DeploySIT
+    displayName: 'Deploy SIT (IIS)'
+    environment: 'SIT'     # <-- Azure Environment name
     pool:
-      name: 'IIS-SIT'
+      name: 'IIS-SIT'      # <-- agent pool with SIT IIS agent
     variables:
-    - group: 'VG-SIT-DataExport'
-    steps:
-    - download: current
-      artifact: drop
+    - group: 'VG-SIT-DataExport'  # <-- your SIT variable group
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
 
-    - task: ExtractFiles@1
-      inputs:
-        archiveFilePatterns: '$(Pipeline.Workspace)\drop\WebApp.zip'
-        destinationFolder: '$(Pipeline.Workspace)\extracted'
-        cleanDestinationFolder: true
+          - task: ExtractFiles@1
+            displayName: 'Extract artifact'
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)\drop\WebApp.zip'
+              destinationFolder: '$(Pipeline.Workspace)\extracted'
+              cleanDestinationFolder: true
 
-    - task: FileTransform@1
-      displayName: 'JSON substitution (appsettings.json)'
-      inputs:
-        folderPath: '$(Pipeline.Workspace)\extracted'
-        fileType: 'json'
-        targetFiles: '**/appsettings.json'
+          - task: FileTransform@1
+            displayName: 'JSON substitution (appsettings.json)'
+            inputs:
+              folderPath: '$(Pipeline.Workspace)\extracted'
+              fileType: 'json'
+              targetFiles: '**/appsettings.json'
 
-    - powershell: |
-        Import-Module WebAdministration
-        Stop-WebAppPool -Name "DataExport_SIT_AppPool"
-      displayName: Stop app pool
+          - powershell: |
+              Import-Module WebAdministration
+              Stop-WebAppPool -Name "DataExport_SIT_AppPool"
+            displayName: 'Stop SIT App Pool'
 
-    - task: CopyFiles@2
-      inputs:
-        SourceFolder: '$(Pipeline.Workspace)\extracted'
-        Contents: '**'
-        TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # SIT path
-        OverWrite: true
+          - task: CopyFiles@2
+            displayName: 'Copy files (SIT)'
+            inputs:
+              SourceFolder: '$(Pipeline.Workspace)\extracted'
+              Contents: '**'
+              TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- SIT path
+              OverWrite: true
 
-    - powershell: |
-        Import-Module WebAdministration
-        Start-WebAppPool -Name "DataExport_SIT_AppPool"
-      displayName: Start app pool
+          - powershell: |
+              Import-Module WebAdministration
+              Start-WebAppPool -Name "DataExport_SIT_AppPool"
+            displayName: 'Start SIT App Pool'
+
 
 # =========================
-# DEPLOY UAT (only on uat branch)
+# DEPLOY UAT (only when branch == uat) - approvals via Environment checks
 # =========================
 - stage: Deploy_UAT
-  displayName: Deploy to UAT
+  displayName: Deploy to UAT (Approval required)
   dependsOn: Build
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/uat'))
   jobs:
-  - job: Deploy
+  - deployment: DeployUAT
+    displayName: 'Deploy UAT (IIS)'
+    environment: 'UAT'     # <-- approvals/checks configured in the UAT environment UI
     pool:
       name: 'IIS-UAT'
     variables:
     - group: 'VG-UAT-DataExport'
-    steps:
-    - download: current
-      artifact: drop
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
 
-    - task: ExtractFiles@1
-      inputs:
-        archiveFilePatterns: '$(Pipeline.Workspace)\drop\WebApp.zip'
-        destinationFolder: '$(Pipeline.Workspace)\extracted'
-        cleanDestinationFolder: true
+          - task: ExtractFiles@1
+            displayName: 'Extract artifact'
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)\drop\WebApp.zip'
+              destinationFolder: '$(Pipeline.Workspace)\extracted'
+              cleanDestinationFolder: true
 
-    - task: FileTransform@1
-      inputs:
-        folderPath: '$(Pipeline.Workspace)\extracted'
-        fileType: 'json'
-        targetFiles: '**/appsettings.json'
+          - task: FileTransform@1
+            displayName: 'JSON substitution (appsettings.json)'
+            inputs:
+              folderPath: '$(Pipeline.Workspace)\extracted'
+              fileType: 'json'
+              targetFiles: '**/appsettings.json'
 
-    - powershell: |
-        Import-Module WebAdministration
-        Stop-WebAppPool -Name "DataExport_UAT_AppPool"
-      displayName: Stop app pool
+          - powershell: |
+              Import-Module WebAdministration
+              Stop-WebAppPool -Name "DataExport_UAT_AppPool"
+            displayName: 'Stop UAT App Pool'
 
-    - task: CopyFiles@2
-      inputs:
-        SourceFolder: '$(Pipeline.Workspace)\extracted'
-        Contents: '**'
-        TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # UAT path
-        OverWrite: true
+          - task: CopyFiles@2
+            displayName: 'Copy files (UAT)'
+            inputs:
+              SourceFolder: '$(Pipeline.Workspace)\extracted'
+              Contents: '**'
+              TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- UAT path
+              OverWrite: true
 
-    - powershell: |
-        Import-Module WebAdministration
-        Start-WebAppPool -Name "DataExport_UAT_AppPool"
-      displayName: Start app pool
+          - powershell: |
+              Import-Module WebAdministration
+              Start-WebAppPool -Name "DataExport_UAT_AppPool"
+            displayName: 'Start UAT App Pool'
+
 
 # =========================
-# DEPLOY PROD (only on prod branch)
+# DEPLOY PROD (only when branch == master) - approvals via Environment checks
 # =========================
 - stage: Deploy_PROD
-  displayName: Deploy to PROD
+  displayName: Deploy to PROD (Approval required)
   dependsOn: Build
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/prod'))
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
   jobs:
-  - job: Deploy
+  - deployment: DeployPROD
+    displayName: 'Deploy PROD (IIS)'
+    environment: 'PROD'    # <-- approvals/checks configured in the PROD environment UI
     pool:
-      name: 'IIS-PROD'
+      name: 'IIS-PROD'     # <-- locked-down pool recommended
     variables:
     - group: 'VG-PROD-DataExport'
-    steps:
-    - download: current
-      artifact: drop
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
 
-    - task: ExtractFiles@1
-      inputs:
-        archiveFilePatterns: '$(Pipeline.Workspace)\drop\WebApp.zip'
-        destinationFolder: '$(Pipeline.Workspace)\extracted'
-        cleanDestinationFolder: true
+          - task: ExtractFiles@1
+            displayName: 'Extract artifact'
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)\drop\WebApp.zip'
+              destinationFolder: '$(Pipeline.Workspace)\extracted'
+              cleanDestinationFolder: true
 
-    - task: FileTransform@1
-      inputs:
-        folderPath: '$(Pipeline.Workspace)\extracted'
-        fileType: 'json'
-        targetFiles: '**/appsettings.json'
+          - task: FileTransform@1
+            displayName: 'JSON substitution (appsettings.json)'
+            inputs:
+              folderPath: '$(Pipeline.Workspace)\extracted'
+              fileType: 'json'
+              targetFiles: '**/appsettings.json'
 
-    - powershell: |
-        Import-Module WebAdministration
-        Stop-WebAppPool -Name "DataExport_PROD_AppPool"
-      displayName: Stop app pool
+          - powershell: |
+              Import-Module WebAdministration
+              Stop-WebAppPool -Name "DataExport_PROD_AppPool"
+            displayName: 'Stop PROD App Pool'
 
-    - task: CopyFiles@2
-      inputs:
-        SourceFolder: '$(Pipeline.Workspace)\extracted'
-        Contents: '**'
-        TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # PROD path
-        OverWrite: true
+          - task: CopyFiles@2
+            displayName: 'Copy files (PROD)'
+            inputs:
+              SourceFolder: '$(Pipeline.Workspace)\extracted'
+              Contents: '**'
+              TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- PROD path
+              OverWrite: true
 
-    - powershell: |
-        Import-Module WebAdministration
-        Start-WebAppPool -Name "DataExport_PROD_AppPool"
-      displayName: Start app pool
+          - powershell: |
+              Import-Module WebAdministration
+              Start-WebAppPool -Name "DataExport_PROD_AppPool"
+            displayName: 'Start PROD App Pool'
