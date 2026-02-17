@@ -1,1 +1,100 @@
-https://download.agent.dev.azure.com/agent/3.238.0/vsts-agent-win-x64-3.238.0.zip
+Hello Team,
+
+We’re setting up a CI/CD workflow using Azure DevOps Server 2022.2 (on-prem) to automate deployments to our IIS servers across environments (DEV, SIT, UAT, PROD). To proceed, we need your support to prepare the required infrastructure, system access, and security approvals.
+
+Below is the target approach and the concrete requirements.
+
+1. Target CI/CD approach (recommended)
+
+* Build happens once on a dedicated Build Agent server (self-hosted Azure DevOps Agent).
+* Deployments happen on each environment’s IIS server using a self-hosted Azure DevOps Agent installed locally on the server.
+* The build output is published as an Azure DevOps pipeline artifact and stored on Azure DevOps Server. Deployment servers download the artifact from Azure DevOps Server (no direct file copy from the build server to SIT/UAT/PROD).
+
+2. Servers involved
+
+* Azure DevOps Server (existing)
+* Build Agent Server (new or existing Windows Server VM)
+* IIS Servers per environment (existing): SIT, UAT, PROD (and DEV if applicable)
+
+  * Backend IIS VM(s)
+  * Frontend IIS VM(s)
+
+3. Network / Connectivity requirements
+   Please allow the following communication paths:
+   A) Build Agent Server → Azure DevOps Server
+
+* HTTPS/HTTP access to the Azure DevOps Server URL (used by the agent for Git checkout, pipeline communication, and artifact publish).
+
+B) Each IIS Deployment Server (SIT/UAT/PROD) → Azure DevOps Server
+
+* HTTPS/HTTP access to the Azure DevOps Server URL (used by the agent to receive jobs and download artifacts).
+
+Notes:
+
+* No SMB/WinRM connectivity from the Build Server to PROD/SIT/UAT is required with this model.
+* Standard domain name resolution and routing between the servers is required.
+
+4. Accounts & permissions (Windows / IIS)
+   We need a decision on the service account strategy for running the Azure DevOps Agent service on each machine:
+
+Option 1 (simpler): Run agent service as Local System
+
+* Requires local admin-level capability for IIS actions (app pool restart / optional IIS reset) and write access to deployment folders.
+
+Option 2 (preferred in controlled environments): Use a dedicated domain service account
+For each IIS server (or one per environment), grant:
+
+* NTFS Modify permissions on the deployment target folder(s), e.g.:
+
+  * Backend: C:\inetpub\wwwroot<BackendApp>\
+  * Frontend: C:\inetpub\wwwroot<FrontendApp>\
+* Ability to stop/start the relevant IIS Application Pool(s) (or execute IIS reset if required).
+* If the deployment strategy includes stopping/starting app pools, the account must be allowed to run PowerShell with the WebAdministration module locally.
+
+For the Build Agent Server service account:
+
+* Permission to access Azure DevOps Server and the project repo.
+* Ability to restore packages from approved package sources (see section 5).
+
+5. Package restore (NuGet) requirements
+   Our build requires restoring NuGet packages. Please confirm one of the following:
+
+* Internet access from the Build Agent Server to nuget.org; OR
+* Preferred: Use an internal package source (Azure Artifacts / Nexus / Artifactory / ProGet) and allow the Build Agent Server to access it.
+
+If internet access is not allowed, we will update nuget.config to use only the approved internal feed/proxy.
+
+6. Tools to be installed
+   On the Build Agent Server:
+
+* Azure DevOps self-hosted agent
+* Visual Studio Build Tools (matching project requirements) and .NET SDK/targeting packs as needed
+* NuGet tooling (typically handled by the pipeline tasks)
+
+On each IIS Deployment Server:
+
+* Azure DevOps self-hosted agent
+* PowerShell (existing) and IIS WebAdministration module (part of IIS management features)
+* No build tools required (deployment only)
+
+7. Security controls (recommended)
+   To prevent accidental PROD deployments:
+
+* Create separate Agent Pools per environment (e.g., IIS-SIT, IIS-UAT, IIS-PROD).
+* Restrict “Use” permission on the IIS-PROD agent pool to a limited group (e.g., Release Managers).
+* Enable approvals/checks for PROD deployments (pipeline stage approvals).
+
+8. What we need from you
+
+* Confirm/approve the deployment model (agents on IIS servers downloading artifacts from Azure DevOps Server).
+* Provide/approve service account(s) and required permissions (or approve Local System usage).
+* Approve the network paths (Build/IIS servers → Azure DevOps Server) and any firewall rules required.
+* Confirm the approved NuGet package source approach (internet vs internal proxy/feed).
+* Confirm the list of IIS target folders and app pool names (we will provide exact values if needed).
+
+Once these prerequisites are in place, we can implement the pipeline stages for Build → Deploy (SIT/UAT/PROD) with “copy files + app pool restart” and keep PROD protected via restricted pools and approvals.
+
+Thank you, and please let me know if you prefer a short technical walkthrough meeting to align on the final approach.
+
+Best regards,
+Pierre Abou Serhal
