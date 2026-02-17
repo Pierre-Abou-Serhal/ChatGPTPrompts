@@ -1,1 +1,49 @@
-download.agent.dev.azure.com/agent/3.238.0/vsts-agent-win-x64-3.238.0.zip
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+
+  "AppSettings": {
+    "DataExportConnectionString": "Data Source=DEV-SQL2016\\PERFAPP;Initial Catalog=Alterna_DataExport;User ID=sasadmin;Password=sasadmin",
+    "IsSwaggerEnabled": true,
+    "IsHttps": true,
+    "MQURL": "",
+    "FTPConfigurations": {
+      "FtpAddress": "10.0.40.6",
+      "FtpPort": 2121,
+      "FtpUserName": "pabouserhal",
+      "FtpPassword": "P@ssw0rd-m2",
+      "IsFtpsEnabled": false
+    }
+  },
+
+  "NLogSettings": {
+    "Is_DB_Log": "true",
+    "Is_DB_Log_Info": "true",
+    "NLog_Location": "C:\\logs\\DataExporter.txt",
+    "NLog_MaxArchiveDays": "75",
+    "NLog_LogLevel": "info",
+    "LoggingApi": "http://10.0.40.41:8043/api/Logger/LogData",
+    "Caller_App": "DataExport"
+  },
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.File" ],
+    "MinimumLevel": "Information",
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "C:\\logs\\FluentFTP\\AlternaDataExport-.log",
+          "rollingInterval": "Day",
+          "fileSizeLimitBytes": "65535000",
+          "retainedFileCountLimit": "100",
+          "rollOnFileSizeLimit": true
+        }
+      }
+    ],
+    "Enrich": [ "FromLogContext" ]
+  }
+}
