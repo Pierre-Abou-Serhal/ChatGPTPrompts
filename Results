@@ -1,49 +1,199 @@
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
+trigger:
+  branches:
+    include:
+    - sit
+    - uat
+    - prod
 
-  "AppSettings": {
-    "DataExportConnectionString": "Data Source=DEV-SQL2016\\PERFAPP;Initial Catalog=Alterna_DataExport;User ID=sasadmin;Password=sasadmin",
-    "IsSwaggerEnabled": true,
-    "IsHttps": true,
-    "MQURL": "",
-    "FTPConfigurations": {
-      "FtpAddress": "10.0.40.6",
-      "FtpPort": 2121,
-      "FtpUserName": "pabouserhal",
-      "FtpPassword": "P@ssw0rd-m2",
-      "IsFtpsEnabled": false
-    }
-  },
+variables:
+  buildConfiguration: 'Release'
 
-  "NLogSettings": {
-    "Is_DB_Log": "true",
-    "Is_DB_Log_Info": "true",
-    "NLog_Location": "C:\\logs\\DataExporter.txt",
-    "NLog_MaxArchiveDays": "75",
-    "NLog_LogLevel": "info",
-    "LoggingApi": "http://10.0.40.41:8043/api/Logger/LogData",
-    "Caller_App": "DataExport"
-  },
-  "Serilog": {
-    "Using": [ "Serilog.Sinks.File" ],
-    "MinimumLevel": "Information",
-    "WriteTo": [
-      {
-        "Name": "File",
-        "Args": {
-          "path": "C:\\logs\\FluentFTP\\AlternaDataExport-.log",
-          "rollingInterval": "Day",
-          "fileSizeLimitBytes": "65535000",
-          "retainedFileCountLimit": "100",
-          "rollOnFileSizeLimit": true
-        }
-      }
-    ],
-    "Enrich": [ "FromLogContext" ]
-  }
-}
+stages:
+# =========================
+# BUILD (always runs)
+# =========================
+- stage: Build
+  displayName: Build & Publish Artifact
+  jobs:
+  - job: BuildJob
+    pool:
+      name: 'BUILD'
+    steps:
+    - checkout: self
+      clean: true
+
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '8.x'   # change to your SDK version
+
+    - task: DotNetCoreCLI@2
+      displayName: Restore
+      inputs:
+        command: restore
+        projects: '**/*.csproj'
+
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: build
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration)'
+
+    - task: DotNetCoreCLI@2
+      displayName: Publish
+      inputs:
+        command: publish
+        publishWebProjects: true
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)\publish'
+        zipAfterPublish: false
+
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)\WebApp.zip'
+        replaceExistingArchive: true
+
+    - publish: '$(Build.ArtifactStagingDirectory)\WebApp.zip'
+      artifact: drop
+
+# =========================
+# DEPLOY SIT (only on sit branch)
+# =========================
+- stage: Deploy_SIT
+  displayName: Deploy to SIT
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
+  jobs:
+  - job: Deploy
+    pool:
+      name: 'IIS-SIT'
+    variables:
+    - group: 'VG-SIT-DataExport'
+    steps:
+    - download: current
+      artifact: drop
+
+    - task: ExtractFiles@1
+      inputs:
+        archiveFilePatterns: '$(Pipeline.Workspace)\drop\WebApp.zip'
+        destinationFolder: '$(Pipeline.Workspace)\extracted'
+        cleanDestinationFolder: true
+
+    - task: FileTransform@1
+      displayName: 'JSON substitution (appsettings.json)'
+      inputs:
+        folderPath: '$(Pipeline.Workspace)\extracted'
+        fileType: 'json'
+        targetFiles: '**/appsettings.json'
+
+    - powershell: |
+        Import-Module WebAdministration
+        Stop-WebAppPool -Name "DataExport_SIT_AppPool"
+      displayName: Stop app pool
+
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Pipeline.Workspace)\extracted'
+        Contents: '**'
+        TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # SIT path
+        OverWrite: true
+
+    - powershell: |
+        Import-Module WebAdministration
+        Start-WebAppPool -Name "DataExport_SIT_AppPool"
+      displayName: Start app pool
+
+# =========================
+# DEPLOY UAT (only on uat branch)
+# =========================
+- stage: Deploy_UAT
+  displayName: Deploy to UAT
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/uat'))
+  jobs:
+  - job: Deploy
+    pool:
+      name: 'IIS-UAT'
+    variables:
+    - group: 'VG-UAT-DataExport'
+    steps:
+    - download: current
+      artifact: drop
+
+    - task: ExtractFiles@1
+      inputs:
+        archiveFilePatterns: '$(Pipeline.Workspace)\drop\WebApp.zip'
+        destinationFolder: '$(Pipeline.Workspace)\extracted'
+        cleanDestinationFolder: true
+
+    - task: FileTransform@1
+      inputs:
+        folderPath: '$(Pipeline.Workspace)\extracted'
+        fileType: 'json'
+        targetFiles: '**/appsettings.json'
+
+    - powershell: |
+        Import-Module WebAdministration
+        Stop-WebAppPool -Name "DataExport_UAT_AppPool"
+      displayName: Stop app pool
+
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Pipeline.Workspace)\extracted'
+        Contents: '**'
+        TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # UAT path
+        OverWrite: true
+
+    - powershell: |
+        Import-Module WebAdministration
+        Start-WebAppPool -Name "DataExport_UAT_AppPool"
+      displayName: Start app pool
+
+# =========================
+# DEPLOY PROD (only on prod branch)
+# =========================
+- stage: Deploy_PROD
+  displayName: Deploy to PROD
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/prod'))
+  jobs:
+  - job: Deploy
+    pool:
+      name: 'IIS-PROD'
+    variables:
+    - group: 'VG-PROD-DataExport'
+    steps:
+    - download: current
+      artifact: drop
+
+    - task: ExtractFiles@1
+      inputs:
+        archiveFilePatterns: '$(Pipeline.Workspace)\drop\WebApp.zip'
+        destinationFolder: '$(Pipeline.Workspace)\extracted'
+        cleanDestinationFolder: true
+
+    - task: FileTransform@1
+      inputs:
+        folderPath: '$(Pipeline.Workspace)\extracted'
+        fileType: 'json'
+        targetFiles: '**/appsettings.json'
+
+    - powershell: |
+        Import-Module WebAdministration
+        Stop-WebAppPool -Name "DataExport_PROD_AppPool"
+      displayName: Stop app pool
+
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Pipeline.Workspace)\extracted'
+        Contents: '**'
+        TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # PROD path
+        OverWrite: true
+
+    - powershell: |
+        Import-Module WebAdministration
+        Start-WebAppPool -Name "DataExport_PROD_AppPool"
+      displayName: Start app pool
