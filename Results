@@ -1,6 +1,24 @@
-Get-ChildItem ".\download" -Recurse -Filter *.nupkg | ForEach-Object {
-  .\nuget.exe push $_.FullName `
-    -Source "<NEW_FEED_V3_URL>" `
-    -ApiKey "AzureDevOps" `
-    -SkipDuplicate
-}
+Project setup
+Windows
+Other
+Add a nuget.config file to your project, in the same folder as your .csproj or .sln file
+
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="azure-devops-dev-nuget-offline-packages" value="http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json" />
+  </packageSources>
+</configuration>
+
+Having issues? See the instructions for using a Personal Access Token to authenticate.
+
+Restore packages
+Run this command in your project directory
+
+nuget.exe restore
+
+Publish packages
+Publish a package by providing the package path, an API Key (any string will do), and the feed URL
+
+nuget.exe push -Source "azure-devops-dev-nuget-offline-packages" -ApiKey az <packagePath>
