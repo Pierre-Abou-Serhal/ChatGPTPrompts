@@ -1,11 +1,6 @@
-Starting: Use .NET SDK
-==============================================================================
-Task         : Use .NET Core
-Description  : Acquires a specific version of the .NET Core SDK from the internet or the local cache and adds it to the PATH. Use this task to change the version of .NET Core used in subsequent tasks. Additionally provides proxy support.
-Version      : 2.235.0
-Author       : Microsoft Corporation
-Help         : https://aka.ms/AA4xgy0
-==============================================================================
-Tool to install: .NET Core sdk version 8.x.
-##[error]Failed to download or parse releases-index.json with error: {"errno":-3001,"code":"EAI_AGAIN","syscall":"getaddrinfo","hostname":"dotnetcli.blob.core.windows.net"}
-Finishing: Use .NET SDK
+Get-ChildItem ".\download" -Recurse -Filter *.nupkg | ForEach-Object {
+  .\nuget.exe push $_.FullName `
+    -Source "<NEW_FEED_V3_URL>" `
+    -ApiKey "AzureDevOps" `
+    -SkipDuplicate
+}
