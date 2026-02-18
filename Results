@@ -1,49 +1,18 @@
-Searching for .nupkg files under: C:\Users\pabouserhal\Downloads\NugetPackages
-Found 109 packages. Starting push to source: azure-devops-dev-nuget-offline-packages
-Pushing: C:\Users\pabouserhal\Downloads\NugetPackages\cryptography.1.0.0.nupkg
+nuget push -Source "http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json" -ApiKey az "$env:USERPROFILE\Downloads\NugetPackages\cryptography.1.0.0.nupkg"
 WARNING: You are running the 'push' operation with an 'HTTP' source, 'http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json'. Non-HT
 TPS access will be removed in a future version. Consider migrating to an 'HTTPS' source.
 Pushing cryptography.1.0.0.nupkg to 'http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/'...
 WARNING: You are running the 'push' operation with an 'HTTP' source, 'http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/'. Non-HTTPS access wi
 ll be removed in a future version. Consider migrating to an 'HTTPS' source.
   PUT http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/
-An error was encountered when fetching 'PUT http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/'. The request will now be retried.
-An error occurred while sending the request.
-  The underlying connection was closed: An unexpected error occurred on a receive.
-  Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host.
-  An existing connection was forcibly closed by the remote host
+  InternalServerError http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/ 2644ms
   PUT http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/
-An error was encountered when fetching 'PUT http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/'. The request will now be retried.
-An error occurred while sending the request.
-  The underlying connection was closed: An unexpected error occurred on a receive.
-  Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host.
-  An existing connection was forcibly closed by the remote host
+  InternalServerError http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/ 111ms
   PUT http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/
-nuget.exe : The underlying connection was closed: An unexpected error occurred on a receive.
-At C:\Users\pabouserhal\Desktop\uploadNugetPackages.ps1:37 char:3
-+   & $nugetExe push $pkg.FullName `
-+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (The underlying ...d on a receive.:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-  Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host.
-  An existing connection was forcibly closed by the remote host
-WARNING: Failed pushing: C:\Users\pabouserhal\Downloads\NugetPackages\cryptography.1.0.0.nupkg (exit code: 1)
-Pushing: C:\Users\pabouserhal\Downloads\NugetPackages\cryptography.1.0.1.nupkg
-WARNING: You are running the 'push' operation with an 'HTTP' source, 'http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json'. Non-HT
-TPS access will be removed in a future version. Consider migrating to an 'HTTPS' source.
-Pushing cryptography.1.0.1.nupkg to 'http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/'...
-WARNING: You are running the 'push' operation with an 'HTTP' source, 'http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/'. Non-HTTPS access wi
-ll be removed in a future version. Consider migrating to an 'HTTPS' source.
-  PUT http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/
-An error was encountered when fetching 'PUT http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/'. The request will now be retried.
-An error occurred while sending the request.
-  The underlying connection was closed: An unexpected error occurred on a receive.
-  Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host.
-  An existing connection was forcibly closed by the remote host
-  PUT http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/
-An error was encountered when fetching 'PUT http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/'. The request will now be retried.
-An error occurred while sending the request.
-  The underlying connection was closed: An unexpected error occurred on a receive.
-  Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host.
-  An existing connection was forcibly closed by the remote host
+  InternalServerError http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v2/ 12056ms
+nuget : Response status code does not indicate success: 500 (Internal Server Error - Failed to retrieve data from the upstream package source 
+'https://api.nuget.org/v3/index.json': An error occurred while sending the request. (DevOps Activity ID: 5268D513-22C6-4F64-BA56-2573FB67C31A)).
+At line:1 char:1
++ nuget push -Source "http://uat-azure/DEV/_packaging/azure-devops-dev- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Response status...2573FB67C31A)).:String) [], RemoteException
