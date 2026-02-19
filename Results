@@ -1,1 +1,338 @@
-nuget push -Source "http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json" -ApiKey az "$env:USERPROFILE\Downloads\NugetPackages\cryptography.1.0.0.nupkg"
+USE [Alterna_KYC]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_Alterna_GetDuplicateCustomers]    Script Date: 2/19/2026 10:56:22 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER   PROCEDURE [dbo].[usp_Alterna_GetDuplicateCustomers]
+(
+    @MaxCandidatesPerNew   int           = 500,
+    @StatusCode            nvarchar(250)  = N'PENDING',
+    @DifferenceThreshold   tinyint        = 4  -- 1..4 (higher = stricter)
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    ;WITH NC AS
+    (
+        SELECT
+            T24C.Id AS NewCustomerId,
+
+            -- New customer normalized values (computed once)
+            dbo.Fn_NormalizeWord(T24C.DateOfBirth)   AS DateOfBirth,
+            dbo.Fn_NormalizeWord(T24C.GivenNames)    AS GivenNames,
+            dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
+            dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
+            dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
+            dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegisterId,
+            dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
+            dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender,
+			dbo.Fn_NormalizeWord(T24C.CustomerSince) AS CustomerSince,
+
+            -- New customer SOUNDEX keys
+            T24C.Sdx_GivenNames,
+            T24C.Sdx_FamilyName,
+            T24C.Sdx_FatherName,
+            T24C.Sdx_MoFirstName
+        FROM dbo.t_NewT24Customers AS NT24C
+        JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
+        WHERE NT24C.StatusCode = @StatusCode
+    )
+    SELECT
+        nc.NewCustomerId,
+        c.CustomerId,
+
+        -- New customer values
+        nc.DateOfBirth   AS New_DateOfBirth,
+        nc.GivenNames    AS New_GivenNames,
+        nc.FamilyName    AS New_FamilyName,
+        nc.FatherName    AS New_FatherName,
+        nc.MoFirstName   AS New_MoFirstName,
+
+        -- Return description for display
+        nc.BirthRegisterId            AS New_BirthRegisterId,
+        brNew.New_BirthRegisterDesc   AS New_BirthRegister,
+
+        nc.BirthRegNo    AS New_BirthRegNo,
+        nc.Gender        AS New_Gender,
+		nc.CustomerSince AS New_CustomerSince,
+
+        -- Candidate values
+        c.Db_DateOfBirth,
+        c.Db_GivenNames,
+        c.Db_FamilyName,
+        c.Db_FatherName,
+        c.Db_MoFirstName,
+
+        -- Return description for display
+        c.Db_BirthRegisterId          AS Db_BirthRegisterId,
+        brDb.Db_BirthRegisterDesc     AS Db_BirthRegister,
+
+        c.Db_BirthRegNo,
+        c.Db_Gender,
+		c.Db_CustomerSince,
+
+        -- Exact flags
+        c.Match_DateOfBirth,
+        c.Match_BirthRegNo,
+        c.Match_BirthRegister,
+        c.Match_Gender,
+
+        -- Fuzzy flags
+        c.Match_GivenNames,
+        c.Match_FamilyName,
+        c.Match_FatherName,
+        c.Match_MoFirstName
+    FROM NC AS nc
+
+    -- Lookup description for NEW customer BirthRegisterId
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            b.DescriptionFR AS New_BirthRegisterDesc   -- or b.DescriptionFR
+        FROM [Lookup.CusBirth] b
+        WHERE b.Id = TRY_CONVERT(int, nc.BirthRegisterId)
+    ) brNew
+
+    OUTER APPLY
+    (
+        SELECT TOP (@MaxCandidatesPerNew)
+            t.Id AS CustomerId,
+
+            -- Candidate normalized values (already persisted)
+            t.Norm_DateOfBirth   AS Db_DateOfBirth,
+            t.Norm_GivenNames    AS Db_GivenNames,
+            t.Norm_FamilyName    AS Db_FamilyName,
+            t.Norm_FatherName    AS Db_FatherName,
+            t.Norm_MoFirstName   AS Db_MoFirstName,
+
+            -- IMPORTANT: still the ID (as text) used for matching
+            t.Norm_BirthRegister AS Db_BirthRegisterId,
+
+            t.Norm_BirthRegNo    AS Db_BirthRegNo,
+            t.Norm_Gender        AS Db_Gender,
+			t.CustomerSince      AS Db_CustomerSince,
+
+            -- Exact match flags (still compares IDs)
+            CAST(CASE WHEN t.Norm_DateOfBirth   = nc.DateOfBirth       THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
+            CAST(CASE WHEN t.Norm_BirthRegNo    = nc.BirthRegNo        THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
+            CAST(CASE WHEN t.Norm_BirthRegister = nc.BirthRegisterId   THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
+            CAST(CASE WHEN t.Norm_Gender        = nc.Gender            THEN 1 ELSE 0 END AS bit) AS Match_Gender,
+
+            -- Fuzzy flags
+            CAST(CASE WHEN DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
+            CAST(CASE WHEN DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
+            CAST(CASE WHEN DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
+            CAST(CASE WHEN DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
+
+        FROM dbo.t_T24Customer AS t
+        WHERE
+            t.Id <> nc.NewCustomerId
+
+            AND nc.GivenNames  IS NOT NULL
+            AND nc.FamilyName  IS NOT NULL
+            --AND nc.FatherName  IS NOT NULL
+            --AND nc.MoFirstName IS NOT NULL
+
+            AND t.Norm_GivenNames  IS NOT NULL
+            AND t.Norm_FamilyName  IS NOT NULL
+            --AND t.Norm_FatherName  IS NOT NULL
+            --AND t.Norm_MoFirstName IS NOT NULL
+
+            AND t.Sdx_GivenNames  = nc.Sdx_GivenNames
+            AND t.Sdx_FamilyName  = nc.Sdx_FamilyName
+            --AND t.Sdx_FatherName  = nc.Sdx_FatherName
+            --AND t.Sdx_MoFirstName = nc.Sdx_MoFirstName
+
+            --AND (nc.DateOfBirth      IS NULL OR t.Norm_DateOfBirth   = nc.DateOfBirth)
+            --AND (nc.Gender           IS NULL OR t.Norm_Gender        = nc.Gender)
+   --         AND (nc.BirthRegNo       IS NULL OR t.Norm_BirthRegNo    = nc.BirthRegNo)
+			--AND (nc.BirthRegisterId  IS NULL OR t.Norm_BirthRegister = nc.BirthRegisterId)
+
+            --AND DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold
+            --AND DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold
+            --AND DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold
+            --AND DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold
+
+        ORDER BY t.Id
+    ) AS c
+
+    -- Lookup description for DB candidate BirthRegisterId
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            b.DescriptionFR AS Db_BirthRegisterDesc 
+        FROM [Lookup.CusBirth] b
+        WHERE b.Id = TRY_CONVERT(int, c.Db_BirthRegisterId)
+    ) brDb
+
+    ORDER BY nc.NewCustomerId, c.CustomerId
+    OPTION (RECOMPILE);
+END
+
+And these are the indexes + Computed columns:
+
+-- Alter Table t_T24Customer
+ALTER TABLE t_T24Customer ADD 
+[Norm_GivenNames]         AS              (CONVERT([nvarchar](200),left([dbo].[Fn_NormalizeWord]([GivenNames]),(200)))) PERSISTED,
+[Norm_FamilyName]         AS              (CONVERT([nvarchar](200),left([dbo].[Fn_NormalizeWord]([FamilyName]),(200)))) PERSISTED,
+[Norm_FatherName]         AS              (CONVERT([nvarchar](200),left([dbo].[Fn_NormalizeWord]([FatherName]),(200)))) PERSISTED,
+[Norm_MoFirstName]        AS              (CONVERT([nvarchar](200),left([dbo].[Fn_NormalizeWord]([MoFirstName]),(200)))) PERSISTED,
+[Norm_DateOfBirth]        AS              (CONVERT([nvarchar](50),[dbo].[Fn_NormalizeWord]([DateOfBirth]))) PERSISTED,
+[Norm_BirthRegister]      AS              (CONVERT([nvarchar](100),[dbo].[Fn_NormalizeWord]([BirthRegister]))) PERSISTED,
+[Norm_BirthRegNo]         AS              (CONVERT([nvarchar](100),[dbo].[Fn_NormalizeWord]([BirthRegNo]))) PERSISTED,
+[Norm_Gender]             AS              (CONVERT([nvarchar](20),[dbo].[Fn_NormalizeWord]([Gender]))) PERSISTED,
+[Sdx_GivenNames]          AS              (soundex(CONVERT([nvarchar](200),left([dbo].[Fn_NormalizeWord]([GivenNames]),(200))))) PERSISTED,
+[Sdx_FamilyName]          AS              (soundex(CONVERT([nvarchar](200),left([dbo].[Fn_NormalizeWord]([FamilyName]),(200))))) PERSISTED,
+[Sdx_FatherName]          AS              (soundex(CONVERT([nvarchar](200),left([dbo].[Fn_NormalizeWord]([FatherName]),(200))))) PERSISTED,
+[Sdx_MoFirstName]         AS              (soundex(CONVERT([nvarchar](200),left([dbo].[Fn_NormalizeWord]([MoFirstName]),(200))))) PERSISTED;
+GO
+
+CREATE NONCLUSTERED INDEX [IX_T24Customer_DedupeSeek]
+    ON [dbo].[t_T24Customer]([Sdx_GivenNames] ASC, [Sdx_FamilyName] ASC, [Sdx_FatherName] ASC, [Sdx_MoFirstName] ASC, [Id] ASC)
+    INCLUDE([Norm_GivenNames], [Norm_FamilyName], [Norm_FatherName], [Norm_MoFirstName], [Norm_DateOfBirth], [Norm_BirthRegister], [Norm_BirthRegNo], [Norm_Gender]);
+GO
+
+        public List<DuplicateCustomerDto> CustomerDuplicateDetection()
+        {
+            List<DuplicateCustomerDto> dups =  DapperDBAccess.ExecuteSelectCommand<DuplicateCustomerDto>("usp_Alterna_GetDuplicateCustomers", null, CommandType.StoredProcedure);
+
+            // Fetching grading totals
+            TotalMarkDto totalMarks = DapperDBAccess.ExecuteSelectCommand<TotalMarkDto>("usp_Alterna_GetTotalMarks", null, CommandType.StoredProcedure).First();
+
+            foreach (DuplicateCustomerDto dup in dups)
+            {
+                dup.Total_Mark_DateOfBirth = totalMarks.TotalMarkDateOfBirth;
+                dup.Total_Mark_GivenNames = totalMarks.TotalMarkGivenNames;
+                dup.Total_Mark_FamilyName = totalMarks.TotalMarkFamilyName;
+                dup.Total_Mark_FatherName = totalMarks.TotalMarkFatherName;
+                dup.Total_Mark_MoFirstName = totalMarks.TotalMarkMoFirstName;
+                dup.Total_Mark_BirthRegister = totalMarks.TotalMarkBirthRegister;
+                dup.Total_Mark_BirthRegNo = totalMarks.TotalMarkBirthRegNo;
+                dup.Total_Mark_Gender = totalMarks.TotalMarkGender;
+                dup.MinimumPassingMark = totalMarks.MinimumPassingMark;
+            }
+
+            // Grading Duplicate Customers
+            DuplicateCustomerGrader.GradeAll(dups);
+
+            return dups;
+        }
+
+
+        public static void GradeAll(IEnumerable<DuplicateCustomerDto> items)
+        {
+            if (items == null) return;
+            foreach (var dto in items) Grade(dto);
+        }
+
+        public static void Grade(DuplicateCustomerDto dto)
+        {
+            if (dto == null) throw new ArgumentNullException(nameof(dto));
+
+            // Exact fields
+            dto.Match_DateOfBirth = ExactDateMatch(dto.New_DateOfBirth, dto.Db_DateOfBirth);
+            dto.Mark_DateOfBirth = dto.Match_DateOfBirth ? dto.Total_Mark_DateOfBirth : 0m;
+
+            dto.Match_BirthRegister = ExactTextMatch(dto.New_BirthRegister, dto.Db_BirthRegister);
+            dto.Mark_BirthRegister = dto.Match_BirthRegister ? dto.Total_Mark_BirthRegister : 0m;
+
+            dto.Match_BirthRegNo = ExactTextMatch(dto.New_BirthRegNo, dto.Db_BirthRegNo);
+            dto.Mark_BirthRegNo = dto.Match_BirthRegNo ? dto.Total_Mark_BirthRegNo : 0m;
+
+            dto.Match_Gender = ExactTextMatch(dto.New_Gender, dto.Db_Gender);
+            dto.Mark_Gender = dto.Match_Gender ? dto.Total_Mark_Gender : 0m;
+
+            // Fuzzy fields (0..weight)
+            dto.Mark_GivenNames = FuzzyMark(dto.New_GivenNames, dto.Db_GivenNames, dto.Total_Mark_GivenNames, out bool mGiven);
+            dto.Match_GivenNames = mGiven;
+
+            dto.Mark_FamilyName = FuzzyMark(dto.New_FamilyName, dto.Db_FamilyName, dto.Total_Mark_FamilyName, out bool mFamily);
+            dto.Match_FamilyName = mFamily;
+
+            dto.Mark_FatherName = FuzzyMark(dto.New_FatherName, dto.Db_FatherName, dto.Total_Mark_FatherName, out bool mFather);
+            dto.Match_FatherName = mFather;
+
+            dto.Mark_MoFirstName = FuzzyMark(dto.New_MoFirstName, dto.Db_MoFirstName, dto.Total_Mark_MoFirstName, out bool mMo);
+            dto.Match_MoFirstName = mMo;
+        }
+
+        private static bool ExactTextMatch(string a, string b)
+        {
+            // If both is missing, return true and consider equal.
+            if (string.IsNullOrWhiteSpace(a) && string.IsNullOrWhiteSpace(b))
+                return true;
+
+            // If either is missing, return false to avoid awarding marks for incomplete data.
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+                return false;
+
+            return string.Equals(NormalizeText(a), NormalizeText(b), StringComparison.Ordinal);
+        }
+
+        private static bool ExactDateMatch(string a, string b)
+        {
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+                return false;
+
+            // Try parsing both; if parsed, compare Date
+            if (TryParseDate(a, out var da) && TryParseDate(b, out var db))
+                return da.Date == db.Date;
+
+            // Fallback to normalized text compare if parsing fails
+            return string.Equals(NormalizeText(a), NormalizeText(b), StringComparison.Ordinal);
+        }
+
+        private static decimal FuzzyMark(string a, string b, decimal weight, out bool isMatch)
+        {
+            if(string.IsNullOrWhiteSpace(a) && string.IsNullOrWhiteSpace(b))
+            {
+                isMatch = true;
+                return weight;
+            }
+
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+            {
+                isMatch = false;
+                return 0m;
+            }
+
+            var na = NormalizeText(a);
+            var nb = NormalizeText(b);
+
+            var sim = SimilarityLevenshtein(na, nb); // 0..1
+
+            // Define what "Match_*" means for fuzzy fields.
+            // Example: consider it a match if >= 0.85 similarity.
+            isMatch = sim >= 0.85;
+
+            // Mark is proportional to similarity, capped to [0..weight]
+            var mark = weight * (decimal)sim;
+            return ClampDecimal(mark, 0m, weight);
+        }
+
+And on th efront end level, I am doing the following:
+
+                List<DuplicateCustomerDto> filteredDups = duplicateCustomerDtos
+                    .Where(i => i.NewCustomerId == newCustomerId && i.CustomerId > 0 && 
+                        (    
+                            (
+                                i.Mark_DateOfBirth + i.Mark_GivenNames +
+                                i.Mark_FamilyName + i.Mark_FatherName +
+                                i.Mark_MoFirstName + i.Mark_BirthRegister +
+                                i.Mark_BirthRegNo + i.Mark_Gender
+                            ) >= i.MinimumPassingMark
+                            && (i.Mark_GivenNames > 0 && i.Mark_FamilyName > 0)))
+                    .OrderByDescending(i=>(i.Mark_DateOfBirth + i.Mark_GivenNames +
+                                i.Mark_FamilyName + i.Mark_FatherName +
+                                i.Mark_MoFirstName + i.Mark_BirthRegister +
+                                i.Mark_BirthRegNo + i.Mark_Gender)).ToList();
+
+
+The problem is that currently, I am not taking into concideration customers having Given Names and Last Names having SOUNDEX that are not exactly the same
+
+Can I not rely anymore on Soundex and instead only rely on grading in a verry fast way ?
+
+Note that t_T24Customers have a total of 175 columns, all have NVARCHAR(2000) NOT NULL as data type
