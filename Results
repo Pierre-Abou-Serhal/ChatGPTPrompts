@@ -1,158 +1,76 @@
-USE [Alterna_KYC]
-GO
-/****** Object:  StoredProcedure [dbo].[usp_Alterna_GetDuplicateCustomers]    Script Date: 2/23/2026 12:23:13 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-ALTER   PROCEDURE [dbo].[usp_Alterna_GetDuplicateCustomers]
-(
-    @MaxCandidatesPerNew   int           = 500,
-    @StatusCode            nvarchar(250)  = N'PENDING',
-    @DifferenceThreshold   tinyint        = 4,  -- 1..4 (higher = stricter),
-	@NewCustomerId         int
+Yes — absolutely.
+
+Since your procedure is filtered by **one** `@NewCustomerId`, you can compute the DOB once at the top (and the swapped version too), then reuse it in the `WHERE`.
+
+## Option 1 (simple): use local variables at the beginning
+
+Add this near the top of the procedure (after `SET NOCOUNT ON;`):
+
+```sql
+DECLARE @NewDob nvarchar(20);
+DECLARE @NewDobSwapped nvarchar(20);
+
+SELECT
+    @NewDob = dbo.Fn_NormalizeWord(T24C.DateOfBirth)
+FROM dbo.t_NewT24Customers AS NT24C
+JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
+WHERE NT24C.StatusCode = @StatusCode
+  AND NT24C.CustomerId = @NewCustomerId;
+
+SET @NewDobSwapped =
+    CASE
+        WHEN LEN(@NewDob) = 8
+        THEN LEFT(@NewDob, 4) + SUBSTRING(@NewDob, 7, 2) + SUBSTRING(@NewDob, 5, 2)
+        ELSE NULL
+    END;
+```
+
+Then use it in your condition:
+
+```sql
+AND (
+    t.DateOfBirth = @NewDob
+    OR t.DateOfBirth = @NewDobSwapped
 )
-AS
-BEGIN
-    SET NOCOUNT ON;
+```
 
-    ;WITH NC AS
-    (
-        SELECT
-            T24C.Id AS NewCustomerId,
+---
 
-            -- New customer normalized values (computed once)
-            dbo.Fn_NormalizeWord(T24C.DateOfBirth)   AS DateOfBirth,
-            dbo.Fn_NormalizeWord(T24C.GivenNames)    AS GivenNames,
-            dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
-            dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
-            dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
-            dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegisterId,
-            dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
-            dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender,
-			dbo.Fn_NormalizeWord(T24C.CustomerSince) AS CustomerSince,
+## Better for consistency (recommended)
 
-            -- New customer SOUNDEX keys
-            T24C.Sdx_GivenNames,
-            T24C.Sdx_FamilyName,
-            T24C.Sdx_FatherName,
-            T24C.Sdx_MoFirstName
-        FROM dbo.t_NewT24Customers AS NT24C
-        JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
-        WHERE 
-			NT24C.StatusCode = @StatusCode
-			AND NT24C.CustomerId = @NewCustomerId
-    )
-    SELECT
-        nc.NewCustomerId,
-        c.CustomerId,
+You’re already using normalized fields (`Norm_DateOfBirth`, etc.), so it’s usually cleaner to compare against the normalized DOB column too:
 
-        -- New customer values
-        nc.DateOfBirth   AS New_DateOfBirth,
-        nc.GivenNames    AS New_GivenNames,
-        nc.FamilyName    AS New_FamilyName,
-        nc.FatherName    AS New_FatherName,
-        nc.MoFirstName   AS New_MoFirstName,
+```sql
+AND (
+    t.Norm_DateOfBirth = @NewDob
+    OR t.Norm_DateOfBirth = @NewDobSwapped
+)
+```
 
-        -- Return description for display
-        nc.BirthRegisterId            AS New_BirthRegisterId,
-        brNew.New_BirthRegisterDesc   AS New_BirthRegister,
+That avoids mixing `t.DateOfBirth` and normalized values.
 
-        nc.BirthRegNo    AS New_BirthRegNo,
-        nc.Gender        AS New_Gender,
-		nc.CustomerSince AS New_CustomerSince,
+---
 
-        -- Candidate values
-        c.Db_DateOfBirth,
-        c.Db_GivenNames,
-        c.Db_FamilyName,
-        c.Db_FatherName,
-        c.Db_MoFirstName,
+## Also update the DOB match flag (important)
 
-        -- Return description for display
-        c.Db_BirthRegisterId          AS Db_BirthRegisterId,
-        brDb.Db_BirthRegisterDesc     AS Db_BirthRegister,
+Otherwise, swapped DOB rows will be returned, but `Match_DateOfBirth` may still show `0`.
 
-        c.Db_BirthRegNo,
-        c.Db_Gender,
-		c.Db_CustomerSince,
+Use:
 
-        -- Exact flags
-        c.Match_DateOfBirth,
-        c.Match_BirthRegNo,
-        c.Match_BirthRegister,
-        c.Match_Gender,
+```sql
+CAST(
+    CASE
+        WHEN t.Norm_DateOfBirth = @NewDob
+          OR t.Norm_DateOfBirth = @NewDobSwapped
+        THEN 1 ELSE 0
+    END AS bit
+) AS Match_DateOfBirth,
+```
 
-        -- Fuzzy flags
-        c.Match_GivenNames,
-        c.Match_FamilyName,
-        c.Match_FatherName,
-        c.Match_MoFirstName
-    FROM NC AS nc
+---
 
-    -- Lookup description for NEW customer BirthRegisterId
-    OUTER APPLY
-    (
-        SELECT TOP (1)
-            b.DescriptionFR AS New_BirthRegisterDesc   -- or b.DescriptionFR
-        FROM [Lookup.CusBirth] b
-        WHERE b.Id = TRY_CONVERT(int, nc.BirthRegisterId)
-    ) brNew
+## Alternative (even cleaner inside your CTE)
 
-    OUTER APPLY
-    (
-        SELECT TOP (@MaxCandidatesPerNew)
-            t.Id AS CustomerId,
+If you prefer not to use variables, you can compute a `SwappedDateOfBirth` column inside the `NC` CTE and reuse `nc.DateOfBirth` / `nc.SwappedDateOfBirth`.
 
-            -- Candidate normalized values (already persisted)
-            t.Norm_DateOfBirth   AS Db_DateOfBirth,
-            t.Norm_GivenNames    AS Db_GivenNames,
-            t.Norm_FamilyName    AS Db_FamilyName,
-            t.Norm_FatherName    AS Db_FatherName,
-            t.Norm_MoFirstName   AS Db_MoFirstName,
-
-            -- IMPORTANT: still the ID (as text) used for matching
-            t.Norm_BirthRegister AS Db_BirthRegisterId,
-
-            t.Norm_BirthRegNo    AS Db_BirthRegNo,
-            t.Norm_Gender        AS Db_Gender,
-			t.CustomerSince      AS Db_CustomerSince,
-
-            -- Exact match flags (still compares IDs)
-            CAST(CASE WHEN t.Norm_DateOfBirth   = nc.DateOfBirth       THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
-            CAST(CASE WHEN t.Norm_BirthRegNo    = nc.BirthRegNo        THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
-            CAST(CASE WHEN t.Norm_BirthRegister = nc.BirthRegisterId   THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
-            CAST(CASE WHEN t.Norm_Gender        = nc.Gender            THEN 1 ELSE 0 END AS bit) AS Match_Gender,
-
-            -- Fuzzy flags
-            CAST(CASE WHEN DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
-            CAST(CASE WHEN DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
-            CAST(CASE WHEN DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
-            CAST(CASE WHEN DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
-
-        FROM dbo.t_T24Customer AS t
-        WHERE
-            t.Id <> nc.NewCustomerId
-			AND t.DateOfBirth = nc.DateOfBirth
-
-            AND nc.GivenNames  IS NOT NULL
-            AND nc.FamilyName  IS NOT NULL
-
-            AND t.Norm_GivenNames  IS NOT NULL
-            AND t.Norm_FamilyName  IS NOT NULL
-
-        ORDER BY t.Id
-    ) AS c
-
-    -- Lookup description for DB candidate BirthRegisterId
-    OUTER APPLY
-    (
-        SELECT TOP (1)
-            b.DescriptionFR AS Db_BirthRegisterDesc 
-        FROM [Lookup.CusBirth] b
-        WHERE b.Id = TRY_CONVERT(int, c.Db_BirthRegisterId)
-    ) brDb
-
-    ORDER BY nc.NewCustomerId, c.CustomerId
-    OPTION (RECOMPILE);
-END
+But yes — **using variables at the beginning is totally valid** here, and it’s a good approach for readability.
