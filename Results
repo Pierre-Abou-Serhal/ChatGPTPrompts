@@ -1,28 +1,139 @@
-    const dupes = this.getDuplicatedAccNbrs(this.fileImport?.fileImportContents ?? []);
+Nice — that fits perfectly with the modal approach.
 
-    if(dupes.length > 0) {
+Since you now want **Yes / No (Continue / Cancel)** inside your custom modal, you can replace the old `Swal.fire(...)` block with:
 
-      const dupeLines: string[] = dupes.map(d => `${d.accNbr} (x${d.count})`);
-      const dupeText: string = dupeLines.join(', ');
+* open the modal if duplicates exist
+* pass duplicate rows to the modal
+* if user clicks **Yes**, close the modal with a result (`'continue'`)
+* in the parent, if result is `'continue'`, call `this.validateFileApiCall(request)`
 
-      Swal.fire({
-        title: 'Duplicate Proposed Account Number Found. Do you want to continue ?',
-        text: dupeText,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes',
-        cancelButtonText: 'No',
-        customClass: {
-          confirmButton: 'btn btn-success',
-          cancelButton: 'btn btn-danger',
-        },
-      }).then((result) => {
-        if (result.isConfirmed) {
-          this.validateFileApiCall(request);
-        }
-      });
-    }
-    else {
-      this.validateFileApiCall(request);
-    }
+---
+
+## 1) Update the modal component TS (add Continue / No actions)
+
+```ts
+import { Component, Input } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+
+import { DuplicateAccNbr } from 'src/app/models/your-model-file'; // adjust path
+
+@Component({
+  selector: 'app-duplicate-accounts-modal',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './duplicate-accounts-modal.component.html',
+})
+export class DuplicateAccountsModalComponent {
+  @Input() duplicates: DuplicateAccNbr[] = [];
+
+  constructor(public activeModal: NgbActiveModal) {}
+
+  onNo(): void {
+    this.activeModal.dismiss('cancel');
   }
+
+  onYesContinue(): void {
+    this.activeModal.close('continue');
+  }
+}
+```
+
+---
+
+## 2) Update the modal HTML (table + Yes/No buttons)
+
+```html
+<div class="modal-header">
+  <h4 class="modal-title">Duplicate Proposed Account Numbers Found</h4>
+  <button type="button" class="btn-close" (click)="onNo()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="alert alert-warning">
+    Duplicate proposed account numbers were found. Do you want to continue?
+  </div>
+
+  <div *ngIf="!duplicates || duplicates.length === 0" class="alert alert-info mb-0">
+    No duplicate account numbers found.
+  </div>
+
+  <div *ngIf="duplicates && duplicates.length > 0" class="table-responsive">
+    <table class="table table-bordered table-striped mb-0">
+      <thead>
+        <tr>
+          <th class="text-start">Duplicate Account Number</th>
+          <th class="text-start">Other</th>
+          <th class="text-start">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of duplicates">
+          <td class="text-start">{{ item.accNbr }}</td>
+          <td class="text-start">{{ item.other || '-' }}</td>
+          <td class="text-start">{{ item.amount | number : '1.0-20' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-danger" (click)="onNo()">
+    No
+  </button>
+
+  <button type="button" class="btn btn-success" (click)="onYesContinue()">
+    Yes
+  </button>
+</div>
+```
+
+---
+
+## 3) Replace your old Swal logic in the parent component
+
+Here’s the updated version of your old logic using the modal:
+
+```ts
+const dupes = this.getDuplicatedAccNbrs(this.fileImport?.fileImportContents ?? []);
+
+if (dupes.length > 0) {
+  const modalRef = this.modalService.open(DuplicateAccountsModalComponent, {
+    size: 'lg',
+    backdrop: 'static',
+    centered: true,
+    keyboard: false,
+  });
+
+  modalRef.componentInstance.duplicates = dupes;
+
+  modalRef.result
+    .then((result) => {
+      if (result === 'continue') {
+        this.validateFileApiCall(request);
+      }
+    })
+    .catch(() => {
+      // User clicked No / closed modal -> do nothing
+    });
+} else {
+  this.validateFileApiCall(request);
+}
+```
+
+---
+
+## 4) Small note (important)
+
+Your old code used:
+
+```ts
+d.count
+```
+
+But now `DuplicateAccNbr` no longer has `count`, so the modal table is the right place to show the details instead of building `dupeText`.
+
+---
+
+If you want, I can also give you a **grouped version inside the modal** (so it shows one row per account number, and under it the related `other` + `amount` entries).
