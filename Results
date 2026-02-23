@@ -1,124 +1,28 @@
-//#region Duplicate T24 accounts on Validate Screen
-export interface DuplicateAccNbr {
-  accNbr: string;
-  amount: number;
-  other?: string;
-}
-//#endregion
+    const dupes = this.getDuplicatedAccNbrs(this.fileImport?.fileImportContents ?? []);
 
-private getDuplicatedAccNbrs(items: FileImportContent[]): DuplicateAccNbr[] {
-  const counts = new Map<string, number>();
+    if(dupes.length > 0) {
 
-  // First pass: count account numbers
-  for (const item of items) {
-    const acc = item.accNbr?.trim();
-    if (!acc) continue;
+      const dupeLines: string[] = dupes.map(d => `${d.accNbr} (x${d.count})`);
+      const dupeText: string = dupeLines.join(', ');
 
-    counts.set(acc, (counts.get(acc) ?? 0) + 1);
+      Swal.fire({
+        title: 'Duplicate Proposed Account Number Found. Do you want to continue ?',
+        text: dupeText,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes',
+        cancelButtonText: 'No',
+        customClass: {
+          confirmButton: 'btn btn-success',
+          cancelButton: 'btn btn-danger',
+        },
+      }).then((result) => {
+        if (result.isConfirmed) {
+          this.validateFileApiCall(request);
+        }
+      });
+    }
+    else {
+      this.validateFileApiCall(request);
+    }
   }
-
-  // Second pass: return all duplicated rows with amount + other
-  const duplicates: DuplicateAccNbr[] = items
-    .map((item) => ({
-      accNbr: item.accNbr?.trim(),
-      amount: item.amount,
-      other: item.other,
-    }))
-    .filter(
-      (item): item is DuplicateAccNbr =>
-        !!item.accNbr && (counts.get(item.accNbr) ?? 0) > 1
-    )
-    .sort(
-      (a, b) =>
-        a.accNbr.localeCompare(b.accNbr) || b.amount - a.amount
-    );
-
-  return duplicates;
-}
-
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { DuplicateAccountsModalComponent } from './duplicate-accounts-modal/duplicate-accounts-modal.component'; // adjust path
-import { DuplicateAccNbr, FileImportContent } from 'src/app/models/your-model-file'; // adjust path
-
-constructor(private modalService: NgbModal) {}
-
-openDuplicateAccountsModal(): void {
-  const items = this.fileImport?.fileImportContents ?? [];
-  const duplicates = this.getDuplicatedAccNbrs(items);
-
-  const modalRef = this.modalService.open(DuplicateAccountsModalComponent, {
-    size: 'lg',
-    backdrop: 'static',
-    centered: true,
-  });
-
-  modalRef.componentInstance.duplicates = duplicates;
-}
-
-
-
----------------------------
----------------------------
----------------------------
-
-import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-
-import { DuplicateAccNbr } from 'src/app/models/your-model-file'; // adjust path
-
-@Component({
-  selector: 'app-duplicate-accounts-modal',
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: './duplicate-accounts-modal.component.html',
-})
-export class DuplicateAccountsModalComponent {
-  @Input() duplicates: DuplicateAccNbr[] = [];
-
-  constructor(public activeModal: NgbActiveModal) {}
-
-  dismissModal(): void {
-    this.activeModal.dismiss();
-  }
-
-  closeModal(): void {
-    this.activeModal.close();
-  }
-}
-
-<div class="modal-header">
-  <h4 class="modal-title">Duplicate Accounts</h4>
-  <button type="button" class="btn-close" (click)="dismissModal()"></button>
-</div>
-
-<div class="modal-body">
-  <div *ngIf="!duplicates || duplicates.length === 0" class="alert alert-info mb-0">
-    No duplicate account numbers found.
-  </div>
-
-  <div *ngIf="duplicates && duplicates.length > 0" class="table-responsive">
-    <table class="table table-bordered table-striped mb-0">
-      <thead>
-        <tr>
-          <th class="text-start">Duplicate Account Number</th>
-          <th class="text-start">Other</th>
-          <th class="text-start">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of duplicates; let i = index">
-          <td class="text-start">{{ item.accNbr }}</td>
-          <td class="text-start">{{ item.other || '-' }}</td>
-          <td class="text-start">{{ item.amount | number : '1.0-20' }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="modal-footer">
-  <button type="button" class="btn btn-secondary" (click)="closeModal()">
-    Close
-  </button>
-</div>
