@@ -1,139 +1,158 @@
-Nice — that fits perfectly with the modal approach.
+USE [Alterna_KYC]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_Alterna_GetDuplicateCustomers]    Script Date: 2/23/2026 12:23:13 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER   PROCEDURE [dbo].[usp_Alterna_GetDuplicateCustomers]
+(
+    @MaxCandidatesPerNew   int           = 500,
+    @StatusCode            nvarchar(250)  = N'PENDING',
+    @DifferenceThreshold   tinyint        = 4,  -- 1..4 (higher = stricter),
+	@NewCustomerId         int
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-Since you now want **Yes / No (Continue / Cancel)** inside your custom modal, you can replace the old `Swal.fire(...)` block with:
+    ;WITH NC AS
+    (
+        SELECT
+            T24C.Id AS NewCustomerId,
 
-* open the modal if duplicates exist
-* pass duplicate rows to the modal
-* if user clicks **Yes**, close the modal with a result (`'continue'`)
-* in the parent, if result is `'continue'`, call `this.validateFileApiCall(request)`
+            -- New customer normalized values (computed once)
+            dbo.Fn_NormalizeWord(T24C.DateOfBirth)   AS DateOfBirth,
+            dbo.Fn_NormalizeWord(T24C.GivenNames)    AS GivenNames,
+            dbo.Fn_NormalizeWord(T24C.FamilyName)    AS FamilyName,
+            dbo.Fn_NormalizeWord(T24C.FatherName)    AS FatherName,
+            dbo.Fn_NormalizeWord(T24C.MoFirstName)   AS MoFirstName,
+            dbo.Fn_NormalizeWord(T24C.BirthRegister) AS BirthRegisterId,
+            dbo.Fn_NormalizeWord(T24C.BirthRegNo)    AS BirthRegNo,
+            dbo.Fn_NormalizeWord(T24C.Gender)        AS Gender,
+			dbo.Fn_NormalizeWord(T24C.CustomerSince) AS CustomerSince,
 
----
+            -- New customer SOUNDEX keys
+            T24C.Sdx_GivenNames,
+            T24C.Sdx_FamilyName,
+            T24C.Sdx_FatherName,
+            T24C.Sdx_MoFirstName
+        FROM dbo.t_NewT24Customers AS NT24C
+        JOIN dbo.t_T24Customer     AS T24C ON NT24C.CustomerId = T24C.Id
+        WHERE 
+			NT24C.StatusCode = @StatusCode
+			AND NT24C.CustomerId = @NewCustomerId
+    )
+    SELECT
+        nc.NewCustomerId,
+        c.CustomerId,
 
-## 1) Update the modal component TS (add Continue / No actions)
+        -- New customer values
+        nc.DateOfBirth   AS New_DateOfBirth,
+        nc.GivenNames    AS New_GivenNames,
+        nc.FamilyName    AS New_FamilyName,
+        nc.FatherName    AS New_FatherName,
+        nc.MoFirstName   AS New_MoFirstName,
 
-```ts
-import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+        -- Return description for display
+        nc.BirthRegisterId            AS New_BirthRegisterId,
+        brNew.New_BirthRegisterDesc   AS New_BirthRegister,
 
-import { DuplicateAccNbr } from 'src/app/models/your-model-file'; // adjust path
+        nc.BirthRegNo    AS New_BirthRegNo,
+        nc.Gender        AS New_Gender,
+		nc.CustomerSince AS New_CustomerSince,
 
-@Component({
-  selector: 'app-duplicate-accounts-modal',
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: './duplicate-accounts-modal.component.html',
-})
-export class DuplicateAccountsModalComponent {
-  @Input() duplicates: DuplicateAccNbr[] = [];
+        -- Candidate values
+        c.Db_DateOfBirth,
+        c.Db_GivenNames,
+        c.Db_FamilyName,
+        c.Db_FatherName,
+        c.Db_MoFirstName,
 
-  constructor(public activeModal: NgbActiveModal) {}
+        -- Return description for display
+        c.Db_BirthRegisterId          AS Db_BirthRegisterId,
+        brDb.Db_BirthRegisterDesc     AS Db_BirthRegister,
 
-  onNo(): void {
-    this.activeModal.dismiss('cancel');
-  }
+        c.Db_BirthRegNo,
+        c.Db_Gender,
+		c.Db_CustomerSince,
 
-  onYesContinue(): void {
-    this.activeModal.close('continue');
-  }
-}
-```
+        -- Exact flags
+        c.Match_DateOfBirth,
+        c.Match_BirthRegNo,
+        c.Match_BirthRegister,
+        c.Match_Gender,
 
----
+        -- Fuzzy flags
+        c.Match_GivenNames,
+        c.Match_FamilyName,
+        c.Match_FatherName,
+        c.Match_MoFirstName
+    FROM NC AS nc
 
-## 2) Update the modal HTML (table + Yes/No buttons)
+    -- Lookup description for NEW customer BirthRegisterId
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            b.DescriptionFR AS New_BirthRegisterDesc   -- or b.DescriptionFR
+        FROM [Lookup.CusBirth] b
+        WHERE b.Id = TRY_CONVERT(int, nc.BirthRegisterId)
+    ) brNew
 
-```html
-<div class="modal-header">
-  <h4 class="modal-title">Duplicate Proposed Account Numbers Found</h4>
-  <button type="button" class="btn-close" (click)="onNo()"></button>
-</div>
+    OUTER APPLY
+    (
+        SELECT TOP (@MaxCandidatesPerNew)
+            t.Id AS CustomerId,
 
-<div class="modal-body">
-  <div class="alert alert-warning">
-    Duplicate proposed account numbers were found. Do you want to continue?
-  </div>
+            -- Candidate normalized values (already persisted)
+            t.Norm_DateOfBirth   AS Db_DateOfBirth,
+            t.Norm_GivenNames    AS Db_GivenNames,
+            t.Norm_FamilyName    AS Db_FamilyName,
+            t.Norm_FatherName    AS Db_FatherName,
+            t.Norm_MoFirstName   AS Db_MoFirstName,
 
-  <div *ngIf="!duplicates || duplicates.length === 0" class="alert alert-info mb-0">
-    No duplicate account numbers found.
-  </div>
+            -- IMPORTANT: still the ID (as text) used for matching
+            t.Norm_BirthRegister AS Db_BirthRegisterId,
 
-  <div *ngIf="duplicates && duplicates.length > 0" class="table-responsive">
-    <table class="table table-bordered table-striped mb-0">
-      <thead>
-        <tr>
-          <th class="text-start">Duplicate Account Number</th>
-          <th class="text-start">Other</th>
-          <th class="text-start">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of duplicates">
-          <td class="text-start">{{ item.accNbr }}</td>
-          <td class="text-start">{{ item.other || '-' }}</td>
-          <td class="text-start">{{ item.amount | number : '1.0-20' }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
+            t.Norm_BirthRegNo    AS Db_BirthRegNo,
+            t.Norm_Gender        AS Db_Gender,
+			t.CustomerSince      AS Db_CustomerSince,
 
-<div class="modal-footer">
-  <button type="button" class="btn btn-danger" (click)="onNo()">
-    No
-  </button>
+            -- Exact match flags (still compares IDs)
+            CAST(CASE WHEN t.Norm_DateOfBirth   = nc.DateOfBirth       THEN 1 ELSE 0 END AS bit) AS Match_DateOfBirth,
+            CAST(CASE WHEN t.Norm_BirthRegNo    = nc.BirthRegNo        THEN 1 ELSE 0 END AS bit) AS Match_BirthRegNo,
+            CAST(CASE WHEN t.Norm_BirthRegister = nc.BirthRegisterId   THEN 1 ELSE 0 END AS bit) AS Match_BirthRegister,
+            CAST(CASE WHEN t.Norm_Gender        = nc.Gender            THEN 1 ELSE 0 END AS bit) AS Match_Gender,
 
-  <button type="button" class="btn btn-success" (click)="onYesContinue()">
-    Yes
-  </button>
-</div>
-```
+            -- Fuzzy flags
+            CAST(CASE WHEN DIFFERENCE(nc.GivenNames,  t.Norm_GivenNames)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_GivenNames,
+            CAST(CASE WHEN DIFFERENCE(nc.FamilyName,  t.Norm_FamilyName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FamilyName,
+            CAST(CASE WHEN DIFFERENCE(nc.FatherName,  t.Norm_FatherName)  >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_FatherName,
+            CAST(CASE WHEN DIFFERENCE(nc.MoFirstName, t.Norm_MoFirstName) >= @DifferenceThreshold THEN 1 ELSE 0 END AS bit) AS Match_MoFirstName
 
----
+        FROM dbo.t_T24Customer AS t
+        WHERE
+            t.Id <> nc.NewCustomerId
+			AND t.DateOfBirth = nc.DateOfBirth
 
-## 3) Replace your old Swal logic in the parent component
+            AND nc.GivenNames  IS NOT NULL
+            AND nc.FamilyName  IS NOT NULL
 
-Here’s the updated version of your old logic using the modal:
+            AND t.Norm_GivenNames  IS NOT NULL
+            AND t.Norm_FamilyName  IS NOT NULL
 
-```ts
-const dupes = this.getDuplicatedAccNbrs(this.fileImport?.fileImportContents ?? []);
+        ORDER BY t.Id
+    ) AS c
 
-if (dupes.length > 0) {
-  const modalRef = this.modalService.open(DuplicateAccountsModalComponent, {
-    size: 'lg',
-    backdrop: 'static',
-    centered: true,
-    keyboard: false,
-  });
+    -- Lookup description for DB candidate BirthRegisterId
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            b.DescriptionFR AS Db_BirthRegisterDesc 
+        FROM [Lookup.CusBirth] b
+        WHERE b.Id = TRY_CONVERT(int, c.Db_BirthRegisterId)
+    ) brDb
 
-  modalRef.componentInstance.duplicates = dupes;
-
-  modalRef.result
-    .then((result) => {
-      if (result === 'continue') {
-        this.validateFileApiCall(request);
-      }
-    })
-    .catch(() => {
-      // User clicked No / closed modal -> do nothing
-    });
-} else {
-  this.validateFileApiCall(request);
-}
-```
-
----
-
-## 4) Small note (important)
-
-Your old code used:
-
-```ts
-d.count
-```
-
-But now `DuplicateAccNbr` no longer has `count`, so the modal table is the right place to show the details instead of building `dupeText`.
-
----
-
-If you want, I can also give you a **grouped version inside the modal** (so it shows one row per account number, and under it the related `other` + `amount` entries).
+    ORDER BY nc.NewCustomerId, c.CustomerId
+    OPTION (RECOMPILE);
+END
