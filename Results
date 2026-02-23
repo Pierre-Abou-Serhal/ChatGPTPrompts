@@ -1,259 +1,128 @@
 //#region Duplicate T24 accounts on Validate Screen
 export interface DuplicateAccNbr {
   accNbr: string;
-  count: number;
-}
-//#endregion
-
-//#region FileImportContent
-export interface FileImportContent {
-  id: number;
-  customerName?: string;
-  fileImportId: number;
-  fileImportDescription: string;
-  altAccNbr: string;
-  productCode?: string;
-  productDescription?: string;
-  sourceAccountNumber?: string;
-  accNbr?: string;
   amount: number;
   other?: string;
-  statusId: number;
-  validationRejectReason?: string;
-  statusDescription?: string;
-  statusColor?: string;
-  lastModifiedDate?: string;
-  lastModifiedBy?: string;
 }
 //#endregion
 
-  private getDuplicatedAccNbrsWithCounts(
-    items: FileImportContent[]
-  ): DuplicateAccNbr[] {
-    const counts = new Map<string, number>();
+private getDuplicatedAccNbrs(items: FileImportContent[]): DuplicateAccNbr[] {
+  const counts = new Map<string, number>();
 
-    for (const item of items) {
-      const acc = item.accNbr?.trim();
-      if (!acc) continue;
-      counts.set(acc, (counts.get(acc) ?? 0) + 1);
-    }
+  // First pass: count account numbers
+  for (const item of items) {
+    const acc = item.accNbr?.trim();
+    if (!acc) continue;
 
-    const duplicates: DuplicateAccNbr[] = [];
-    for (const [accNbr, count] of counts) {
-      if (count > 1) duplicates.push({ accNbr, count });
-    }
-
-    // sort by most frequent first
-    duplicates.sort((a, b) => b.count - a.count || a.accNbr.localeCompare(b.accNbr));
-
-    return duplicates;
+    counts.set(acc, (counts.get(acc) ?? 0) + 1);
   }
 
-I wnat to  return, in the rename "getDuplicatedAccNbrsWithCounts" to getDuplicatedAccNbrs.
+  // Second pass: return all duplicated rows with amount + other
+  const duplicates: DuplicateAccNbr[] = items
+    .map((item) => ({
+      accNbr: item.accNbr?.trim(),
+      amount: item.amount,
+      other: item.other,
+    }))
+    .filter(
+      (item): item is DuplicateAccNbr =>
+        !!item.accNbr && (counts.get(item.accNbr) ?? 0) > 1
+    )
+    .sort(
+      (a, b) =>
+        a.accNbr.localeCompare(b.accNbr) || b.amount - a.amount
+    );
 
-It will also return all the duplicated Account numbers with the "amount" and the "other" property, so DuplicateAccNbr will be updated: count removed and "amount" + "other" added
+  return duplicates;
+}
 
-I also want to create a component that will be a modal that will display the list of duplicate accounts.
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { DuplicateAccountsModalComponent } from './duplicate-accounts-modal/duplicate-accounts-modal.component'; // adjust path
+import { DuplicateAccNbr, FileImportContent } from 'src/app/models/your-model-file'; // adjust path
 
-This is an example of a modal used in our project:
+constructor(private modalService: NgbModal) {}
+
+openDuplicateAccountsModal(): void {
+  const items = this.fileImport?.fileImportContents ?? [];
+  const duplicates = this.getDuplicatedAccNbrs(items);
+
+  const modalRef = this.modalService.open(DuplicateAccountsModalComponent, {
+    size: 'lg',
+    backdrop: 'static',
+    centered: true,
+  });
+
+  modalRef.componentInstance.duplicates = duplicates;
+}
+
+
+
+---------------------------
+---------------------------
+---------------------------
+
+private getDuplicatedAccNbrs(items: FileImportContent[]): DuplicateAccNbr[] {
+  const counts = new Map<string, number>();
+
+  // First pass: count account numbers
+  for (const item of items) {
+    const acc = item.accNbr?.trim();
+    if (!acc) continue;
+
+    counts.set(acc, (counts.get(acc) ?? 0) + 1);
+  }
+
+  // Second pass: return all duplicated rows with amount + other
+  const duplicates: DuplicateAccNbr[] = items
+    .map((item) => ({
+      accNbr: item.accNbr?.trim(),
+      amount: item.amount,
+      other: item.other,
+    }))
+    .filter(
+      (item): item is DuplicateAccNbr =>
+        !!item.accNbr && (counts.get(item.accNbr) ?? 0) > 1
+    )
+    .sort(
+      (a, b) =>
+        a.accNbr.localeCompare(b.accNbr) || b.amount - a.amount
+    );
+
+  return duplicates;
+}
 
 <div class="modal-header">
-  <h4 class="modal-title">Manage Columns Validation Rules</h4>
+  <h4 class="modal-title">Duplicate Accounts</h4>
   <button type="button" class="btn-close" (click)="dismissModal()"></button>
 </div>
-<form [formGroup]="editColumnValidationsfg" (ngSubmit)="onSaveChanges()">
-  <div class="modal-body">
-    <!-- This div now acts as the container for the FormArray named "columnValidations" -->
-    <div class="row" formArrayName="columnValidations">
-      <div class="col-12 text-end">
-        <button
-          type="button"
-          class="btn btn-outline-primary"
-          (click)="addRule()"
-        >
-          + Add Another Rule
-        </button>
-      </div>
 
-      <ng-container
-        *ngFor="
-          let columnValidationCtrl of fileColumnsValidationRules.controls;
-          let i = index
-        "
-      >
-        <div class="row mb-3" [formGroupName]="i">
-          <div class="col-10">
-            <label [attr.for]="'select-injest-prop-id-' + i" class="form-label">
-              Injest Rule <span class="text-danger">*</span>
-            </label>
-            <select
-              [id]="'select-injest-prop-id-' + i"
-              class="form-select"
-              formControlName="injestPropId"
-              [ngClass]="{
-                'border-danger':
-                  columnValidationCtrl.get('injestPropId')?.invalid &&
-                  (columnValidationCtrl.get('injestPropId')?.touched ||
-                    columnValidationCtrl.get('injestPropId')?.dirty)
-              }"
-            >
-              <option [ngValue]="null" selected>select an injest rule</option>
-              <option
-                *ngFor="let rule of injestRuleOptions"
-                [ngValue]="rule.id"
-                [title]="rule.description"
-              >
-                {{ rule.validationWorkflowName }}
-              </option>
-            </select>
-          </div>
-
-          <div class="col-2">
-            <label class="form-label d-block">&nbsp;</label>
-            <button
-              class="btn btn-outline-danger"
-              type="button"
-              (click)="removeRule(i)"
-            >
-              Remove
-            </button>
-          </div>
-        </div>
-      </ng-container>
-    </div>
+<div class="modal-body">
+  <div *ngIf="!duplicates || duplicates.length === 0" class="alert alert-info mb-0">
+    No duplicate account numbers found.
   </div>
 
-  <div class="modal-footer">
-    <button type="button" class="btn btn-secondary" (click)="dismissModal()">
-      Cancel
-    </button>
-
-    <button
-      type="submit"
-      class="btn btn-primary"
-      [disabled]="editColumnValidationsfg.invalid || isSaveLoading"
-    >
-      <div
-        *ngIf="isSaveLoading"
-        class="spinner-border spinner-border-sm text-light"
-      ></div>
-      <span *ngIf="!isSaveLoading">Save</span>
-    </button>
+  <div *ngIf="duplicates && duplicates.length > 0" class="table-responsive">
+    <table class="table table-bordered table-striped mb-0">
+      <thead>
+        <tr>
+          <th class="text-start">Duplicate Account Number</th>
+          <th class="text-start">Other</th>
+          <th class="text-start">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of duplicates; let i = index">
+          <td class="text-start">{{ item.accNbr }}</td>
+          <td class="text-start">{{ item.other || '-' }}</td>
+          <td class="text-start">{{ item.amount | number : '1.0-20' }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
-</form>
+</div>
 
-
-And this is an example of a table used:
-<table
-              class="table table-bordered"
-              datatable
-              [dtOptions]="dtOptions"
-              [dtTrigger]="dtTrigger"
-            >
-              <thead>
-                <tr>
-                  <th class="text-start">Received Account Number</th>
-                  <th class="text-start">Proposed Account Number</th>
-                  <th class="text-start">Debit Account</th>
-                  <th class="text-start">Product</th>
-                  <th class="text-start">Account Name</th>
-                  <th class="text-start">Other</th>
-                  <th class="text-start">Amount</th>
-                  <th class="text-start">Validation Result</th>
-                  <th class="text-start">Status Description</th>
-                  <th class="text-start">Last Modified By</th>
-                  <th class="text-start">Last Modified Date</th>
-                  <th class="text-start">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for(item of fileImport?.fileImportContents; track $index){
-                <tr>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.altAccNbr }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.accNbr }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.sourceAccountNumber }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.productDescription }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.customerName }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.other }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.amount | number : "1.0-20" }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.validationRejectReason }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.statusId }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.lastModifiedBy }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.lastModifiedDate | date : "dd/MM/yyyy hh:mm a" }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    <div class="d-flex justify-content-between table-actions">
-                      <a
-                        class="btn btn-sm edit-btn mx-1"
-                        title="Edit"
-                        (click)="openEditDataModal($index, item.id)"
-                      >
-                        <i class="bi bi-pencil-square"></i>
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-                }
-              </tbody>
-            </table>
-
-The modal will have three columns:
-
-Duplicate Account Number, Other and Amount
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="closeModal()">
+    Close
+  </button>
+</div>
