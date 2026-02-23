@@ -61,34 +61,30 @@ openDuplicateAccountsModal(): void {
 ---------------------------
 ---------------------------
 
-private getDuplicatedAccNbrs(items: FileImportContent[]): DuplicateAccNbr[] {
-  const counts = new Map<string, number>();
+import { Component, Input } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 
-  // First pass: count account numbers
-  for (const item of items) {
-    const acc = item.accNbr?.trim();
-    if (!acc) continue;
+import { DuplicateAccNbr } from 'src/app/models/your-model-file'; // adjust path
 
-    counts.set(acc, (counts.get(acc) ?? 0) + 1);
+@Component({
+  selector: 'app-duplicate-accounts-modal',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './duplicate-accounts-modal.component.html',
+})
+export class DuplicateAccountsModalComponent {
+  @Input() duplicates: DuplicateAccNbr[] = [];
+
+  constructor(public activeModal: NgbActiveModal) {}
+
+  dismissModal(): void {
+    this.activeModal.dismiss();
   }
 
-  // Second pass: return all duplicated rows with amount + other
-  const duplicates: DuplicateAccNbr[] = items
-    .map((item) => ({
-      accNbr: item.accNbr?.trim(),
-      amount: item.amount,
-      other: item.other,
-    }))
-    .filter(
-      (item): item is DuplicateAccNbr =>
-        !!item.accNbr && (counts.get(item.accNbr) ?? 0) > 1
-    )
-    .sort(
-      (a, b) =>
-        a.accNbr.localeCompare(b.accNbr) || b.amount - a.amount
-    );
-
-  return duplicates;
+  closeModal(): void {
+    this.activeModal.close();
+  }
 }
 
 <div class="modal-header">
