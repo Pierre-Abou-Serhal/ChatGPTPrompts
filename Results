@@ -1,16 +1,88 @@
-I got this when running the pipeline a second time:
+Perfect — that’s a good approach and usually fixes the file-lock issue.
 
-Starting: Copy files (SIT)
-==============================================================================
-Task         : Copy files
-Description  : Copy files from a source folder to a target folder using patterns matching file paths (not folder paths)
-Version      : 2.231.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/copy-files
-==============================================================================
-found 52 files
-Copying C:\agent\_work\1\extracted\Alterna-DataExport.deps.json to C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1\Alterna-DataExport.deps.json
-Copying C:\agent\_work\1\extracted\Alterna-DataExport.dll to C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1\Alterna-DataExport.dll
-cp: copyFileSync: could not write to dest file (code=EBUSY):C:/inetpub/wwwroot/AlternaDataExportService-AzureDevOps-BN1/Alterna-DataExport.dll
-##[error]Error: Failed cp: cp: copyFileSync: could not write to dest file (code=EBUSY):C:/inetpub/wwwroot/AlternaDataExportService-AzureDevOps-BN1/Alterna-DataExport.dll
-Finishing: Copy files (SIT)
+You only need to change your **PowerShell steps** in the deploy stage:
+
+## Replace your current “Stop SIT App Pool” step
+
+Use this (stops **website + app pool** and waits until both are stopped):
+
+```yml
+- powershell: |
+    Import-Module WebAdministration
+
+    $siteName = "AlternaDataExportServiceAzureDevOps"
+    $appPool  = "AlternaDataExportServiceAzureDevOps"
+
+    Write-Host "Stopping website: $siteName"
+    if ((Get-Website -Name $siteName).State -ne "Stopped") {
+      Stop-Website -Name $siteName
+    }
+
+    Write-Host "Stopping app pool: $appPool"
+    Stop-WebAppPool -Name $appPool
+
+    $maxTries = 30
+    for ($i = 1; $i -le $maxTries; $i++) {
+      $siteState = (Get-Website -Name $siteName).State
+      $poolState = (Get-WebAppPoolState -Name $appPool).Value
+
+      Write-Host "Website state: $siteState | AppPool state: $poolState"
+
+      if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
+        Write-Host "Website and App Pool are stopped."
+        break
+      }
+
+      Start-Sleep -Seconds 2
+    }
+
+    $finalSiteState = (Get-Website -Name $siteName).State
+    $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
+
+    if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
+      throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
+    }
+
+    Start-Sleep -Seconds 2
+  displayName: 'Stop SIT Website + App Pool'
+```
+
+---
+
+## Replace your current “Start SIT App Pool” step
+
+Use this (starts **app pool + website**):
+
+```yml
+- powershell: |
+    Import-Module WebAdministration
+
+    $siteName = "AlternaDataExportServiceAzureDevOps"
+    $appPool  = "AlternaDataExportServiceAzureDevOps"
+
+    Write-Host "Starting app pool: $appPool"
+    Start-WebAppPool -Name $appPool
+
+    Write-Host "Starting website: $siteName"
+    Start-Website -Name $siteName
+
+    $siteState = (Get-Website -Name $siteName).State
+    $poolState = (Get-WebAppPoolState -Name $appPool).Value
+
+    Write-Host "Website state: $siteState | AppPool state: $poolState"
+  displayName: 'Start SIT Website + App Pool'
+```
+
+---
+
+## So in your pipeline, only these two steps change
+
+Everything else (download, extract, file transform, copy) stays the same.
+
+---
+
+## Optional extra safety (recommended)
+
+If file locks happen again, add `app_offline.htm` before copy — but try website+app pool stop first; it often solves it.
+
+If you want, I can paste your full `Deploy_SIT` stage exactly as it should look with these changes already inserted.
