@@ -1,9 +1,5 @@
-$src = "http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json"
-$root = "$env:USERPROFILE\Downloads\NugetPackages"
-
-Get-ChildItem $root -Recurse -Filter *.nupkg |
-  Where-Object { $_.Name -notlike "*.symbols.nupkg" } |
-  ForEach-Object {
-    Write-Host "Pushing $($_.FullName)"
-    nuget push -Source $src -ApiKey az -NonInteractive -SkipDuplicate $_.FullName
-  }
+[azure-devops-dev-nuget-offline-packages] Failed to retrieve metadata from source 'http://uat-azure/DEV/_packaging/6e4e577c-c7a7-401e-860b-b621ab86117a/nuget/v3/query2/?q=NLOG&skip=0&take=26&prerelease=false&supportedFramework=net8.0&semVerLevel=2.0.0'.
+  An error occurred while sending the request.
+  The underlying connection was closed: An unexpected error occurred on a receive.
+  Unable to read data from the transport connection: An existing connection was forcibly closed by the remote host.
+  An existing connection was forcibly closed by the remote host
