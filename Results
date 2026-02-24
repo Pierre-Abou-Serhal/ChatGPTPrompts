@@ -1,3 +1,10 @@
+Adding this worked: Alterna-DataExport Build Service (DEV)
+
+But this did not, it gave me 403 forbidden: Project Collection Build Service Accounts
+
+Also, the pipiline failded at this stage: PublishPipelineArtifact
+This is the error:
+
 Starting: PublishPipelineArtifact
 ==============================================================================
 Task         : Publish Pipeline Artifacts
@@ -9,3 +16,239 @@ Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/p
 Artifact name input: drop
 ##[error]Pipeline Artifact Task is not supported in on-premises. Please use Build Artifact Task instead.
 Finishing: PublishPipelineArtifact
+
+
+And this is the pipeline yaml code
+
+trigger:
+  branches:
+    include:
+    - sit
+    - uat
+    - master
+
+variables:
+  buildConfiguration: 'Release'
+
+stages:
+# =========================
+# BUILD (runs for sit/uat/master)
+# =========================
+- stage: Build
+  displayName: Build & Publish Artifact
+  jobs:
+  - job: BuildJob
+    displayName: Build (ASP.NET Core)
+    pool:
+      name: 'Build Pool'   # <-- self-hosted build agent pool
+      demands:
+      - Agent.Name -equals 'SIT-ALTERNAB-N1'
+    steps:
+    - checkout: self
+      clean: true
+
+    - task: UseDotNet@2
+      displayName: 'Use .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '8.x'   # <-- change to your project's SDK (6.x/7.x/8.x)
+
+    - task: DotNetCoreCLI@2
+      displayName: Restore
+      inputs:
+        command: restore
+        projects: '**/*.csproj'
+ 
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: build
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration)'
+
+    - task: DotNetCoreCLI@2
+      displayName: Publish
+      inputs:
+        command: publish
+        publishWebProjects: true
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)\publish'
+        zipAfterPublish: false
+
+    - task: ArchiveFiles@2
+      displayName: 'Zip publish output'
+      inputs:
+        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
+        replaceExistingArchive: true
+
+    - publish: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
+      artifact: drop
+
+
+# =========================
+# DEPLOY SIT (only when branch == sit)
+# =========================
+- stage: Deploy_SIT
+  displayName: Deploy to SIT
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
+  jobs:
+  - deployment: DeploySIT
+    displayName: 'Deploy SIT (IIS)'
+    environment: 'SIT'     # <-- Azure Environment name
+    pool:
+      name: 'Build Pool'   # <-- self-hosted build agent pool
+      demands:
+      - Agent.Name -equals 'SIT-ALTERNAB-N1'      # <-- agent pool with SIT IIS agent
+    variables:
+    - group: 'SIT_VARIABLE_GROUP'  # <-- your SIT variable group
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+
+          - task: ExtractFiles@1
+            displayName: 'Extract artifact'
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
+              destinationFolder: '$(Pipeline.Workspace)\extracted'
+              cleanDestinationFolder: true
+
+          - task: FileTransform@1
+            displayName: 'JSON substitution (appsettings.json)'
+            inputs:
+              folderPath: '$(Pipeline.Workspace)\extracted'
+              fileType: 'json'
+              targetFiles: '**/appsettings.json'
+
+          - powershell: |
+              Import-Module WebAdministration
+              Stop-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
+            displayName: 'Stop SIT App Pool'
+
+          - task: CopyFiles@2
+            displayName: 'Copy files (SIT)'
+            inputs:
+              SourceFolder: '$(Pipeline.Workspace)\extracted'
+              Contents: '**'
+              TargetFolder: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1'   # <-- SIT path
+              OverWrite: true
+
+          - powershell: |
+              Import-Module WebAdministration
+              Start-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
+            displayName: 'Start SIT App Pool'
+
+
+# =========================
+# DEPLOY UAT (only when branch == uat) - approvals via Environment checks
+# =========================
+# - stage: Deploy_UAT
+#   displayName: Deploy to UAT (Approval required)
+#   dependsOn: Build
+#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/uat'))
+#   jobs:
+#   - deployment: DeployUAT
+#     displayName: 'Deploy UAT (IIS)'
+#     environment: 'UAT'     # <-- approvals/checks configured in the UAT environment UI
+#     pool:
+#       name: 'IIS-UAT'
+#     variables:
+#     - group: 'UAT_VARIABLE_GROUP'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - download: current
+#             artifact: drop
+
+#           - task: ExtractFiles@1
+#             displayName: 'Extract artifact'
+#             inputs:
+#               archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
+#               destinationFolder: '$(Pipeline.Workspace)\extracted'
+#               cleanDestinationFolder: true
+
+#           - task: FileTransform@1
+#             displayName: 'JSON substitution (appsettings.json)'
+#             inputs:
+#               folderPath: '$(Pipeline.Workspace)\extracted'
+#               fileType: 'json'
+#               targetFiles: '**/appsettings.json'
+
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Stop-WebAppPool -Name "DataExport_UAT_AppPool"
+#             displayName: 'Stop UAT App Pool'
+
+#           - task: CopyFiles@2
+#             displayName: 'Copy files (UAT)'
+#             inputs:
+#               SourceFolder: '$(Pipeline.Workspace)\extracted'
+#               Contents: '**'
+#               TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- UAT path
+#               OverWrite: true
+
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Start-WebAppPool -Name "DataExport_UAT_AppPool"
+#             displayName: 'Start UAT App Pool'
+
+
+# # =========================
+# # DEPLOY PROD (only when branch == master) - approvals via Environment checks
+# # =========================
+# - stage: Deploy_PROD
+#   displayName: Deploy to PROD (Approval required)
+#   dependsOn: Build
+#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+#   jobs:
+#   - deployment: DeployPROD
+#     displayName: 'Deploy PROD (IIS)'
+#     environment: 'PROD'    # <-- approvals/checks configured in the PROD environment UI
+#     pool:
+#       name: 'IIS-PROD'     # <-- locked-down pool recommended
+#     variables:
+#     - group: 'PRD_VARIABLE_GROUP'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - download: current
+#             artifact: drop
+
+#           - task: ExtractFiles@1
+#             displayName: 'Extract artifact'
+#             inputs:
+#               archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
+#               destinationFolder: '$(Pipeline.Workspace)\extracted'
+#               cleanDestinationFolder: true
+
+#           - task: FileTransform@1
+#             displayName: 'JSON substitution (appsettings.json)'
+#             inputs:
+#               folderPath: '$(Pipeline.Workspace)\extracted'
+#               fileType: 'json'
+#               targetFiles: '**/appsettings.json'
+
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Stop-WebAppPool -Name "DataExport_PROD_AppPool"
+#             displayName: 'Stop PROD App Pool'
+
+#           - task: CopyFiles@2
+#             displayName: 'Copy files (PROD)'
+#             inputs:
+#               SourceFolder: '$(Pipeline.Workspace)\extracted'
+#               Contents: '**'
+#               TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- PROD path
+#               OverWrite: true
+
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Start-WebAppPool -Name "DataExport_PROD_AppPool"
+#             displayName: 'Start PROD App Pool'
