@@ -1,20 +1,11 @@
-Build FAILED.
-
-       "C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj" (Restore target) (1) ->
-       (Restore target) -> 
-         C:\agent\_work\1\s\Alterna-DataExport\DAL\DAL.csproj : warning NU1803: You are running the 'restore' operation with an 'HTTP' source, 'http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json'. Non-HTTPS access will be removed in a future version. Consider migrating to an 'HTTPS' source. [C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj]
-         C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj : warning NU1803: You are running the 'restore' operation with an 'HTTP' source, 'http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json'. Non-HTTPS access will be removed in a future version. Consider migrating to an 'HTTPS' source.
-         C:\agent\_work\1\s\Alterna-DataExport\BLL\BLL.csproj : warning NU1803: You are running the 'restore' operation with an 'HTTP' source, 'http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json'. Non-HTTPS access will be removed in a future version. Consider migrating to an 'HTTPS' source. [C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj]
-
-
-       "C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj" (Restore target) (1) ->
-       (Restore target) -> 
-         C:\Program Files\dotnet\sdk\8.0.101\NuGet.targets(156,5): error : Unable to load the service index for source http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json. [C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj]
-       C:\Program Files\dotnet\sdk\8.0.101\NuGet.targets(156,5): error :   Response status code does not indicate success: 403 (Forbidden - User 'Build\3c344fb3-4e0d-4898-a6e2-ba70c3c8b2d0' lacks permission to complete this action. You need to have 'ReadPackages'. (DevOps Activity ID: 52687374-22C6-4F64-BA56-2573FB67C31A)). [C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj]
-
-    3 Warning(s)
-    1 Error(s)
-
-Time Elapsed 00:00:08.39
-##[error]Error: The process 'C:\Program Files\dotnet\dotnet.exe' failed with exit code 1
-##[error]Packages failed to restore
+Starting: PublishPipelineArtifact
+==============================================================================
+Task         : Publish Pipeline Artifacts
+Description  : Publish (upload) a file or directory as a named artifact for the current run
+Version      : 1.199.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/publish-pipeline-artifact
+==============================================================================
+Artifact name input: drop
+##[error]Pipeline Artifact Task is not supported in on-premises. Please use Build Artifact Task instead.
+Finishing: PublishPipelineArtifact
