@@ -1,141 +1,29 @@
-Great progress — you’ve already solved the hardest parts.
+In the Deploy to SIT step,
+In the Stop SIT App Pool stage, I got:
 
-You hit **two on-prem Azure DevOps Server specifics**:
+Starting: Stop SIT App Pool
+==============================================================================
+Task         : PowerShell
+Description  : Run a PowerShell script on Linux, macOS, or Windows
+Version      : 2.232.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\be927713-3883-4c16-8242-ebb3119a0e60.ps1'"
+stop-webitem : Filename: redirection.config
+Error: Cannot read configuration file due to insufficient permissions
+At C:\agent\_work\_temp\be927713-3883-4c16-8242-ebb3119a0e60.ps1:5 char:1
++ Stop-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [Stop-WebItem], UnauthorizedAccessException
+    + FullyQualifiedErrorId : System.UnauthorizedAccessException,Microsoft.IIs.PowerShell.Provider.StopItemCommand
+ 
+##[error]PowerShell exited with code '1'.
+Finishing: Stop SIT App Pool
 
----
 
-## 1) Why `Alterna-DataExport Build Service (DEV)` worked, but `Project Collection Build Service Accounts` didn’t
-
-That’s normal.
-
-Your pipeline is running under the **project-level build identity** for this project (`Alterna-DataExport Build Service (DEV)`), so that’s the identity that needs **ReadPackages** on the feed.
-
-`Project Collection Build Service Accounts` is broader, but depending on your server/feed security setup, it may not be the effective identity used for that pipeline run.
-
-✅ Keep using:
-
-* **`Alterna-DataExport Build Service (DEV)`** with feed read permission.
-
----
-
-## 2) `PublishPipelineArtifact` is not supported on Azure DevOps Server (on-prem)
-
-Correct — `publish:` in YAML maps to **PublishPipelineArtifact**, and that task is **cloud-only**.
-
-### On Azure DevOps Server, use:
-
-* **`PublishBuildArtifacts@1`** (upload artifact)
-* **`DownloadBuildArtifacts@0`** (download artifact in deploy stages)
-
----
-
-# What you need to change in your YAML
-
-## A) Replace this (cloud-only)
-
-```yml
-- publish: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
-  artifact: drop
-```
-
-## With this (on-prem supported)
-
-```yml
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish Build Artifact'
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
-    ArtifactName: 'drop'
-    publishLocation: 'Container'
-```
-
----
-
-## B) Replace this in deploy stage (cloud shortcut)
-
-```yml
-- download: current
-  artifact: drop
-```
-
-## With this (on-prem supported)
-
-```yml
-- task: DownloadBuildArtifacts@0
-  displayName: 'Download Build Artifact'
-  inputs:
-    buildType: 'current'
-    downloadType: 'single'
-    artifactName: 'drop'
-    downloadPath: '$(Pipeline.Workspace)'
-```
-
-Then your zip will be here:
-
-```yml
-$(Pipeline.Workspace)\drop\Alterna-DataExport.zip
-```
-
-✅ Which matches your existing `ExtractFiles` path.
-
----
-
-# Important improvements to your pipeline (recommended)
-
-Your restore worked only after adding `nuget.config`, but your current restore step in the YAML still doesn’t explicitly use it.
-
-## Fix restore to use your `nuget.config`
-
-Change restore step to:
-
-```yml
-- task: DotNetCoreCLI@2
-  displayName: Restore
-  inputs:
-    command: restore
-    projects: '**/*.csproj'
-    feedsToUse: 'config'
-    nugetConfigPath: 'nuget.config'
-```
-
-> If `nuget.config` is not in repo root, set the correct relative path.
-
----
-
-## Prevent build/publish from restoring again (and possibly ignoring your config)
-
-Add `--no-restore`:
-
-### Build
-
-```yml
-- task: DotNetCoreCLI@2
-  displayName: Build
-  inputs:
-    command: build
-    projects: '**/*.csproj'
-    arguments: '--configuration $(buildConfiguration) --no-restore'
-```
-
-### Publish
-
-```yml
-- task: DotNetCoreCLI@2
-  displayName: Publish
-  inputs:
-    command: publish
-    publishWebProjects: true
-    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)\publish --no-restore'
-    zipAfterPublish: false
-```
-
----
-
-# Your corrected YAML (Build + SIT deploy only, on-prem compatible)
-
-Here’s your pipeline with the **on-prem artifact fix** and **restore fix** applied:
-
-```yml
 trigger:
   branches:
     include:
@@ -148,7 +36,7 @@ variables:
 
 stages:
 # =========================
-# BUILD
+# BUILD (runs for sit/uat/master)
 # =========================
 - stage: Build
   displayName: Build & Publish Artifact
@@ -158,16 +46,10 @@ stages:
     pool:
       name: 'Build Pool'
       demands:
-      - Agent.Name -equals 'SIT-ALTERNAB-N1'
+      - Agent.Name -equals UAT-ALTERNA-DK1
     steps:
     - checkout: self
       clean: true
-
-    - task: UseDotNet@2
-      displayName: 'Use .NET SDK'
-      inputs:
-        packageType: 'sdk'
-        version: '8.x'
 
     - task: DotNetCoreCLI@2
       displayName: Restore
@@ -176,7 +58,7 @@ stages:
         projects: '**/*.csproj'
         feedsToUse: 'config'
         nugetConfigPath: 'nuget.config'
-
+ 
     - task: DotNetCoreCLI@2
       displayName: Build
       inputs:
@@ -208,6 +90,7 @@ stages:
         ArtifactName: 'drop'
         publishLocation: 'Container'
 
+
 # =========================
 # DEPLOY SIT
 # =========================
@@ -222,7 +105,7 @@ stages:
     pool:
       name: 'Build Pool'
       demands:
-      - Agent.Name -equals 'SIT-ALTERNAB-N1'
+      - Agent.Name -equals SIT-ALTERNA-BN1
     variables:
     - group: 'SIT_VARIABLE_GROUP'
     strategy:
@@ -268,19 +151,113 @@ stages:
               Import-Module WebAdministration
               Start-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
             displayName: 'Start SIT App Pool'
-```
 
----
 
-# One more on-prem note (important)
+# =========================
+# DEPLOY UAT (only when branch == uat) - approvals via Environment checks
+# =========================
+# - stage: Deploy_UAT
+#   displayName: Deploy to UAT (Approval required)
+#   dependsOn: Build
+#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/uat'))
+#   jobs:
+#   - deployment: DeployUAT
+#     displayName: 'Deploy UAT (IIS)'
+#     environment: 'UAT'     # <-- approvals/checks configured in the UAT environment UI
+#     pool:
+#       name: 'IIS-UAT'
+#     variables:
+#     - group: 'UAT_VARIABLE_GROUP'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - download: current
+#             artifact: drop
 
-You’re using the **same agent** (`SIT-ALTERNAB-N1`) for build and deploy right now. That’s okay for a POC, and your YAML is valid for that.
+#           - task: ExtractFiles@1
+#             displayName: 'Extract artifact'
+#             inputs:
+#               archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
+#               destinationFolder: '$(Pipeline.Workspace)\extracted'
+#               cleanDestinationFolder: true
 
-Later, if you split build/deploy agents, just change:
+#           - task: FileTransform@1
+#             displayName: 'JSON substitution (appsettings.json)'
+#             inputs:
+#               folderPath: '$(Pipeline.Workspace)\extracted'
+#               fileType: 'json'
+#               targetFiles: '**/appsettings.json'
 
-* Build stage pool/demands → your build agent
-* Deploy stage pool/demands → your SIT IIS agent
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Stop-WebAppPool -Name "DataExport_UAT_AppPool"
+#             displayName: 'Stop UAT App Pool'
 
----
+#           - task: CopyFiles@2
+#             displayName: 'Copy files (UAT)'
+#             inputs:
+#               SourceFolder: '$(Pipeline.Workspace)\extracted'
+#               Contents: '**'
+#               TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- UAT path
+#               OverWrite: true
 
-If you want, I can now give you the **UAT and PROD sections** in the same corrected on-prem format (with `DownloadBuildArtifacts@0` and environment approvals preserved).
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Start-WebAppPool -Name "DataExport_UAT_AppPool"
+#             displayName: 'Start UAT App Pool'
+
+
+# # =========================
+# # DEPLOY PROD (only when branch == master) - approvals via Environment checks
+# # =========================
+# - stage: Deploy_PROD
+#   displayName: Deploy to PROD (Approval required)
+#   dependsOn: Build
+#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+#   jobs:
+#   - deployment: DeployPROD
+#     displayName: 'Deploy PROD (IIS)'
+#     environment: 'PROD'    # <-- approvals/checks configured in the PROD environment UI
+#     pool:
+#       name: 'IIS-PROD'     # <-- locked-down pool recommended
+#     variables:
+#     - group: 'PRD_VARIABLE_GROUP'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - download: current
+#             artifact: drop
+
+#           - task: ExtractFiles@1
+#             displayName: 'Extract artifact'
+#             inputs:
+#               archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
+#               destinationFolder: '$(Pipeline.Workspace)\extracted'
+#               cleanDestinationFolder: true
+
+#           - task: FileTransform@1
+#             displayName: 'JSON substitution (appsettings.json)'
+#             inputs:
+#               folderPath: '$(Pipeline.Workspace)\extracted'
+#               fileType: 'json'
+#               targetFiles: '**/appsettings.json'
+
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Stop-WebAppPool -Name "DataExport_PROD_AppPool"
+#             displayName: 'Stop PROD App Pool'
+
+#           - task: CopyFiles@2
+#             displayName: 'Copy files (PROD)'
+#             inputs:
+#               SourceFolder: '$(Pipeline.Workspace)\extracted'
+#               Contents: '**'
+#               TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- PROD path
+#               OverWrite: true
+
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Start-WebAppPool -Name "DataExport_PROD_AppPool"
+#             displayName: 'Start PROD App Pool'
