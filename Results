@@ -45,55 +45,55 @@ stages:
   - job: BuildJob
     displayName: Build (ASP.NET Core)
     pool:
-      name: 'Build Pool'   # <-- self-hosted build agent pool
+      name: 'Build Pool'
       demands:
-      - Agent.Name -equals 'SIT-ALTERNAB-N1'
+      - Agent.Name -equals UAT-ALTERNA-DK1
     steps:
     - checkout: self
       clean: true
-
-    - task: UseDotNet@2
-      displayName: 'Use .NET SDK'
-      inputs:
-        packageType: 'sdk'
-        version: '8.x'   # <-- change to your project's SDK (6.x/7.x/8.x)
 
     - task: DotNetCoreCLI@2
       displayName: Restore
       inputs:
         command: restore
         projects: '**/*.csproj'
+        feedsToUse: 'config'
+        nugetConfigPath: 'nuget.config'
  
     - task: DotNetCoreCLI@2
       displayName: Build
       inputs:
         command: build
         projects: '**/*.csproj'
-        arguments: '--configuration $(buildConfiguration)'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
 
     - task: DotNetCoreCLI@2
       displayName: Publish
       inputs:
         command: publish
         publishWebProjects: true
-        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)\publish'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)\publish --no-restore'
         zipAfterPublish: false
 
     - task: ArchiveFiles@2
       displayName: 'Zip publish output'
       inputs:
-        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish'
+        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish\Alterna-DataExport'
         includeRootFolder: false
         archiveType: 'zip'
         archiveFile: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
         replaceExistingArchive: true
 
-    - publish: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
-      artifact: drop
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Build Artifact'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
 
 
 # =========================
-# DEPLOY SIT (only when branch == sit)
+# DEPLOY SIT
 # =========================
 - stage: Deploy_SIT
   displayName: Deploy to SIT
@@ -102,19 +102,24 @@ stages:
   jobs:
   - deployment: DeploySIT
     displayName: 'Deploy SIT (IIS)'
-    environment: 'SIT'     # <-- Azure Environment name
+    environment: 'SIT'
     pool:
-      name: 'Build Pool'   # <-- self-hosted build agent pool
+      name: 'Build Pool'
       demands:
-      - Agent.Name -equals 'SIT-ALTERNAB-N1'      # <-- agent pool with SIT IIS agent
+      - Agent.Name -equals SIT-ALTERNA-BN1
     variables:
-    - group: 'SIT_VARIABLE_GROUP'  # <-- your SIT variable group
+    - group: 'SIT_VARIABLE_GROUP'
     strategy:
       runOnce:
         deploy:
           steps:
-          - download: current
-            artifact: drop
+          - task: DownloadBuildArtifacts@0
+            displayName: 'Download Build Artifact'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(Pipeline.Workspace)'
 
           - task: ExtractFiles@1
             displayName: 'Extract artifact'
@@ -132,21 +137,68 @@ stages:
 
           - powershell: |
               Import-Module WebAdministration
-              Stop-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
-            displayName: 'Stop SIT App Pool'
+
+              $siteName = "AlternaDataExportServiceAzureDevOps"
+              $appPool  = "AlternaDataExportServiceAzureDevOps"
+
+              Write-Host "Stopping website: $siteName"
+              if ((Get-Website -Name $siteName).State -ne "Stopped") {
+                Stop-Website -Name $siteName
+              }
+
+              Write-Host "Stopping app pool: $appPool"
+              Stop-WebAppPool -Name $appPool
+
+              $maxTries = 30
+              for ($i = 1; $i -le $maxTries; $i++) {
+                $siteState = (Get-Website -Name $siteName).State
+                $poolState = (Get-WebAppPoolState -Name $appPool).Value
+
+                Write-Host "Website state: $siteState | AppPool state: $poolState"
+
+                if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
+                  Write-Host "Website and App Pool are stopped."
+                  break
+                }
+
+                Start-Sleep -Seconds 2
+              }
+
+              $finalSiteState = (Get-Website -Name $siteName).State
+              $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
+
+              if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
+                throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
+              }
+
+              Start-Sleep -Seconds 2
+            displayName: 'Stop SIT Website + App Pool'
 
           - task: CopyFiles@2
             displayName: 'Copy files (SIT)'
             inputs:
               SourceFolder: '$(Pipeline.Workspace)\extracted'
               Contents: '**'
-              TargetFolder: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1'   # <-- SIT path
+              TargetFolder: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1'
               OverWrite: true
 
           - powershell: |
               Import-Module WebAdministration
-              Start-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
-            displayName: 'Start SIT App Pool'
+
+              $siteName = "AlternaDataExportServiceAzureDevOps"
+              $appPool  = "AlternaDataExportServiceAzureDevOps"
+
+              Write-Host "Starting app pool: $appPool"
+              Start-WebAppPool -Name $appPool
+
+              Write-Host "Starting website: $siteName"
+              Start-Website -Name $siteName
+
+              $siteState = (Get-Website -Name $siteName).State
+              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+
+              Write-Host "Website state: $siteState | AppPool state: $poolState"
+            displayName: 'Start SIT Website + App Pool'
 
 
 # =========================
