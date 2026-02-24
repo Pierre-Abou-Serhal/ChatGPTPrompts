@@ -1,108 +1,232 @@
-Yep — this is just because `Stop-WebAppPool` throws an error if it’s **already stopped**.
+trigger:
+  branches:
+    include:
+    - sit
+    - uat
+    - master
 
-So your script is fine logically, but you need to make it **idempotent** (safe to run multiple times).
+variables:
+  buildConfiguration: 'Release'
 
-## Fix
+stages:
+# =========================
+# BUILD (runs for sit/uat/master)
+# =========================
+- stage: Build
+  displayName: Build & Publish Artifact
+  jobs:
+  - job: BuildJob
+    displayName: Build (ASP.NET Core)
+    pool:
+      name: 'Build Pool'   # <-- self-hosted build agent pool
+      demands:
+      - Agent.Name -equals 'SIT-ALTERNAB-N1'
+    steps:
+    - checkout: self
+      clean: true
 
-Before stopping the app pool, check its state (same as you did for the website).
+    - task: UseDotNet@2
+      displayName: 'Use .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '8.x'   # <-- change to your project's SDK (6.x/7.x/8.x)
 
-### Replace your stop step with this
+    - task: DotNetCoreCLI@2
+      displayName: Restore
+      inputs:
+        command: restore
+        projects: '**/*.csproj'
+ 
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: build
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration)'
 
-```yml
-- powershell: |
-    Import-Module WebAdministration
+    - task: DotNetCoreCLI@2
+      displayName: Publish
+      inputs:
+        command: publish
+        publishWebProjects: true
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)\publish'
+        zipAfterPublish: false
 
-    $siteName = "AlternaDataExportServiceAzureDevOps"
-    $appPool  = "AlternaDataExportServiceAzureDevOps"
+    - task: ArchiveFiles@2
+      displayName: 'Zip publish output'
+      inputs:
+        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
+        replaceExistingArchive: true
 
-    # Stop website only if running
-    $site = Get-Website -Name $siteName
-    Write-Host "Website current state: $($site.State)"
-    if ($site.State -ne "Stopped") {
-      Write-Host "Stopping website: $siteName"
-      Stop-Website -Name $siteName
-    } else {
-      Write-Host "Website already stopped."
-    }
+    - publish: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
+      artifact: drop
 
-    # Stop app pool only if running
-    $poolState = (Get-WebAppPoolState -Name $appPool).Value
-    Write-Host "AppPool current state: $poolState"
-    if ($poolState -ne "Stopped") {
-      Write-Host "Stopping app pool: $appPool"
-      Stop-WebAppPool -Name $appPool
-    } else {
-      Write-Host "AppPool already stopped."
-    }
 
-    # Wait until both are stopped
-    $maxTries = 30
-    for ($i = 1; $i -le $maxTries; $i++) {
-      $siteState = (Get-Website -Name $siteName).State
-      $poolState = (Get-WebAppPoolState -Name $appPool).Value
+# =========================
+# DEPLOY SIT (only when branch == sit)
+# =========================
+- stage: Deploy_SIT
+  displayName: Deploy to SIT
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
+  jobs:
+  - deployment: DeploySIT
+    displayName: 'Deploy SIT (IIS)'
+    environment: 'SIT'     # <-- Azure Environment name
+    pool:
+      name: 'Build Pool'   # <-- self-hosted build agent pool
+      demands:
+      - Agent.Name -equals 'SIT-ALTERNAB-N1'      # <-- agent pool with SIT IIS agent
+    variables:
+    - group: 'SIT_VARIABLE_GROUP'  # <-- your SIT variable group
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
 
-      Write-Host "Website state: $siteState | AppPool state: $poolState"
+          - task: ExtractFiles@1
+            displayName: 'Extract artifact'
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
+              destinationFolder: '$(Pipeline.Workspace)\extracted'
+              cleanDestinationFolder: true
 
-      if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-        Write-Host "Website and App Pool are stopped."
-        break
-      }
+          - task: FileTransform@1
+            displayName: 'JSON substitution (appsettings.json)'
+            inputs:
+              folderPath: '$(Pipeline.Workspace)\extracted'
+              fileType: 'json'
+              targetFiles: '**/appsettings.json'
 
-      Start-Sleep -Seconds 2
-    }
+          - powershell: |
+              Import-Module WebAdministration
+              Stop-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
+            displayName: 'Stop SIT App Pool'
 
-    $finalSiteState = (Get-Website -Name $siteName).State
-    $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
+          - task: CopyFiles@2
+            displayName: 'Copy files (SIT)'
+            inputs:
+              SourceFolder: '$(Pipeline.Workspace)\extracted'
+              Contents: '**'
+              TargetFolder: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1'   # <-- SIT path
+              OverWrite: true
 
-    if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-      throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
-    }
+          - powershell: |
+              Import-Module WebAdministration
+              Start-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
+            displayName: 'Start SIT App Pool'
 
-    Start-Sleep -Seconds 2
-  displayName: 'Stop SIT Website + App Pool'
-```
 
----
+# =========================
+# DEPLOY UAT (only when branch == uat) - approvals via Environment checks
+# =========================
+# - stage: Deploy_UAT
+#   displayName: Deploy to UAT (Approval required)
+#   dependsOn: Build
+#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/uat'))
+#   jobs:
+#   - deployment: DeployUAT
+#     displayName: 'Deploy UAT (IIS)'
+#     environment: 'UAT'     # <-- approvals/checks configured in the UAT environment UI
+#     pool:
+#       name: 'IIS-UAT'
+#     variables:
+#     - group: 'UAT_VARIABLE_GROUP'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - download: current
+#             artifact: drop
 
-## Optional improvement for the start step too
+#           - task: ExtractFiles@1
+#             displayName: 'Extract artifact'
+#             inputs:
+#               archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
+#               destinationFolder: '$(Pipeline.Workspace)\extracted'
+#               cleanDestinationFolder: true
 
-`Start-WebAppPool` / `Start-Website` can also complain if already started (less common, but can happen).
-You can make it idempotent too:
+#           - task: FileTransform@1
+#             displayName: 'JSON substitution (appsettings.json)'
+#             inputs:
+#               folderPath: '$(Pipeline.Workspace)\extracted'
+#               fileType: 'json'
+#               targetFiles: '**/appsettings.json'
 
-```yml
-- powershell: |
-    Import-Module WebAdministration
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Stop-WebAppPool -Name "DataExport_UAT_AppPool"
+#             displayName: 'Stop UAT App Pool'
 
-    $siteName = "AlternaDataExportServiceAzureDevOps"
-    $appPool  = "AlternaDataExportServiceAzureDevOps"
+#           - task: CopyFiles@2
+#             displayName: 'Copy files (UAT)'
+#             inputs:
+#               SourceFolder: '$(Pipeline.Workspace)\extracted'
+#               Contents: '**'
+#               TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- UAT path
+#               OverWrite: true
 
-    $poolState = (Get-WebAppPoolState -Name $appPool).Value
-    if ($poolState -ne "Started") {
-      Write-Host "Starting app pool: $appPool"
-      Start-WebAppPool -Name $appPool
-    } else {
-      Write-Host "AppPool already started."
-    }
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Start-WebAppPool -Name "DataExport_UAT_AppPool"
+#             displayName: 'Start UAT App Pool'
 
-    $siteState = (Get-Website -Name $siteName).State
-    if ($siteState -ne "Started") {
-      Write-Host "Starting website: $siteName"
-      Start-Website -Name $siteName
-    } else {
-      Write-Host "Website already started."
-    }
 
-    $siteState = (Get-Website -Name $siteName).State
-    $poolState = (Get-WebAppPoolState -Name $appPool).Value
-    Write-Host "Website state: $siteState | AppPool state: $poolState"
-  displayName: 'Start SIT Website + App Pool'
-```
+# # =========================
+# # DEPLOY PROD (only when branch == master) - approvals via Environment checks
+# # =========================
+# - stage: Deploy_PROD
+#   displayName: Deploy to PROD (Approval required)
+#   dependsOn: Build
+#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+#   jobs:
+#   - deployment: DeployPROD
+#     displayName: 'Deploy PROD (IIS)'
+#     environment: 'PROD'    # <-- approvals/checks configured in the PROD environment UI
+#     pool:
+#       name: 'IIS-PROD'     # <-- locked-down pool recommended
+#     variables:
+#     - group: 'PRD_VARIABLE_GROUP'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - download: current
+#             artifact: drop
 
----
+#           - task: ExtractFiles@1
+#             displayName: 'Extract artifact'
+#             inputs:
+#               archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
+#               destinationFolder: '$(Pipeline.Workspace)\extracted'
+#               cleanDestinationFolder: true
 
-## Why it happened on second run
+#           - task: FileTransform@1
+#             displayName: 'JSON substitution (appsettings.json)'
+#             inputs:
+#               folderPath: '$(Pipeline.Workspace)\extracted'
+#               fileType: 'json'
+#               targetFiles: '**/appsettings.json'
 
-On the first run, the app pool got stopped.
-Then the pipeline failed later (or didn’t start it back), so when you ran again, it was already stopped.
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Stop-WebAppPool -Name "DataExport_PROD_AppPool"
+#             displayName: 'Stop PROD App Pool'
 
-This updated script handles that cleanly.
+#           - task: CopyFiles@2
+#             displayName: 'Copy files (PROD)'
+#             inputs:
+#               SourceFolder: '$(Pipeline.Workspace)\extracted'
+#               Contents: '**'
+#               TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- PROD path
+#               OverWrite: true
+
+#           - powershell: |
+#               Import-Module WebAdministration
+#               Start-WebAppPool -Name "DataExport_PROD_AppPool"
+#             displayName: 'Start PROD App Pool'
