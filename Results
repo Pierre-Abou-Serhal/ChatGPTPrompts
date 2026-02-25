@@ -1,106 +1,76 @@
-Yes — good catch. That happens because `dotnet publish` can create a subfolder under `publish` (especially if `publishWebProjects: true` or certain project layouts), so zipping `...\publish` can include that extra folder.
+That’s exactly the issue ✅
 
-## Best fix in the template
+In `DotNetCoreCLI@2` **Publish**, Azure DevOps has an option called:
 
-Make the template zip the **published project output directly**, not the parent `publish` folder.
+* **`modifyOutputPath`** (default is often `true`)
 
-### Change the `Publish` step output to a project-specific folder
+When it’s `true`, it automatically appends the **project folder name** to your output path, which is why you get:
 
-In your **build job template**, change:
+* `publish_output\Alterna-DataExport\...`
+
+---
+
+## Fix
+
+In your **build template** Publish task, add:
 
 ```yml
-arguments: '--configuration ${{ parameters.buildConfiguration }} --output $(Build.ArtifactStagingDirectory)\publish --no-restore'
+modifyOutputPath: false
 ```
 
-to:
+## Correct Publish step
 
 ```yml
-arguments: '--configuration ${{ parameters.buildConfiguration }} --output $(Build.ArtifactStagingDirectory)\publish_output --no-restore'
+- task: DotNetCoreCLI@2
+  displayName: 'Publish'
+  inputs:
+    command: 'publish'
+    projects: ${{ parameters.publishProject }}
+    arguments: '--configuration ${{ parameters.buildConfiguration }} --output "${{ parameters.publishOutputFolder }}" --no-restore'
+    zipAfterPublish: false
+    modifyOutputPath: false
 ```
 
-Then change `ArchiveFiles` to zip that exact folder:
+---
+
+## Then keep ArchiveFiles like this
 
 ```yml
 - task: ArchiveFiles@2
   displayName: 'Zip publish output'
   inputs:
-    rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish_output'
+    rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
     includeRootFolder: false
     archiveType: 'zip'
     archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
     replaceExistingArchive: true
 ```
 
-✅ This is the cleanest approach **if your `publishProject` points to one specific `.csproj`** (which it should).
+---
+
+## Result
+
+Your zip will contain files directly (no nested `Alterna-DataExport` folder), so extraction/copy to IIS will be clean.
 
 ---
 
-## Why this works
+## Why it happened
 
-Because your template already uses:
+This is Azure DevOps task behavior, not `.NET` itself.
+The task tries to help when publishing multiple projects by adding project subfolders.
 
-```yml
-projects: ${{ parameters.publishProject }}
-```
+For your case (single API project), set it to `false`.
 
-So `dotnet publish` is publishing **one project**, and the output goes directly into the folder you provide (`publish_output`) — no extra project-name folder should appear.
+If you want, I can paste your **full final build job template** with:
 
----
+* `publishOutputFolder`
+* `modifyOutputPath: false`
+* on-prem artifact publishing (`PublishBuildArtifacts@1`)
 
-## If you want to make it reusable/flexible
 
-Add a parameter for the publish output folder (optional):
 
-### Add parameter
 
-```yml
-- name: publishOutputFolder
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish_output'
-```
 
-### Use it in publish
 
-```yml
-arguments: '--configuration ${{ parameters.buildConfiguration }} --output ${{ parameters.publishOutputFolder }} --no-restore'
-```
 
-### Use it in archive
-
-```yml
-rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
-```
-
----
-
-## Important note
-
-This only works cleanly if you are publishing **one project** (`publishProject`), not `publishWebProjects: true`.
-
-Your template already does the right thing by using:
-
-* `publishProject` parameter ✅
-
-So you’re good.
-
----
-
-## Quick final change to apply in your build template
-
-Replace this:
-
-```yml
---output $(Build.ArtifactStagingDirectory)\publish
-...
-rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish'
-```
-
-With this:
-
-```yml
---output $(Build.ArtifactStagingDirectory)\publish_output
-...
-rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish_output'
-```
-
-If you want, I can paste the **full corrected build job template** with this change applied.
+    publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish_output'
