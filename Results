@@ -1,3 +1,256 @@
+Use **YAML templates**. That’s the best way to reuse the same CI/CD logic across many .NET Core Web API projects.
+
+## Recommended structure
+
+Create a separate repo (or a folder in one repo) for templates, for example:
+
+* `DevOps.Templates`
+
+  * `templates/build-dotnet-webapi.yml`
+  * `templates/deploy-iis.yml`
+  * `templates/pipeline-dotnet-iis.yml` (optional combined template)
+
+Then each project pipeline becomes very small and only passes parameters.
+
+---
+
+## What to reuse
+
+Split your reusable parts into templates:
+
+### 1) Build template
+
+Reusable for all .NET projects:
+
+* restore
+* build
+* publish
+* zip
+* publish build artifact (on-prem: `PublishBuildArtifacts@1`)
+
+### 2) Deploy IIS template
+
+Reusable for all IIS deployments:
+
+* download artifact
+* extract
+* file transform
+* stop website/app pool
+* copy files
+* start website/app pool
+
+### 3) Optional full pipeline template
+
+If all projects follow the exact same branch strategy (`sit`, `uat`, `master`), you can make one template that includes:
+
+* Build stage
+* Deploy_SIT
+* Deploy_UAT
+* Deploy_PROD
+
+Then per project you only pass names/paths/pools/variable groups.
+
+---
+
+# Example reusable templates
+
+## A) Build template (`templates/build-dotnet-webapi.yml`)
+
+```yml
+parameters:
+- name: buildPool
+  type: string
+- name: buildAgentName
+  type: string
+- name: solutionOrProject
+  type: string
+  default: '**/*.csproj'
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+- name: publishProject
+  type: string
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+jobs:
+- job: BuildJob
+  displayName: Build (.NET)
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: ${{ parameters.solutionOrProject }}
+      feedsToUse: 'config'
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}
+
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: ${{ parameters.solutionOrProject }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
+
+  - task: DotNetCoreCLI@2
+    displayName: Publish
+    inputs:
+      command: publish
+      projects: ${{ parameters.publishProject }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --output $(Build.ArtifactStagingDirectory)\publish --no-restore'
+      zipAfterPublish: false
+
+  - task: ArchiveFiles@2
+    displayName: Zip publish output
+    inputs:
+      rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish'
+      includeRootFolder: false
+      archiveType: zip
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: Publish Build Artifact
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
+```
+
+---
+
+## B) IIS deploy template (`templates/deploy-iis.yml`)
+
+```yml
+parameters:
+- name: environmentName
+  type: string
+- name: stageName
+  type: string
+- name: stageDisplayName
+  type: string
+- name: branchRef
+  type: string
+- name: deployPool
+  type: string
+- name: deployAgentName
+  type: string
+- name: variableGroup
+  type: string
+- name: zipName
+  type: string
+- name: siteName
+  type: string
+- name: appPoolName
+  type: string
+- name: iisTargetPath
+  type: string
+
+stages:
+- stage: ${{ parameters.stageName }}
+  displayName: ${{ parameters.stageDisplayName }}
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], '${{ parameters.branchRef }}'))
+  jobs:
+  - deployment: DeployJob
+    displayName: 'Deploy to ${{ parameters.environmentName }}'
+    environment: ${{ parameters.environmentName }}
+    pool:
+      name: ${{ parameters.deployPool }}
+      demands:
+      - Agent.Name -equals ${{ parameters.deployAgentName }}
+    variables:
+    - group: ${{ parameters.variableGroup }}
+
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@0
+            displayName: Download Build Artifact
+            inputs:
+              buildType: current
+              downloadType: single
+              artifactName: drop
+              downloadPath: '$(Pipeline.Workspace)'
+
+          - task: ExtractFiles@1
+            displayName: Extract artifact
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
+              destinationFolder: '$(Pipeline.Workspace)\extracted'
+              cleanDestinationFolder: true
+
+          - task: FileTransform@1
+            displayName: JSON substitution (appsettings.json)
+            inputs:
+              folderPath: '$(Pipeline.Workspace)\extracted'
+              fileType: 'json'
+              targetFiles: '**/appsettings.json'
+
+          - powershell: |
+              Import-Module WebAdministration
+
+              $siteName = "${{ parameters.siteName }}"
+              $appPool  = "${{ parameters.appPoolName }}"
+
+              $site = Get-Website -Name $siteName
+              if ($site.State -ne "Stopped") { Stop-Website -Name $siteName }
+
+              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+              if ($poolState -ne "Stopped") { Stop-WebAppPool -Name $appPool }
+
+              Start-Sleep -Seconds 2
+            displayName: 'Stop Website + App Pool'
+
+          - task: CopyFiles@2
+            displayName: Copy files
+            inputs:
+              SourceFolder: '$(Pipeline.Workspace)\extracted'
+              Contents: '**'
+              TargetFolder: '${{ parameters.iisTargetPath }}'
+              OverWrite: true
+
+          - powershell: |
+              Import-Module WebAdministration
+
+              $siteName = "${{ parameters.siteName }}"
+              $appPool  = "${{ parameters.appPoolName }}"
+
+              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+              if ($poolState -ne "Started") { Start-WebAppPool -Name $appPool }
+
+              $siteState = (Get-Website -Name $siteName).State
+              if ($siteState -ne "Started") { Start-Website -Name $siteName }
+            displayName: 'Start Website + App Pool'
+```
+
+---
+
+# How each project pipeline will look (small and clean)
+
+## Project pipeline (`azure-pipelines.yml` inside each app repo)
+
+```yml
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: DEV/DevOps.Templates   # ProjectName/RepoName in Azure DevOps Server
+    ref: refs/heads/master
+
 trigger:
   branches:
     include:
@@ -9,224 +262,103 @@ variables:
   buildConfiguration: 'Release'
 
 stages:
-# =========================
-# BUILD (runs for sit/uat/master)
-# =========================
 - stage: Build
   displayName: Build & Publish Artifact
   jobs:
-  - job: BuildJob
-    displayName: Build (ASP.NET Core)
-    pool:
-      name: 'Build Pool'   # <-- self-hosted build agent pool
-      demands:
-      - Agent.Name -equals 'SIT-ALTERNAB-N1'
-    steps:
-    - checkout: self
-      clean: true
+  - template: templates/build-dotnet-webapi.yml@templates
+    parameters:
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      solutionOrProject: '**/*.csproj'
+      nugetConfigPath: 'nuget.config'
+      publishProject: 'Alterna-DataExport/Alterna-DataExport/Alterna-DataExport.csproj'
+      buildConfiguration: 'Release'
+      zipName: 'Alterna-DataExport.zip'
 
-    - task: UseDotNet@2
-      displayName: 'Use .NET SDK'
-      inputs:
-        packageType: 'sdk'
-        version: '8.x'   # <-- change to your project's SDK (6.x/7.x/8.x)
+- template: templates/deploy-iis.yml@templates
+  parameters:
+    environmentName: 'SIT'
+    stageName: 'Deploy_SIT'
+    stageDisplayName: 'Deploy to SIT'
+    branchRef: 'refs/heads/sit'
+    deployPool: 'Build Pool'
+    deployAgentName: 'SIT-ALTERNA-BN1'
+    variableGroup: 'SIT_VARIABLE_GROUP'
+    zipName: 'Alterna-DataExport.zip'
+    siteName: 'AlternaDataExportServiceAzureDevOps'
+    appPoolName: 'AlternaDataExportServiceAzureDevOps'
+    iisTargetPath: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1'
 
-    - task: DotNetCoreCLI@2
-      displayName: Restore
-      inputs:
-        command: restore
-        projects: '**/*.csproj'
- 
-    - task: DotNetCoreCLI@2
-      displayName: Build
-      inputs:
-        command: build
-        projects: '**/*.csproj'
-        arguments: '--configuration $(buildConfiguration)'
+# Add same template again for UAT
+# Add same template again for PROD
+```
 
-    - task: DotNetCoreCLI@2
-      displayName: Publish
-      inputs:
-        command: publish
-        publishWebProjects: true
-        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)\publish'
-        zipAfterPublish: false
+---
 
-    - task: ArchiveFiles@2
-      displayName: 'Zip publish output'
-      inputs:
-        rootFolderOrFile: '$(Build.ArtifactStagingDirectory)\publish'
-        includeRootFolder: false
-        archiveType: 'zip'
-        archiveFile: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
-        replaceExistingArchive: true
+## Why this is the best approach
 
-    - publish: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport.zip'
-      artifact: drop
+### ✅ Benefits
 
+* Reuse the same proven logic for all projects
+* Fix once in template → all pipelines benefit
+* Less copy/paste mistakes
+* Easier onboarding for new projects
 
-# =========================
-# DEPLOY SIT (only when branch == sit)
-# =========================
-- stage: Deploy_SIT
-  displayName: Deploy to SIT
-  dependsOn: Build
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
-  jobs:
-  - deployment: DeploySIT
-    displayName: 'Deploy SIT (IIS)'
-    environment: 'SIT'     # <-- Azure Environment name
-    pool:
-      name: 'Build Pool'   # <-- self-hosted build agent pool
-      demands:
-      - Agent.Name -equals 'SIT-ALTERNAB-N1'      # <-- agent pool with SIT IIS agent
-    variables:
-    - group: 'SIT_VARIABLE_GROUP'  # <-- your SIT variable group
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - download: current
-            artifact: drop
+### ✅ What changes per project
 
-          - task: ExtractFiles@1
-            displayName: 'Extract artifact'
-            inputs:
-              archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
-              destinationFolder: '$(Pipeline.Workspace)\extracted'
-              cleanDestinationFolder: true
+Only parameters:
 
-          - task: FileTransform@1
-            displayName: 'JSON substitution (appsettings.json)'
-            inputs:
-              folderPath: '$(Pipeline.Workspace)\extracted'
-              fileType: 'json'
-              targetFiles: '**/appsettings.json'
+* project path
+* zip name
+* IIS path
+* app pool/site name
+* variable group
+* agent name/pool
 
-          - powershell: |
-              Import-Module WebAdministration
-              Stop-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
-            displayName: 'Stop SIT App Pool'
+---
 
-          - task: CopyFiles@2
-            displayName: 'Copy files (SIT)'
-            inputs:
-              SourceFolder: '$(Pipeline.Workspace)\extracted'
-              Contents: '**'
-              TargetFolder: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1'   # <-- SIT path
-              OverWrite: true
+## Extra best practices for scale
 
-          - powershell: |
-              Import-Module WebAdministration
-              Start-WebAppPool -Name "AlternaDataExportServiceAzureDevOps"
-            displayName: 'Start SIT App Pool'
+### 1) Standardize naming
 
+If all projects follow consistent naming:
 
-# =========================
-# DEPLOY UAT (only when branch == uat) - approvals via Environment checks
-# =========================
-# - stage: Deploy_UAT
-#   displayName: Deploy to UAT (Approval required)
-#   dependsOn: Build
-#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/uat'))
-#   jobs:
-#   - deployment: DeployUAT
-#     displayName: 'Deploy UAT (IIS)'
-#     environment: 'UAT'     # <-- approvals/checks configured in the UAT environment UI
-#     pool:
-#       name: 'IIS-UAT'
-#     variables:
-#     - group: 'UAT_VARIABLE_GROUP'
-#     strategy:
-#       runOnce:
-#         deploy:
-#           steps:
-#           - download: current
-#             artifact: drop
+* `VG-SIT-{AppName}`
+* `VG-UAT-{AppName}`
+* `VG-PROD-{AppName}`
+* IIS site/app pool names follow a pattern
 
-#           - task: ExtractFiles@1
-#             displayName: 'Extract artifact'
-#             inputs:
-#               archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
-#               destinationFolder: '$(Pipeline.Workspace)\extracted'
-#               cleanDestinationFolder: true
+Then templates become even cleaner.
 
-#           - task: FileTransform@1
-#             displayName: 'JSON substitution (appsettings.json)'
-#             inputs:
-#               folderPath: '$(Pipeline.Workspace)\extracted'
-#               fileType: 'json'
-#               targetFiles: '**/appsettings.json'
+### 2) Version your templates
 
-#           - powershell: |
-#               Import-Module WebAdministration
-#               Stop-WebAppPool -Name "DataExport_UAT_AppPool"
-#             displayName: 'Stop UAT App Pool'
+Keep templates in a dedicated repo and use tags/branches if needed:
 
-#           - task: CopyFiles@2
-#             displayName: 'Copy files (UAT)'
-#             inputs:
-#               SourceFolder: '$(Pipeline.Workspace)\extracted'
-#               Contents: '**'
-#               TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- UAT path
-#               OverWrite: true
+* `ref: refs/heads/master`
+  or
+* `ref: refs/tags/v1.0`
 
-#           - powershell: |
-#               Import-Module WebAdministration
-#               Start-WebAppPool -Name "DataExport_UAT_AppPool"
-#             displayName: 'Start UAT App Pool'
+### 3) Add a shared “pre-deploy checks” template later
 
+For example:
 
-# # =========================
-# # DEPLOY PROD (only when branch == master) - approvals via Environment checks
-# # =========================
-# - stage: Deploy_PROD
-#   displayName: Deploy to PROD (Approval required)
-#   dependsOn: Build
-#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
-#   jobs:
-#   - deployment: DeployPROD
-#     displayName: 'Deploy PROD (IIS)'
-#     environment: 'PROD'    # <-- approvals/checks configured in the PROD environment UI
-#     pool:
-#       name: 'IIS-PROD'     # <-- locked-down pool recommended
-#     variables:
-#     - group: 'PRD_VARIABLE_GROUP'
-#     strategy:
-#       runOnce:
-#         deploy:
-#           steps:
-#           - download: current
-#             artifact: drop
+* verify folder exists
+* verify website/app pool exists
+* verify agent identity
+* optional backup
 
-#           - task: ExtractFiles@1
-#             displayName: 'Extract artifact'
-#             inputs:
-#               archiveFilePatterns: '$(Pipeline.Workspace)\drop\Alterna-DataExport.zip'
-#               destinationFolder: '$(Pipeline.Workspace)\extracted'
-#               cleanDestinationFolder: true
+---
 
-#           - task: FileTransform@1
-#             displayName: 'JSON substitution (appsettings.json)'
-#             inputs:
-#               folderPath: '$(Pipeline.Workspace)\extracted'
-#               fileType: 'json'
-#               targetFiles: '**/appsettings.json'
+## One important note for Azure DevOps Server (on-prem)
 
-#           - powershell: |
-#               Import-Module WebAdministration
-#               Stop-WebAppPool -Name "DataExport_PROD_AppPool"
-#             displayName: 'Stop PROD App Pool'
+Use:
 
-#           - task: CopyFiles@2
-#             displayName: 'Copy files (PROD)'
-#             inputs:
-#               SourceFolder: '$(Pipeline.Workspace)\extracted'
-#               Contents: '**'
-#               TargetFolder: 'C:\inetpub\wwwroot\DataExport'   # <-- PROD path
-#               OverWrite: true
+* `PublishBuildArtifacts@1` / `DownloadBuildArtifacts@0`
+  and avoid:
+* `publish:` / `download:` shortcuts (Pipeline Artifacts)
 
-#           - powershell: |
-#               Import-Module WebAdministration
-#               Start-WebAppPool -Name "DataExport_PROD_AppPool"
-#             displayName: 'Start PROD App Pool'
+You already discovered this — keep it in your templates too.
+
+---
+
+If you want, I can generate a **full template set** for your exact setup (Build + SIT/UAT/PROD deploy with approvals) and a **sample pipeline for a second project** so you can copy the pattern immediately.
