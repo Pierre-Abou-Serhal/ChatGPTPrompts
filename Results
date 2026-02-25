@@ -1,1 +1,204 @@
-/azure-pipelines.yml: Could not get the latest source version for repository Azure Templates hosted on Azure Repos using ref refs/heads/master.
+That changes the answer a lot: for **JPG / JPEG / PNG**, compressing the raw bytes with **GZip/Brotli** usually gives **little to no benefit** (sometimes it can even get slightly bigger).
+
+## Best approach for images
+
+Instead of byte compression, do **image optimization**:
+
+* **JPEG** → re-encode with lower quality (ex: 70–85)
+* **PNG** → keep PNG (lossless) or convert to WebP (better size)
+* Remove metadata (EXIF)
+* Optionally resize very large images
+
+This gives much better results than compressing the bytes directly.
+
+---
+
+## Recommended strategy in your API
+
+* If file is an **image** → optimize image bytes (re-encode)
+* If file is **not an image** → use Brotli/GZip on bytes
+
+---
+
+## ASP.NET Core 8 example (ImageSharp)
+
+> Install package:
+
+* `SixLabors.ImageSharp`
+
+### Request model
+
+```csharp
+public class UploadBase64Request
+{
+    public string FileName { get; set; } = string.Empty;
+    public string Base64Content { get; set; } = string.Empty;
+    public string? ContentType { get; set; } // optional
+}
+```
+
+---
+
+### Image optimization helper
+
+```csharp
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Processing;
+
+public static class ImageOptimizeHelper
+{
+    public static byte[] OptimizeImage(byte[] inputBytes, string? contentType = null)
+    {
+        using var image = Image.Load(inputBytes);
+
+        // Remove metadata (can reduce size)
+        image.Metadata.ExifProfile = null;
+
+        // Optional resize (only if too large)
+        const int maxWidth = 1920;
+        const int maxHeight = 1920;
+
+        if (image.Width > maxWidth || image.Height > maxHeight)
+        {
+            image.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Mode = ResizeMode.Max,
+                Size = new Size(maxWidth, maxHeight)
+            }));
+        }
+
+        using var output = new MemoryStream();
+
+        // Decide encoding
+        var ct = (contentType ?? string.Empty).ToLowerInvariant();
+
+        if (ct.Contains("jpeg") || ct.Contains("jpg"))
+        {
+            // Lossy compression (big size savings)
+            image.Save(output, new JpegEncoder
+            {
+                Quality = 75 // adjust 60-85 based on quality/size needs
+            });
+        }
+        else if (ct.Contains("png"))
+        {
+            // PNG is already compressed; this is mostly metadata cleanup + re-encode
+            image.Save(output, new PngEncoder());
+        }
+        else
+        {
+            // Fallback by file content (if contentType missing/incorrect)
+            // You can choose JPEG fallback, but be careful with transparency
+            image.Save(output, new JpegEncoder { Quality = 75 });
+        }
+
+        return output.ToArray();
+    }
+}
+```
+
+---
+
+### Controller (Base64 → optimize → save → return)
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+
+[ApiController]
+[Route("api/files")]
+public class FilesController : ControllerBase
+{
+    private readonly IWebHostEnvironment _env;
+
+    public FilesController(IWebHostEnvironment env)
+    {
+        _env = env;
+    }
+
+    [HttpPost("upload-base64-image-optimized")]
+    public async Task<IActionResult> UploadBase64ImageOptimized([FromBody] UploadBase64Request request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Base64Content))
+            return BadRequest("Base64Content is required.");
+
+        try
+        {
+            // Handle data URL format too: data:image/png;base64,xxxx
+            var base64 = request.Base64Content;
+            var commaIndex = base64.IndexOf(',');
+            if (commaIndex >= 0)
+                base64 = base64[(commaIndex + 1)..];
+
+            var originalBytes = Convert.FromBase64String(base64);
+
+            // Optimize image bytes
+            var optimizedBytes = ImageOptimizeHelper.OptimizeImage(originalBytes, request.ContentType);
+
+            // Save optimized file
+            var folder = Path.Combine(_env.ContentRootPath, "OptimizedFiles");
+            Directory.CreateDirectory(folder);
+
+            var safeFileName = Path.GetFileName(request.FileName);
+            var outputPath = Path.Combine(folder, safeFileName);
+
+            await System.IO.File.WriteAllBytesAsync(outputPath, optimizedBytes);
+
+            // Return optimized version
+            var contentType = string.IsNullOrWhiteSpace(request.ContentType)
+                ? "application/octet-stream"
+                : request.ContentType;
+
+            return File(optimizedBytes, contentType, safeFileName);
+        }
+        catch (FormatException)
+        {
+            return BadRequest("Invalid Base64 content.");
+        }
+        catch (UnknownImageFormatException)
+        {
+            return BadRequest("Unsupported or invalid image format.");
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error processing file: {ex.Message}");
+        }
+    }
+}
+```
+
+---
+
+## Important notes for image types
+
+### JPEG / JPG
+
+* Best compression gains
+* Use `Quality = 70–85`
+* Lower quality = smaller size
+
+### PNG
+
+* Often already compressed
+* Gains are smaller
+* Big win only if:
+
+  * image is huge and you resize it
+  * you convert PNG → WebP (if your frontend supports it)
+
+### Other image types (BMP, TIFF, etc.)
+
+* Huge opportunity to reduce size by converting to JPEG or PNG/WebP
+
+---
+
+## If you want even smaller files (recommended)
+
+For web/mobile apps, a better strategy is:
+
+* Convert **JPEG/PNG → WebP** (or AVIF if supported)
+
+That usually gives much better size reduction than JPG/PNG re-encode.
+
+If you want, I can give you a **WebP version** of the helper (with fallback for transparency and unsupported clients).
