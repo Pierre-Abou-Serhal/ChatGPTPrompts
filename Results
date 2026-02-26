@@ -1,76 +1,66 @@
-That’s exactly the issue ✅
+Yes — you *can* include a `dotnet test` step in the build template, but you should make it **optional**, otherwise projects with no test projects may fail (or at least waste time).
 
-In `DotNetCoreCLI@2` **Publish**, Azure DevOps has an option called:
+## Best practice: make tests configurable via template parameters
 
-* **`modifyOutputPath`** (default is often `true`)
-
-When it’s `true`, it automatically appends the **project folder name** to your output path, which is why you get:
-
-* `publish_output\Alterna-DataExport\...`
-
----
-
-## Fix
-
-In your **build template** Publish task, add:
+### 1) Add parameters to the build template
 
 ```yml
-modifyOutputPath: false
+parameters:
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testProjects
+  type: string
+  default: '**/*Tests/*.csproj'   # adjust to your naming
 ```
 
-## Correct Publish step
+### 2) Add the test step with a condition
+
+Put this after Build (and before Publish):
 
 ```yml
 - task: DotNetCoreCLI@2
-  displayName: 'Publish'
+  displayName: 'Test'
+  condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
   inputs:
-    command: 'publish'
-    projects: ${{ parameters.publishProject }}
-    arguments: '--configuration ${{ parameters.buildConfiguration }} --output "${{ parameters.publishOutputFolder }}" --no-restore'
-    zipAfterPublish: false
-    modifyOutputPath: false
+    command: 'test'
+    projects: ${{ parameters.testProjects }}
+    arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
+    publishTestResults: true
 ```
+
+✅ If `runTests: false`, the step is skipped.
+✅ If a project has tests, you set `runTests: true` and optionally specify the test project pattern.
 
 ---
 
-## Then keep ArchiveFiles like this
+## How to use it per project
+
+### Project without tests
+
+Don’t pass anything (default `false`):
 
 ```yml
-- task: ArchiveFiles@2
-  displayName: 'Zip publish output'
-  inputs:
-    rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
-    includeRootFolder: false
-    archiveType: 'zip'
-    archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-    replaceExistingArchive: true
+- template: pipelines/build-dotnet-webapi-job.yml@templates
+  parameters:
+    publishProject: '...'
+```
+
+### Project with tests
+
+```yml
+- template: pipelines/build-dotnet-webapi-job.yml@templates
+  parameters:
+    publishProject: '...'
+    runTests: true
+    testProjects: '**/*.Tests.csproj'
 ```
 
 ---
 
-## Result
+## Alternative (auto-detect tests)
 
-Your zip will contain files directly (no nested `Alterna-DataExport` folder), so extraction/copy to IIS will be clean.
+You *can* try to detect test projects automatically, but in YAML templates it becomes messy. The parameter approach stays clean and predictable.
 
----
-
-## Why it happened
-
-This is Azure DevOps task behavior, not `.NET` itself.
-The task tries to help when publishing multiple projects by adding project subfolders.
-
-For your case (single API project), set it to `false`.
-
-If you want, I can paste your **full final build job template** with:
-
-* `publishOutputFolder`
-* `modifyOutputPath: false`
-* on-prem artifact publishing (`PublishBuildArtifacts@1`)
-
-
-
-
-
-
-
-    publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish_output'
+If you want, paste your current build template and I’ll integrate `runTests` + `testProjects` cleanly with your publish/zip/artifact steps.
