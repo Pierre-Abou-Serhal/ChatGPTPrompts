@@ -1,79 +1,113 @@
-That error comes from this line in the clean script:
-
-```powershell
-$exclude += ${{ convertToJson(parameters.cleanExclude) }} | ConvertFrom-Json
-```
-
-When you pass `cleanExclude: []`, `convertToJson(...)` becomes just `[]` and PowerShell tries to parse `[]` as a **type** (like `[string]`), so it fails with:
-
-> Missing type name after '['
-
-## Fix (simplest): don’t parse JSON at all
-
-Since the exclude list is small and simple, just pass it as a **multi-line string parameter** instead of an object. This avoids YAML→JSON→PowerShell parsing issues completely.
-
-### 1) Change your template parameters
-
-Replace the object parameter with a string:
-
-```yml
-- name: cleanExcludeCsv
+parameters:
+- name: jobName
   type: string
-  default: 'web.config,logs,app_offline.htm'
-```
+  default: 'BuildJob'
 
-### 2) Replace the clean step with this
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET)'
 
-```yml
-- powershell: |
-    $target = '${{ parameters.iisTargetPath }}'
+- name: buildPool
+  type: string
 
-    if (-not (Test-Path $target)) {
-      throw "Target folder does not exist: $target"
-    }
+- name: buildAgentName
+  type: string
 
-    $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-    $exclude = @()
+- name: buildConfiguration
+  type: string
+  default: 'Release'
 
-    if ($excludeCsv) {
-      $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-    }
+- name: restoreProjects
+  type: string
+  default: '**/*.csproj'
 
-    Write-Host "Cleaning target folder: $target"
-    Write-Host "Excluding: $($exclude -join ', ')"
+- name: runTests
+  type: boolean
+  default: false
 
-    Get-ChildItem -Path $target -Force | ForEach-Object {
-      if ($exclude -contains $_.Name) {
-        Write-Host "Skipping excluded item: $($_.FullName)"
-      } else {
-        Write-Host "Removing: $($_.FullName)"
-        Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-      }
-    }
-  displayName: 'Clean target folder (before copy)'
-  condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
-```
+- name: testProjects
+  type: string
+  default: '**/*Tests/*.csproj'
 
-### 3) How to use it
+- name: publishProject
+  type: string
 
-#### Wipe everything (no excludes)
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
 
-```yml
-cleanTargetBeforeCopy: true
-cleanExcludeCsv: ''
-```
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
 
-#### Keep web.config + logs
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+  
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
 
-```yml
-cleanTargetBeforeCopy: true
-cleanExcludeCsv: 'web.config,logs'
-```
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
 
----
+  steps:
+  - checkout: self
+    clean: true
 
-## If you want to keep your current `cleanExclude: []` style
+  # Restore using nuget.config
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      projects: ${{ parameters.restoreProjects }}
+      feedsToUse: 'config'
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}
 
-I can also fix it using proper quoting so PowerShell receives a string JSON, but the CSV approach is **more reliable** and easier to maintain across projects.
+  # Building project: dotnet build
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: ${{ parameters.restoreProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
 
-If you want, paste your current deploy template file and I’ll show you exactly what lines to replace (minimal diff).
+  # Running tests if available: dotnet test
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    inputs:
+      command: 'test'
+      projects: ${{ parameters.testProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
+      publishTestResults: true
+
+  # Publish the API project
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish'
+    inputs:
+      command: 'publish'
+      projects: ${{ parameters.publishProject }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --output "${{ parameters.publishOutputFolder }}" --no-restore'
+      zipAfterPublish: false
+      modifyOutputPath: false
+
+  # Zipping published files
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  # Uploading zipped files to Azure
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
