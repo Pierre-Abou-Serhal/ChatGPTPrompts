@@ -1,20 +1,79 @@
-Starting: Clean target folder (before copy)
-==============================================================================
-Task         : PowerShell
-Description  : Run a PowerShell script on Linux, macOS, or Windows
-Version      : 2.232.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\bdc50ebb-6d10-48e0-840d-74ae6c58ca0d.ps1'"
-At C:\agent\_work\_temp\bdc50ebb-6d10-48e0-840d-74ae6c58ca0d.ps1:11 char:14
-+ $exclude += [] | ConvertFrom-Json
-+              ~
-Missing type name after '['.
-    + CategoryInfo          : ParserError: (:) [], ParseException
-    + FullyQualifiedErrorId : MissingTypename
- 
-##[error]PowerShell exited with code '1'.
-Finishing: Clean target folder (before copy)
+That error comes from this line in the clean script:
+
+```powershell
+$exclude += ${{ convertToJson(parameters.cleanExclude) }} | ConvertFrom-Json
+```
+
+When you pass `cleanExclude: []`, `convertToJson(...)` becomes just `[]` and PowerShell tries to parse `[]` as a **type** (like `[string]`), so it fails with:
+
+> Missing type name after '['
+
+## Fix (simplest): don’t parse JSON at all
+
+Since the exclude list is small and simple, just pass it as a **multi-line string parameter** instead of an object. This avoids YAML→JSON→PowerShell parsing issues completely.
+
+### 1) Change your template parameters
+
+Replace the object parameter with a string:
+
+```yml
+- name: cleanExcludeCsv
+  type: string
+  default: 'web.config,logs,app_offline.htm'
+```
+
+### 2) Replace the clean step with this
+
+```yml
+- powershell: |
+    $target = '${{ parameters.iisTargetPath }}'
+
+    if (-not (Test-Path $target)) {
+      throw "Target folder does not exist: $target"
+    }
+
+    $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
+    $exclude = @()
+
+    if ($excludeCsv) {
+      $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    }
+
+    Write-Host "Cleaning target folder: $target"
+    Write-Host "Excluding: $($exclude -join ', ')"
+
+    Get-ChildItem -Path $target -Force | ForEach-Object {
+      if ($exclude -contains $_.Name) {
+        Write-Host "Skipping excluded item: $($_.FullName)"
+      } else {
+        Write-Host "Removing: $($_.FullName)"
+        Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+      }
+    }
+  displayName: 'Clean target folder (before copy)'
+  condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
+```
+
+### 3) How to use it
+
+#### Wipe everything (no excludes)
+
+```yml
+cleanTargetBeforeCopy: true
+cleanExcludeCsv: ''
+```
+
+#### Keep web.config + logs
+
+```yml
+cleanTargetBeforeCopy: true
+cleanExcludeCsv: 'web.config,logs'
+```
+
+---
+
+## If you want to keep your current `cleanExclude: []` style
+
+I can also fix it using proper quoting so PowerShell receives a string JSON, but the CSV approach is **more reliable** and easier to maintain across projects.
+
+If you want, paste your current deploy template file and I’ll show you exactly what lines to replace (minimal diff).
