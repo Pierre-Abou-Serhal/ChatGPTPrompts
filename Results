@@ -1,162 +1,134 @@
-parameters:
-- name: deploymentName
-  type: string
-  default: 'DeployJob'
+Yep — for Angular (and even for many .NET apps) you should **delete the old files first**, otherwise you’ll keep stale JS bundles and the site can load mixed versions.
 
-- name: deploymentDisplayName
-  type: string
-  default: 'Deploy IIS'
+The cleanest pattern is:
 
-- name: environmentName
-  type: string
+1. **Stop site + app pool**
+2. **Clean target folder** (but keep things you don’t want to lose, like `web.config`, `logs`, uploads, etc.)
+3. **Copy new files**
+4. **Start site + app pool**
 
-- name: deployPool
-  type: string
+Below is a safe, reusable change to your deploy template.
 
-- name: deployAgentName
-  type: string
+---
 
-- name: variableGroup
-  type: string
+## Add parameters to control cleaning (recommended)
 
-- name: zipName
-  type: string
+Add these parameters near the top:
 
-- name: siteName
-  type: string
+```yml
+- name: cleanTargetBeforeCopy
+  type: boolean
+  default: true
 
-- name: appPoolName
-  type: string
+- name: cleanExclude
+  type: object
+  default:
+    - 'web.config'
+    - 'logs'
+    - 'app_offline.htm'
+```
 
-- name: iisTargetPath
-  type: string
+* `cleanTargetBeforeCopy`: let you turn it on/off per project
+* `cleanExclude`: list of files/folders to keep
 
-- name: appSettingsFilePattern
-  type: string
-  default: '**/appsettings.json'
+---
 
-jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
+## Add a “Clean IIS folder” step before CopyFiles
 
-  environment: ${{ parameters.environmentName }}
+Insert this step **after** “Stop Website + App Pool” and **before** “Copy files”:
 
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
+```yml
+- powershell: |
+    $target = '${{ parameters.iisTargetPath }}'
 
-  variables:
-  - group: ${{ parameters.variableGroup }}
+    if (-not (Test-Path $target)) {
+      throw "Target folder does not exist: $target"
+    }
 
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - task: DownloadBuildArtifacts@0
-          displayName: 'Download Build Artifact'
-          inputs:
-            buildType: 'current'
-            downloadType: 'single'
-            artifactName: 'drop'
-            downloadPath: '$(Pipeline.Workspace)'
+    $exclude = @()
+    $exclude += ${{ convertToJson(parameters.cleanExclude) }} | ConvertFrom-Json
 
-        - task: ExtractFiles@1
-          displayName: 'Extract artifact'
-          inputs:
-            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\extracted'
-            cleanDestinationFolder: true
+    Write-Host "Cleaning target folder: $target"
+    Write-Host "Excluding: $($exclude -join ', ')"
 
-        - task: FileTransform@1
-          displayName: 'JSON substitution (appsettings.json)'
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            fileType: 'json'
-            targetFiles: ${{ parameters.appSettingsFilePattern }}
+    Get-ChildItem -Path $target -Force | ForEach-Object {
+      if ($exclude -contains $_.Name) {
+        Write-Host "Skipping excluded item: $($_.FullName)"
+      } else {
+        Write-Host "Removing: $($_.FullName)"
+        Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+      }
+    }
+  displayName: 'Clean target folder (before copy)'
+  condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
+```
 
-        # Stop website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
+### Why this is safe
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
+* It deletes **everything in the folder** except what you exclude
+* It will keep `web.config` (important for IIS hosting) and `logs` by default
+* You can add other excludes like `uploads`, `wwwroot\files`, etc.
 
-            $site = Get-Website -Name $siteName
-            Write-Host "Website current state: $($site.State)"
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website: $siteName"
-              Stop-Website -Name $siteName
-            } else {
-              Write-Host "Website already stopped."
-            }
+---
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "AppPool current state: $poolState"
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool: $appPool"
-              Stop-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already stopped."
-            }
+## Then keep your CopyFiles step as-is
 
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $siteState = (Get-Website -Name $siteName).State
-              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+```yml
+- task: CopyFiles@2
+  displayName: 'Copy files'
+  inputs:
+    SourceFolder: '$(Pipeline.Workspace)\extracted'
+    Contents: '**'
+    TargetFolder: '${{ parameters.iisTargetPath }}'
+    OverWrite: true
+```
 
-              Write-Host "Website state: $siteState | AppPool state: $poolState"
+---
 
-              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-                Write-Host "Website and App Pool are stopped."
-                break
-              }
+## How to use it for Angular projects
 
-              Start-Sleep -Seconds 2
-            }
+For Angular deployments, you’ll usually exclude:
 
-            $finalSiteState = (Get-Website -Name $siteName).State
-            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
+* `web.config` (if you keep a custom one)
+* `logs` (if any)
+* `uploads` (if users upload files)
+* sometimes `assets` (depends if it’s generated or static)
 
-            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
-            }
+Example usage in pipeline:
 
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool'
+```yml
+- template: pipelines/deploy-iis-job.yml@templates
+  parameters:
+    ...
+    cleanTargetBeforeCopy: true
+    cleanExclude:
+      - 'web.config'
+      - 'logs'
+      - 'uploads'
+```
 
-        - task: CopyFiles@2
-          displayName: 'Copy files'
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
+---
 
-        # Start website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
+## Even simpler option (wipe everything)
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
+If you truly want to wipe everything, set excludes to empty:
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool: $appPool"
-              Start-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already started."
-            }
+```yml
+cleanExclude: []
+```
 
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website: $siteName"
-              Start-Website -Name $siteName
-            } else {
-              Write-Host "Website already started."
-            }
+But I **don’t** recommend that on IIS unless you’re 100% sure you redeploy `web.config` every time.
 
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool'
+---
+
+## One more tip for Angular
+
+Make sure your zip contains only the built `dist` output (not the whole repo), and ideally your build produces deterministic output. Cleaning will handle changing JS filenames perfectly.
+
+---
+
+If you want, I can paste the **full updated deploy template** with:
+
+* the new parameters
+* the clean step inserted in the right spot
+* optional `app_offline.htm` toggle (even safer for file locks).
