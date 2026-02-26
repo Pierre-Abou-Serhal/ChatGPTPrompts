@@ -1,134 +1,20 @@
-Yep — for Angular (and even for many .NET apps) you should **delete the old files first**, otherwise you’ll keep stale JS bundles and the site can load mixed versions.
-
-The cleanest pattern is:
-
-1. **Stop site + app pool**
-2. **Clean target folder** (but keep things you don’t want to lose, like `web.config`, `logs`, uploads, etc.)
-3. **Copy new files**
-4. **Start site + app pool**
-
-Below is a safe, reusable change to your deploy template.
-
----
-
-## Add parameters to control cleaning (recommended)
-
-Add these parameters near the top:
-
-```yml
-- name: cleanTargetBeforeCopy
-  type: boolean
-  default: true
-
-- name: cleanExclude
-  type: object
-  default:
-    - 'web.config'
-    - 'logs'
-    - 'app_offline.htm'
-```
-
-* `cleanTargetBeforeCopy`: let you turn it on/off per project
-* `cleanExclude`: list of files/folders to keep
-
----
-
-## Add a “Clean IIS folder” step before CopyFiles
-
-Insert this step **after** “Stop Website + App Pool” and **before** “Copy files”:
-
-```yml
-- powershell: |
-    $target = '${{ parameters.iisTargetPath }}'
-
-    if (-not (Test-Path $target)) {
-      throw "Target folder does not exist: $target"
-    }
-
-    $exclude = @()
-    $exclude += ${{ convertToJson(parameters.cleanExclude) }} | ConvertFrom-Json
-
-    Write-Host "Cleaning target folder: $target"
-    Write-Host "Excluding: $($exclude -join ', ')"
-
-    Get-ChildItem -Path $target -Force | ForEach-Object {
-      if ($exclude -contains $_.Name) {
-        Write-Host "Skipping excluded item: $($_.FullName)"
-      } else {
-        Write-Host "Removing: $($_.FullName)"
-        Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-      }
-    }
-  displayName: 'Clean target folder (before copy)'
-  condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
-```
-
-### Why this is safe
-
-* It deletes **everything in the folder** except what you exclude
-* It will keep `web.config` (important for IIS hosting) and `logs` by default
-* You can add other excludes like `uploads`, `wwwroot\files`, etc.
-
----
-
-## Then keep your CopyFiles step as-is
-
-```yml
-- task: CopyFiles@2
-  displayName: 'Copy files'
-  inputs:
-    SourceFolder: '$(Pipeline.Workspace)\extracted'
-    Contents: '**'
-    TargetFolder: '${{ parameters.iisTargetPath }}'
-    OverWrite: true
-```
-
----
-
-## How to use it for Angular projects
-
-For Angular deployments, you’ll usually exclude:
-
-* `web.config` (if you keep a custom one)
-* `logs` (if any)
-* `uploads` (if users upload files)
-* sometimes `assets` (depends if it’s generated or static)
-
-Example usage in pipeline:
-
-```yml
-- template: pipelines/deploy-iis-job.yml@templates
-  parameters:
-    ...
-    cleanTargetBeforeCopy: true
-    cleanExclude:
-      - 'web.config'
-      - 'logs'
-      - 'uploads'
-```
-
----
-
-## Even simpler option (wipe everything)
-
-If you truly want to wipe everything, set excludes to empty:
-
-```yml
-cleanExclude: []
-```
-
-But I **don’t** recommend that on IIS unless you’re 100% sure you redeploy `web.config` every time.
-
----
-
-## One more tip for Angular
-
-Make sure your zip contains only the built `dist` output (not the whole repo), and ideally your build produces deterministic output. Cleaning will handle changing JS filenames perfectly.
-
----
-
-If you want, I can paste the **full updated deploy template** with:
-
-* the new parameters
-* the clean step inserted in the right spot
-* optional `app_offline.htm` toggle (even safer for file locks).
+Starting: Clean target folder (before copy)
+==============================================================================
+Task         : PowerShell
+Description  : Run a PowerShell script on Linux, macOS, or Windows
+Version      : 2.232.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\bdc50ebb-6d10-48e0-840d-74ae6c58ca0d.ps1'"
+At C:\agent\_work\_temp\bdc50ebb-6d10-48e0-840d-74ae6c58ca0d.ps1:11 char:14
++ $exclude += [] | ConvertFrom-Json
++              ~
+Missing type name after '['.
+    + CategoryInfo          : ParserError: (:) [], ParseException
+    + FullyQualifiedErrorId : MissingTypename
+ 
+##[error]PowerShell exited with code '1'.
+Finishing: Clean target folder (before copy)
