@@ -1,32 +1,37 @@
-    public static class ImageOptimizeHelper
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+
+public static class ImageOptimizeHelper
+{
+    public static byte[] ConvertToJpeg(byte[] inputBytes, int quality = 75)
     {
-        public static byte[] OptimizeImage(byte[] inputBytes)
+        // Load as RGBA so we can safely flatten transparency
+        using var image = Image.Load<Rgba32>(inputBytes);
+
+        // Remove metadata
+        image.Metadata.ExifProfile = null;
+
+        // Optional resize
+        const int maxWidth = 1920;
+        const int maxHeight = 1920;
+
+        if (image.Width > maxWidth || image.Height > maxHeight)
         {
-            using var image = Image.Load(inputBytes);
-
-            // Remove metadata (can reduce size)
-            image.Metadata.ExifProfile = null;
-
-            // Optional resize (only if too large)
-            const int maxWidth = 1920;
-            const int maxHeight = 1920;
-
-            if (image.Width > maxWidth || image.Height > maxHeight)
+            image.Mutate(x => x.Resize(new ResizeOptions
             {
-                image.Mutate(x => x.Resize(new ResizeOptions
-                {
-                    Mode = ResizeMode.Max,
-                    Size = new Size(maxWidth, maxHeight)
-                }));
-            }
-
-            using var output = new MemoryStream();
-
-            image.Save(output, new JpegEncoder
-            {
-                Quality = 75 // adjust 60-85 based on quality/size needs
-            });
-
-            return output.ToArray();
+                Mode = ResizeMode.Max,
+                Size = new Size(maxWidth, maxHeight)
+            }));
         }
+
+        // Flatten transparency onto a background color (IMPORTANT for PNGs)
+        image.Mutate(x => x.BackgroundColor(Color.White)); // choose White/Black/etc.
+
+        using var output = new MemoryStream();
+        image.Save(output, new JpegEncoder { Quality = quality });
+
+        return output.ToArray();
     }
+}
