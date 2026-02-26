@@ -1,235 +1,32 @@
-Here’s a reusable **Angular build job template** that matches your approach (zip + **PublishBuildArtifacts** for Azure DevOps Server on-prem). It supports optional tests and allows you to control the build output folder.
+    public static class ImageOptimizeHelper
+    {
+        public static byte[] OptimizeImage(byte[] inputBytes)
+        {
+            using var image = Image.Load(inputBytes);
 
-## 1) Angular Build Job Template
+            // Remove metadata (can reduce size)
+            image.Metadata.ExifProfile = null;
 
-Create this file in your templates repo:
+            // Optional resize (only if too large)
+            const int maxWidth = 1920;
+            const int maxHeight = 1920;
 
-**`pipelines/build-angular-job.yml`**
+            if (image.Width > maxWidth || image.Height > maxHeight)
+            {
+                image.Mutate(x => x.Resize(new ResizeOptions
+                {
+                    Mode = ResizeMode.Max,
+                    Size = new Size(maxWidth, maxHeight)
+                }));
+            }
 
-```yml
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildAngular'
+            using var output = new MemoryStream();
 
-- name: jobDisplayName
-  type: string
-  default: 'Build (Angular)'
+            image.Save(output, new JpegEncoder
+            {
+                Quality = 75 // adjust 60-85 based on quality/size needs
+            });
 
-- name: buildPool
-  type: string
-
-- name: buildAgentName
-  type: string
-
-# Where your Angular project lives relative to repo root
-- name: workingDirectory
-  type: string
-  default: '.'
-
-# Node version to use (must exist on server or be installed)
-- name: nodeVersion
-  type: string
-  default: '18.x'
-
-# npm / yarn / pnpm
-- name: packageManager
-  type: string
-  default: 'npm'
-
-# install command
-- name: installCommand
-  type: string
-  default: 'ci'   # npm ci recommended for CI
-
-# whether to run tests
-- name: runTests
-  type: boolean
-  default: false
-
-# test command (customizable)
-- name: testCommand
-  type: string
-  default: 'test -- --watch=false --browsers=ChromeHeadless'
-
-# build configuration / command
-- name: buildCommand
-  type: string
-  default: 'run build -- --configuration=production'
-
-# Angular dist folder (relative to workingDirectory)
-# Example: 'dist/my-app'
-- name: distFolder
-  type: string
-
-# Zip file name produced as artifact
-- name: zipName
-  type: string
-  default: 'AngularApp.zip'
-
-# Where to stage files before zipping
-- name: publishOutputFolder
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
-
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
-
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
-
-  steps:
-  - checkout: self
-    clean: true
-
-  # Node tool installer downloads from the internet.
-  # If your build server has no internet, either:
-  # - install Node locally on the agent and REMOVE this step, or
-  # - point to an internal mirror/proxy.
-  - task: NodeTool@0
-    displayName: 'Use Node.js ${{ parameters.nodeVersion }}'
-    inputs:
-      versionSpec: ${{ parameters.nodeVersion }}
-
-  - powershell: |
-      Write-Host "Working directory: ${{ parameters.workingDirectory }}"
-      if (-not (Test-Path "${{ parameters.workingDirectory }}")) {
-        throw "Working directory not found: ${{ parameters.workingDirectory }}"
-      }
-    displayName: 'Validate working directory'
-
-  # Install dependencies
-  - ${{ if eq(parameters.packageManager, 'npm') }}:
-    - script: |
-        npm ${{ parameters.installCommand }}
-      workingDirectory: ${{ parameters.workingDirectory }}
-      displayName: 'Install dependencies (npm)'
-
-  - ${{ if eq(parameters.packageManager, 'yarn') }}:
-    - script: |
-        yarn install --frozen-lockfile
-      workingDirectory: ${{ parameters.workingDirectory }}
-      displayName: 'Install dependencies (yarn)'
-
-  - ${{ if eq(parameters.packageManager, 'pnpm') }}:
-    - script: |
-        pnpm install --frozen-lockfile
-      workingDirectory: ${{ parameters.workingDirectory }}
-      displayName: 'Install dependencies (pnpm)'
-
-  # Optional tests
-  - script: |
-      npm ${{ parameters.testCommand }}
-    workingDirectory: ${{ parameters.workingDirectory }}
-    displayName: 'Run tests'
-    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-    # If you use yarn/pnpm tests, switch this command accordingly.
-
-  # Build
-  - script: |
-      npm ${{ parameters.buildCommand }}
-    workingDirectory: ${{ parameters.workingDirectory }}
-    displayName: 'Build Angular'
-    # If you use yarn/pnpm, switch the command accordingly.
-
-  # Copy dist output to staging folder (clean staging first)
-  - task: CopyFiles@2
-    displayName: 'Copy dist to staging folder'
-    inputs:
-      SourceFolder: '${{ parameters.workingDirectory }}\${{ parameters.distFolder }}'
-      Contents: '**'
-      TargetFolder: '${{ parameters.publishOutputFolder }}'
-      OverWrite: true
-
-  # Zip staged files (no nested dist folder in zip)
-  - task: ArchiveFiles@2
-    displayName: 'Zip dist output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
-
-  # Publish artifact (on-prem compatible)
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: 'drop'
-      publishLocation: 'Container'
-```
-
-### Important note about internet
-
-`NodeTool@0` downloads Node from the internet. If your build agent has **no internet**, do one of these:
-
-* **Install Node.js manually** on the build server and **remove** the `NodeTool@0` step
-* Or use an internal mirror/proxy
-
-For many on-prem setups, manual Node install is simplest.
-
----
-
-## 2) How to use this template in an Angular project pipeline
-
-Example `azure-pipelines.yml` in your Angular repo:
-
-```yml
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/master   # or main
-
-trigger:
-  branches:
-    include:
-    - sit
-    - uat
-    - master
-
-stages:
-- stage: Build
-  displayName: 'Build Angular & Publish Artifact'
-  jobs:
-  - template: pipelines/build-angular-job.yml@templates
-    parameters:
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      workingDirectory: '.'              # folder containing package.json
-      nodeVersion: '18.x'
-      packageManager: 'npm'
-      installCommand: 'ci'
-      runTests: false
-      buildCommand: 'run build -- --configuration=production'
-      distFolder: 'dist/my-angular-app'  # <-- change to your real dist output
-      zipName: 'MyAngularApp.zip'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish'
-```
-
-Then deploy with your **same IIS deploy template**, but make sure your deploy template:
-
-* cleans target folder (important for hashed JS names)
-* (optionally) keeps `web.config` if you use one for SPA routing
-
----
-
-## 3) SPA routing reminder (Angular on IIS)
-
-Angular apps usually need a `web.config` rewrite rule for deep links (`/users/1`).
-If you include `web.config` in your zip, your deploy clean step should **exclude** it OR redeploy it every time.
-
----
-
-If you tell me:
-
-* your Angular `dist` folder name (it differs by project)
-* whether you use **npm** or **yarn**
-* whether the build server has internet (NodeTool or manual Node)
-
-…I’ll tailor the template to your exact environment (including removing NodeTool if needed).
+            return output.ToArray();
+        }
+    }
