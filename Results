@@ -1,66 +1,162 @@
-Yes — you *can* include a `dotnet test` step in the build template, but you should make it **optional**, otherwise projects with no test projects may fail (or at least waste time).
-
-## Best practice: make tests configurable via template parameters
-
-### 1) Add parameters to the build template
-
-```yml
 parameters:
-- name: runTests
-  type: boolean
-  default: false
-
-- name: testProjects
+- name: deploymentName
   type: string
-  default: '**/*Tests/*.csproj'   # adjust to your naming
-```
+  default: 'DeployJob'
 
-### 2) Add the test step with a condition
+- name: deploymentDisplayName
+  type: string
+  default: 'Deploy IIS'
 
-Put this after Build (and before Publish):
+- name: environmentName
+  type: string
 
-```yml
-- task: DotNetCoreCLI@2
-  displayName: 'Test'
-  condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-  inputs:
-    command: 'test'
-    projects: ${{ parameters.testProjects }}
-    arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
-    publishTestResults: true
-```
+- name: deployPool
+  type: string
 
-✅ If `runTests: false`, the step is skipped.
-✅ If a project has tests, you set `runTests: true` and optionally specify the test project pattern.
+- name: deployAgentName
+  type: string
 
----
+- name: variableGroup
+  type: string
 
-## How to use it per project
+- name: zipName
+  type: string
 
-### Project without tests
+- name: siteName
+  type: string
 
-Don’t pass anything (default `false`):
+- name: appPoolName
+  type: string
 
-```yml
-- template: pipelines/build-dotnet-webapi-job.yml@templates
-  parameters:
-    publishProject: '...'
-```
+- name: iisTargetPath
+  type: string
 
-### Project with tests
+- name: appSettingsFilePattern
+  type: string
+  default: '**/appsettings.json'
 
-```yml
-- template: pipelines/build-dotnet-webapi-job.yml@templates
-  parameters:
-    publishProject: '...'
-    runTests: true
-    testProjects: '**/*.Tests.csproj'
-```
+jobs:
+- deployment: ${{ parameters.deploymentName }}
+  displayName: ${{ parameters.deploymentDisplayName }}
 
----
+  environment: ${{ parameters.environmentName }}
 
-## Alternative (auto-detect tests)
+  pool:
+    name: ${{ parameters.deployPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
 
-You *can* try to detect test projects automatically, but in YAML templates it becomes messy. The parameter approach stays clean and predictable.
+  variables:
+  - group: ${{ parameters.variableGroup }}
 
-If you want, paste your current build template and I’ll integrate `runTests` + `testProjects` cleanly with your publish/zip/artifact steps.
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - task: DownloadBuildArtifacts@0
+          displayName: 'Download Build Artifact'
+          inputs:
+            buildType: 'current'
+            downloadType: 'single'
+            artifactName: 'drop'
+            downloadPath: '$(Pipeline.Workspace)'
+
+        - task: ExtractFiles@1
+          displayName: 'Extract artifact'
+          inputs:
+            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
+            destinationFolder: '$(Pipeline.Workspace)\extracted'
+            cleanDestinationFolder: true
+
+        - task: FileTransform@1
+          displayName: 'JSON substitution (appsettings.json)'
+          inputs:
+            folderPath: '$(Pipeline.Workspace)\extracted'
+            fileType: 'json'
+            targetFiles: ${{ parameters.appSettingsFilePattern }}
+
+        # Stop website + app pool safely (idempotent)
+        - powershell: |
+            Import-Module WebAdministration
+
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
+
+            $site = Get-Website -Name $siteName
+            Write-Host "Website current state: $($site.State)"
+            if ($site.State -ne "Stopped") {
+              Write-Host "Stopping website: $siteName"
+              Stop-Website -Name $siteName
+            } else {
+              Write-Host "Website already stopped."
+            }
+
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            Write-Host "AppPool current state: $poolState"
+            if ($poolState -ne "Stopped") {
+              Write-Host "Stopping app pool: $appPool"
+              Stop-WebAppPool -Name $appPool
+            } else {
+              Write-Host "AppPool already stopped."
+            }
+
+            $maxTries = 30
+            for ($i = 1; $i -le $maxTries; $i++) {
+              $siteState = (Get-Website -Name $siteName).State
+              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+
+              Write-Host "Website state: $siteState | AppPool state: $poolState"
+
+              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
+                Write-Host "Website and App Pool are stopped."
+                break
+              }
+
+              Start-Sleep -Seconds 2
+            }
+
+            $finalSiteState = (Get-Website -Name $siteName).State
+            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
+
+            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
+              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
+            }
+
+            Start-Sleep -Seconds 2
+          displayName: 'Stop Website + App Pool'
+
+        - task: CopyFiles@2
+          displayName: 'Copy files'
+          inputs:
+            SourceFolder: '$(Pipeline.Workspace)\extracted'
+            Contents: '**'
+            TargetFolder: '${{ parameters.iisTargetPath }}'
+            OverWrite: true
+
+        # Start website + app pool safely (idempotent)
+        - powershell: |
+            Import-Module WebAdministration
+
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
+
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            if ($poolState -ne "Started") {
+              Write-Host "Starting app pool: $appPool"
+              Start-WebAppPool -Name $appPool
+            } else {
+              Write-Host "AppPool already started."
+            }
+
+            $siteState = (Get-Website -Name $siteName).State
+            if ($siteState -ne "Started") {
+              Write-Host "Starting website: $siteName"
+              Start-Website -Name $siteName
+            } else {
+              Write-Host "Website already started."
+            }
+
+            $siteState = (Get-Website -Name $siteName).State
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            Write-Host "Website state: $siteState | AppPool state: $poolState"
+          displayName: 'Start Website + App Pool'
