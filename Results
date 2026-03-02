@@ -1,228 +1,136 @@
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
+You want to check **what proxy .NET/NuGet is actually using in the *same context as the agent*** (the Windows service account running the Azure DevOps agent). That’s the key.
 
-trigger:
-  branches:
-    include:
-    - sit
-    - uat
-    - master
+Below are the practical ways to do it.
 
-stages:
-# =========================
-# BUILD
-# =========================
-- stage: Build
-  displayName: 'Build Angular & Publish Artifact'
-  jobs:
-  - template: pipelines/build-angular-webapp.yml@templates
-    parameters:
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      workingDirectory: '.'              # folder containing package.json
-      nodeVersion: '22.x'
-      installCommand: 'i'
-      runTests: false
-      buildCommand: 'npx ng build'
-      distFolder: 'dist/Alterna-Telecom-Frontend/browser'
-      zipName: 'Alterna-Telecom-Frontend.zip'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish'
+---
 
-# =========================
-# DEPLOY SIT
-# =========================
-- stage: Deploy_SIT
-  displayName: 'Deploy to SIT'
-  dependsOn: Build
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
-  jobs:
-  - template: pipelines/deploy-iis.yml@templates
-    parameters:
-      deploymentName: 'DeploySIT'
-      deploymentDisplayName: 'Deploy SIT (IIS)'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-FN1'
-      variableGroup: 'SIT_FRONT_END_VARIABLE_GROUP'
-      zipName: 'Alterna-Telecom-Frontend.zip'
-      siteName: 'AlternaTelecomAzureDevOps'
-      appPoolName: 'AlternaTelecomAzureDevOps'
-      iisTargetPath: 'C:\inetpub\wwwroot\AlternaTelecomAzureDevOps'
-      appSettingsFilePattern: '**/appsettings.json'
-      cleanTargetBeforeCopy: true
-      cleanExcludeCsv: ''
+## 1) Print proxy-related environment variables (agent context)
 
-# # =========================
-# # DEPLOY UAT
-# # =========================
-# - stage: Deploy_UAT
-#   displayName: 'Deploy to UAT'
-#   dependsOn: Build
-#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/uat'))
-#   jobs:
-#   - template: pipelines/deploy-iis-job.yml@templates
-#     parameters:
-#       deploymentName: 'DeployUAT'
-#       deploymentDisplayName: 'Deploy UAT (IIS)'
-#       environmentName: 'UAT'         # approvals come from Environment checks
-#       deployPool: 'Build Pool'       # or IIS-UAT if you create a dedicated pool
-#       deployAgentName: 'UAT-ALTERNA-DK1'
-#       variableGroup: 'UAT_VARIABLE_GROUP'
-#       zipName: 'Alterna-DataExport.zip'
-#       siteName: 'AlternaDataExportServiceAzureDevOps'
-#       appPoolName: 'AlternaDataExportServiceAzureDevOps'
-#       iisTargetPath: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-DK1'
+Add a temporary step in your pipeline **before** `dotnet restore/build`:
 
-# # =========================
-# # DEPLOY PROD
-# # =========================
-# - stage: Deploy_PROD
-#   displayName: 'Deploy to PROD'
-#   dependsOn: Build
-#   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
-#   jobs:
-#   - template: pipelines/deploy-iis-job.yml@templates
-#     parameters:
-#       deploymentName: 'DeployPROD'
-#       deploymentDisplayName: 'Deploy PROD (IIS)'
-#       environmentName: 'PROD'        # approvals come from Environment checks
-#       deployPool: 'Build Pool'       # or IIS-PROD (recommended later)
-#       deployAgentName: 'PROD-ALTERNA-XX1'   # <-- replace with actual PROD agent
-#       variableGroup: 'PRD_VARIABLE_GROUP'
-#       zipName: 'Alterna-DataExport.zip'
-#       siteName: 'AlternaDataExportServiceAzureDevOps'
-#       appPoolName: 'AlternaDataExportServiceAzureDevOps'
-#       iisTargetPath: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-PROD'
+```yaml
+- powershell: |
+    Write-Host "User running this step:"
+    whoami
 
+    Write-Host "`nProxy env vars:"
+    Get-ChildItem Env: | Where-Object { $_.Name -match 'proxy|https|http|no_proxy' } | Sort-Object Name | Format-Table -AutoSize
+  displayName: "Show proxy env vars"
+```
 
-Build-angular-webapp.yml:
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildAngular'
+If `HTTP_PROXY` / `HTTPS_PROXY` are set here, dotnet (and many tools) may use them.
 
-- name: jobDisplayName
-  type: string
-  default: 'Build (Angular)'
+---
 
-- name: buildPool
-  type: string
+## 2) Check WinHTTP proxy (many services + some tooling rely on this)
 
-- name: buildAgentName
-  type: string
+Still inside the pipeline:
 
-# Where your Angular project lives relative to repo root
-- name: workingDirectory
-  type: string
-  default: '.'
+```yaml
+- powershell: |
+    Write-Host "WinHTTP proxy:"
+    netsh winhttp show proxy
+  displayName: "Show WinHTTP proxy"
+```
 
-# Node version to use (must exist on server or be installed)
-- name: nodeVersion
-  type: string
-  default: '22.x'
+If this says **Direct access (no proxy server)** while your network requires a proxy, that’s a red flag.
 
-# install command
-- name: installCommand
-  type: string
-  default: 'i'   # npm install
+> WinHTTP proxy is **machine-wide**, often used by services.
 
-# whether to run tests
-- name: runTests
-  type: boolean
-  default: false
+---
 
-# test command (customizable)
-- name: testCommand
-  type: string
-  default: 'test -- --watch=false --browsers=ChromeHeadless'
+## 3) Check the Windows “Internet Options” proxy (WinINET) for the agent user
 
-# build configuration / command
-- name: buildCommand
-  type: string
-  default: 'npx ng build'
+This is the proxy you see in **Internet Options / LAN settings** and it’s **per-user**.
 
-# Angular dist folder (relative to workingDirectory)
-# Example: 'dist/my-app'
-- name: distFolder
-  type: string
+From the pipeline:
 
-# Zip file name produced as artifact
-- name: zipName
-  type: string
-  default: 'AngularApp.zip'
+```yaml
+- powershell: |
+    Write-Host "WinINET proxy (current user hive):"
+    $p = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -ErrorAction SilentlyContinue
+    $p | Select-Object ProxyEnable, ProxyServer, AutoConfigURL | Format-List
+  displayName: "Show WinINET proxy (HKCU)"
+```
 
-# Where to stage files before zipping
-- name: publishOutputFolder
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
+⚠️ Important: This only works if HKCU is loaded for that user (it is, because the step is running as the agent user).
 
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
+---
 
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
+## 4) Check NuGet-specific proxy / settings used by dotnet
 
-  steps:
-  - checkout: self
-    clean: true
+NuGet can have its own proxy config in `NuGet.Config` files.
 
-  - powershell: |
-      Write-Host "Working directory: ${{ parameters.workingDirectory }}"
-      if (-not (Test-Path "${{ parameters.workingDirectory }}")) {
-        throw "Working directory not found: ${{ parameters.workingDirectory }}"
-      }
-    displayName: 'Validate working directory'
+### a) List NuGet sources (and see which config files are being read)
 
-  # Install dependencies
-  - script: |
-      npm ${{ parameters.installCommand }}
-    workingDirectory: ${{ parameters.workingDirectory }}
-    displayName: 'Install dependencies (npm)'
+```yaml
+- powershell: |
+    dotnet nuget list source
+  displayName: "dotnet nuget list source"
+```
 
-  # Optional tests
-  - script: |
-      npm ${{ parameters.testCommand }}
-    workingDirectory: ${{ parameters.workingDirectory }}
-    displayName: 'Run tests'
-    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-    # If you use yarn/pnpm tests, switch this command accordingly.
+### b) Where are NuGet.Config files located (common paths)?
 
-  # Build
-  - script: |
-      npm ${{ parameters.buildCommand }}
-    workingDirectory: ${{ parameters.workingDirectory }}
-    displayName: 'Build Angular'
+NuGet reads config from multiple places, typically:
 
-  # Copy dist output to staging folder (clean staging first)
-  - task: CopyFiles@2
-    displayName: 'Copy dist to staging folder'
-    inputs:
-      SourceFolder: '${{ parameters.workingDirectory }}\${{ parameters.distFolder }}'
-      Contents: '**'
-      TargetFolder: '${{ parameters.publishOutputFolder }}'
-      OverWrite: true
+* repo: `.\NuGet.Config`
+* user: `%AppData%\NuGet\NuGet.Config`
+* machine: `%ProgramFiles(x86)%\NuGet\Config\*.config`
 
-  # Zip staged files (no nested dist folder in zip)
-  - task: ArchiveFiles@2
-    displayName: 'Zip dist output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
+So dump them:
 
-  # Publish artifact (on-prem compatible)
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: 'drop'
-      publishLocation: 'Container'
+```yaml
+- powershell: |
+    Write-Host "Repo NuGet.Config (if exists):"
+    if (Test-Path "$(Build.SourcesDirectory)\NuGet.Config") { Get-Content "$(Build.SourcesDirectory)\NuGet.Config" }
+
+    Write-Host "`nUser NuGet.Config:"
+    $userCfg = Join-Path $env:APPDATA "NuGet\NuGet.Config"
+    if (Test-Path $userCfg) { Get-Content $userCfg } else { Write-Host "No user NuGet.Config at $userCfg" }
+
+    Write-Host "`nMachine NuGet config folder:"
+    $machineDir = "${env:ProgramFiles(x86)}\NuGet\Config"
+    if (Test-Path $machineDir) { Get-ChildItem $machineDir | Select FullName }
+  displayName: "Show NuGet.Config files"
+```
+
+Then look inside those configs for:
+
+* `<add key="http_proxy" ... />`
+* `<add key="https_proxy" ... />`
+* `<config>` proxy keys
+* custom internal feeds (Artifactory/Nexus/Azure Artifacts), which might avoid internet entirely
+
+---
+
+## 5) Confirm what account is running the agent service (outside pipeline)
+
+On the server:
+
+* `services.msc` → your agent service → **Log On** tab
+* Or command:
+
+```bat
+sc qc vstsagent*
+```
+
+(Your service name may differ, but it shows the **SERVICE_START_NAME**.)
+
+---
+
+## What to expect / how to interpret
+
+* If **WinHTTP = Direct** but the network requires a proxy, `npm` often dies fast.
+* `dotnet build` may still “work” because:
+
+  * packages are cached, or
+  * it uses an internal NuGet feed (no internet), or
+  * NuGet is using a different proxy source than npm.
+
+If you paste the output of:
+
+* `netsh winhttp show proxy`
+* the `HKCU Internet Settings` (ProxyEnable/ProxyServer/AutoConfigURL)
+* `dotnet nuget list source`
+
+…I can tell you which path dotnet is taking and why npm is failing in that same agent context.
