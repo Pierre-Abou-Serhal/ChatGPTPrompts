@@ -1,4 +1,128 @@
-npm config set proxy http://PROXY_HOST:PROXY_PORT
+Why do i need installCommand in the build process ?
 
-IF PASS REQUIRED
-npm config set proxy http://USERNAME:PASSWORD@PROXY_HOST:PROXY_PORT
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildAngular'
+
+- name: jobDisplayName
+  type: string
+  default: 'Build (Angular)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+# Where your Angular project lives relative to repo root
+- name: workingDirectory
+  type: string
+  default: '.'
+
+# Node version to use (must exist on server or be installed)
+- name: nodeVersion
+  type: string
+  default: '22.x'
+
+# install command
+- name: installCommand
+  type: string
+  default: 'i'   # npm install
+
+# whether to run tests
+- name: runTests
+  type: boolean
+  default: false
+
+# test command (customizable)
+- name: testCommand
+  type: string
+  default: 'test -- --watch=false --browsers=ChromeHeadless'
+
+# build configuration / command
+- name: buildCommand
+  type: string
+  default: 'npx ng build'
+
+# Angular dist folder (relative to workingDirectory)
+# Example: 'dist/my-app'
+- name: distFolder
+  type: string
+
+# Zip file name produced as artifact
+- name: zipName
+  type: string
+  default: 'AngularApp.zip'
+
+# Where to stage files before zipping
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - powershell: |
+      Write-Host "Working directory: ${{ parameters.workingDirectory }}"
+      if (-not (Test-Path "${{ parameters.workingDirectory }}")) {
+        throw "Working directory not found: ${{ parameters.workingDirectory }}"
+      }
+    displayName: 'Validate working directory'
+
+  # Install dependencies
+  - script: |
+      npm ${{ parameters.installCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Install dependencies (npm)'
+
+  # Optional tests
+  - script: |
+      npm ${{ parameters.testCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Run tests'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    # If you use yarn/pnpm tests, switch this command accordingly.
+
+  # Build
+  - script: |
+      ${{ parameters.buildCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Build Angular'
+
+  # Copy dist output to staging folder (clean staging first)
+  - task: CopyFiles@2
+    displayName: 'Copy dist to staging folder'
+    inputs:
+      SourceFolder: '${{ parameters.workingDirectory }}\${{ parameters.distFolder }}'
+      Contents: '**'
+      TargetFolder: '${{ parameters.publishOutputFolder }}'
+      OverWrite: true
+
+  # Zip staged files (no nested dist folder in zip)
+  - task: ArchiveFiles@2
+    displayName: 'Zip dist output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  # Publish artifact (on-prem compatible)
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
