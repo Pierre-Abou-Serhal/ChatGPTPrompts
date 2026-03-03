@@ -1,147 +1,40 @@
-You “need” an **install step** in an Angular build because the build depends on packages that are **not in your repo** (they live in `node_modules`).
-
-### Why `installCommand` exists in your template
-
-It’s there so the same YAML can work in different setups:
-
-* `npm ci` (recommended in CI): clean + reproducible installs from `package-lock.json`
-* `npm i` / `npm install`: looser install, can update lockfile
-* `npm i --legacy-peer-deps` or other flags for tricky dependency trees
-* switching to `yarn install` / `pnpm i` in other projects without rewriting the template
-
-So `installCommand` is simply making the template reusable/configurable.
-
----
-
-## Why your build fails when you comment the install step
-
-Your build command is:
-
-```yaml
-buildCommand: 'npx ng build'
-```
-
-When you **don’t run `npm install/ci`**, there is **no local Angular CLI** at:
-
-* `node_modules/.bin/ng`
-
-So `npx` falls back to: **“Ok, I’ll download something to run”**.
-
-That’s why your log shows:
-
-* `npm exec ng build`
-* tries to fetch `https://registry.npmjs.org/ng`
-* then fails with DNS/network/proxy errors (`EAI_AGAIN`, `ENOTFOUND`)
-
-So the “build” is failing because it’s trying to reach npm registry at build time (since nothing is installed locally).
-
-**Bottom line:** removing the install step forces `npx` to hit the internet to download tools → and in your agent context it can’t.
-
----
-
-## What is the cause of the error (`ENOTFOUND registry.npmjs.org`)?
-
-`ENOTFOUND` means the agent process **cannot resolve** `registry.npmjs.org` (DNS) *or* it’s being blocked/intercepted by proxy settings.
-
-The key clue is this line in your log:
-
-```
-... C:\Windows\system32\config\systemprofile\.npmrc
-```
-
-Because the Azure DevOps agent runs as **Local System**, npm uses **Local System’s profile** (`systemprofile`) and its networking context.
-
-### Common real-world causes in this exact situation
-
-1. **Proxy settings are configured for your user, not for Local System**
-
-   * `npm get proxy` in your CMD (your user) can show a proxy
-   * but the pipeline runs under Local System, which may have **different npm config / env vars**
-
-2. **Corporate proxy requires authentication (NTLM/Kerberos)**
-
-   * your interactive user can authenticate
-   * **Local System often cannot authenticate** to that proxy → name resolution / outbound calls fail
-
-3. **Agent service has different environment variables**
-
-   * Node/npm mainly use:
-
-     * `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`
-     * or `.npmrc` (`proxy=`, `https-proxy=`, `registry=`)
-   * If those aren’t set for the agent service account, npm won’t route correctly.
-
----
-
-## What to do (practical fixes)
-
-### 1) Put the install step back (and prefer `npm ci`)
-
-Set:
-
-* `installCommand: 'ci'`
-
-So CI is deterministic and uses your lockfile.
-
-### 2) Make proxy/registry work for the **agent account**
-
-Add a diagnostic step (very useful):
-
-```yaml
-- script: |
-    whoami
-    npm config list -l
-    node -p "process.env.HTTP_PROXY"
-    node -p "process.env.HTTPS_PROXY"
-    nslookup registry.npmjs.org
-    npm ping --registry=https://registry.npmjs.org/
-  displayName: 'Diagnose npm network'
-```
-
-This will show you what **Local System** actually sees.
-
-### 3) Configure npm for Local System (systemprofile)
-
-Because your log shows it reads:
-
-`C:\Windows\system32\config\systemprofile\.npmrc`
-
-You can set proxy/registry there (or via pipeline variables), e.g. in a step:
-
-```yaml
-- powershell: |
-    npm config set proxy http://YOUR_PROXY:PORT
-    npm config set https-proxy http://YOUR_PROXY:PORT
-    npm config set registry https://registry.npmjs.org/
-  displayName: 'Configure npm proxy for agent'
-```
-
-If proxy needs credentials, use secret variables (don’t hardcode).
-
-### 4) Best practice: run the agent service under a real domain/service user
-
-If your proxy requires auth, the cleanest solution is usually:
-
-* run the Azure DevOps agent service as a dedicated domain account that can authenticate to the proxy.
-
----
-
-## Small improvement to avoid “npx downloads stuff”
-
-Instead of `npx ng build`, use:
-
-* `npm run build`
-
-And in `package.json`:
-
-```json
-"scripts": {
-  "build": "ng build"
-}
-```
-
-This ensures it uses the **locally installed** CLI from `node_modules` (but still requires install).
-
----
-
-If you paste the output of the diagnostic step (`npm config list -l` + `nslookup` + `npm ping`) from inside the pipeline, I can tell you exactly whether it’s DNS vs proxy auth vs missing config in Local System.
+omit-lockfile-registry-resolved = false
+only = null
+optional = null
+os = null
+otp = null
+pack-destination = "."
+package = []
+package-lock = true
+package-lock-only = false
+parseable = false
+prefer-dedupe = false
+prefer-offline = false
+prefer-online = false
+prefix = "C:\\NodeJS"
+preid = ""
+production = null
+progress = false
+provenance = false
+provenance-file = null
+proxy = null
+read-only = false
+rebuild-bundle = true
+registry = "https://registry.npmjs.org/"
+replace-registry-host = "npmjs"
+save = true
+save-bundle = false
+save-dev = false
+save-exact = false
+save-optional = false
+save-peer = false
+save-prefix = "^"
+save-prod = false
+sbom-format = null
+sbom-type = "library"
+scope = ""
+script-shell = null
+searchexclude = ""
+searchlimit = 20
+searchopts = ""
+searchstaleness = 900
