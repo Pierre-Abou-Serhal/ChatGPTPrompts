@@ -1,5 +1,4 @@
-npm config set proxy http://PROXY_HOST:
-
+npm config set proxy http://PROXY_HOST:PROXY_PORT
 
 IF PASS REQUIRED
 npm config set proxy http://USERNAME:PASSWORD@PROXY_HOST:PROXY_PORT
