@@ -1,1 +1,39 @@
-       C:\Program Files\dotnet\sdk\8.0.101\NuGet.targets(156,5): error :   Response status code does not indicate success: 403 (Forbidden - User 'Build\b4613701-53af-4066-924b-8d7deeac38d3' lacks permission to complete this action. You need to have 'ReadPackages'. (DevOps Activity ID: 526A6AF1-22C6-4F64-BA56-2573FB67C31A)). [C:\agent\_work\3\s\Alterna-Telecom-Backend\Alterna-Telecom-Backend.csproj]
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+    <appSettings>
+
+        <!--Global Config-->
+        <add key="API_TOKEN_CHECK" value="true"/>
+        <add key="API_TOKENS_XML_PATH"
+             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\ApiTokens.xml"/>
+        <add key="API_STRATEGIES_XML_PATH"
+             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\ApiStrategies.xml"/>
+        <add key="RESPONSE_CODES"
+             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\ResponseCodes.xml"/>
+        <add key="DATABASE_CONNECTIONS"
+             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\Connections.xml"/>
+        <add key="LDAP_CONN" value="hidden"/>
+
+		<!--Get Customer Config-->
+		<add key="CONN_STRING_User" value="hidden" />
+		<add key="CONN_STRING_T24" value="hidden" />
+		<add key="RANGE_LIMIT" value="1000"/>
+		
+		<!--Get Company Config-->
+		<add key="CONN_STRING_Company" value="hidden" />
+		<add key="GET_ALL_COMPANIES_SP" value="usp_GetAllCompanies"/>
+		
+		<!--LdapConfig-->
+		<add key="BREF_CONN" value="hidden" />
+
+        <!--Logger Config...-->
+        <add key="LoggingApi" value="http://10.0.40.41:8043/api/Logger/LogData"/>
+        <add key="Is_DB_Log" value="true"/>
+        <add key="Is_DB_Log_Info" value="true"/>
+        <add key="NLog_Location" value="C:\logs\Data_Gateway_Service_BN.txt"/>
+        <add key="NLog_MaxArchiveDays" value="90"/>
+        <add key="NLog_LogLevel" value="info"/>
+        <add key="Caller_App" value="Data_Gateway_Service_BN"/>
+
+    </appSettings>
+</configuration>
