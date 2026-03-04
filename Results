@@ -1,14 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <clear />
-    <add key="azure-devops-dev-nuget-offline-packages"
-         value="http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json"
-         allowInsecureConnections="true" />
-    <add key="nuget.org"
-         value="https://api.nuget.org/v3/index.json" />
-  </packageSources>
-  <config>
-    <add key="http_proxy" value="http://10.0.30.222:3128" />
-  </config>
-</configuration>
+- powershell: |
+    whoami
+    [Net.ServicePointManager]::SecurityProtocol
+    curl -I https://api.nuget.org/v3/index.json
+    curl -I http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json
+  env:
+    HTTP_PROXY: http://10.0.30.222:3128
+    HTTPS_PROXY: http://10.0.30.222:3128
