@@ -1,133 +1,113 @@
-Below is the same **dictionary-style env injection** template update, but **without `strictXmlSubstitution`** (it will just replace keys that have a provided variable and skip the rest silently).
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
 
-### What you’ll have
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET)'
 
-* `xmlConfigFiles`: list of files/patterns to edit (e.g. `**/App.config`, `**/API.dll.config`)
-* `xmlVariableValues`: dictionary `{ KEY: $(KEY) }`
-* PowerShell edits only `<configuration><appSettings><add key="...">` nodes
+- name: buildPool
+  type: string
 
----
+- name: buildAgentName
+  type: string
 
-## Template snippet (replace your XML substitution part)
+- name: buildConfiguration
+  type: string
+  default: 'Release'
 
-### Parameters (add `xmlVariableValues`)
+- name: restoreProjects
+  type: string
+  default: '**/*.csproj'
 
-```yaml
-- name: enableXmlConfigTransform
+- name: runTests
   type: boolean
   default: false
 
-- name: xmlConfigFiles
-  type: object
-  default: []
+- name: testProjects
+  type: string
+  default: '**/*Tests/*.csproj'
 
-- name: xmlVariableValues
-  type: object
-  default: {}
-```
+- name: publishProject
+  type: string
 
-### Step: Reliable XML appSettings substitution (PowerShell)
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
 
-Replace the `FileTransform` XML step with:
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
 
-```yaml
-- powershell: |
-    $ErrorActionPreference = "Stop"
-    $root = "$(Pipeline.Workspace)\extracted"
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+  
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
 
-    $patternsJson = @'
-    ${{ convertToJson(parameters.xmlConfigFiles) }}
-    '@
-    $patterns = $patternsJson | ConvertFrom-Json
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
 
-    if (-not $patterns -or $patterns.Count -eq 0) {
-      Write-Host "No xmlConfigFiles patterns provided. Skipping."
-      exit 0
-    }
+  steps:
+  - checkout: self
+    clean: true
 
-    function Resolve-Files([string]$base, [string]$pattern) {
-      $pattern = $pattern -replace '\\','/'
+  # Restore using nuget.config
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      projects: ${{ parameters.restoreProjects }}
+      feedsToUse: 'config'
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}
 
-      if ($pattern.StartsWith("**/")) {
-        $name = $pattern.Substring(3)
-        return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-      }
+  # Building project: dotnet build
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: ${{ parameters.restoreProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
 
-      if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-        $p = Join-Path $base ($pattern -replace '/','\')
-        return Get-Item $p -ErrorAction SilentlyContinue
-      }
+  # Running tests if available: dotnet test
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    inputs:
+      command: 'test'
+      projects: ${{ parameters.testProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
+      publishTestResults: true
 
-      return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-    }
+  # Publish the API project
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish'
+    inputs:
+      command: 'publish'
+      projects: ${{ parameters.publishProject }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --output "${{ parameters.publishOutputFolder }}" --no-restore'
+      zipAfterPublish: false
+      modifyOutputPath: false
 
-    # collect unique files
-    $files = @()
-    foreach ($pat in $patterns) {
-      $files += Resolve-Files $root ([string]$pat)
-    }
-    $files = $files | Where-Object { $_ } | Select-Object -Unique
+  # Zipping published files
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
 
-    if (-not $files -or $files.Count -eq 0) {
-      throw "No config files matched xmlConfigFiles patterns under: $root"
-    }
-
-    foreach ($f in $files) {
-      Write-Host "Editing: $($f.FullName)"
-      [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-      $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
-      if (-not $nodes -or $nodes.Count -eq 0) {
-        Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
-        continue
-      }
-
-      $changed = 0
-
-      foreach ($n in $nodes) {
-        $key = [string]$n.GetAttribute("key")
-        $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
-
-        # no variable provided => skip
-        if ([string]::IsNullOrWhiteSpace($val)) { continue }
-
-        $current = [string]$n.GetAttribute("value")
-        if ($current -ne $val) {
-          $n.SetAttribute("value", $val)
-          $changed++
-        }
-      }
-
-      $xml.Save($f.FullName)
-      Write-Host "Updated $changed setting(s) in $($f.Name)"
-    }
-  displayName: 'Reliable XML appSettings substitution (.config)'
-  condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-  env:
-    ${{ each pair in parameters.xmlVariableValues }}:
-      ${{ pair.key }}: ${{ pair.value }}
-```
-
----
-
-## How to call it from your pipeline
-
-Example:
-
-```yaml
-enableXmlConfigTransform: true
-xmlConfigFiles:
-  - '**/App.config'
-  - '**/API.dll.config'
-
-xmlVariableValues:
-  API_TOKEN_CHECK: $(API_TOKEN_CHECK)
-  CONN_STRING_User: $(CONN_STRING_User)
-  NLog_MaxArchiveDays: $(NLog_MaxArchiveDays)
-```
-
-Add more keys as needed.
-
----
-
-If you want, I can also tweak `Resolve-Files` to support patterns like `**/*.dll.config` (wildcards), not only exact filenames.
+  # Uploading zipped files to Azure
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
