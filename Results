@@ -4,7 +4,146 @@ parameters:
   default: 'BuildJob'
 
 - name: jobDisplayName
+  type: stringparameters:
+- name: jobName
   type: string
+  default: 'BuildJob'
+
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET Framework)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+# Important for .NET Framework builds: agent must have VS installed.
+# Examples: 'latest', '17.0', '16.0'
+- name: vsVersion
+  type: string
+  default: 'latest'
+
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+# Prefer restoring/building a solution for .NET Framework
+- name: solution
+  type: string
+  default: '**/*.sln'
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: runTests
+  type: boolean
+  default: false
+
+# Test assemblies pattern used by VSTest
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
+
+# For Web API packaging:
+# If you have a web project, VSBuild can produce a Web Deploy package (.zip)
+# This is usually the easiest "publish-like" artifact for .NET Framework web apps.
+- name: createWebDeployPackage
+  type: boolean
+  default: true
+
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\package'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  # Install NuGet (helps on some self-hosted agents)
+  - task: NuGetToolInstaller@1
+    displayName: 'Use NuGet'
+
+  # Restore (classic .NET Framework)
+  - task: NuGetCommand@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      restoreSolution: '${{ parameters.solution }}'
+      feedsToUse: 'config'
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+
+  # Build (MSBuild / Visual Studio)
+  - task: VSBuild@1
+    displayName: 'Build'
+    inputs:
+      solution: '${{ parameters.solution }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArgs: >
+        /p:DeployOnBuild=${{ parameters.createWebDeployPackage }}
+        /p:WebPublishMethod=Package
+        /p:PackageAsSingleFile=true
+        /p:SkipInvalidConfigurations=true
+        /p:PackageLocation="${{ parameters.packageLocation }}"
+        /p:AutoParameterizationWebConfigConnectionStrings=false
+
+  # Tests (VSTest)
+  - task: VSTest@2
+    displayName: 'Test'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    inputs:
+      testSelector: 'testAssemblies'
+      testAssemblyVer2: '${{ parameters.testAssemblies }}'
+      searchFolder: '$(System.DefaultWorkingDirectory)'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      diagnosticsEnabled: true
+
+  # If you created a web deploy package, it’s already a zip in packageLocation.
+  # But teams often want a stable zip name, so we re-archive the package folder.
+  - task: ArchiveFiles@2
+    displayName: 'Zip build output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
   default: 'Build (.NET)'
 
 - name: buildPool
