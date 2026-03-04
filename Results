@@ -1,17 +1,133 @@
-# JSON substitution (v2)
-- task: FileTransform@2
-  displayName: 'JSON substitution (appsettings.json)'
-  condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
-  inputs:
-    folderPath: '$(Pipeline.Workspace)\extracted'
-    jsonTargetFiles: ${{ parameters.jsonFiles }}
+Below is the same **dictionary-style env injection** template update, but **without `strictXmlSubstitution`** (it will just replace keys that have a provided variable and skip the rest silently).
 
-# XML substitution (v2)
-- task: FileTransform@2
-  displayName: 'XML substitution (.config)'
+### What you’ll have
+
+* `xmlConfigFiles`: list of files/patterns to edit (e.g. `**/App.config`, `**/API.dll.config`)
+* `xmlVariableValues`: dictionary `{ KEY: $(KEY) }`
+* PowerShell edits only `<configuration><appSettings><add key="...">` nodes
+
+---
+
+## Template snippet (replace your XML substitution part)
+
+### Parameters (add `xmlVariableValues`)
+
+```yaml
+- name: enableXmlConfigTransform
+  type: boolean
+  default: false
+
+- name: xmlConfigFiles
+  type: object
+  default: []
+
+- name: xmlVariableValues
+  type: object
+  default: {}
+```
+
+### Step: Reliable XML appSettings substitution (PowerShell)
+
+Replace the `FileTransform` XML step with:
+
+```yaml
+- powershell: |
+    $ErrorActionPreference = "Stop"
+    $root = "$(Pipeline.Workspace)\extracted"
+
+    $patternsJson = @'
+    ${{ convertToJson(parameters.xmlConfigFiles) }}
+    '@
+    $patterns = $patternsJson | ConvertFrom-Json
+
+    if (-not $patterns -or $patterns.Count -eq 0) {
+      Write-Host "No xmlConfigFiles patterns provided. Skipping."
+      exit 0
+    }
+
+    function Resolve-Files([string]$base, [string]$pattern) {
+      $pattern = $pattern -replace '\\','/'
+
+      if ($pattern.StartsWith("**/")) {
+        $name = $pattern.Substring(3)
+        return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
+      }
+
+      if ($pattern.Contains("/") -or $pattern.Contains("\")) {
+        $p = Join-Path $base ($pattern -replace '/','\')
+        return Get-Item $p -ErrorAction SilentlyContinue
+      }
+
+      return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
+    }
+
+    # collect unique files
+    $files = @()
+    foreach ($pat in $patterns) {
+      $files += Resolve-Files $root ([string]$pat)
+    }
+    $files = $files | Where-Object { $_ } | Select-Object -Unique
+
+    if (-not $files -or $files.Count -eq 0) {
+      throw "No config files matched xmlConfigFiles patterns under: $root"
+    }
+
+    foreach ($f in $files) {
+      Write-Host "Editing: $($f.FullName)"
+      [xml]$xml = Get-Content -Raw -Path $f.FullName
+
+      $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
+      if (-not $nodes -or $nodes.Count -eq 0) {
+        Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
+        continue
+      }
+
+      $changed = 0
+
+      foreach ($n in $nodes) {
+        $key = [string]$n.GetAttribute("key")
+        $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
+
+        # no variable provided => skip
+        if ([string]::IsNullOrWhiteSpace($val)) { continue }
+
+        $current = [string]$n.GetAttribute("value")
+        if ($current -ne $val) {
+          $n.SetAttribute("value", $val)
+          $changed++
+        }
+      }
+
+      $xml.Save($f.FullName)
+      Write-Host "Updated $changed setting(s) in $($f.Name)"
+    }
+  displayName: 'Reliable XML appSettings substitution (.config)'
   condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-  inputs:
-    folderPath: '$(Pipeline.Workspace)\extracted'
-    enableXmlTransform: false
-    xmlTargetFiles: |
-      ${{ join('\n', parameters.xmlConfigFiles) }}
+  env:
+    ${{ each pair in parameters.xmlVariableValues }}:
+      ${{ pair.key }}: ${{ pair.value }}
+```
+
+---
+
+## How to call it from your pipeline
+
+Example:
+
+```yaml
+enableXmlConfigTransform: true
+xmlConfigFiles:
+  - '**/App.config'
+  - '**/API.dll.config'
+
+xmlVariableValues:
+  API_TOKEN_CHECK: $(API_TOKEN_CHECK)
+  CONN_STRING_User: $(CONN_STRING_User)
+  NLog_MaxArchiveDays: $(NLog_MaxArchiveDays)
+```
+
+Add more keys as needed.
+
+---
+
+If you want, I can also tweak `Resolve-Files` to support patterns like `**/*.dll.config` (wildcards), not only exact filenames.
