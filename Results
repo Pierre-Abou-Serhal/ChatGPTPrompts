@@ -1,39 +1,104 @@
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-    <appSettings>
+Since `APITOKEN.xml` is **custom XML**, you should **not** try to map variables like `KEY1`, `KEY2`, etc. (those change). Instead, make variables keyed by the **stable identifier**: `APPLICATION_NAME` + (optionally) the section name.
 
-        <!--Global Config-->
-        <add key="API_TOKEN_CHECK" value="true"/>
-        <add key="API_TOKENS_XML_PATH"
-             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\ApiTokens.xml"/>
-        <add key="API_STRATEGIES_XML_PATH"
-             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\ApiStrategies.xml"/>
-        <add key="RESPONSE_CODES"
-             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\ResponseCodes.xml"/>
-        <add key="DATABASE_CONNECTIONS"
-             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\Connections.xml"/>
-        <add key="LDAP_CONN" value="hidden"/>
+### 1) Example `APITOKEN.xml` targets
 
-		<!--Get Customer Config-->
-		<add key="CONN_STRING_User" value="hidden" />
-		<add key="CONN_STRING_T24" value="hidden" />
-		<add key="RANGE_LIMIT" value="1000"/>
-		
-		<!--Get Company Config-->
-		<add key="CONN_STRING_Company" value="hidden" />
-		<add key="GET_ALL_COMPANIES_SP" value="usp_GetAllCompanies"/>
-		
-		<!--LdapConfig-->
-		<add key="BREF_CONN" value="hidden" />
+You showed these apps:
 
-        <!--Logger Config...-->
-        <add key="LoggingApi" value="http://10.0.40.41:8043/api/Logger/LogData"/>
-        <add key="Is_DB_Log" value="true"/>
-        <add key="Is_DB_Log_Info" value="true"/>
-        <add key="NLog_Location" value="C:\logs\Data_Gateway_Service_BN.txt"/>
-        <add key="NLog_MaxArchiveDays" value="90"/>
-        <add key="NLog_LogLevel" value="info"/>
-        <add key="Caller_App" value="Data_Gateway_Service_BN"/>
+* `APPORTEUR_AFFAIRE`
+* `AMS`
+* `FRESH_ACCOUNT`
+* `PSS`
 
-    </appSettings>
-</configuration>
+So your Variable Group should store:
+
+* the token **VALUE** per app
+* any permissions you want to override (optional)
+
+---
+
+## Complete Variable Group example
+
+### Variable Group name: `VG-UAT-APITOKEN`
+
+Create these variables (mark **TOKEN_*** as **secret**):
+
+#### Tokens (secret)
+
+* `TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE` = `UAT-APPORTEUR-SECRET-KEY`  ✅ secret
+* `TOKEN_GET_CUSTOMER_AMS` = `UAT-AMS-SECRET-KEY` ✅ secret
+* `TOKEN_GET_CUSTOMER_FRESH_ACCOUNT` = `UAT-FRESH-SECRET-KEY` ✅ secret
+* `TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE` = `UAT-COMPANY-APPORTEUR-KEY` ✅ secret
+* `TOKEN_GET_T24USER_AMS` = `UAT-T24USER-AMS-KEY` ✅ secret
+* `TOKEN_LDAP_PSS` = `UAT-LDAP-PSS-KEY` ✅ secret
+* `TOKEN_GET_PRODUCT_FRESH_ACCOUNT` = `UAT-PRODUCT-FRESH-KEY` ✅ secret
+
+#### Optional permission flags (non-secret)
+
+(Only include the ones you actually want to change per environment)
+
+* `FRESH_ACCOUNT_HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS` = `true`
+* `AMS_HAVE_ACCESS_TO_GET_CUSTOMERIDS_BY_EXTERNAL_ID` = `true`
+* `APPORTEUR_HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS` = `false`
+
+> If you don’t need to change permissions, don’t add them.
+
+---
+
+## Custom XML rules (template parameter) that use those variables
+
+You’d call your template with `customXmlEdits` like this:
+
+```yaml
+enableCustomXmlEdits: true
+customXmlEdits:
+  # ===== GET_CUSTOMER =====
+  - file: '**/APITOKEN.xml'
+    xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@VALUE'
+    variable: 'TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE'
+
+  - file: '**/APITOKEN.xml'
+    xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="AMS"]/@VALUE'
+    variable: 'TOKEN_GET_CUSTOMER_AMS'
+
+  - file: '**/APITOKEN.xml'
+    xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@VALUE'
+    variable: 'TOKEN_GET_CUSTOMER_FRESH_ACCOUNT'
+
+  # Optional permission override example (FRESH_ACCOUNT)
+  - file: '**/APITOKEN.xml'
+    xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS'
+    variable: 'FRESH_ACCOUNT_HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS'
+
+  # ===== GET_COMPANY =====
+  - file: '**/APITOKEN.xml'
+    xpath: '/APITOKEN/GET_COMPANY/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@VALUE'
+    variable: 'TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE'
+
+  # ===== GET_T24USER =====
+  - file: '**/APITOKEN.xml'
+    xpath: '/APITOKEN/GET_T24USER/TOKEN[@APPLICATION_NAME="AMS"]/@VALUE'
+    variable: 'TOKEN_GET_T24USER_AMS'
+
+  # ===== LDAP =====
+  - file: '**/APITOKEN.xml'
+    xpath: '/APITOKEN/LDAP/TOKEN[@APPLICATION_NAME="PSS"]/@VALUE'
+    variable: 'TOKEN_LDAP_PSS'
+
+  # ===== GET_PRODUCT =====
+  - file: '**/APITOKEN.xml'
+    xpath: '/APITOKEN/GET_PRODUCT/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@VALUE'
+    variable: 'TOKEN_GET_PRODUCT_FRESH_ACCOUNT'
+```
+
+---
+
+## Why this is the best variable naming scheme
+
+* It’s readable (you know exactly which token you’re changing)
+* It’s stable across environments
+* It avoids reliance on `KEY1`, `KEY2` positions
+* Works with secret variables cleanly
+
+---
+
+If you want, I can also generate the **full set** of rules for *every permission attribute* in your file, but in practice it’s better to only override permissions when they differ by environment.
