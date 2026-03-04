@@ -1,97 +1,243 @@
-This is one file:
+parameters:
+- name: deploymentName
+  type: string
+  default: 'DeployJob'
 
-<?xml version="1.0" encoding="utf-8"?>
-<APISTRATEGY>
+- name: deploymentDisplayName
+  type: string
+  default: 'Deploy IIS'
 
-    <GET_CUSTOMER>
+- name: environmentName
+  type: string
 
-        <STRATEGY VALUE="openFreshAccount" API="GET_ELIGIBLE_CUSTOMERS"/>
+- name: deployPool
+  type: string
 
-        <STRATEGY VALUE="openFreshAccount2" API="GET_ELIGIBLE_CUSTOMERS"/>
+- name: deployAgentName
+  type: string
 
-        <STRATEGY VALUE="openFreshAccount3" API="GET_ELIGIBLE_CUSTOMERS"/>
+- name: variableGroup
+  type: string
 
-    </GET_CUSTOMER>
+- name: zipName
+  type: string
 
-</APISTRATEGY>
+- name: siteName
+  type: string
 
+- name: appPoolName
+  type: string
 
-And this is the other:
-<?xml version="1.0" encoding="utf-8"?>
-<APITOKEN>
+- name: iisTargetPath
+  type: string
 
-    <GET_CUSTOMER>
+- name: cleanTargetBeforeCopy
+  type: boolean
+  default: true
 
-        <TOKEN VALUE="KEY1"
-               APPLICATION_NAME="APPORTEUR_AFFAIRE"
-               HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES="true"
-               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_CUSTOMER_ID_LIST="true"
-               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_RANGE="true"
-               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_WHERE="true"
-               HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS="false"
-               HAVE_ACCESS_TO_GET_CUSTOMERIDS_BY_EXTERNAL_ID="false"
-        />
+- name: cleanExcludeCsv
+  type: string
+  default: 'web.config,logs,Keys'
 
-        <TOKEN VALUE="KEY2"
-               APPLICATION_NAME="AMS"
-               HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES="true"
-               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_CUSTOMER_ID_LIST="true"
-               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_RANGE="true"
-               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_WHERE="true"
-               HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS="false"
-               HAVE_ACCESS_TO_GET_CUSTOMERIDS_BY_EXTERNAL_ID="true"
-        />
+# ---------- JSON (appsettings.json) ----------
+- name: enableJsonTransform
+  type: boolean
+  default: true
 
-        <TOKEN VALUE="KEY3"
-               APPLICATION_NAME="FRESH_ACCOUNT"
-               HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES="false"
-               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_CUSTOMER_ID_LIST="false"
-               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_RANGE="false"
-               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_WHERE="false"
-               HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS="true"
-               HAVE_ACCESS_TO_GET_CUSTOMERIDS_BY_EXTERNAL_ID="false"
-        />
+- name: jsonFiles
+  type: string
+  default: '**/appsettings.json'
 
-    </GET_CUSTOMER>
+# ---------- Standard XML .config (web.config / *.exe.config ...) ----------
+- name: enableXmlConfigTransform
+  type: boolean
+  default: false
 
-    <GET_COMPANY>
+- name: xmlConfigFiles
+  type: object
+  default: []   # example: ['**/web.config', '**/*.exe.config']
 
-        <TOKEN VALUE="KEY4"
-               APPLICATION_NAME="APPORTEUR_AFFAIRE"
-               HAVE_ACCESS_TO_GET_GET_ALL_COMPANIES="true"
-        />
+# ---------- Custom XML (XPath edits) ----------
+- name: enableCustomXmlEdits
+  type: boolean
+  default: false
 
-    </GET_COMPANY>
+- name: customXmlEdits
+  type: object
+  default: []
+  # example:
+  # - file: '**/APITOKEN.xml'
+  #   xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="AMS"]/@VALUE'
+  #   variable: 'TOKEN_AMS'
 
-    <GET_T24USER>
+jobs:
+- deployment: ${{ parameters.deploymentName }}
+  displayName: ${{ parameters.deploymentDisplayName }}
+  environment: ${{ parameters.environmentName }}
 
-        <TOKEN VALUE="KEY5"
-               APPLICATION_NAME="AMS"
-               HAVE_ACCESS_TO_GET_T24_USER_BY_EMAIL_ID="true"
-               HAVE_ACCESS_TO_GET_ALL_T24_USERS="true"
-        />
+  pool:
+    name: ${{ parameters.deployPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
 
-    </GET_T24USER>
+  variables:
+  - group: ${{ parameters.variableGroup }}
 
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - task: DownloadBuildArtifacts@0
+          displayName: 'Download Build Artifact'
+          inputs:
+            buildType: 'current'
+            downloadType: 'single'
+            artifactName: 'drop'
+            downloadPath: '$(Pipeline.Workspace)'
 
-    <LDAP>
+        - task: ExtractFiles@1
+          displayName: 'Extract artifact'
+          inputs:
+            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
+            destinationFolder: '$(Pipeline.Workspace)\extracted'
+            cleanDestinationFolder: true
 
-        <TOKEN VALUE="KEY6"
-               APPLICATION_NAME="PSS"
-               HAVE_ACCESS_TO_EDITLDAPUSER="true"
-               HAVE_ACCESS_TO_GET_LDAPUSERS="true"
-               HAVE_ACCESS_TO_SYNCHRONIZEHRUSERS="true"
-               HAVE_ACCESS_TO_GETHRUSERBYEMAIL="true"
-        />
-    </LDAP>
+        # ---- JSON substitution (appsettings.json) ----
+        - task: FileTransform@1
+          displayName: 'JSON substitution (appsettings.json)'
+          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
+          inputs:
+            folderPath: '$(Pipeline.Workspace)\extracted'
+            fileType: 'json'
+            targetFiles: ${{ parameters.jsonFiles }}
 
-    <GET_PRODUCT>
+        # ---- Standard .NET XML substitution (.config) ----
+        - task: FileTransform@1
+          displayName: 'XML substitution (.config)'
+          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
+          inputs:
+            folderPath: '$(Pipeline.Workspace)\extracted'
+            fileType: 'xml'
+            targetFiles: |
+              ${{ join('\n', parameters.xmlConfigFiles) }}
 
-        <TOKEN VALUE="KEY7"
-               APPLICATION_NAME="FRESH_ACCOUNT"
-               HAVE_ACCESS_TO_GET_PRODUCTS_BY_CUSTOMER_TYPE="true"
-        />
+        # ---- Custom XML substitution (XPath) ----
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $root = "$(Pipeline.Workspace)\extracted"
 
-    </GET_PRODUCT>
+            $rulesJson = @'
+            ${{ convertToJson(parameters.customXmlEdits) }}
+            '@
+            $rules = $rulesJson | ConvertFrom-Json
 
-</APITOKEN>
+            if (-not $rules -or $rules.Count -eq 0) {
+              Write-Host "No custom XML edits provided. Skipping."
+              exit 0
+            }
+
+            function Resolve-Files($base, $pattern) {
+              # supports: **/File.xml, File.xml, or folder\File.xml
+              $pattern = $pattern -replace '\\','/'
+              if ($pattern.StartsWith("**/")) {
+                $name = $pattern.Substring(3)
+                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
+              }
+              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
+                $p = Join-Path $base ($pattern -replace '/','\')
+                return Get-Item $p -ErrorAction SilentlyContinue
+              }
+              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
+            }
+
+            foreach ($r in $rules) {
+              $filePat = [string]$r.file
+              $xpath   = [string]$r.xpath
+              $varName = [string]$r.variable
+
+              if (-not $filePat -or -not $xpath -or -not $varName) {
+                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
+              }
+
+              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
+              if ([string]::IsNullOrWhiteSpace($value)) {
+                throw "Pipeline variable '$varName' is missing/empty."
+              }
+
+              $files = Resolve-Files $root $filePat
+              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
+
+              foreach ($f in @($files)) {
+                [xml]$xml = Get-Content -Raw -Path $f.FullName
+
+                if ($xpath -match "/@([^/]+)$") {
+                  $attrName = $Matches[1]
+                  $nodePath = $xpath -replace "/@[^/]+$",""
+                  $node = $xml.SelectSingleNode($nodePath)
+                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
+
+                  $attr = $node.Attributes[$attrName]
+                  if (-not $attr) {
+                    $attr = $xml.CreateAttribute($attrName)
+                    [void]$node.Attributes.Append($attr)
+                  }
+                  $attr.Value = $value
+                } else {
+                  $node = $xml.SelectSingleNode($xpath)
+                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
+                  $node.InnerText = $value
+                }
+
+                $xml.Save($f.FullName)
+                Write-Host "Updated $($f.Name): $xpath (from $varName)"
+              }
+            }
+          displayName: 'Custom XML substitution (XPath)'
+          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
+
+        # ---- Stop IIS ----
+        - powershell: |
+            Import-Module WebAdministration
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
+
+            $site = Get-Website -Name $siteName
+            if ($site.State -ne "Stopped") { Stop-Website -Name $siteName }
+
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            if ($poolState -ne "Stopped") { Stop-WebAppPool -Name $appPool }
+          displayName: 'Stop Website + App Pool'
+
+        # ---- Clean target ----
+        - powershell: |
+            $target = '${{ parameters.iisTargetPath }}'
+            if (-not (Test-Path $target)) { throw "Target folder does not exist: $target" }
+
+            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
+            $exclude = @()
+            if ($excludeCsv) { $exclude = $excludeCsv.Split(',') | % { $_.Trim() } | ? { $_ } }
+
+            Get-ChildItem -Path $target -Force | ForEach-Object {
+              if ($exclude -contains $_.Name) { return }
+              Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+            }
+          displayName: 'Clean target folder (before copy)'
+          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
+
+        - task: CopyFiles@2
+          displayName: 'Copy files'
+          inputs:
+            SourceFolder: '$(Pipeline.Workspace)\extracted'
+            Contents: '**'
+            TargetFolder: '${{ parameters.iisTargetPath }}'
+            OverWrite: true
+
+        # ---- Start IIS ----
+        - powershell: |
+            Import-Module WebAdministration
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
+
+            if ((Get-WebAppPoolState -Name $appPool).Value -ne "Started") { Start-WebAppPool -Name $appPool }
+            if ((Get-Website -Name $siteName).State -ne "Started") { Start-Website -Name $siteName }
+          displayName: 'Start Website + App Pool'
