@@ -1,113 +1,198 @@
 parameters:
-- name: jobName
+- name: deploymentName
   type: string
-  default: 'BuildJob'
+  default: 'DeployJob'
 
-- name: jobDisplayName
+- name: deploymentDisplayName
   type: string
-  default: 'Build (.NET)'
+  default: 'Deploy IIS'
 
-- name: buildPool
-  type: string
-
-- name: buildAgentName
+- name: environmentName
   type: string
 
-- name: buildConfiguration
-  type: string
-  default: 'Release'
-
-- name: restoreProjects
-  type: string
-  default: '**/*.csproj'
-
-- name: runTests
-  type: boolean
-  default: false
-
-- name: testProjects
-  type: string
-  default: '**/*Tests/*.csproj'
-
-- name: publishProject
+- name: deployPool
   type: string
 
-- name: nugetConfigPath
+- name: deployAgentName
   type: string
-  default: 'nuget.config'
+
+- name: variableGroup
+  type: string
 
 - name: zipName
   type: string
-  default: 'WebApp.zip'
 
-- name: publishOutputFolder
+- name: siteName
   type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
-  
+
+- name: appPoolName
+  type: string
+
+- name: iisTargetPath
+  type: string
+
+- name: appSettingsFilePattern
+  type: string
+  default: '**/appsettings.json'
+
+- name: cleanTargetBeforeCopy
+  type: boolean
+  default: true
+
+- name: cleanExcludeCsv
+  type: string
+  default: 'web.config,logs,Keys'
+
 jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
+- deployment: ${{ parameters.deploymentName }}
+  displayName: ${{ parameters.deploymentDisplayName }}
+
+  environment: ${{ parameters.environmentName }}
 
   pool:
-    name: ${{ parameters.buildPool }}
+    name: ${{ parameters.deployPool }}
     demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
 
-  steps:
-  - checkout: self
-    clean: true
+  variables:
+  - group: ${{ parameters.variableGroup }}
 
-  # Restore using nuget.config
-  - task: DotNetCoreCLI@2
-    displayName: 'Restore'
-    inputs:
-      command: 'restore'
-      projects: ${{ parameters.restoreProjects }}
-      feedsToUse: 'config'
-      nugetConfigPath: ${{ parameters.nugetConfigPath }}
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - task: DownloadBuildArtifacts@0
+          displayName: 'Download Build Artifact'
+          inputs:
+            buildType: 'current'
+            downloadType: 'single'
+            artifactName: 'drop'
+            downloadPath: '$(Pipeline.Workspace)'
 
-  # Building project: dotnet build
-  - task: DotNetCoreCLI@2
-    displayName: 'Build'
-    inputs:
-      command: 'build'
-      projects: ${{ parameters.restoreProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
+        - task: ExtractFiles@1
+          displayName: 'Extract artifact'
+          inputs:
+            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
+            destinationFolder: '$(Pipeline.Workspace)\extracted'
+            cleanDestinationFolder: true
 
-  # Running tests if available: dotnet test
-  - task: DotNetCoreCLI@2
-    displayName: 'Test'
-    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-    inputs:
-      command: 'test'
-      projects: ${{ parameters.testProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
-      publishTestResults: true
+        - task: FileTransform@1
+          displayName: 'JSON substitution (appsettings.json)'
+          inputs:
+            folderPath: '$(Pipeline.Workspace)\extracted'
+            fileType: 'json'
+            targetFiles: ${{ parameters.appSettingsFilePattern }}
 
-  # Publish the API project
-  - task: DotNetCoreCLI@2
-    displayName: 'Publish'
-    inputs:
-      command: 'publish'
-      projects: ${{ parameters.publishProject }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --output "${{ parameters.publishOutputFolder }}" --no-restore'
-      zipAfterPublish: false
-      modifyOutputPath: false
+        # Stop website + app pool safely (idempotent)
+        - powershell: |
+            Import-Module WebAdministration
 
-  # Zipping published files
-  - task: ArchiveFiles@2
-    displayName: 'Zip publish output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
 
-  # Uploading zipped files to Azure
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: 'drop'
-      publishLocation: 'Container'
+            $site = Get-Website -Name $siteName
+            Write-Host "Website current state: $($site.State)"
+            if ($site.State -ne "Stopped") {
+              Write-Host "Stopping website: $siteName"
+              Stop-Website -Name $siteName
+            } else {
+              Write-Host "Website already stopped."
+            }
+
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            Write-Host "AppPool current state: $poolState"
+            if ($poolState -ne "Stopped") {
+              Write-Host "Stopping app pool: $appPool"
+              Stop-WebAppPool -Name $appPool
+            } else {
+              Write-Host "AppPool already stopped."
+            }
+
+            $maxTries = 30
+            for ($i = 1; $i -le $maxTries; $i++) {
+              $siteState = (Get-Website -Name $siteName).State
+              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+
+              Write-Host "Website state: $siteState | AppPool state: $poolState"
+
+              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
+                Write-Host "Website and App Pool are stopped."
+                break
+              }
+
+              Start-Sleep -Seconds 2
+            }
+
+            $finalSiteState = (Get-Website -Name $siteName).State
+            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
+
+            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
+              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
+            }
+
+            Start-Sleep -Seconds 2
+          displayName: 'Stop Website + App Pool'
+
+        - powershell: |
+            $target = '${{ parameters.iisTargetPath }}'
+
+            if (-not (Test-Path $target)) {
+              throw "Target folder does not exist: $target"
+            }
+
+            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
+            $exclude = @()
+
+            if ($excludeCsv) {
+              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            }
+
+            Write-Host "Cleaning target folder: $target"
+            Write-Host "Excluding: $($exclude -join ', ')"
+
+            Get-ChildItem -Path $target -Force | ForEach-Object {
+              if ($exclude -contains $_.Name) {
+                Write-Host "Skipping excluded item: $($_.FullName)"
+              } else {
+                Write-Host "Removing: $($_.FullName)"
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+              }
+            }
+          displayName: 'Clean target folder (before copy)'
+          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
+
+        - task: CopyFiles@2
+          displayName: 'Copy files'
+          inputs:
+            SourceFolder: '$(Pipeline.Workspace)\extracted'
+            Contents: '**'
+            TargetFolder: '${{ parameters.iisTargetPath }}'
+            OverWrite: true
+
+        # Start website + app pool safely (idempotent)
+        - powershell: |
+            Import-Module WebAdministration
+
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
+
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            if ($poolState -ne "Started") {
+              Write-Host "Starting app pool: $appPool"
+              Start-WebAppPool -Name $appPool
+            } else {
+              Write-Host "AppPool already started."
+            }
+
+            $siteState = (Get-Website -Name $siteName).State
+            if ($siteState -ne "Started") {
+              Write-Host "Starting website: $siteName"
+              Start-Website -Name $siteName
+            } else {
+              Write-Host "Website already started."
+            }
+
+            $siteState = (Get-Website -Name $siteName).State
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            Write-Host "Website state: $siteState | AppPool state: $poolState"
+          displayName: 'Start Website + App Pool'
