@@ -1,6 +1,14 @@
-     1>C:\agent\_work\3\s\BAL\BAL.csproj : error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json. [C:\agent\_work\3\s\Alterna-Telecom-Backend\Alterna-Telecom-Backend.csproj]
-     1>C:\agent\_work\3\s\Alterna-Telecom-Backend\Alterna-Telecom-Backend.csproj : error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json.
-     1>C:\agent\_work\3\s\Alterna-Telecom-Backend\Alterna-Telecom-Backend.csproj : error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json.
-     1>C:\agent\_work\3\s\BAL\BAL.csproj : error NU1301: Unable to load the service index for source http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json. [C:\agent\_work\3\s\Alterna-Telecom-Backend\Alterna-Telecom-Backend.csproj]
-     1>C:\agent\_work\3\s\Alterna-Telecom-Backend\Alterna-Telecom-Backend.csproj : error NU1301: Unable to load the service index for source http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json.
-     1>C:\agent\_work\3\s\Alterna-Telecom-Backend\Alterna-Telecom-Backend.csproj : error NU1301: Unable to load the service index for source http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json.
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="azure-devops-dev-nuget-offline-packages"
+         value="http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json"
+         allowInsecureConnections="true" />
+    <add key="nuget.org"
+         value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <config>
+    <add key="http_proxy" value="http://10.0.30.222:3128" />
+  </config>
+</configuration>
