@@ -1,30 +1,17 @@
-I am using FileTransform@2
-I got this:
+# JSON substitution (v2)
+- task: FileTransform@2
+  displayName: 'JSON substitution (appsettings.json)'
+  condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
+  inputs:
+    folderPath: '$(Pipeline.Workspace)\extracted'
+    jsonTargetFiles: ${{ parameters.jsonFiles }}
 
-
-XML substitution (.config)
-
-View raw log
-Starting: XML substitution (.config)
-==============================================================================
-Task         : File transform
-Description  : Replace tokens with variable values in XML or JSON configuration files
-Version      : 2.222.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/file-transform
-==============================================================================
-##[error]Unable to apply transformation for the given package - Changes are already present in the package.
-Finishing: XML substitution (.config)
-
-This is the task:
-
-        # ---- Standard .NET XML substitution (.config) ----
-        - task: FileTransform@2
-          displayName: 'XML substitution (.config)'
-          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            enableVariableSubstitution: true
-            fileType: 'xml'
-            targetFiles: |
-              ${{ join('\n', parameters.xmlConfigFiles) }}
+# XML substitution (v2)
+- task: FileTransform@2
+  displayName: 'XML substitution (.config)'
+  condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
+  inputs:
+    folderPath: '$(Pipeline.Workspace)\extracted'
+    enableXmlTransform: false
+    xmlTargetFiles: |
+      ${{ join('\n', parameters.xmlConfigFiles) }}
