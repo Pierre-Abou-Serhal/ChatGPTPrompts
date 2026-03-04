@@ -1,64 +1,30 @@
-Locate config files (before transform)
-
-View raw log
-
-Starting: Locate config files (before transform)
-==============================================================================
-Task         : PowerShell
-Description  : Run a PowerShell script on Linux, macOS, or Windows
-Version      : 2.232.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\414bbaec-7d74-4d27-b4e9-91da9c323ef7.ps1'"
-
-FullName                                 
---------                                 
-C:\agent\_work\3\extracted\API.dll.config
-C:\agent\_work\3\extracted\App.config    
-
-
-Finishing: Locate config files (before transform)
+I am using FileTransform@2
+I got this:
 
 
 XML substitution (.config)
 
 View raw log
-
 Starting: XML substitution (.config)
 ==============================================================================
 Task         : File transform
 Description  : Replace tokens with variable values in XML or JSON configuration files
-Version      : 1.233.0
+Version      : 2.222.0
 Author       : Microsoft Corporation
 Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/file-transform
 ==============================================================================
-XML variable substitution applied successfully.
+##[error]Unable to apply transformation for the given package - Changes are already present in the package.
 Finishing: XML substitution (.config)
 
-Verify XML substitution (after FileTransform)
+This is the task:
 
-View raw log
-
-Starting: Verify XML substitution (after FileTransform)
-==============================================================================
-Task         : PowerShell
-Description  : Run a PowerShell script on Linux, macOS, or Windows
-Version      : 2.232.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\497ef32b-86aa-4fd5-8c3a-72bf5c897370.ps1'"
-==== C:\agent\_work\3\extracted\API.dll.config ====
-        <add key="API_TOKEN_CHECK" value="true"/>
-		<add key="CONN_STRING_User" value="Data Source=DEV-SQL2016\PERFAPP;Initial Catalog=Alterna.Bref;User ID=sasadmin;Password=sasadmin" />
-        <add key="NLog_MaxArchiveDays" value="90"/>
-==== C:\agent\_work\3\extracted\App.config ====
-        <add key="API_TOKEN_CHECK" value="true"/>
-		<add key="CONN_STRING_User" value="Data Source=DEV-SQL2016\PERFAPP;Initial Catalog=Alterna.Bref;User ID=sasadmin;Password=sasadmin" />
-        <add key="NLog_MaxArchiveDays" value="90"/>
-Finishing: Verify XML substitution (after FileTransform)
+        # ---- Standard .NET XML substitution (.config) ----
+        - task: FileTransform@2
+          displayName: 'XML substitution (.config)'
+          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
+          inputs:
+            folderPath: '$(Pipeline.Workspace)\extracted'
+            enableVariableSubstitution: true
+            fileType: 'xml'
+            targetFiles: |
+              ${{ join('\n', parameters.xmlConfigFiles) }}
