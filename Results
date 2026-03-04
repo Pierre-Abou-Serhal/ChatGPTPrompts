@@ -1,39 +1,128 @@
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-    <appSettings>
+If **App.config** and **API.dll.config** are standard `<configuration><appSettings>...</appSettings></configuration>` (and you confirmed `API.dll.config` is the same), then `FileTransform@1` *will* substitute **only the keys that exist as variables**.
 
-        <!--Global Config-->
-        <add key="API_TOKEN_CHECK" value="true"/>
-        <add key="API_TOKENS_XML_PATH"
-             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\ApiTokens.xml"/>
-        <add key="API_STRATEGIES_XML_PATH"
-             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\ApiStrategies.xml"/>
-        <add key="RESPONSE_CODES"
-             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\ResponseCodes.xml"/>
-        <add key="DATABASE_CONNECTIONS"
-             value="D:\@Workspace\deve-repo\alterna-services-dotnet8\DataGatewayService\API\Connections.xml"/>
-        <add key="LDAP_CONN" value="LDAP://sgbl.com.lb/OU=SGBL Group,DC=sgbl,DC=com,DC=lb"/>
+Right now your **SIT_VARIABLE_GROUP** contains only:
 
-		<!--Get Customer Config-->
-		<add key="CONN_STRING_User" value="Data Source=DEV-SQL2016\PERFAPP;Initial Catalog=Alterna.Bref;User ID=user;Password=user" />
-		<add key="CONN_STRING_T24" value="Data Source=DEV-SQL2016\PERFAPP;Initial Catalog=Alterna.Bref;User ID=user;Password=user" />
-		<add key="RANGE_LIMIT" value="1000"/>
-		
-		<!--Get Company Config-->
-		<add key="CONN_STRING_Company" value="Data Source=DEV-SQL2016;Initial Catalog=Alterna.Archive;User ID=user;Password=user" />
-		<add key="GET_ALL_COMPANIES_SP" value="usp_GetAllCompanies"/>
-		
-		<!--LdapConfig-->
-		<add key="BREF_CONN" value="Data Source=DEV-SQL2016;Initial Catalog=Alterna.Bref;User ID=user;Password=user" />
+* `API_TOKEN_CHECK` ✅
+* `CONN_STRING_User` ✅
+* `NLog_MaxArchiveDays` ✅
+* (tokens…) ❌ not used by App.config
 
-        <!--Logger Config...-->
-        <add key="LoggingApi" value="http://10.0.40.41:8043/api/Logger/LogData"/>
-        <add key="Is_DB_Log" value="true"/>
-        <add key="Is_DB_Log_Info" value="true"/>
-        <add key="NLog_Location" value="C:\logs\Data_Gateway_Service_BN.txt"/>
-        <add key="NLog_MaxArchiveDays" value="90"/>
-        <add key="NLog_LogLevel" value="info"/>
-        <add key="Caller_App" value="Data_Gateway_Service_BN"/>
+But your file has many more keys. So the transform will change **only those 3** and leave everything else untouched — which often looks like “it didn’t change”.
 
-    </appSettings>
-</configuration>
+### First: what should have changed with your current variables?
+
+From your variable group:
+
+* `API_TOKEN_CHECK` should become `false`
+* `CONN_STRING_User` should become your SIT value
+* `NLog_MaxArchiveDays` should become `30`
+
+If none of these 3 changed, then it’s not a “missing variables” issue; it’s that the task isn’t targeting the files you think, or it’s running before/after you inspect.
+
+---
+
+## 1) Most common reason it “didn’t change”: you’re looking at the wrong copy
+
+Your pipeline transforms files under:
+
+`$(Pipeline.Workspace)\extracted`
+
+But you might be checking:
+
+* the original file in repo
+* or the deployed file under IIS target path
+* or a different `App.config` that exists elsewhere in the artifact
+
+✅ Add this *immediately after* the FileTransform XML step:
+
+```yaml
+- powershell: |
+    $root = "$(Pipeline.Workspace)\extracted"
+    $files = Get-ChildItem $root -Recurse -File | Where-Object { $_.Name -in @('App.config','API.dll.config') }
+    foreach ($f in $files) {
+      Write-Host "==== $($f.FullName) ===="
+      Select-String -Path $f.FullName -Pattern 'API_TOKEN_CHECK|CONN_STRING_User|NLog_MaxArchiveDays' | ForEach-Object { $_.Line }
+    }
+  displayName: 'Verify XML substitution (after FileTransform)'
+```
+
+This proves whether the transform happened inside the artifact.
+
+---
+
+## 2) Ensure FileTransform is actually matching both files
+
+Your `xmlConfigFiles` are patterns. For `FileTransform@1`, `targetFiles` are relative to `folderPath`.
+
+If your files are deep, `**/App.config` is fine. But if the case differs (rare on Windows), or the file name is different, it won’t match.
+
+✅ Add this step before FileTransform to confirm matches:
+
+```yaml
+- powershell: |
+    $root = "$(Pipeline.Workspace)\extracted"
+    Get-ChildItem $root -Recurse -File | Where-Object { $_.Name -in @('App.config','API.dll.config') } | Select FullName
+  displayName: 'Locate config files (before transform)'
+```
+
+If nothing prints, FileTransform isn’t targeting what you think.
+
+---
+
+## 3) Make sure the variable group values are not quoted
+
+In your screenshot-style list, you have values like:
+
+* `API_TOKEN_CHECK` = `"false"`
+* `NLog_MaxArchiveDays` = `"30"`
+
+If you literally stored the quotes in the variable value, FileTransform will substitute with quotes, resulting in:
+
+```xml
+<add key="API_TOKEN_CHECK" value=""false"" />
+```
+
+That’s obviously wrong.
+
+So in variable group, set them as:
+
+* `false` (no quotes)
+* `30` (no quotes)
+
+Tokens can remain secrets (no quotes).
+
+---
+
+## 4) If you want “all keys substituted”, your variable group must include them
+
+To fully drive this config per environment, add variables for each key you want to differ in SIT:
+
+* `API_TOKENS_XML_PATH`
+* `API_STRATEGIES_XML_PATH`
+* `RESPONSE_CODES`
+* `DATABASE_CONNECTIONS`
+* `LDAP_CONN`
+* `CONN_STRING_T24`
+* `RANGE_LIMIT`
+* `CONN_STRING_Company`
+* `GET_ALL_COMPANIES_SP`
+* `BREF_CONN`
+* `LoggingApi`
+* `Is_DB_Log`
+* `Is_DB_Log_Info`
+* `NLog_Location`
+* `NLog_LogLevel`
+* `Caller_App`
+
+(Only add what changes by environment; the rest can remain hardcoded.)
+
+---
+
+## The fastest path to resolve your current “didn’t change”
+
+1. Remove quotes in variable group values (`false`, `30`)
+2. Add the “Verify XML substitution” step right after FileTransform
+3. Confirm those 3 keys changed in the extracted files
+4. If they did, then deploy is fine — add more variables if you want more keys changed
+
+If you paste the output of the verification step (the three lines it prints), I’ll tell you immediately whether the transform is working and whether quotes are the issue.
