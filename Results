@@ -1,8 +1,1 @@
-- powershell: |
-    whoami
-    [Net.ServicePointManager]::SecurityProtocol
-    curl -I https://api.nuget.org/v3/index.json
-    curl -I http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json
-  env:
-    HTTP_PROXY: http://10.0.30.222:3128
-    HTTPS_PROXY: http://10.0.30.222:3128
+       C:\Program Files\dotnet\sdk\8.0.101\NuGet.targets(156,5): error :   Response status code does not indicate success: 403 (Forbidden - User 'Build\b4613701-53af-4066-924b-8d7deeac38d3' lacks permission to complete this action. You need to have 'ReadPackages'. (DevOps Activity ID: 526A6AF1-22C6-4F64-BA56-2573FB67C31A)). [C:\agent\_work\3\s\Alterna-Telecom-Backend\Alterna-Telecom-Backend.csproj]
