@@ -1,198 +1,97 @@
-parameters:
-- name: deploymentName
-  type: string
-  default: 'DeployJob'
+This is one file:
 
-- name: deploymentDisplayName
-  type: string
-  default: 'Deploy IIS'
+<?xml version="1.0" encoding="utf-8"?>
+<APISTRATEGY>
 
-- name: environmentName
-  type: string
+    <GET_CUSTOMER>
 
-- name: deployPool
-  type: string
+        <STRATEGY VALUE="openFreshAccount" API="GET_ELIGIBLE_CUSTOMERS"/>
 
-- name: deployAgentName
-  type: string
+        <STRATEGY VALUE="openFreshAccount2" API="GET_ELIGIBLE_CUSTOMERS"/>
 
-- name: variableGroup
-  type: string
+        <STRATEGY VALUE="openFreshAccount3" API="GET_ELIGIBLE_CUSTOMERS"/>
 
-- name: zipName
-  type: string
+    </GET_CUSTOMER>
 
-- name: siteName
-  type: string
+</APISTRATEGY>
 
-- name: appPoolName
-  type: string
 
-- name: iisTargetPath
-  type: string
+And this is the other:
+<?xml version="1.0" encoding="utf-8"?>
+<APITOKEN>
 
-- name: appSettingsFilePattern
-  type: string
-  default: '**/appsettings.json'
+    <GET_CUSTOMER>
 
-- name: cleanTargetBeforeCopy
-  type: boolean
-  default: true
+        <TOKEN VALUE="KEY1"
+               APPLICATION_NAME="APPORTEUR_AFFAIRE"
+               HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES="true"
+               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_CUSTOMER_ID_LIST="true"
+               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_RANGE="true"
+               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_WHERE="true"
+               HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS="false"
+               HAVE_ACCESS_TO_GET_CUSTOMERIDS_BY_EXTERNAL_ID="false"
+        />
 
-- name: cleanExcludeCsv
-  type: string
-  default: 'web.config,logs,Keys'
+        <TOKEN VALUE="KEY2"
+               APPLICATION_NAME="AMS"
+               HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES="true"
+               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_CUSTOMER_ID_LIST="true"
+               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_RANGE="true"
+               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_WHERE="true"
+               HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS="false"
+               HAVE_ACCESS_TO_GET_CUSTOMERIDS_BY_EXTERNAL_ID="true"
+        />
 
-jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
+        <TOKEN VALUE="KEY3"
+               APPLICATION_NAME="FRESH_ACCOUNT"
+               HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES="false"
+               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_CUSTOMER_ID_LIST="false"
+               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_RANGE="false"
+               HAVE_ACCESS_TO_GET_CUSTOMER_DATA_BY_WHERE="false"
+               HAVE_ACCESS_TO_GET_ELIGIBLE_CUSTOMERS="true"
+               HAVE_ACCESS_TO_GET_CUSTOMERIDS_BY_EXTERNAL_ID="false"
+        />
 
-  environment: ${{ parameters.environmentName }}
+    </GET_CUSTOMER>
 
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
+    <GET_COMPANY>
 
-  variables:
-  - group: ${{ parameters.variableGroup }}
+        <TOKEN VALUE="KEY4"
+               APPLICATION_NAME="APPORTEUR_AFFAIRE"
+               HAVE_ACCESS_TO_GET_GET_ALL_COMPANIES="true"
+        />
 
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - task: DownloadBuildArtifacts@0
-          displayName: 'Download Build Artifact'
-          inputs:
-            buildType: 'current'
-            downloadType: 'single'
-            artifactName: 'drop'
-            downloadPath: '$(Pipeline.Workspace)'
+    </GET_COMPANY>
 
-        - task: ExtractFiles@1
-          displayName: 'Extract artifact'
-          inputs:
-            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\extracted'
-            cleanDestinationFolder: true
+    <GET_T24USER>
 
-        - task: FileTransform@1
-          displayName: 'JSON substitution (appsettings.json)'
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            fileType: 'json'
-            targetFiles: ${{ parameters.appSettingsFilePattern }}
+        <TOKEN VALUE="KEY5"
+               APPLICATION_NAME="AMS"
+               HAVE_ACCESS_TO_GET_T24_USER_BY_EMAIL_ID="true"
+               HAVE_ACCESS_TO_GET_ALL_T24_USERS="true"
+        />
 
-        # Stop website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
+    </GET_T24USER>
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
 
-            $site = Get-Website -Name $siteName
-            Write-Host "Website current state: $($site.State)"
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website: $siteName"
-              Stop-Website -Name $siteName
-            } else {
-              Write-Host "Website already stopped."
-            }
+    <LDAP>
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "AppPool current state: $poolState"
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool: $appPool"
-              Stop-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already stopped."
-            }
+        <TOKEN VALUE="KEY6"
+               APPLICATION_NAME="PSS"
+               HAVE_ACCESS_TO_EDITLDAPUSER="true"
+               HAVE_ACCESS_TO_GET_LDAPUSERS="true"
+               HAVE_ACCESS_TO_SYNCHRONIZEHRUSERS="true"
+               HAVE_ACCESS_TO_GETHRUSERBYEMAIL="true"
+        />
+    </LDAP>
 
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $siteState = (Get-Website -Name $siteName).State
-              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+    <GET_PRODUCT>
 
-              Write-Host "Website state: $siteState | AppPool state: $poolState"
+        <TOKEN VALUE="KEY7"
+               APPLICATION_NAME="FRESH_ACCOUNT"
+               HAVE_ACCESS_TO_GET_PRODUCTS_BY_CUSTOMER_TYPE="true"
+        />
 
-              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-                Write-Host "Website and App Pool are stopped."
-                break
-              }
+    </GET_PRODUCT>
 
-              Start-Sleep -Seconds 2
-            }
-
-            $finalSiteState = (Get-Website -Name $siteName).State
-            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
-
-            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool'
-
-        - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder (before copy)'
-          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
-
-        - task: CopyFiles@2
-          displayName: 'Copy files'
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
-
-        # Start website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool: $appPool"
-              Start-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website: $siteName"
-              Start-Website -Name $siteName
-            } else {
-              Write-Host "Website already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool'
+</APITOKEN>
