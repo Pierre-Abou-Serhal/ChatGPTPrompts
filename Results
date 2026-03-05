@@ -1,62 +1,113 @@
-# azure-pipelines.yml (example consuming the template)
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
 
-trigger: none
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET)'
 
-stages:
-- stage: Deploy_Service_UAT
-  displayName: Deploy Windows Service (UAT)
-  jobs:
-  - template: templates/deploy-windows-service.yml  # <-- your template path
-    parameters:
-      deploymentName: 'DeploySvcJob'
-      deploymentDisplayName: 'Deploy Windows Service - UAT'
-      environmentName: 'UAT'
-      deployPool: 'OnPrem-Windows'
-      deployAgentName: 'WIN-AGENT-01'
-      variableGroup: 'VG-UAT-WindowsService'
+- name: buildPool
+  type: string
 
-      zipName: 'MyService-drop.zip'
+- name: buildAgentName
+  type: string
 
-      # --- service-specific ---
-      serviceName: 'MyCompany.MyService'
-      serviceDisplayName: 'My Company - My Service'
-      serviceDescription: 'Processes background jobs for MyCompany.'
-      serviceTargetPath: 'D:\Services\MyCompany\MyService'
-      serviceExeName: 'MyCompany.MyService.exe'
-      serviceStartType: 'auto'
-      createServiceIfMissing: true
-      updateBinPathIfExists: true
-      serviceUser: 'MYDOMAIN\svc_myservice'
-      servicePassword: '$(SvcPassword)'   # from variable group (secret)
+- name: buildConfiguration
+  type: string
+  default: 'Release'
 
-      # --- same knobs as IIS template ---
-      cleanTargetBeforeCopy: true
-      cleanExcludeCsv: 'logs,Keys'
+- name: restoreProjects
+  type: string
+  default: '**/*.csproj'
 
-      enableJsonTransform: true
-      jsonFiles: |
-        **/appsettings.json
+- name: runTests
+  type: boolean
+  default: false
 
-      enableXmlConfigTransform: true
-      xmlConfigFiles:
-        - '**/MyCompany.MyService.exe.config'
-        - '**/MyCompany.MyService.config'
-      xmlVariableValues:
-        # these become Env:KEY and will replace <add key="KEY" value="..."/>
-        ConnectionStrings__Main: '$(MainDbConn)'     # from variable group
-        Redis__Host: '$(RedisHost)'                  # from variable group
-        Redis__Password: '$(RedisPassword)'          # from variable group (secret)
+- name: testProjects
+  type: string
+  default: '**/*Tests/*.csproj'
 
-      enableCustomXmlEdits: true
-      customXmlEdits:
-        # attribute update example
-        - file: '**/MyCompany.MyService.exe.config'
-          xpath: '/configuration/applicationSettings/MyCompany.MyService.Properties.Settings/setting[@name="ApiBaseUrl"]/value'
-          variable: 'ApiBaseUrl'
-        # another attribute example (if you target an attribute)
-        - file: '**/MyCompany.MyService.exe.config'
-          xpath: '/configuration/system.serviceModel/client/endpoint[@name="SomeEndpoint"]/@address'
-          variable: 'SomeEndpointAddress'
-      customXmlVariableValues:
-        ApiBaseUrl: '$(ApiBaseUrl)'                        # from variable group
-        SomeEndpointAddress: '$(SomeEndpointAddress)'      # from variable group
+- name: publishProject
+  type: string
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+  
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  # Restore using nuget.config
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      projects: ${{ parameters.restoreProjects }}
+      feedsToUse: 'config'
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}
+
+  # Building project: dotnet build
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: ${{ parameters.restoreProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
+
+  # Running tests if available: dotnet test
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    inputs:
+      command: 'test'
+      projects: ${{ parameters.testProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
+      publishTestResults: true
+
+  # Publish the API project
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish'
+    inputs:
+      command: 'publish'
+      projects: ${{ parameters.publishProject }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --output "${{ parameters.publishOutputFolder }}" --no-restore'
+      zipAfterPublish: false
+      modifyOutputPath: false
+
+  # Zipping published files
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  # Uploading zipped files to Azure
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
