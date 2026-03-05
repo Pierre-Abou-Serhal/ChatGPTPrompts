@@ -1,14 +1,11 @@
 parameters:
-- name: deploymentName
+- name: jobName
   type: string
-  default: 'DeployJob'
+  default: 'DeployService'
 
-- name: deploymentDisplayName
+- name: jobDisplayName
   type: string
-  default: 'Deploy IIS'
-
-- name: environmentName
-  type: string
+  default: 'Deploy Windows Service'
 
 - name: deployPool
   type: string
@@ -16,368 +13,170 @@ parameters:
 - name: deployAgentName
   type: string
 
-- name: variableGroup
+# Artifact inputs
+- name: artifactName
   type: string
+  default: 'drop'
 
 - name: zipName
   type: string
+  default: 'Service.zip'
 
-- name: siteName
+# Deployment folder on the server
+- name: installDir
   type: string
+  default: 'C:\Apps\MyService'
 
-- name: appPoolName
+# Windows Service details
+- name: serviceName
   type: string
+  default: 'MyService'
 
-- name: iisTargetPath
+- name: serviceDisplayName
   type: string
+  default: 'My Service'
 
-- name: cleanTargetBeforeCopy
+# Path to the EXE inside installDir after unzip (relative path)
+# Example: 'MyService.exe' or 'bin\MyService.exe'
+- name: exeRelativePath
+  type: string
+  default: 'MyService.exe'
+
+# Service account (optional)
+# If empty -> LocalSystem
+- name: serviceUser
+  type: string
+  default: ''
+
+# If you use a domain/local user, pass password via secret variable and map it
+- name: servicePassword
+  type: string
+  default: ''
+
+# If your service needs args (optional)
+- name: serviceArgs
+  type: string
+  default: ''
+
+# Backup old version (optional)
+- name: backupEnabled
   type: boolean
   default: true
-
-- name: cleanExcludeCsv
-  type: string
-  default: 'web.config,logs,Keys'
-
-- name: enableJsonTransform
-  type: boolean
-  default: true
-
-- name: jsonFiles
-  type: string
-  default: '**/appsettings.json'
-
-- name: enableXmlConfigTransform
-  type: boolean
-  default: false
-
-- name: xmlConfigFiles
-  type: object
-  default: []
-
-- name: xmlVariableValues
-  type: object
-  default: {}
-
-- name: enableCustomXmlEdits
-  type: boolean
-  default: false
-
-- name: customXmlEdits
-  type: object
-  default: []
-
-- name: customXmlVariableValues
-  type: object
-  default: {}
 
 jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
-
-  environment: ${{ parameters.environmentName }}
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
 
   pool:
     name: ${{ parameters.deployPool }}
     demands:
     - Agent.Name -equals ${{ parameters.deployAgentName }}
 
-  variables:
-  - group: ${{ parameters.variableGroup }}
+  steps:
+  - checkout: none
 
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - task: DownloadBuildArtifacts@0
-          displayName: 'Download Build Artifact'
-          inputs:
-            buildType: 'current'
-            downloadType: 'single'
-            artifactName: 'drop'
-            downloadPath: '$(Pipeline.Workspace)'
+  # Download artifact produced by build
+  - download: current
+    artifact: ${{ parameters.artifactName }}
+    displayName: 'Download artifact'
 
-        - task: ExtractFiles@1
-          displayName: 'Extract artifact'
-          inputs:
-            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\extracted'
-            cleanDestinationFolder: true
+  - task: PowerShell@2
+    displayName: 'Deploy Windows Service (stop/copy/install/start)'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $ErrorActionPreference = "Stop"
 
-        # JSON substitution (v2)
-        - task: FileTransform@2
-          displayName: 'JSON substitution (appsettings.json)'
-          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            enableXmlTransform: false
-            xmlTransformationRules: ''
-            jsonTargetFiles: ${{ parameters.jsonFiles }}
+        $zipPath = "$(Pipeline.Workspace)\${{ parameters.artifactName }}\${{ parameters.zipName }}"
+        if (!(Test-Path $zipPath)) {
+          throw "Zip not found: $zipPath"
+        }
 
-        # XML substitution (v2)
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
+        $installDir = "${{ parameters.installDir }}"
+        $serviceName = "${{ parameters.serviceName }}"
+        $displayName = "${{ parameters.serviceDisplayName }}"
+        $exeRel = "${{ parameters.exeRelativePath }}"
+        $args = "${{ parameters.serviceArgs }}"
 
-            $patternsJson = @'
-            ${{ convertToJson(parameters.xmlConfigFiles) }}
-            '@
-            $patterns = $patternsJson | ConvertFrom-Json
+        $exePath = Join-Path $installDir $exeRel
 
-            if (-not $patterns -or $patterns.Count -eq 0) {
-              Write-Host "No xmlConfigFiles patterns provided. Skipping."
-              exit 0
+        Write-Host "Zip: $zipPath"
+        Write-Host "InstallDir: $installDir"
+        Write-Host "Service: $serviceName"
+        Write-Host "ExePath: $exePath"
+
+        # Ensure install dir exists
+        New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+        # Backup current folder (optional)
+        if ("${{ parameters.backupEnabled }}" -eq "true" -and (Test-Path $installDir) ) {
+          $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+          $backupDir = "$installDir-backup-$timestamp"
+          # only backup if there's something deployed already
+          if (Get-ChildItem -Path $installDir -Force -ErrorAction SilentlyContinue) {
+            Write-Host "Backing up current version to: $backupDir"
+            Copy-Item -Path $installDir -Destination $backupDir -Recurse -Force
+          }
+        }
+
+        # Stop service if exists
+        $svc = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+        if ($null -ne $svc) {
+          if ($svc.Status -ne "Stopped") {
+            Write-Host "Stopping service: $serviceName"
+            Stop-Service -Name $serviceName -Force
+            $svc.WaitForStatus("Stopped", (New-TimeSpan -Seconds 60))
+          } else {
+            Write-Host "Service already stopped."
+          }
+        } else {
+          Write-Host "Service does not exist yet: $serviceName"
+        }
+
+        # Clean install dir (keep folder, remove contents)
+        Write-Host "Cleaning install directory contents..."
+        Get-ChildItem -Path $installDir -Force | Remove-Item -Recurse -Force
+
+        # Extract zip to install dir
+        Write-Host "Extracting zip..."
+        Expand-Archive -Path $zipPath -DestinationPath $installDir -Force
+
+        if (!(Test-Path $exePath)) {
+          throw "Service EXE not found after extraction: $exePath (check exeRelativePath)"
+        }
+
+        # Create or update service
+        $binPath = "`"$exePath`""
+        if ($args -and $args.Trim().Length -gt 0) {
+          $binPath = "$binPath $args"
+        }
+
+        if ($null -eq $svc) {
+          Write-Host "Creating service..."
+          $user = "${{ parameters.serviceUser }}"
+          $pass = "${{ parameters.servicePassword }}"
+
+          if ([string]::IsNullOrWhiteSpace($user)) {
+            # LocalSystem
+            sc.exe create $serviceName binPath= $binPath DisplayName= "`"$displayName`"" start= auto | Out-Host
+          } else {
+            if ([string]::IsNullOrWhiteSpace($pass)) {
+              throw "servicePassword is required when serviceUser is provided."
             }
+            sc.exe create $serviceName binPath= $binPath DisplayName= "`"$displayName`"" start= auto obj= $user password= $pass | Out-Host
+          }
+        } else {
+          Write-Host "Updating service binPath..."
+          sc.exe config $serviceName binPath= $binPath start= auto | Out-Host
+        }
 
-            function Resolve-Files([string]$base, [string]$pattern) {
-              $pattern = $pattern -replace '\\','/'
+        # Start service
+        Write-Host "Starting service..."
+        Start-Service -Name $serviceName
 
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            # collect unique files
-            $files = @()
-            foreach ($pat in $patterns) {
-              $files += Resolve-Files $root ([string]$pat)
-            }
-            $files = $files | Where-Object { $_ } | Select-Object -Unique
-
-            if (-not $files -or $files.Count -eq 0) {
-              throw "No config files matched xmlConfigFiles patterns under: $root"
-            }
-
-            foreach ($f in $files) {
-              Write-Host "Editing: $($f.FullName)"
-              [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
-              if (-not $nodes -or $nodes.Count -eq 0) {
-                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
-                continue
-              }
-
-              $changed = 0
-
-              foreach ($n in $nodes) {
-                $key = [string]$n.GetAttribute("key")
-                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
-
-                # no variable provided => skip
-                if ([string]::IsNullOrWhiteSpace($val)) { continue }
-
-                $current = [string]$n.GetAttribute("value")
-                if ($current -ne $val) {
-                  $n.SetAttribute("value", $val)
-                  $changed++
-                }
-              }
-
-              $xml.Save($f.FullName)
-              Write-Host "Updated $changed setting(s) in $($f.Name)"
-            }
-          displayName: 'XML appSettings substitution (.config)'
-          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-          env:
-            ${{ each pair in parameters.xmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-          # ---- Custom XML substitution (XPath) ----
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $rulesJson = @'
-            ${{ convertToJson(parameters.customXmlEdits) }}
-            '@
-            $rules = $rulesJson | ConvertFrom-Json
-
-            if (-not $rules -or $rules.Count -eq 0) {
-              Write-Host "No custom XML edits provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files($base, $pattern) {
-              # supports: **/File.xml, File.xml, or folder\File.xml
-              $pattern = $pattern -replace '\\','/'
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            foreach ($r in $rules) {
-              $filePat = [string]$r.file
-              $xpath   = [string]$r.xpath
-              $varName = [string]$r.variable
-
-              if (-not $filePat -or -not $xpath -or -not $varName) {
-                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
-              }
-
-              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
-              if ([string]::IsNullOrWhiteSpace($value)) {
-                throw "Pipeline variable '$varName' is missing/empty."
-              }
-
-              $files = Resolve-Files $root $filePat
-              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
-
-              foreach ($f in @($files)) {
-                [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-                if ($xpath -match "/@([^/]+)$") {
-                  $attrName = $Matches[1]
-                  $nodePath = $xpath -replace "/@[^/]+$",""
-                  $node = $xml.SelectSingleNode($nodePath)
-                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
-
-                  $attr = $node.Attributes[$attrName]
-                  if (-not $attr) {
-                    $attr = $xml.CreateAttribute($attrName)
-                    [void]$node.Attributes.Append($attr)
-                  }
-                  $attr.Value = $value
-                } else {
-                  $node = $xml.SelectSingleNode($xpath)
-                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
-                  $node.InnerText = $value
-                }
-
-                $xml.Save($f.FullName)
-                Write-Host "Updated $($f.Name): $xpath (from $varName)"
-              }
-            }
-          displayName: 'Custom XML substitution (XPath)'
-          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
-          env:
-            ${{ each pair in parameters.customXmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        # Stop website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $site = Get-Website -Name $siteName
-            Write-Host "Website current state: $($site.State)"
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website: $siteName"
-              Stop-Website -Name $siteName
-            } else {
-              Write-Host "Website already stopped."
-            }
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "AppPool current state: $poolState"
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool: $appPool"
-              Stop-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already stopped."
-            }
-
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $siteState = (Get-Website -Name $siteName).State
-              $poolState = (Get-WebAppPoolState -Name $appPool).Value
-
-              Write-Host "Website state: $siteState | AppPool state: $poolState"
-
-              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-                Write-Host "Website and App Pool are stopped."
-                break
-              }
-
-              Start-Sleep -Seconds 2
-            }
-
-            $finalSiteState = (Get-Website -Name $siteName).State
-            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
-
-            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool'
-
-        - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder (before copy)'
-          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
-
-        - task: CopyFiles@2
-          displayName: 'Copy files'
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
-
-        # Start website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool: $appPool"
-              Start-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website: $siteName"
-              Start-Website -Name $siteName
-            } else {
-              Write-Host "Website already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool'
+        # Confirm running
+        $svc2 = Get-Service -Name $serviceName
+        Write-Host "Service status: $($svc2.Status)"
+        if ($svc2.Status -ne "Running") {
+          throw "Service failed to start."
+        }
