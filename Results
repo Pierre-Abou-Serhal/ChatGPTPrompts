@@ -1,116 +1,219 @@
-You’re past the “project not found” issue now — the current error is different and very clear:
+Starting: Publish
+==============================================================================
+Task         : .NET Core
+Description  : Build, test, package, or publish a dotnet application, or run a custom dotnet command
+Version      : 2.235.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/build/dotnet-core-cli
+==============================================================================
+C:\Windows\system32\chcp.com 65001
+Active code page: 65001
+Info: .NET Core SDK/runtime 2.2 and 3.0 are now End of Life(EOL) and have been removed from all hosted agents. If you're using these SDK/runtimes on hosted agents, kindly upgrade to newer versions which are not EOL, or else use UseDotNet task to install the required version.
+"C:\Program Files\dotnet\dotnet.exe" publish C:\agent\_work\5\s\Logger\Logger.csproj --configuration Release --output C:\agent\_work\5\a\Alterna-Logger --no-restore -r win-x64 --self-contained true /p:PublishSingleFile=true
+MSBuild version 17.8.3+195e7f5a3 for .NET
+C:\Program Files\dotnet\sdk\8.0.101\Sdks\Microsoft.NET.Sdk\targets\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1047: Assets file 'C:\agent\_work\5\s\Logger\obj\project.assets.json' doesn't have a target for 'net8.0/win-x64'. Ensure that restore has run and that you have included 'net8.0' in the TargetFrameworks for your project. You may also need to include 'win-x64' in your project's RuntimeIdentifiers. [C:\agent\_work\5\s\Logger\Logger.csproj]
+##[error]Error: The process 'C:\Program Files\dotnet\dotnet.exe' failed with exit code 1
+##[warning].NET 5 has some compatibility issues with older Nuget versions(<=5.7), so if you are using an older Nuget version(and not dotnet cli) to restore, then the dotnet cli commands (e.g. dotnet build) which rely on such restored packages might fail. To mitigate such error, you can either: (1) - Use dotnet cli to restore, (2) - Use Nuget version 5.8 to restore, (3) - Use global.json using an older sdk version(<=3) to build
+Info: Azure Pipelines hosted agents have been updated and now contain .Net 5.x SDK/Runtime along with the older .Net Core version which are currently lts. Unless you have locked down a SDK version for your project(s), 5.x SDK might be picked up which might have breaking behavior as compared to previous versions. You can learn more about the breaking changes here: https://docs.microsoft.com/en-us/dotnet/core/tools/ and https://docs.microsoft.com/en-us/dotnet/core/compatibility/ . To learn about more such changes and troubleshoot, refer here: https://docs.microsoft.com/en-us/azure/devops/pipelines/tasks/build/dotnet-core-cli?view=azure-devops#troubleshooting
+##[error]Dotnet command failed with non-zero exit code on the following projects : [ 'C:\\agent\\_work\\5\\s\\Logger\\Logger.csproj' ]
+Finishing: Publish
 
-> **NETSDK1047**: `project.assets.json` doesn’t have a target for **`net8.0/win-x64`**
-> This happens when **restore didn’t run for the same TargetFramework + RuntimeIdentifier combo** that you later publish with.
 
-Right now you restore like this (no runtime):
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
 
-```yaml
-command: restore
-projects: **/*.csproj
-```
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET)'
 
-But you publish with:
+- name: buildPool
+  type: string
 
-```bash
-dotnet publish ... -r win-x64 --self-contained true
-```
+- name: buildAgentName
+  type: string
 
-That produces a restore graph for `net8.0/win-x64`, which **was not restored**.
+- name: buildConfiguration
+  type: string
+  default: 'Release'
 
----
+- name: restoreProjects
+  type: string
+  default: '**/*.csproj'
 
-## The fix
+- name: runTests
+  type: boolean
+  default: false
 
-When you publish **with `-r win-x64`** (or any runtime), you must also **restore with the same runtime** (or do restore again inside publish, but you have `--no-restore`).
+- name: testProjects
+  type: string
+  default: '**/*Tests/*.csproj'
 
-### ✅ Fix option A (recommended): pass `-r` to Restore too
+- name: publishProject
+  type: string
 
-Add the same runtime to restore arguments.
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
 
-### Also: Don’t default `targetRuntime: win-x64`
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
 
-For Web APIs (framework-dependent/IIS), you usually **don’t want** a runtime at all. Default it to empty.
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
 
----
+- name: deploymentMode
+  type: string
+  default: 'framework-dependent'
+  values:
+  - framework-dependent
+  - self-contained
 
-## Updated template (only the relevant parts changed)
-
-### 1) Change default runtime to empty
-
-```yaml
 - name: targetRuntime
   type: string
-  default: ''   # <-- was win-x64
-```
+  default: ''
 
-### 2) Add restoreArgs variables and use them in Restore
+- name: produceSingleFile
+  type: boolean
+  default: false
 
-Add these variables under `variables:`:
+- name: readyToRun
+  type: boolean
+  default: false
 
-```yaml
+- name: trim
+  type: boolean
+  default: false
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  variables:
+  - name: publishArgsBase
+    value: >-
+      --configuration ${{ parameters.buildConfiguration }}
+      --output "${{ parameters.publishOutputFolder }}"
+      --no-restore
+
+  - name: publishArgsRuntime
+    value: ''
+
+  - name: publishArgsSelfContained
+    value: ''
+
+  - name: publishArgsSingleFile
+    value: ''
+
+  - name: publishArgsReadyToRun
+    value: ''
+
+  - name: publishArgsTrim
+    value: ''
+  
   - name: restoreArgs
     value: ''
 
   - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: publishArgsRuntime
+      value: '-r ${{ parameters.targetRuntime }}'
+
+  - ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained true'
+
+  - ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained false'
+
+  - ${{ if eq(parameters.produceSingleFile, true) }}:
+    - name: publishArgsSingleFile
+      value: '/p:PublishSingleFile=true'
+
+  - ${{ if eq(parameters.readyToRun, true) }}:
+    - name: publishArgsReadyToRun
+      value: '/p:PublishReadyToRun=true'
+
+  - ${{ if eq(parameters.trim, true) }}:
+    - name: publishArgsTrim
+      value: '/p:PublishTrimmed=true'
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
     - name: restoreArgs
       value: '-r ${{ parameters.targetRuntime }}'
-```
 
-Then update the **Restore task** to include `arguments:`:
+  steps:
+  - checkout: self
+    clean: true
 
-```yaml
-- task: DotNetCoreCLI@2
-  displayName: 'Restore'
-  inputs:
-    command: 'restore'
-    projects: ${{ parameters.restoreProjects }}
-    feedsToUse: 'config'
-    nugetConfigPath: ${{ parameters.nugetConfigPath }}
-    arguments: >-
-      $(restoreArgs)
-```
+  # Restore using nuget.config
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      projects: ${{ parameters.restoreProjects }}
+      feedsToUse: 'config'
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}
+      arguments: >-
+        $(restoreArgs)
 
-That’s it. Now restore will generate assets for `net8.0/win-x64` when needed.
+  # Building project: dotnet build
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: ${{ parameters.restoreProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
 
----
+  # Running tests if available: dotnet test
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    inputs:
+      command: 'test'
+      projects: ${{ parameters.testProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
+      publishTestResults: true
 
-## Why this works
+  # Publish the API project (with deployment-mode / runtime / single-file options)
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish'
+    inputs:
+      command: 'publish'
+      projects: ${{ parameters.publishProject }}
+      publishWebProjects: false
+      zipAfterPublish: false
+      modifyOutputPath: false
+      arguments: >-
+        $(publishArgsBase)
+        $(publishArgsRuntime)
+        $(publishArgsSelfContained)
+        $(publishArgsSingleFile)
+        $(publishArgsReadyToRun)
+        $(publishArgsTrim)
 
-* Framework-dependent (no runtime): `targetRuntime: ''` → restoreArgs empty → normal restore.
-* Self-contained + runtime: `targetRuntime: win-x64` → restore runs with `-r win-x64` → assets contain `net8.0/win-x64` → publish succeeds even with `--no-restore`.
+  # Zipping published files
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
 
----
-
-## Bonus: fail fast if self-contained but runtime missing
-
-If you want safety, add a validation step before restore:
-
-```yaml
-- powershell: |
-    if ('${{ parameters.deploymentMode }}' -eq 'self-contained' -and [string]::IsNullOrWhiteSpace('${{ parameters.targetRuntime }}')) {
-      throw "deploymentMode=self-contained requires targetRuntime (e.g. win-x64)."
-    }
-  displayName: 'Validate publish parameters'
-```
-
----
-
-## What to set when building the Windows Service
-
-In your consuming pipeline:
-
-```yaml
-deploymentMode: 'self-contained'
-targetRuntime: 'win-x64'
-produceSingleFile: true
-```
-
-For IIS Web API (framework-dependent):
-
-```yaml
-deploymentMode: 'framework-dependent'
-targetRuntime: ''   # important
-```
-
-If you want, I can paste the *full* corrected template file end-to-end with these edits applied so you can copy/paste directly.
+  # Uploading zipped files to Azure
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
