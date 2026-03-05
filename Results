@@ -1,62 +1,56 @@
-variables:
-- name: publishArgsBase
-  value: >-
-    --configuration ${{ parameters.buildConfiguration }}
-    --output "${{ parameters.publishOutputFolder }}"
-    --no-restore
+Yes — you *can* (and usually should) explicitly control the .NET SDK version.
 
-- name: publishArgsRuntime
-  value: ''
+### How it works by default
 
-- name: publishArgsSelfContained
-  value: ''
+`DotNetCoreCLI@2` just runs **`dotnet` from the agent’s PATH**.
 
-- name: publishArgsSingleFile
-  value: ''
+So:
 
-- name: publishArgsReadyToRun
-  value: ''
+* **Microsoft-hosted agents**: they come with multiple SDKs installed; the task will use whatever `dotnet` resolves to (often the latest installed), *unless* your repo pins a version.
+* **Self-hosted agents**: it will use whatever SDK is installed on that machine (or whatever is first in PATH). Nothing is “auto-downloaded” unless you tell it to.
 
-- name: publishArgsTrim
-  value: ''
+### Best ways to pin the version
 
-- ${{ if ne(parameters.targetRuntime, '') }}:
-  - name: publishArgsRuntime
-    value: '-r ${{ parameters.targetRuntime }}'
+#### Option A) `global.json` (recommended for consistency)
 
-- ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
-  - name: publishArgsSelfContained
-    value: '--self-contained true'
+Put this at the repo root:
 
-- ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
-  - name: publishArgsSelfContained
-    value: '--self-contained false'
+```json
+{
+  "sdk": {
+    "version": "8.0.204",
+    "rollForward": "latestFeature"
+  }
+}
+```
 
-- ${{ if eq(parameters.produceSingleFile, true) }}:
-  - name: publishArgsSingleFile
-    value: '/p:PublishSingleFile=true'
+Then every build uses that SDK (as long as it’s installed or you install it in pipeline).
 
-- ${{ if eq(parameters.readyToRun, true) }}:
-  - name: publishArgsReadyToRun
-    value: '/p:PublishReadyToRun=true'
+#### Option B) Add `UseDotNet@2` in your template (most explicit)
 
-- ${{ if eq(parameters.trim, true) }}:
-  - name: publishArgsTrim
-    value: '/p:PublishTrimmed=true'
+Add a parameter and install that SDK before restore/build/test/publish:
 
-- task: DotNetCoreCLI@2
-  displayName: 'Publish'
+```yaml
+parameters:
+- name: dotnetSdkVersion
+  type: string
+  default: '8.0.x'
+
+steps:
+- task: UseDotNet@2
+  displayName: 'Use .NET SDK ${{ parameters.dotnetSdkVersion }}'
   inputs:
-    command: 'publish'
-    projects: ${{ parameters.publishProject }}
-    publishWebProjects: false
-    zipAfterPublish: false
-    modifyOutputPath: false
-    arguments: >-
-      $(publishArgsBase)
-      $(publishArgsRuntime)
-      $(publishArgsSelfContained)
-      $(publishArgsSingleFile)
-      $(publishArgsReadyToRun)
-      $(publishArgsTrim)
+    packageType: 'sdk'
+    version: '${{ parameters.dotnetSdkVersion }}'
+    includePreviewVersions: false
+```
 
+After that, your `DotNetCoreCLI@2` tasks will use the installed SDK automatically.
+
+### Which should you use?
+
+* If you want **repo-level control** (developers + CI): **use `global.json`**
+* If you want **pipeline-level control** (without touching repo): **use `UseDotNet@2`**
+* Many teams do **both**: `global.json` + `UseDotNet@2` to guarantee the agent has the right SDK.
+
+If you tell me which SDK you target (e.g., .NET 6/7/8) and whether your agent is hosted or self-hosted, I can drop the exact change into your `build-dotnet-core-webapi.yml` template.
