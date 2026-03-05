@@ -5,7 +5,7 @@ parameters:
 
 - name: jobDisplayName
   type: string
-  default: 'Build (.NET)'
+  default: 'Build (.NET Framework)'
 
 - name: buildPool
   type: string
@@ -13,37 +13,61 @@ parameters:
 - name: buildAgentName
   type: string
 
+# Visual Studio used by VSBuild (self-hosted agent must have VS/Build Tools installed)
+- name: vsVersion
+  type: string
+  default: 'latest'
+
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
+
 - name: buildConfiguration
   type: string
   default: 'Release'
 
-- name: restoreProjects
+# Restore/build input
+- name: solution
   type: string
-  default: '**/*.csproj'
-
-- name: runTests
-  type: boolean
-  default: false
-
-- name: testProjects
-  type: string
-  default: '**/*Tests/*.csproj'
-
-- name: publishProject
-  type: string
+  default: '**/*.sln'
 
 - name: nugetConfigPath
   type: string
   default: 'nuget.config'
 
+# Tests
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
+
+# “Publish” / packaging
+# For .NET Framework web apps, the closest equivalent of dotnet publish is MSBuild Web Deploy packaging
+- name: publishProject
+  type: string
+  default: ''   # optional; if empty we build the whole solution
+
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
 - name: zipName
   type: string
   default: 'WebApp.zip'
 
-- name: publishOutputFolder
+- name: artifactName
   type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
-  
+  default: 'drop'
+
 jobs:
 - job: ${{ parameters.jobName }}
   displayName: ${{ parameters.jobDisplayName }}
@@ -57,57 +81,76 @@ jobs:
   - checkout: self
     clean: true
 
-  # Restore using nuget.config
-  - task: DotNetCoreCLI@2
+  # NuGet tooling
+  - task: NuGetToolInstaller@1
+    displayName: 'Use NuGet'
+
+  # Restore using nuget.config (classic .NET Framework)
+  - task: NuGetCommand@2
     displayName: 'Restore'
     inputs:
       command: 'restore'
-      projects: ${{ parameters.restoreProjects }}
+      restoreSolution: '${{ parameters.solution }}'
       feedsToUse: 'config'
-      nugetConfigPath: ${{ parameters.nugetConfigPath }}
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
 
-  # Building project: dotnet build
-  - task: DotNetCoreCLI@2
+  # Build (solution)
+  - task: VSBuild@1
     displayName: 'Build'
     inputs:
-      command: 'build'
-      projects: ${{ parameters.restoreProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
+      solution: '${{ parameters.solution }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
 
-  # Running tests if available: dotnet test
-  - task: DotNetCoreCLI@2
+  # Tests (optional)
+  - task: VSTest@2
     displayName: 'Test'
     condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
     inputs:
-      command: 'test'
-      projects: ${{ parameters.testProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
-      publishTestResults: true
+      testSelector: 'testAssemblies'
+      testAssemblyVer2: '${{ parameters.testAssemblies }}'
+      searchFolder: '$(System.DefaultWorkingDirectory)'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      diagnosticsEnabled: true
 
-  # Publish the API project
-  - task: DotNetCoreCLI@2
-    displayName: 'Publish'
+  # Publish/Package the web project (Web Deploy Package)
+  # This creates a deployable package under packageLocation (closest to dotnet publish)
+  - task: VSBuild@1
+    displayName: 'Publish (Package)'
+    condition: and(succeeded(), ne('${{ parameters.publishProject }}', ''))
     inputs:
-      command: 'publish'
-      projects: ${{ parameters.publishProject }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --output "${{ parameters.publishOutputFolder }}" --no-restore'
-      zipAfterPublish: false
-      modifyOutputPath: false
+      solution: '${{ parameters.publishProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: false
+      msbuildArgs: >
+        /p:DeployOnBuild=true
+        /p:WebPublishMethod=Package
+        /p:PackageAsSingleFile=true
+        /p:SkipInvalidConfigurations=true
+        /p:PackageLocation="${{ parameters.packageLocation }}"
+        /p:AutoParameterizationWebConfigConnectionStrings=false
 
-  # Zipping published files
+  # Zip package output (same as your dotnet core template)
   - task: ArchiveFiles@2
     displayName: 'Zip publish output'
     inputs:
-      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
       includeRootFolder: false
       archiveType: 'zip'
       archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
       replaceExistingArchive: true
 
-  # Uploading zipped files to Azure
+  # Publish artifact
   - task: PublishBuildArtifacts@1
     displayName: 'Publish Build Artifact'
     inputs:
       PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: 'drop'
+      ArtifactName: '${{ parameters.artifactName }}'
       publishLocation: 'Container'
