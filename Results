@@ -1,3 +1,4 @@
+# Deploy Windows Service (same structure as IIS template)
 parameters:
 - name: deploymentName
   type: string
@@ -5,7 +6,7 @@ parameters:
 
 - name: deploymentDisplayName
   type: string
-  default: 'Deploy IIS'
+  default: 'Deploy Windows Service'
 
 - name: environmentName
   type: string
@@ -22,22 +23,58 @@ parameters:
 - name: zipName
   type: string
 
-- name: siteName
+# --- Windows Service specific ---
+- name: serviceName
   type: string
 
-- name: appPoolName
+- name: serviceDisplayName
+  type: string
+  default: ''
+
+- name: serviceDescription
+  type: string
+  default: ''
+
+# Path where service binaries will live (like iisTargetPath)
+- name: serviceTargetPath
   type: string
 
-- name: iisTargetPath
+# Optional: if you want to run under a specific account
+- name: serviceUser
+  type: string
+  default: ''         # e.g. DOMAIN\svc_user
+
+- name: servicePassword
+  type: string
+  default: ''         # supply via variable group/secret
+
+# If service does not exist, create it.
+- name: createServiceIfMissing
+  type: boolean
+  default: true
+
+# If service exists, optionally update its binPath (points to exe in target)
+- name: updateBinPathIfExists
+  type: boolean
+  default: true
+
+# exe name inside target folder, used to set binPath (e.g. MySvc.exe)
+- name: serviceExeName
   type: string
 
+# Start type: auto | demand | disabled
+- name: serviceStartType
+  type: string
+  default: 'auto'
+
+# --- Same clean/transform knobs as IIS template ---
 - name: cleanTargetBeforeCopy
   type: boolean
   default: true
 
 - name: cleanExcludeCsv
   type: string
-  default: 'web.config,logs,Keys'
+  default: 'logs,Keys'
 
 - name: enableJsonTransform
   type: boolean
@@ -191,7 +228,7 @@ jobs:
             ${{ each pair in parameters.xmlVariableValues }}:
               ${{ pair.key }}: ${{ pair.value }}
 
-          # ---- Custom XML substitution (XPath) ----
+        # ---- Custom XML substitution (XPath) ----
         - powershell: |
             $ErrorActionPreference = "Stop"
             $root = "$(Pipeline.Workspace)\extracted"
@@ -268,58 +305,46 @@ jobs:
             ${{ each pair in parameters.customXmlVariableValues }}:
               ${{ pair.key }}: ${{ pair.value }}
 
-        # Stop website + app pool safely (idempotent)
+        # Stop Windows Service safely (idempotent)
         - powershell: |
-            Import-Module WebAdministration
+            $ErrorActionPreference = "Stop"
+            $svcName = "${{ parameters.serviceName }}"
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $site = Get-Website -Name $siteName
-            Write-Host "Website current state: $($site.State)"
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website: $siteName"
-              Stop-Website -Name $siteName
-            } else {
-              Write-Host "Website already stopped."
+            $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+            if (-not $svc) {
+              Write-Host "Service '$svcName' not found. Nothing to stop."
+              exit 0
             }
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "AppPool current state: $poolState"
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool: $appPool"
-              Stop-WebAppPool -Name $appPool
+            Write-Host "Service current status: $($svc.Status)"
+            if ($svc.Status -ne "Stopped") {
+              Write-Host "Stopping service: $svcName"
+              Stop-Service -Name $svcName -Force -ErrorAction Stop
             } else {
-              Write-Host "AppPool already stopped."
+              Write-Host "Service already stopped."
             }
 
             $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $siteState = (Get-Website -Name $siteName).State
-              $poolState = (Get-WebAppPoolState -Name $appPool).Value
-
-              Write-Host "Website state: $siteState | AppPool state: $poolState"
-
-              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-                Write-Host "Website and App Pool are stopped."
+            for ($i=1; $i -le $maxTries; $i++) {
+              $status = (Get-Service -Name $svcName).Status
+              Write-Host "Service status: $status"
+              if ($status -eq "Stopped") {
+                Write-Host "Service is stopped."
                 break
               }
-
               Start-Sleep -Seconds 2
             }
 
-            $finalSiteState = (Get-Website -Name $siteName).State
-            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
-
-            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
+            $final = (Get-Service -Name $svcName).Status
+            if ($final -ne "Stopped") {
+              throw "Failed to stop service '$svcName'. Final status: $final"
             }
 
             Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool'
+          displayName: 'Stop Windows Service'
 
         - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
+            $target = '${{ parameters.serviceTargetPath }}'
 
             if (-not (Test-Path $target)) {
               throw "Target folder does not exist: $target"
@@ -351,33 +376,112 @@ jobs:
           inputs:
             SourceFolder: '$(Pipeline.Workspace)\extracted'
             Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
+            TargetFolder: '${{ parameters.serviceTargetPath }}'
             OverWrite: true
 
-        # Start website + app pool safely (idempotent)
+        # Create or update Windows Service to point to the deployed EXE
         - powershell: |
-            Import-Module WebAdministration
+            $ErrorActionPreference = "Stop"
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
+            $svcName   = "${{ parameters.serviceName }}"
+            $exeName   = "${{ parameters.serviceExeName }}"
+            $targetDir = "${{ parameters.serviceTargetPath }}"
+            $exePath   = Join-Path $targetDir $exeName
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool: $appPool"
-              Start-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already started."
+            if (-not (Test-Path $exePath)) {
+              throw "Service executable not found: $exePath"
             }
 
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website: $siteName"
-              Start-Website -Name $siteName
-            } else {
-              Write-Host "Website already started."
+            $displayName = "${{ parameters.serviceDisplayName }}"
+            if ([string]::IsNullOrWhiteSpace($displayName)) { $displayName = $svcName }
+
+            $desc = "${{ parameters.serviceDescription }}"
+            $startType = "${{ parameters.serviceStartType }}"  # auto|demand|disabled
+
+            $user = "${{ parameters.serviceUser }}"
+            $pass = "${{ parameters.servicePassword }}"
+
+            $existing = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+
+            function Set-StartType([string]$name, [string]$st) {
+              switch ($st.ToLowerInvariant()) {
+                "auto"     { sc.exe config $name start= auto    | Out-Host }
+                "demand"   { sc.exe config $name start= demand  | Out-Host }
+                "disabled" { sc.exe config $name start= disabled| Out-Host }
+                default    { throw "Invalid serviceStartType: $st (use auto|demand|disabled)" }
+              }
             }
 
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool'
+            if (-not $existing) {
+              if ('${{ parameters.createServiceIfMissing }}' -ne 'true') {
+                throw "Service '$svcName' does not exist and createServiceIfMissing=false."
+              }
+
+              Write-Host "Creating service: $svcName"
+              # Important: sc.exe spacing rules (space after '=')
+              if (-not [string]::IsNullOrWhiteSpace($user)) {
+                if ([string]::IsNullOrWhiteSpace($pass)) { throw "servicePassword is required when serviceUser is set." }
+
+                sc.exe create $svcName binPath= "`"$exePath`"" DisplayName= "`"$displayName`"" start= $startType obj= "`"$user`"" password= "`"$pass`"" | Out-Host
+              } else {
+                sc.exe create $svcName binPath= "`"$exePath`"" DisplayName= "`"$displayName`"" start= $startType | Out-Host
+              }
+
+              if (-not [string]::IsNullOrWhiteSpace($desc)) {
+                sc.exe description $svcName "`"$desc`"" | Out-Host
+              }
+            }
+            else {
+              Write-Host "Service exists: $svcName"
+
+              if ('${{ parameters.updateBinPathIfExists }}' -eq 'true') {
+                Write-Host "Updating binPath to: $exePath"
+                # binPath is updated using 'config'
+                sc.exe config $svcName binPath= "`"$exePath`"" | Out-Host
+              }
+
+              # Keep start type aligned
+              Set-StartType $svcName $startType
+
+              if (-not [string]::IsNullOrWhiteSpace($desc)) {
+                sc.exe description $svcName "`"$desc`"" | Out-Host
+              }
+
+              if (-not [string]::IsNullOrWhiteSpace($user)) {
+                if ([string]::IsNullOrWhiteSpace($pass)) { throw "servicePassword is required when serviceUser is set." }
+                sc.exe config $svcName obj= "`"$user`"" password= "`"$pass`"" | Out-Host
+              }
+            }
+          displayName: 'Create/Update Windows Service'
+
+        # Start Windows Service safely (idempotent)
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $svcName = "${{ parameters.serviceName }}"
+
+            $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+            if (-not $svc) { throw "Service '$svcName' not found." }
+
+            if ($svc.Status -ne "Running") {
+              Write-Host "Starting service: $svcName"
+              Start-Service -Name $svcName -ErrorAction Stop
+            } else {
+              Write-Host "Service already running."
+            }
+
+            $maxTries = 30
+            for ($i=1; $i -le $maxTries; $i++) {
+              $status = (Get-Service -Name $svcName).Status
+              Write-Host "Service status: $status"
+              if ($status -eq "Running") {
+                Write-Host "Service is running."
+                break
+              }
+              Start-Sleep -Seconds 2
+            }
+
+            $final = (Get-Service -Name $svcName).Status
+            if ($final -ne "Running") {
+              throw "Failed to start service '$svcName'. Final status: $final"
+            }
+          displayName: 'Start Windows Service'
