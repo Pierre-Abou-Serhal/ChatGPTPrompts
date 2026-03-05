@@ -1,3 +1,11 @@
+# build-dotnet-core-webapi.yml (extended)
+# Adds:
+# - deploymentMode: framework-dependent | self-contained
+# - targetRuntime: e.g. win-x64, linux-x64
+# - produceSingleFile: true/false
+# - readyToRun: true/false (optional, nice for services)
+# - trim: true/false (optional; can be risky depending on reflection)
+
 parameters:
 - name: jobName
   type: string
@@ -43,7 +51,38 @@ parameters:
 - name: publishOutputFolder
   type: string
   default: '$(Build.ArtifactStagingDirectory)\publish'
-  
+
+# ---------------- NEW ----------------
+# Framework-dependent = normal web api publish (needs .NET runtime on server)
+# Self-contained      = bundles runtime for the targetRuntime (good for Windows Services)
+- name: deploymentMode
+  type: string
+  default: 'framework-dependent'
+  values:
+  - framework-dependent
+  - self-contained
+
+# If empty => no -r passed (framework-dependent default behavior)
+# For self-contained you normally set this (e.g. win-x64).
+- name: targetRuntime
+  type: string
+  default: ''  # examples: win-x64, win-x86, linux-x64
+
+- name: produceSingleFile
+  type: boolean
+  default: false
+
+# Optional performance tweaks (generally safe)
+- name: readyToRun
+  type: boolean
+  default: false
+
+# Optional size tweak (can break apps that rely on reflection if not configured)
+- name: trim
+  type: boolean
+  default: false
+# -------------------------------------
+
 jobs:
 - job: ${{ parameters.jobName }}
   displayName: ${{ parameters.jobDisplayName }}
@@ -84,15 +123,25 @@ jobs:
       arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
       publishTestResults: true
 
-  # Publish the API project
+  # Publish (with deployment-mode / runtime / single-file options)
   - task: DotNetCoreCLI@2
     displayName: 'Publish'
     inputs:
       command: 'publish'
       projects: ${{ parameters.publishProject }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --output "${{ parameters.publishOutputFolder }}" --no-restore'
+      publishWebProjects: false
       zipAfterPublish: false
       modifyOutputPath: false
+      arguments: >
+        --configuration ${{ parameters.buildConfiguration }}
+        --output "${{ parameters.publishOutputFolder }}"
+        --no-restore
+        ${{ if ne(parameters.targetRuntime, '') }}: -r ${{ parameters.targetRuntime }}
+        ${{ if eq(parameters.deploymentMode, 'self-contained') }}: --self-contained true
+        ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}: --self-contained false
+        ${{ if eq(parameters.produceSingleFile, true) }}: /p:PublishSingleFile=true
+        ${{ if eq(parameters.readyToRun, true) }}: /p:PublishReadyToRun=true
+        ${{ if eq(parameters.trim, true) }}: /p:PublishTrimmed=true
 
   # Zipping published files
   - task: ArchiveFiles@2
