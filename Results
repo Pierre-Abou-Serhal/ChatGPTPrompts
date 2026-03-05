@@ -1,1 +1,62 @@
-/pipelines/build-dotnet-core-webapi.yml@templates (Line: 119, Col: 18): The directive 'if' is not allowed in this context. Directives are not supported for expressions that are embedded within a string. Directives are only supported when the entire value is an expression.
+variables:
+- name: publishArgsBase
+  value: >-
+    --configuration ${{ parameters.buildConfiguration }}
+    --output "${{ parameters.publishOutputFolder }}"
+    --no-restore
+
+- name: publishArgsRuntime
+  value: ''
+
+- name: publishArgsSelfContained
+  value: ''
+
+- name: publishArgsSingleFile
+  value: ''
+
+- name: publishArgsReadyToRun
+  value: ''
+
+- name: publishArgsTrim
+  value: ''
+
+- ${{ if ne(parameters.targetRuntime, '') }}:
+  - name: publishArgsRuntime
+    value: '-r ${{ parameters.targetRuntime }}'
+
+- ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
+  - name: publishArgsSelfContained
+    value: '--self-contained true'
+
+- ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
+  - name: publishArgsSelfContained
+    value: '--self-contained false'
+
+- ${{ if eq(parameters.produceSingleFile, true) }}:
+  - name: publishArgsSingleFile
+    value: '/p:PublishSingleFile=true'
+
+- ${{ if eq(parameters.readyToRun, true) }}:
+  - name: publishArgsReadyToRun
+    value: '/p:PublishReadyToRun=true'
+
+- ${{ if eq(parameters.trim, true) }}:
+  - name: publishArgsTrim
+    value: '/p:PublishTrimmed=true'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Publish'
+  inputs:
+    command: 'publish'
+    projects: ${{ parameters.publishProject }}
+    publishWebProjects: false
+    zipAfterPublish: false
+    modifyOutputPath: false
+    arguments: >-
+      $(publishArgsBase)
+      $(publishArgsRuntime)
+      $(publishArgsSelfContained)
+      $(publishArgsSingleFile)
+      $(publishArgsReadyToRun)
+      $(publishArgsTrim)
+
