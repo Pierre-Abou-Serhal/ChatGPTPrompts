@@ -1,246 +1,89 @@
-Thiss throwed ths:
+Because Azure DevOps is not checking “is Build Tools installed somewhere on disk?” It is checking whether the **agent detected Visual Studio/Build Tools as capabilities**.
 
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
+Right now, your logs show the opposite:
 
-trigger:
-  branches:
-    include:
-    - sit
+* the agent capabilities page does **not** list `visualstudio`
+* `MSBuild@1` runs `vswhere.exe` and then falls back to
+  `C:\Windows\Microsoft.NET\Framework\v4.0.30319\msbuild.exe`
+* your build fails on missing `Microsoft.WebApplication.targets`
 
+That means the agent is **not seeing a usable Visual Studio / Build Tools installation** for web projects.
 
-stages:
-- stage: Build
-  displayName: Build MVC + API
-  jobs:
-  # MVC
-  - template: pipelines/build-dotnet-framework-webapi.yml@templates
-    parameters:
-      jobName: Build_MVC
-      jobDisplayName: 'Build MVC'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      vsVersion: 'latest'
-      buildConfiguration: 'Release'
-      solution: 'CardManagement/CardManagement.sln'
-      nugetConfigPath: 'nuget.config'
-      runTests: false
-      testAssemblies: ''
-      publishProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
-      zipName: 'AlternaCardManagementMVC.zip'
-      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
+## Why this happens
 
-  # API
-  - template: pipelines/build-dotnet-framework-webapi.yml@templates
-    parameters:
-      jobName: Build_API
-      jobDisplayName: 'Build Web API'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      vsVersion: 'latest'
-      buildConfiguration: 'Release'
-      solution: 'CardManagement/CardManagement.sln'
-      nugetConfigPath: 'nuget.config'
-      runTests: false
-      testAssemblies: ''
-      publishProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
-      zipName: 'AlternaCardManagementAPI.zip'
-      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
+Most likely one of these is true:
 
-Starting: Build
-==============================================================================
-Task         : MSBuild
-Description  : Build with MSBuild
-Version      : 1.231.4
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/build/msbuild
-==============================================================================
-"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\vswhere.exe" -version [17.0,18.0) -latest -format json
-"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\vswhere.exe" -version [17.0,18.0) -products Microsoft.VisualStudio.Product.BuildTools -latest -format json
-"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\vswhere.exe" -version [16.0,17.0) -latest -format json
-"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\vswhere.exe" -version [16.0,17.0) -products Microsoft.VisualStudio.Product.BuildTools -latest -format json
-"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\vswhere.exe" -version [15.0,16.0) -latest -format json
-"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\vswhere.exe" -version [15.0,16.0) -products Microsoft.VisualStudio.Product.BuildTools -latest -format json
-"C:\Windows\Microsoft.NET\Framework\v4.0.30319\msbuild.exe" "C:\agent\_work\6\s\CardManagement\CardManagement.sln" /nologo /nr:false /t:"Clean" /dl:CentralLogger,"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\Microsoft.TeamFoundation.DistributedTask.MSBuild.Logger.dll";"RootDetailId=|SolutionDir=C:\agent\_work\6\s\CardManagement|enableOrphanedProjectsLogs=true"*ForwardingLogger,"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\Microsoft.TeamFoundation.DistributedTask.MSBuild.Logger.dll" /p:SkipInvalidConfigurations=true /p:platform="Any CPU" /p:configuration="Release" /p:_MSDeployUserAgent="TFS_de6d64fc-44b6-41ed-b791-554c69e3c04c_build_5_0"
-Building the projects in this solution one at a time. To enable parallel build, please add the "/m" switch.
-Build started 3/6/2026 3:28:23 PM.
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" on node 1 (Clean target(s)).
-ValidateSolutionConfiguration:
-  Building solution configuration "Release|Any CPU".
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.PS\SGBL.CardManagement.PS.csproj" (2) on node 1 (Clean target(s)).
-Project file contains ToolsVersion="14.0". This toolset may be unknown or missing, in which case you may be able to resolve this by installing the appropriate version of MSBuild, or the build may have been forced to a particular ToolsVersion for policy reasons. Treating the project as if it had ToolsVersion="4.0". For more information, please see http://go.microsoft.com/fwlink/?LinkId=291333.
-CoreClean:
-  Creating directory "obj\Release\".
-Done Building Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.PS\SGBL.CardManagement.PS.csproj" (Clean target(s)).
-##[error]CardManagement\SGBL.CardManagement.Host\SGBL.CardManagement.Host.csproj(321,3): Error MSB4019: The imported project "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Host\SGBL.CardManagement.Host.csproj" (3) on node 1 (Clean target(s)).
-C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Host\SGBL.CardManagement.Host.csproj(321,3): error MSB4019: The imported project "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.
-Done Building Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Host\SGBL.CardManagement.Host.csproj" (Clean target(s)) -- FAILED.
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.DAL\SGBL.CardManagement.DAL.csproj" (4) on node 1 (Clean target(s)).
-Project file contains ToolsVersion="14.0". This toolset may be unknown or missing, in which case you may be able to resolve this by installing the appropriate version of MSBuild, or the build may have been forced to a particular ToolsVersion for policy reasons. Treating the project as if it had ToolsVersion="4.0". For more information, please see http://go.microsoft.com/fwlink/?LinkId=291333.
-CoreClean:
-  Creating directory "obj\Release\".
-Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.DAL\SGBL.CardManagement.DAL.csproj" (4) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Common\SGBL.CardManagement.Common.csproj" (5) on node 1 (Clean target(s)).
-Project file contains ToolsVersion="14.0". This toolset may be unknown or missing, in which case you may be able to resolve this by installing the appropriate version of MSBuild, or the build may have been forced to a particular ToolsVersion for policy reasons. Treating the project as if it had ToolsVersion="4.0". For more information, please see http://go.microsoft.com/fwlink/?LinkId=291333.
-CoreClean:
-  Creating directory "obj\Release\".
-##[error]CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj(785,3): Error MSB4019: The imported project "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.
-Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Common\SGBL.CardManagement.Common.csproj" (5) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj" (6) on node 1 (Clean target(s)).
-C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj(785,3): error MSB4019: The imported project "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.
+### 1) The agent was not restarted after Build Tools was installed
 
+Azure DevOps says that after installing new software on a self-hosted agent, you must **restart the agent** for new capabilities to appear. ([GitHub][1])
 
-and this is the build template:
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildJob'
+### 2) The installed Build Tools do not include the right workload/components
 
-- name: jobDisplayName
-  type: string
-  default: 'Build (.NET Framework)'
+For classic ASP.NET/.NET Framework web projects, plain MSBuild alone is not enough. You need the **web build targets** too, which is why your build is failing on `Microsoft.WebApplication.targets`. That file comes from Visual Studio web tooling, not just the base .NET Framework. Your error is direct evidence that the needed web components are missing or not being found.
 
-- name: buildPool
-  type: string
+### 3) The agent version is old
 
-- name: buildAgentName
-  type: string
+Earlier you showed `Agent.Version = 3.238.0`, and Azure DevOps was demanding a version greater than that. Microsoft recommends keeping self-hosted agents updated, and newer tasks can require a newer agent version. ([Microsoft Learn][2])
 
-# Visual Studio used by VSBuild (self-hosted agent must have VS/Build Tools installed)
-- name: vsVersion
-  type: string
-  default: 'latest'
+### 4) `vswhere` cannot find the installation
 
-- name: buildPlatform
-  type: string
-  default: 'Any CPU'
+Your MSBuild task explicitly called `vswhere.exe` several times and did not find a Visual Studio / Build Tools instance to use, then fell back to framework MSBuild. That strongly suggests the installation is either incomplete, corrupted, or missing the product/workload that `vswhere` expects.
 
-- name: buildConfiguration
-  type: string
-  default: 'Release'
+## What to check on the build server
 
-# Restore/build input
-- name: solution
-  type: string
-  default: '**/*.sln'
+Run these in CMD on the server.
 
-- name: nugetConfigPath
-  type: string
-  default: 'nuget.config'
+First:
 
-# Tests
-- name: runTests
-  type: boolean
-  default: false
+```bat
+"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -all -products * -format json
+```
 
-- name: testAssemblies
-  type: string
-  default: |
-    **\*test*.dll
-    **\*tests*.dll
-    !**\obj\**
-    !**\bin\ref\**
-    !**\*TestAdapter.dll
-    !**\*vstest*.dll
+Then:
 
-# “Publish” / packaging
-# For .NET Framework web apps, the closest equivalent of dotnet publish is MSBuild Web Deploy packaging
-- name: publishProject
-  type: string
-  default: ''   # optional; if empty we build the whole solution
+```bat
+"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -all -products Microsoft.VisualStudio.Product.BuildTools -format json
+```
 
-- name: packageLocation
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
+If those return nothing useful, Azure DevOps is not going to detect `visualstudio` either.
 
-- name: zipName
-  type: string
-  default: 'WebApp.zip'
+Then check whether this file exists:
 
-- name: artifactName
-  type: string
-  default: 'drop'
+```bat
+dir "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\*\WebApplications\Microsoft.WebApplication.targets"
+```
 
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
+If nothing is found, your web build components are not installed.
 
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
+## What I would do now
 
-  steps:
-  - checkout: self
-    clean: true
+1. **Restart the Azure Pipelines agent service**
+2. **Update the agent** in Azure DevOps
+3. Run the two `vswhere` commands above
+4. If `vswhere` does not find Build Tools, modify the Build Tools installation and add the ASP.NET/web build components
+5. Check the agent capabilities page again
 
-  # Restore using nuget.config (classic .NET Framework)
-  - task: NuGetCommand@2
-    displayName: 'Restore'
-    inputs:
-      command: 'restore'
-      restoreSolution: '${{ parameters.solution }}'
-      feedsToUse: 'config'
-      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+## Important point
 
-  # Build (solution)
-  - task: MSBuild@1
-    displayName: 'Build'
-    inputs:
-      solution: '${{ parameters.solution }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: true
-      msbuildArguments: >
-        /p:SkipInvalidConfigurations=true
+Even if “Visual Studio Build Tools” is installed, that does **not automatically mean** the agent will show `visualstudio` capability. It only shows up if the agent can detect a valid installation and capabilities are refreshed.
 
-  # Tests (optional)
-  # - task: VSTest@2
-  #   displayName: 'Test'
-  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-  #   inputs:
-  #     testSelector: 'testAssemblies'
-  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
-  #     searchFolder: '$(System.DefaultWorkingDirectory)'
-  #     platform: '${{ parameters.buildPlatform }}'
-  #     configuration: '${{ parameters.buildConfiguration }}'
-  #     diagnosticsEnabled: true
+## Also, your current build log already proves the environment is incomplete
 
-  # Publish/Package the web project (Web Deploy Package)
-  # This creates a deployable package under packageLocation (closest to dotnet publish)
-  - task: MSBuild@1
-    displayName: 'Publish (Package)'
-    condition: and(succeeded(), ne('${{ parameters.publishProject }}', ''))
-    inputs:
-      solution: '${{ parameters.publishProject }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: false
-      msbuildArguments: >
-        /p:DeployOnBuild=true
-        /p:WebPublishMethod=Package
-        /p:PackageAsSingleFile=true
-        /p:SkipInvalidConfigurations=true
-        /p:PackageLocation="${{ parameters.packageLocation }}"
-        /p:AutoParameterizationWebConfigConnectionStrings=false
+This line is the giveaway:
 
-  # Zip package output (same as your dotnet core template)
-  - task: ArchiveFiles@2
-    displayName: 'Zip publish output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.packageLocation }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
+```text
+Treating the project as if it had ToolsVersion="4.0"
+```
 
-  # Publish artifact
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'Container'
+and this one:
+
+```text
+Microsoft.WebApplication.targets was not found
+```
+
+So the machine is currently behaving like a basic .NET Framework/MSBuild box, not a fully prepared ASP.NET web build agent.
+
+Paste the output of the `vswhere` commands and I’ll tell you exactly what is missing.
+
+[1]: https://github.com/MicrosoftDocs/azure-devops-docs/blob/main/docs/pipelines/agents/includes/capabilities.md "azure-devops-docs/docs/pipelines/agents/includes/capabilities.md at main · MicrosoftDocs/azure-devops-docs · GitHub"
+[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/agents/agents?view=azure-devops "Azure Pipelines Agents - Azure Pipelines | Microsoft Learn"
