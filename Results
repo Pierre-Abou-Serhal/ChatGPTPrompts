@@ -1,5 +1,30 @@
-Where is the visualstudio demand in this template ?
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="azure-devops-dev-nuget-offline-packages"
+         value="http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json"
+         allowInsecureConnections="true" />
+    <add key="nuget.org"
+         value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+</configuration>
 
+Use NuGet
+
+Starting: Use NuGet
+==============================================================================
+Task         : NuGet tool installer
+Description  : Acquires a specific version of NuGet from the internet or the tools cache and adds it to the PATH. Use this task to change the version of NuGet used in the NuGet tasks.
+Version      : 1.231.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/tool/nuget
+==============================================================================
+You are using a query match on the version string. Behavior changes or breaking changes might occur as NuGet updates to a new version.
+ERR:getaddrinfo EAI_AGAIN dist.nuget.org
+Finishing: Use NuGet
+
+And this is my template:
 parameters:
 - name: jobName
   type: string
@@ -97,15 +122,14 @@ jobs:
       nugetConfigPath: '${{ parameters.nugetConfigPath }}'
 
   # Build (solution)
-  - task: VSBuild@1
+  - task: MSBuild@1
     displayName: 'Build'
     inputs:
       solution: '${{ parameters.solution }}'
-      vsVersion: '${{ parameters.vsVersion }}'
       platform: '${{ parameters.buildPlatform }}'
       configuration: '${{ parameters.buildConfiguration }}'
       clean: true
-      msbuildArgs: >
+      msbuildArguments: >
         /p:SkipInvalidConfigurations=true
 
   # Tests (optional)
@@ -155,3 +179,55 @@ jobs:
       PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
       ArtifactName: '${{ parameters.artifactName }}'
       publishLocation: 'Container'
+
+And this is my pipeline:
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - sit
+
+
+stages:
+- stage: Build
+  displayName: Build MVC + API
+  jobs:
+  # MVC
+  - template: pipelines/build-dotnet-framework-webapi.yml@templates
+    parameters:
+      jobName: Build_MVC
+      jobDisplayName: 'Build MVC'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      vsVersion: 'latest'
+      buildConfiguration: 'Release'
+      solution: 'CardManagement.sln'
+      nugetConfigPath: 'nuget.config'
+      runTests: false
+      testAssemblies: ''
+      publishProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
+      zipName: 'AlternaCardManagementMVC.zip'
+      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
+
+  # API
+  - template: pipelines/build-dotnet-framework-webapi.yml@templates
+    parameters:
+      jobName: Build_API
+      jobDisplayName: 'Build Web API'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      vsVersion: 'latest'
+      buildConfiguration: 'Release'
+      solution: 'CardManagement.sln'
+      nugetConfigPath: 'nuget.config'
+      runTests: false
+      testAssemblies: ''
+      publishProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
+      zipName: 'AlternaCardManagementAPI.zip'
+      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
