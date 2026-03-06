@@ -1,81 +1,4 @@
-I am getting this error when trying to run my pipeline for my dotnetframework project
-##[error]No agent found in pool Build Pool which satisfies the following demand: visualstudio. All demands: Agent.Name -equals UAT-ALTERNA-DK1, msbuild, visualstudio, vstest, Agent.Version -gtVersion 3.238.0
-
-These are the capabiliteis of the Build server:
-Agent.Name
-UAT-ALTERNA-DK1
-Agent.Version
-3.238.0
-Agent.ComputerName
-UAT-ALTERNA-DK1
-Agent.HomeDirectory
-C:\agent
-MSBuild_3.5
-C:\Windows\Microsoft.NET\Framework\v3.5\
-MSBuild_3.5_x64
-C:\Windows\Microsoft.NET\Framework64\v3.5\
-MSBuild_4.0
-C:\Windows\Microsoft.NET\Framework\v4.0.30319\
-MSBuild_4.0_x64
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\
-MSBuild_x64
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\
-node.js
-C:\Program Files\nodejs\node.exe
-npm
-C:\Program Files\nodejs\npm.cmd
-NUMBER_OF_PROCESSORS
-4
-OS
-Windows_NT
-Path
-C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files\Docker\Docker\resources\bin;C:\Program Files\dotnet\;C:\Program Files\nodejs\;C:\Users\pabouserhal\AppData\Local\Microsoft\WindowsApps;C:\Users\pabouserhal\.dotnet\tools;C:\Users\pabouserhal\AppData\Roaming\npm
-PATHEXT
-.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
-PowerShell
-5.1.20348.2849
-PROCESSOR_ARCHITECTURE
-AMD64
-PROCESSOR_IDENTIFIER
-Intel64 Family 6 Model 79 Stepping 1, GenuineIntel
-PROCESSOR_LEVEL
-6
-PROCESSOR_REVISION
-4f01
-ProgramData
-C:\ProgramData
-ProgramFiles
-C:\Program Files
-ProgramFiles(x86)
-C:\Program Files (x86)
-ProgramW6432
-C:\Program Files
-PUBLIC
-C:\Users\Public
-SystemDrive
-C:
-SystemRoot
-C:\Windows
-TEMP
-C:\Users\PABOUS~1\AppData\Local\Temp
-TMP
-C:\Users\PABOUS~1\AppData\Local\Temp
-UATDATA
-C:\Windows\CCM\UATData\D9F8C395-CAB8-491d-B8AC-179A1FE1BE77
-USERDNSDOMAIN
-SGBL.COM.LB
-USERDOMAIN
-SGBL
-USERDOMAIN_ROAMINGPROFILE
-SGBL
-USERNAME
-pabouserhal
-USERPROFILE
-C:\Users\pabouserhal
-windir
-C:\Windows
-
-And this is my Buid dotnet famework template:
+Where is the visualstudio demand in this template ?
 
 parameters:
 - name: jobName
@@ -186,29 +109,28 @@ jobs:
         /p:SkipInvalidConfigurations=true
 
   # Tests (optional)
-  - task: VSTest@2
-    displayName: 'Test'
-    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-    inputs:
-      testSelector: 'testAssemblies'
-      testAssemblyVer2: '${{ parameters.testAssemblies }}'
-      searchFolder: '$(System.DefaultWorkingDirectory)'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      diagnosticsEnabled: true
+  # - task: VSTest@2
+  #   displayName: 'Test'
+  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+  #   inputs:
+  #     testSelector: 'testAssemblies'
+  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
+  #     searchFolder: '$(System.DefaultWorkingDirectory)'
+  #     platform: '${{ parameters.buildPlatform }}'
+  #     configuration: '${{ parameters.buildConfiguration }}'
+  #     diagnosticsEnabled: true
 
   # Publish/Package the web project (Web Deploy Package)
   # This creates a deployable package under packageLocation (closest to dotnet publish)
-  - task: VSBuild@1
+  - task: MSBuild@1
     displayName: 'Publish (Package)'
     condition: and(succeeded(), ne('${{ parameters.publishProject }}', ''))
     inputs:
       solution: '${{ parameters.publishProject }}'
-      vsVersion: '${{ parameters.vsVersion }}'
       platform: '${{ parameters.buildPlatform }}'
       configuration: '${{ parameters.buildConfiguration }}'
       clean: false
-      msbuildArgs: >
+      msbuildArguments: >
         /p:DeployOnBuild=true
         /p:WebPublishMethod=Package
         /p:PackageAsSingleFile=true
