@@ -1,114 +1,320 @@
-You’re doing the right thing (adding `-r win-x64` to restore), but the log proves **publish is still using an assets file that was restored *without* the runtime**:
+Running dotnet info on my build server returned me this:
 
-> `project.assets.json doesn't have a target for net8.0/win-x64`
-> That only happens when restore didn’t produce a runtime-specific graph.
+dotnet --info
+.NET SDK:
+ Version:           10.0.103
+ Commit:            c2435c3e0f
+ Workload version:  10.0.100-manifests.c992be6d
+ MSBuild version:   18.0.11+c2435c3e0
 
-Even if your “Restore” task *should* include `-r win-x64`, the most reliable fix in pipelines is:
+Runtime Environment:
+ OS Name:     Windows
+ OS Version:  10.0.20348
+ OS Platform: Windows
+ RID:         win-x64
+ Base Path:   C:\Program Files\dotnet\sdk\10.0.103\
 
-### ✅ Let `dotnet publish` restore (only when runtime is used)
+.NET workloads installed:
+There are no installed workloads to display.
+Configured to use workload sets when installing new manifests.
+No workload sets are installed. Run "dotnet workload restore" to install a workload set.
 
-Because you currently force `--no-restore` in publish:
+Host:
+  Version:      10.0.3
+  Architecture: x64
+  Commit:       c2435c3e0f
 
-```text
-dotnet publish ... --no-restore -r win-x64 --self-contained true
-```
+.NET SDKs installed:
+  8.0.101 [C:\Program Files\dotnet\sdk]
+  9.0.102 [C:\Program Files\dotnet\sdk]
+  10.0.103 [C:\Program Files\dotnet\sdk]
 
-So publish **cannot fix** a missing runtime target.
+.NET runtimes installed:
+  Microsoft.AspNetCore.App 8.0.1 [C:\Program Files\dotnet\shared\Microsoft.AspNetCore.App]
+  Microsoft.AspNetCore.App 9.0.1 [C:\Program Files\dotnet\shared\Microsoft.AspNetCore.App]
+  Microsoft.AspNetCore.App 10.0.3 [C:\Program Files\dotnet\shared\Microsoft.AspNetCore.App]
+  Microsoft.NETCore.App 8.0.1 [C:\Program Files\dotnet\shared\Microsoft.NETCore.App]
+  Microsoft.NETCore.App 9.0.1 [C:\Program Files\dotnet\shared\Microsoft.NETCore.App]
+  Microsoft.NETCore.App 10.0.3 [C:\Program Files\dotnet\shared\Microsoft.NETCore.App]
+  Microsoft.WindowsDesktop.App 8.0.1 [C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App]
+  Microsoft.WindowsDesktop.App 9.0.1 [C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App]
+  Microsoft.WindowsDesktop.App 10.0.3 [C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App]
 
----
+Other architectures found:
+  x86   [C:\Program Files (x86)\dotnet]
+    registered at [HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x86\InstallLocation]
 
-# Best fix: make `--no-restore` conditional
+Environment variables:
+  Not set
 
-### 1) Add a variable `publishArgsNoRestore` and only set it when **no runtime** is used
+global.json file:
+  Not found
 
-Add this to your `variables:` section:
+Learn more:
+  https://aka.ms/dotnet/info
 
-```yaml
-- name: publishArgsNoRestore
-  value: '--no-restore'
+Download .NET:
+  https://aka.ms/dotnet/download
 
-# If targetRuntime is set, remove --no-restore so publish can restore net8.0/win-x64
-- ${{ if ne(parameters.targetRuntime, '') }}:
+The project That I am trying to build havbe .net 8.0 as target framework
+
+Before installing Microsoft Build tools, I had isntalled dotnet SDL 8.0 and it was working fine.
+
+This is the build tempalte that I am using:
+
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
+
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: restoreProjects
+  type: string
+  default: '**/*.csproj'
+
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testProjects
+  type: string
+  default: '**/*Tests/*.csproj'
+
+- name: publishProject
+  type: string
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+- name: deploymentMode
+  type: string
+  default: 'framework-dependent'
+  values:
+  - framework-dependent
+  - self-contained
+
+- name: targetRuntime
+  type: string
+  default: ''
+
+- name: produceSingleFile
+  type: boolean
+  default: false
+
+- name: readyToRun
+  type: boolean
+  default: false
+
+- name: trim
+  type: boolean
+  default: false
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  variables:
+
   - name: publishArgsNoRestore
+    value: '--no-restore'
+
+  - name: publishArgsBase
+    value: >-
+      --configuration ${{ parameters.buildConfiguration }}
+      --output "${{ parameters.publishOutputFolder }}"
+
+  - name: publishArgsRuntime
     value: ''
-```
 
-### 2) Remove `--no-restore` from `publishArgsBase`
+  - name: publishArgsSelfContained
+    value: ''
 
-Change:
+  - name: publishArgsSingleFile
+    value: ''
 
-```yaml
-- name: publishArgsBase
-  value: >-
-    --configuration ${{ parameters.buildConfiguration }}
-    --output "${{ parameters.publishOutputFolder }}"
-    --no-restore
-```
+  - name: publishArgsReadyToRun
+    value: ''
 
-To:
+  - name: publishArgsTrim
+    value: ''
+  
+  - name: restoreArgs
+    value: ''
 
-```yaml
-- name: publishArgsBase
-  value: >-
-    --configuration ${{ parameters.buildConfiguration }}
-    --output "${{ parameters.publishOutputFolder }}"
-```
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: publishArgsRuntime
+      value: '-r ${{ parameters.targetRuntime }}'
 
-### 3) Include `$(publishArgsNoRestore)` in your publish `arguments`
+  - ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained true'
 
-```yaml
-arguments: >-
-  $(publishArgsBase)
-  $(publishArgsNoRestore)
-  $(publishArgsRuntime)
-  $(publishArgsSelfContained)
-  $(publishArgsSingleFile)
-  $(publishArgsReadyToRun)
-  $(publishArgsTrim)
-```
+  - ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained false'
 
-✅ Result:
+  - ${{ if eq(parameters.produceSingleFile, true) }}:
+    - name: publishArgsSingleFile
+      value: '/p:PublishSingleFile=true'
 
-* For IIS framework-dependent (no runtime): publish keeps `--no-restore`
-* For windows service (runtime/self-contained): publish will do its own restore for `net8.0/win-x64` and the error goes away
+  - ${{ if eq(parameters.readyToRun, true) }}:
+    - name: publishArgsReadyToRun
+      value: '/p:PublishReadyToRun=true'
 
----
+  - ${{ if eq(parameters.trim, true) }}:
+    - name: publishArgsTrim
+      value: '/p:PublishTrimmed=true'
 
-# Optional “extra safe” fix (if you want deterministic restore still)
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: restoreArgs
+      value: '-r ${{ parameters.targetRuntime }}'
 
-Instead of letting publish restore, you can add a **second restore step** right before publish (only when runtime is set) that restores the **publishProject** with runtime:
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: publishArgsNoRestore
+      value: ''
 
-```yaml
-- task: DotNetCoreCLI@2
-  displayName: 'Restore (publish project with runtime)'
-  condition: and(succeeded(), ne('${{ parameters.targetRuntime }}', ''))
-  inputs:
-    command: 'restore'
-    projects: ${{ parameters.publishProject }}
-    feedsToUse: 'config'
-    nugetConfigPath: ${{ parameters.nugetConfigPath }}
-    arguments: '-r ${{ parameters.targetRuntime }}'
-```
+  steps:
+  - checkout: self
+    clean: true
 
-Then you can keep `--no-restore` in publish.
+  # Restore using nuget.config
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      projects: ${{ parameters.restoreProjects }}
+      feedsToUse: 'config'
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}
+      arguments: >-
+        $(restoreArgs)
 
----
+  # Building project: dotnet build
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: ${{ parameters.restoreProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
 
-# One more thing to check (project-side)
+  # Running tests if available: dotnet test
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    inputs:
+      command: 'test'
+      projects: ${{ parameters.testProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
+      publishTestResults: true
 
-If your `Logger.csproj` targets `net8.0`, you’re fine.
-But if it’s multitargeting or old, ensure it includes:
+  # Publish the API project (with deployment-mode / runtime / single-file options)
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish'
+    inputs:
+      command: 'publish'
+      projects: ${{ parameters.publishProject }}
+      publishWebProjects: false
+      zipAfterPublish: false
+      modifyOutputPath: false
+      arguments: >-
+        $(publishArgsBase)
+        $(publishArgsNoRestore)
+        $(publishArgsRuntime)
+        $(publishArgsSelfContained)
+        $(publishArgsSingleFile)
+        $(publishArgsReadyToRun)
+        $(publishArgsTrim)
 
-```xml
-<TargetFramework>net8.0</TargetFramework>
-```
+  # Zipping published files
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
 
-You **do not have to** add `RuntimeIdentifiers` if you always pass `-r win-x64`, but adding it can help tooling:
+  # Uploading zipped files to Azure
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
 
-```xml
-<RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-```
+This is how I am using it in my pipeline:
 
----
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
 
-If you want, paste your **consuming pipeline call** (the parameters you pass to this template for Logger) and I’ll tell you exactly which of the two fixes is cleaner for your setup.
+trigger:
+  branches:
+    include:
+    - sit
+    - uat
+    - master
+
+variables:
+  buildConfiguration: 'Release'
+
+stages:
+# =========================
+# BUILD
+# =========================
+- stage: Build
+  displayName: 'Build & Publish Artifact'
+  jobs:
+  - template: pipelines/build-dotnet-core-webapi.yml@templates
+    parameters:
+      jobName: 'BuildJob'
+      jobDisplayName: 'Build DataExport'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      buildConfiguration: 'Release'
+      restoreProjects: '**/*.csproj'
+      runTests: false
+      testProjects: ''
+      publishProject: 'Alterna-DataExport/Alterna-DataExport/Alterna-DataExport.csproj'
+      nugetConfigPath: 'nuget.config'
+      zipName: 'Alterna-DataExport.zip'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport'
+
+And this is the errors that I am getting:
+
+Errors: MSB4276: The default SDK resolver failed to resolve SDK "Microsoft.NET.SDK.WorkloadManifestTargetsLocator" because directory "C:\Program Files\dotnet\sdk\10.0.103\Sdks\Microsoft.NET.SDK.WorkloadManifestTargetsLocator\Sdk" did not exist.
+       The SDK "Microsoft.NET.SDK.WorkloadManifestTargetsLocator" was successfully resolved by the "Microsoft.DotNet.MSBuildWorkloadSdkResolver" resolver to location "C:\Program Files\dotnet\sdk-manifests\10.0.100\microsoft.net.sdk.android\36.1.2" and version "null".
+        C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj : error NU1302: You are running the 'restore' operation with an 'HTTP' source: http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json. NuGet requires HTTPS sources. To use an HTTP source, you must explicitly set 'allowInsecureConnections' to true in your NuGet.Config file. Refer to https://aka.ms/nuget-https-everywhere for more information.
+         C:\agent\_work\1\s\Alterna-DataExport\DAL\DAL.csproj : error NU1302: You are running the 'restore' operation with an 'HTTP' source: http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json. NuGet requires HTTPS sources. To use an HTTP source, you must explicitly set 'allowInsecureConnections' to true in your NuGet.Config file. Refer to https://aka.ms/nuget-https-everywhere for more information. [C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj]
+         C:\agent\_work\1\s\Alterna-DataExport\BLL\BLL.csproj : error NU1302: You are running the 'restore' operation with an 'HTTP' source: http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json. NuGet requires HTTPS sources. To use an HTTP source, you must explicitly set 'allowInsecureConnections' to true in your NuGet.Config file. Refer to https://aka.ms/nuget-https-everywhere for more information. [C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj]
+
