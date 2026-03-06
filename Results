@@ -1,320 +1,130 @@
-Running dotnet info on my build server returned me this:
+Yes.
 
-dotnet --info
-.NET SDK:
- Version:           10.0.103
- Commit:            c2435c3e0f
- Workload version:  10.0.100-manifests.c992be6d
- MSBuild version:   18.0.11+c2435c3e0
+You can absolutely use a template parameter or variable with `UseDotNet@2`. The task accepts a `version` input, and Azure Pipelines lets you pass parameters into task inputs. Microsoft’s examples/documentation show `version` as a normal input, and the task is designed to select the SDK used by later steps. ([Microsoft Learn][1])
 
-Runtime Environment:
- OS Name:     Windows
- OS Version:  10.0.20348
- OS Platform: Windows
- RID:         win-x64
- Base Path:   C:\Program Files\dotnet\sdk\10.0.103\
+Example with a template parameter:
 
-.NET workloads installed:
-There are no installed workloads to display.
-Configured to use workload sets when installing new manifests.
-No workload sets are installed. Run "dotnet workload restore" to install a workload set.
-
-Host:
-  Version:      10.0.3
-  Architecture: x64
-  Commit:       c2435c3e0f
-
-.NET SDKs installed:
-  8.0.101 [C:\Program Files\dotnet\sdk]
-  9.0.102 [C:\Program Files\dotnet\sdk]
-  10.0.103 [C:\Program Files\dotnet\sdk]
-
-.NET runtimes installed:
-  Microsoft.AspNetCore.App 8.0.1 [C:\Program Files\dotnet\shared\Microsoft.AspNetCore.App]
-  Microsoft.AspNetCore.App 9.0.1 [C:\Program Files\dotnet\shared\Microsoft.AspNetCore.App]
-  Microsoft.AspNetCore.App 10.0.3 [C:\Program Files\dotnet\shared\Microsoft.AspNetCore.App]
-  Microsoft.NETCore.App 8.0.1 [C:\Program Files\dotnet\shared\Microsoft.NETCore.App]
-  Microsoft.NETCore.App 9.0.1 [C:\Program Files\dotnet\shared\Microsoft.NETCore.App]
-  Microsoft.NETCore.App 10.0.3 [C:\Program Files\dotnet\shared\Microsoft.NETCore.App]
-  Microsoft.WindowsDesktop.App 8.0.1 [C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App]
-  Microsoft.WindowsDesktop.App 9.0.1 [C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App]
-  Microsoft.WindowsDesktop.App 10.0.3 [C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App]
-
-Other architectures found:
-  x86   [C:\Program Files (x86)\dotnet]
-    registered at [HKLM\SOFTWARE\dotnet\Setup\InstalledVersions\x86\InstallLocation]
-
-Environment variables:
-  Not set
-
-global.json file:
-  Not found
-
-Learn more:
-  https://aka.ms/dotnet/info
-
-Download .NET:
-  https://aka.ms/dotnet/download
-
-The project That I am trying to build havbe .net 8.0 as target framework
-
-Before installing Microsoft Build tools, I had isntalled dotnet SDL 8.0 and it was working fine.
-
-This is the build tempalte that I am using:
-
+```yaml
 parameters:
-- name: jobName
+- name: dotnetSdkVersion
   type: string
-  default: 'BuildJob'
+  default: '8.0.x'
 
-- name: jobDisplayName
-  type: string
-  default: 'Build (.NET)'
+steps:
+- task: UseDotNet@2
+  displayName: 'Use .NET SDK ${{ parameters.dotnetSdkVersion }}'
+  inputs:
+    packageType: 'sdk'
+    version: '${{ parameters.dotnetSdkVersion }}'
+```
 
-- name: buildPool
-  type: string
+Or with a pipeline variable:
 
-- name: buildAgentName
-  type: string
-
-- name: buildConfiguration
-  type: string
-  default: 'Release'
-
-- name: restoreProjects
-  type: string
-  default: '**/*.csproj'
-
-- name: runTests
-  type: boolean
-  default: false
-
-- name: testProjects
-  type: string
-  default: '**/*Tests/*.csproj'
-
-- name: publishProject
-  type: string
-
-- name: nugetConfigPath
-  type: string
-  default: 'nuget.config'
-
-- name: zipName
-  type: string
-  default: 'WebApp.zip'
-
-- name: publishOutputFolder
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
-
-- name: deploymentMode
-  type: string
-  default: 'framework-dependent'
-  values:
-  - framework-dependent
-  - self-contained
-
-- name: targetRuntime
-  type: string
-  default: ''
-
-- name: produceSingleFile
-  type: boolean
-  default: false
-
-- name: readyToRun
-  type: boolean
-  default: false
-
-- name: trim
-  type: boolean
-  default: false
-
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
-
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
-
-  variables:
-
-  - name: publishArgsNoRestore
-    value: '--no-restore'
-
-  - name: publishArgsBase
-    value: >-
-      --configuration ${{ parameters.buildConfiguration }}
-      --output "${{ parameters.publishOutputFolder }}"
-
-  - name: publishArgsRuntime
-    value: ''
-
-  - name: publishArgsSelfContained
-    value: ''
-
-  - name: publishArgsSingleFile
-    value: ''
-
-  - name: publishArgsReadyToRun
-    value: ''
-
-  - name: publishArgsTrim
-    value: ''
-  
-  - name: restoreArgs
-    value: ''
-
-  - ${{ if ne(parameters.targetRuntime, '') }}:
-    - name: publishArgsRuntime
-      value: '-r ${{ parameters.targetRuntime }}'
-
-  - ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
-    - name: publishArgsSelfContained
-      value: '--self-contained true'
-
-  - ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
-    - name: publishArgsSelfContained
-      value: '--self-contained false'
-
-  - ${{ if eq(parameters.produceSingleFile, true) }}:
-    - name: publishArgsSingleFile
-      value: '/p:PublishSingleFile=true'
-
-  - ${{ if eq(parameters.readyToRun, true) }}:
-    - name: publishArgsReadyToRun
-      value: '/p:PublishReadyToRun=true'
-
-  - ${{ if eq(parameters.trim, true) }}:
-    - name: publishArgsTrim
-      value: '/p:PublishTrimmed=true'
-
-  - ${{ if ne(parameters.targetRuntime, '') }}:
-    - name: restoreArgs
-      value: '-r ${{ parameters.targetRuntime }}'
-
-  - ${{ if ne(parameters.targetRuntime, '') }}:
-    - name: publishArgsNoRestore
-      value: ''
-
-  steps:
-  - checkout: self
-    clean: true
-
-  # Restore using nuget.config
-  - task: DotNetCoreCLI@2
-    displayName: 'Restore'
-    inputs:
-      command: 'restore'
-      projects: ${{ parameters.restoreProjects }}
-      feedsToUse: 'config'
-      nugetConfigPath: ${{ parameters.nugetConfigPath }}
-      arguments: >-
-        $(restoreArgs)
-
-  # Building project: dotnet build
-  - task: DotNetCoreCLI@2
-    displayName: 'Build'
-    inputs:
-      command: 'build'
-      projects: ${{ parameters.restoreProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
-
-  # Running tests if available: dotnet test
-  - task: DotNetCoreCLI@2
-    displayName: 'Test'
-    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-    inputs:
-      command: 'test'
-      projects: ${{ parameters.testProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
-      publishTestResults: true
-
-  # Publish the API project (with deployment-mode / runtime / single-file options)
-  - task: DotNetCoreCLI@2
-    displayName: 'Publish'
-    inputs:
-      command: 'publish'
-      projects: ${{ parameters.publishProject }}
-      publishWebProjects: false
-      zipAfterPublish: false
-      modifyOutputPath: false
-      arguments: >-
-        $(publishArgsBase)
-        $(publishArgsNoRestore)
-        $(publishArgsRuntime)
-        $(publishArgsSelfContained)
-        $(publishArgsSingleFile)
-        $(publishArgsReadyToRun)
-        $(publishArgsTrim)
-
-  # Zipping published files
-  - task: ArchiveFiles@2
-    displayName: 'Zip publish output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
-
-  # Uploading zipped files to Azure
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: 'drop'
-      publishLocation: 'Container'
-
-This is how I am using it in my pipeline:
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-    - sit
-    - uat
-    - master
-
+```yaml
 variables:
-  buildConfiguration: 'Release'
+  dotnetSdkVersion: '8.0.x'
 
-stages:
-# =========================
-# BUILD
-# =========================
-- stage: Build
-  displayName: 'Build & Publish Artifact'
-  jobs:
-  - template: pipelines/build-dotnet-core-webapi.yml@templates
-    parameters:
-      jobName: 'BuildJob'
-      jobDisplayName: 'Build DataExport'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      buildConfiguration: 'Release'
-      restoreProjects: '**/*.csproj'
-      runTests: false
-      testProjects: ''
-      publishProject: 'Alterna-DataExport/Alterna-DataExport/Alterna-DataExport.csproj'
-      nugetConfigPath: 'nuget.config'
-      zipName: 'Alterna-DataExport.zip'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport'
+steps:
+- task: UseDotNet@2
+  displayName: 'Use .NET SDK $(dotnetSdkVersion)'
+  inputs:
+    packageType: 'sdk'
+    version: '$(dotnetSdkVersion)'
+```
 
-And this is the errors that I am getting:
+About downloading: `UseDotNet@2` can use the **local cache** if that SDK is already available there, otherwise it will **download it from the internet** and add it to `PATH` for subsequent tasks. That is the official behavior of the task. ([Microsoft Learn][1])
 
-Errors: MSB4276: The default SDK resolver failed to resolve SDK "Microsoft.NET.SDK.WorkloadManifestTargetsLocator" because directory "C:\Program Files\dotnet\sdk\10.0.103\Sdks\Microsoft.NET.SDK.WorkloadManifestTargetsLocator\Sdk" did not exist.
-       The SDK "Microsoft.NET.SDK.WorkloadManifestTargetsLocator" was successfully resolved by the "Microsoft.DotNet.MSBuildWorkloadSdkResolver" resolver to location "C:\Program Files\dotnet\sdk-manifests\10.0.100\microsoft.net.sdk.android\36.1.2" and version "null".
-        C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj : error NU1302: You are running the 'restore' operation with an 'HTTP' source: http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json. NuGet requires HTTPS sources. To use an HTTP source, you must explicitly set 'allowInsecureConnections' to true in your NuGet.Config file. Refer to https://aka.ms/nuget-https-everywhere for more information.
-         C:\agent\_work\1\s\Alterna-DataExport\DAL\DAL.csproj : error NU1302: You are running the 'restore' operation with an 'HTTP' source: http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json. NuGet requires HTTPS sources. To use an HTTP source, you must explicitly set 'allowInsecureConnections' to true in your NuGet.Config file. Refer to https://aka.ms/nuget-https-everywhere for more information. [C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj]
-         C:\agent\_work\1\s\Alterna-DataExport\BLL\BLL.csproj : error NU1302: You are running the 'restore' operation with an 'HTTP' source: http://uat-azure/DEV/_packaging/azure-devops-dev-nuget-offline-packages/nuget/v3/index.json. NuGet requires HTTPS sources. To use an HTTP source, you must explicitly set 'allowInsecureConnections' to true in your NuGet.Config file. Refer to https://aka.ms/nuget-https-everywhere for more information. [C:\agent\_work\1\s\Alterna-DataExport\Alterna-DataExport\Alterna-DataExport.csproj]
+So the practical answer is:
 
+* if the requested SDK is already in the task’s cache, it reuses it
+* if not, it downloads it
+* it does **not** simply “pick one of the SDKs currently installed on the machine” unless that matches what the task can use from cache/path behavior ([Microsoft Learn][1])
+
+For `global.json`:
+
+* `global.json` tells the .NET CLI which SDK version to use when running `dotnet` commands. Without it, the CLI normally uses SDK selection rules that can end up choosing a newer installed SDK. ([Microsoft Learn][2])
+* `UseDotNet@2` is enough to make your pipeline use a specific SDK in that job, because it puts that SDK on `PATH` for later tasks. ([Microsoft Learn][1])
+* But `global.json` is still a good idea if you want the same SDK selection locally, on the build server, and in CI. It makes the repo itself declare the expected SDK version. ([Microsoft Learn][2])
+
+So my recommendation is:
+
+* For the pipeline: use `UseDotNet@2`
+* For repo consistency: also add `global.json`
+
+That is the safest setup.
+
+For your case, I would use both:
+
+```json
+{
+  "sdk": {
+    "version": "8.0.101",
+    "rollForward": "latestPatch"
+  }
+}
+```
+
+and in YAML:
+
+```yaml
+- task: UseDotNet@2
+  displayName: 'Use .NET SDK 8'
+  inputs:
+    packageType: 'sdk'
+    version: '8.0.x'
+```
+
+One important detail: `UseDotNet@2` will help you avoid accidentally using SDK 10, but it will **not** fix your `NU1302` issue. That error is coming from your HTTP NuGet feed, which newer SDK behavior rejects unless you switch to HTTPS or explicitly allow insecure connections in `NuGet.Config`. ([Microsoft Learn][1])
+
+Best practice for you:
+
+* use `UseDotNet@2` to force .NET 8 in the pipeline
+* add `global.json` to pin the repo
+* fix the HTTP feed in `nuget.config`
+
+Here is a clean version for your template:
+
+```yaml
+parameters:
+- name: dotnetSdkVersion
+  type: string
+  default: '8.0.x'
+
+steps:
+- checkout: self
+  clean: true
+
+- task: UseDotNet@2
+  displayName: 'Use .NET SDK ${{ parameters.dotnetSdkVersion }}'
+  inputs:
+    packageType: 'sdk'
+    version: '${{ parameters.dotnetSdkVersion }}'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Restore'
+  inputs:
+    command: 'restore'
+    projects: ${{ parameters.restoreProjects }}
+    feedsToUse: 'config'
+    nugetConfigPath: ${{ parameters.nugetConfigPath }}
+    arguments: '$(restoreArgs)'
+```
+
+And when calling the template:
+
+```yaml
+- template: pipelines/build-dotnet-core-webapi.yml@templates
+  parameters:
+    dotnetSdkVersion: '8.0.x'
+```
+
+Your exact answer in one line:
+
+* Yes, you can use a template variable.
+* Yes, `UseDotNet@2` may download from the internet if needed.
+* No, `global.json` is not strictly required if you use `UseDotNet@2`, but using both is better.
+
+Paste your current `nuget.config` and I’ll show you the exact final setup I’d use.
+
+[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/use-dotnet-v2?view=azure-pipelines&utm_source=chatgpt.com "UseDotNet@2 - Use dotnet v2 task"
+[2]: https://learn.microsoft.com/en-us/dotnet/core/tools/global-json?utm_source=chatgpt.com "global.json overview - .NET CLI"
