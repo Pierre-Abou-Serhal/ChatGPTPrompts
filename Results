@@ -1,61 +1,158 @@
-I have now this error in the Zip publish output:
+Your publish is still going through the **Web Publishing Pipeline package flow**, not a plain folder publish.
 
-Starting: Zip publish output
-==============================================================================
-Task         : Archive files
-Description  : Compress files into .7z, .tar.gz, or .zip
-Version      : 2.231.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/archive-files
-==============================================================================
-ls: no such file or directory: C:/agent/_work/6/a/AlternaCardManagement-package-mvc
-Found 0 files
-##[error]Error: ENOENT: no such file or directory, stat 'C:\agent\_work\6\a\AlternaCardManagement-package-mvc'
-##[error]ENOENT: no such file or directory, stat 'C:\agent\_work\6\a\AlternaCardManagement-package-mvc'
-Finishing: Zip publish output
+The giveaway is in your log:
 
-The publish to folder is successfull.
+```text
+PreTransformWebConfig
+PipelineMsdeploySpecificTransformPhase
+CopyAllFilesToSingleFolderForMsdeploy
+```
 
-This is the output of the Publish to folder:
+That means MSBuild is still building a **web deploy/package-style staging output**, which is why you see content under `obj\Any CPU\Release\Package\PackageTmp` and why your `packageLocation` folder does not exist for the zip step.
 
+## Why this happens
 
-  bin\Any CPU\Release\SGBL.CardManagement.dll to bin\SGBL.CardManagement.dll
-CollectFilesFromContent:
-  Gather all files from Project items @(Content). Adding:
-  3PL\Microsoft.Office.Interop.Excel.dll;3PL\Microsoft.Office.Interop.Outlook.dll;3PL\Microsoft.Office.Interop.Word.dll;Content\bootstrap-toggle.min.css;Content\brands.css;Content\brands.min.css;Content\css\app.min.css;Content\css\bootstrap-datetimepicker.css;Content\css\bootstrap-extended.css;Content\css\bootstrap.css;Content\css\buttons.bootstrap4.min.css;Content\css\buttons.dataTables.min.css;Content\css\cash-flow.css;Content\css\climacons.min.css;Content\css\colors.css;Content\css\colReorder.dataTables.min.css;Content\css\components.css;Content\css\custom\cards.css;Content\css\custom\current-account.css;Content\css\custom\deposit-account.css;Content\css\custom\digital-banking.css;Content\css\custom\Guarantee.css;Content\css\custom\insurance.css;Content\css\custom\loan.css;Content\css\datatables.min.css;Content\css\daterange.min.css;Content\css\daterangepicker.css;Content\css\fixedHeader.dataTables.min.css;Content\css\font-awesome.min.css;Content\css\font-style.css;Content\css\horizontal-menu.min.css;Content\css\jquery-jvectormap-2.0.3.css;Content\css\jquery-ui.css;Content\css\jsgrid-theme.min.css;Content\css\jsgrid.min.css;Content\css\mandate.css;Content\css\morris.css;Content\css\pace.css;Content\css\palette-climacon.css;Content\css\pickadate.css;Content\css\dashboard.css;Content\css\responsive.dataTables.min.css;Content\css\search-customer.css;Content\css\select.dataTables.min.css;Content\css\Site.css;Content\css\style.css;Content\css\style.min.1.css;Content\css\style.min.css;Content\css\unslider.css;Content\css\vendors.min.css;Content\css\wizard.min.css;Content\custom-slider.css;Content\font-awesome.min.css;Content\fontawesome-all.css;Content\fontawesome-all.min.css;Content\fontawesome.css;Content\fontawesome.min.css;Content\my-style.css;Content\regular.css;Content\regular.min.css;Content\solid.css;Content\solid.min.css;Content\svg-with-js.css;Content\svg-with-js.min.css;Content\v4-shims.css;Content\v4-shims.min.css;favicon.ico;Global.asax;NLog.config;webfonts\fa-brands-400.svg;webfonts\fa-regular-400.svg;webfonts\fa-solid-900.svg;Reporting\frmDisplayRdlcPdf.aspx;Scripts\ai.0.22.9-build00167.js;Scripts\ai.0.22.9-build00167.min.js;Scripts\app-menu.min.js;Scripts\app.min.js;Scripts\bootstrap-datetime.min.js;Scripts\bootstrap-datetimepicker.min.js;Scripts\breadcrumbs-with-stats.min.js;Scripts\buttons.bootstrap4.min.js;Scripts\buttons.colVis.min.js;Scripts\chart.min.js;Scripts\charts-jquery.sparkline.min.js;Scripts\customizer.min.js;Scripts\dashboard-analytics.min.js;Scripts\datatable-responsive.min.js;Scripts\datatable-select.min.js;Scripts\dataTables.buttons.min.js;Scripts\dataTables.colReorder.min.js;Scripts\dataTables.fixedHeader.min.js;Scripts\datatables.min.js;Scripts\dataTables.responsive.min.js;Scripts\dataTables.select.min.js;Scripts\daterangepicker.js;Scripts\fontawesome\all.js;Scripts\fontawesome\all.min.js;Scripts\fontawesome\brands.js;Scripts\fontawesome\brands.min.js;Scripts\fontawesome\fontawesome.js;Scripts\fontawesome\fontawesome.min.js;Scripts\fontawesome\regular.js;Scripts\fontawesome\regular.min.js;Scripts\fontawesome\solid.js;Scripts\fontawesome\solid.min.js;Scripts\fontawesome\v4-shims.js;Scripts\fontawesome\v4-shims.min.js;Scripts\form-field.js;Scripts\griddata.js;Scripts\jquery-jvectormap-2.0.3.min.js;Scripts\jquery-jvectormap-world-mill.js;Scripts\jquery.knob.min.js;Scripts\jquery.sparkline.min.js;Scripts\jquery.steps.min.js;Scripts\jquery.sticky.js;Scripts\jquery.validate.js;Scripts\jquery.validate.min.js;Scripts\jquery.validate.unobtrusive.js;Scripts\jsgrid.min-1.js;Scripts\jsgrid.min.js;Scripts\knob.min.js;Scripts\legacy.js;Scripts\moment-with-locales.min.js;Scripts\morris.min.js;Scripts\MyCustomValidation.js;Scripts\MyLibrary.js;Scripts\numeral.js;Scripts\pick-a-datetime.min.js;Scripts\picker.date.js;Scripts\picker.js;Scripts\picker.time.js;Scripts\popover.min.js;Scripts\raphael-min.js;Scripts\unslider-min.js;Scripts\vendors.min.js;Scripts\visitor-data.js;Scripts\wizard-steps.min.js;Web.config;Web.Debug.config;Web.Release.config;Views\_ViewStart.cshtml;Views\Shared\Error.cshtml;Views\Shared\_Layout.cshtml;Views\Home\Index.cshtml;Views\Message\DisplayMessage.cshtml;Views\UserPreference\UserPreferenceIndex.cshtml;Views\Search\SearchIndex.cshtml;webfonts\fa-brands-400.eot;webfonts\fa-brands-400.ttf;webfonts\fa-brands-400.woff;webfonts\fa-brands-400.woff2;webfonts\fa-regular-400.eot;webfonts\fa-regular-400.ttf;webfonts\fa-regular-400.woff;webfonts\fa-regular-400.woff2;webfonts\fa-solid-900.eot;webfonts\fa-solid-900.ttf;webfonts\fa-solid-900.woff;webfonts\fa-solid-900.woff2;Views\Home\HealthCheck.cshtml;Views\PaymentFile\PaymentFileImport.cshtml;Views\Card\UploadExcelFile.cshtml;Views\Card\CardIndex.cshtml;Views\Account\AccountFileImport.cshtml;Views\Card\InternationalUsage.cshtml;Views\Card\CashCardUsd.cshtml;Views\Card\BulkDebitCards.cshtml;Views\Card\BulkCreditCards.cshtml;Views\CardParameter\CardParameterIndex.cshtml;Views\CardParameter\EventsParameters.cshtml;Views\Card\SubEventIndex.cshtml;Views\Card\CardsReport.cshtml;Views\Card\EventIndex.cshtml;Views\Card\SubEventCardParameter.cshtml;Views\CardParameter\SubEventsParameters.cshtml;Views\CardParameter\EditEventParameter.cshtml;Views\CardParameter\EditSubEvent.cshtml;Views\CardParameter\EditSubEventParameter.cshtml;Views\CardParameter\GetSubEventParameterCustom.cshtml;Views\CardParameter\CardPropertiesIndex.cshtml;Views\CardParameter\CardPropertieValuesIndex.cshtml;Views\Card\UpdateParameter.cshtml;Views\Card\CardCancellation.cshtml;Views\CardParameter\SubEventParametersIndex.cshtml;Views\CardParameter\EditSubEventParameterCustom.cshtml;Views\CardParameter\CardPropertyValueIndex.cshtml;Views\CardParameter\CardPropertyValueParameterIndex.cshtml;Views\CardParameter\EditCardPropertyValueParameter.cshtml;Views\Card\ServicePack.cshtml;Views\CardParameter\CardTypeIndex.cshtml;Views\CardParameter\EditCardType.cshtml;Views\CardEventDashboard\CardEventDashboardIndex.cshtml;Views\CardEventDashboard\SearchCardEventsIndex.cshtml;Views\CardEventDashboard\ViewCardEventInformation.cshtml;Views\CardEventActions\CardEventDisposedIndex.cshtml;Views\CardEventActions\PostponeCardEvent.cshtml;Views\CardEventActions\CardEventTransferIndex.cshtml;Views\CardEventSearch\CardEventSearchIndex.cshtml;Views\CardEventInquiry\CardEventInquiryIndex.cshtml;Views\Home\LandingPage.cshtml;Views\Card\UpdateBranch.cshtml;Views\Card\InternationalNumberChange.cshtml;Reporting\DataSet\ReportDS.xsc;Reporting\DataSet\ReportDS.xss;Views\CardEventDashboard\IssuedCards.cshtml;Views\CardEventDashboard\ReceivedCards.cshtml;Views\CardEventDashboard\DeliveredCards.cshtml;Views\CardEventDashboard\TransferredCards.cshtml;Views\CardEventDashboard\DisposedCards.cshtml;Views\web.config;Views\Card\PrepaidCardLoading.cshtml;Views\Card\PrepaidCardUnloading.cshtml;packages.config;Reporting\Rdlc\rdlcCardMailer.rdlc
-CollectFilesFromIntermediateSatelliteAssembliesWithTargetPath:
-  Gather all files from Project output (IntermediateSatelliteAssembliesWithTargetPath). Adding:
-CollectFilesFromReference:
-  Gather all files from Project items @(ReferenceCopyLocalPaths,ReferenceComWrappersToCopyLocal,ResolvedIsolatedComModules,_DeploymentLooseManifestFile,NativeReferenceFile).
-CollectFilesFromAllExtraReferenceFiles:
-  Gather all files from Project items @(AllExtraReferenceFiles). Adding:
-CollectFilesFrom_SourceItemsToCopyToOutputDirectory:
-  Gather all files from Project items @(_SourceItemsToCopyToOutputDirectoryAlways,_SourceItemsToCopyToOutputDirectory). Adding:
-  bin\NLog.config;bin\roslyn\csc.exe;bin\roslyn\Microsoft.Build.Tasks.CodeAnalysis.dll;bin\roslyn\Microsoft.CodeAnalysis.CSharp.dll;bin\roslyn\Microsoft.CodeAnalysis.dll;bin\roslyn\Microsoft.CodeAnalysis.VisualBasic.dll;bin\roslyn\Microsoft.CSharp.Core.targets;bin\roslyn\Microsoft.VisualBasic.Core.targets;bin\roslyn\System.Collections.Immutable.dll;bin\roslyn\System.Reflection.Metadata.dll;bin\roslyn\vbc.exe;bin\roslyn\VBCSCompiler.exe;bin\roslyn\VBCSCompiler.exe.config
-CollectFilesFrom_binDeployableAssemblies:
-  Gather all files from Project items @(_binDeployableAssemblies). Adding:
-PipelineCollectFilesPhase:
-  Publish Pipeline Collect Files Phase
-PreTransformWebConfig:
-  Found The following for Config tranformation:
-  Web.config
-  Creating directory "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\obj\Any CPU\Release\TransformWebConfig\transformed\".
-  Creating directory "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\obj\Any CPU\Release\TransformWebConfig\transformed\Views\".
-  Copying Web.config to obj\Any CPU\Release\TransformWebConfig\original\Web.config.
-  Copying C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\Web.Release.config to obj\Any CPU\Release\TransformWebConfig\assist\Web.config.
-TransformWebConfigCore:
-  Transforming Source File: C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\Web.config
-    Applying Transform File: C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\Web.Release.config
-    Output File: obj\Any CPU\Release\TransformWebConfig\transformed\Web.config
-  Transformation succeeded
-PostTransformWebConfig:
-  Transformed Web.config using C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\Web.Release.config into obj\Any CPU\Release\TransformWebConfig\transformed\Web.config.
-PipelineTransformPhase:
-  Publish Pipeline Transform Phase
-PreAutoParameterizationWebConfigConnectionStrings:
-  Creating directory "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\obj\Any CPU\Release\CSAutoParameterize\transformed\Views\".
-  Copying Views\web.config to obj\Any CPU\Release\CSAutoParameterize\original\Views\web.config.
-  Copying obj\Any CPU\Release\TransformWebConfig\transformed\Web.config to obj\Any CPU\Release\CSAutoParameterize\original\Web.config.
-PipelineMsdeploySpecificTransformPhase:
-  Publish Pipeline Deploy phase Stage PipelineMsdeploySpecificTransformPhase
-CopyAllFilesToSingleFolderForMsdeploy:
+In classic .NET Framework web projects, these flags are not enough by themselves:
+
+```yaml
+/p:DeployOnBuild=true
+/p:WebPublishMethod=FileSystem
+```
+
+Because without the right publish target/output properties, the old web publishing pipeline can still stage files under `obj\...\Package\PackageTmp`.
+
+Also, your zip task is trying to archive:
+
+```text
+$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc
+```
+
+but your publish step never wrote there, so `ArchiveFiles@2` fails.
+
+---
+
+# What to change
+
+Replace your publish step with this exact version:
+
+```yaml
+- task: VSBuild@1
+  displayName: 'Publish to folder'
+  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+  inputs:
+    solution: '${{ parameters.buildProject }}'
+    vsVersion: '${{ parameters.vsVersion }}'
+    platform: '${{ parameters.buildPlatform }}'
+    configuration: '${{ parameters.buildConfiguration }}'
+    clean: false
+    msbuildArgs: >
+      /p:SkipInvalidConfigurations=true
+      /p:VisualStudioVersion=${{ parameters.vsVersion }}
+      /p:DeployOnBuild=true
+      /p:DeployDefaultTarget=WebPublish
+      /p:WebPublishMethod=FileSystem
+      /p:PublishUrl="${{ parameters.packageLocation }}"
+      /p:DeleteExistingFiles=true
+      /p:AutoParameterizationWebConfigConnectionStrings=false
+```
+
+## Important changes
+
+Use these:
+
+```yaml
+/p:DeployDefaultTarget=WebPublish
+/p:PublishUrl="..."
+```
+
+Do **not** use these for your scenario:
+
+```yaml
+/p:PackageLocation="..."
+/p:PackageAsSingleFile=false
+```
+
+Those are for package/webdeploy style output, not for “publish flat folder then zip it”.
+
+---
+
+# Why the zip step failed
+
+Because this folder was expected:
+
+```text
+C:\agent\_work\6\a\AlternaCardManagement-package-mvc
+```
+
+but the publish never created it.
+
+After the fix above, the publish should actually write there, and then this zip step will work:
+
+```yaml
+- task: ArchiveFiles@2
+  displayName: 'Zip publish output'
+  inputs:
+    rootFolderOrFile: '${{ parameters.packageLocation }}'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+    replaceExistingArchive: true
+```
+
+---
+
+# Add one debug step once
+
+Right after publish, add this temporary step:
+
+```yaml
+- powershell: |
+    Write-Host "Checking publish output:"
+    Write-Host "${{ parameters.packageLocation }}"
+    if (Test-Path "${{ parameters.packageLocation }}") {
+      Get-ChildItem "${{ parameters.packageLocation }}" -Recurse | Select-Object FullName
+    } else {
+      Write-Host "Publish folder does not exist."
+    }
+  displayName: 'Debug publish folder'
+```
+
+This will confirm the files are really landing where you want.
+
+---
+
+# Expected result after the fix
+
+Inside:
+
+```text
+$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc
+```
+
+you should directly get IIS-ready files like:
+
+* `Web.config`
+* `bin\...`
+* `Content\...`
+* `Views\...`
+
+No more:
+
+* `Archive\Content\C_C\...`
+* `PackageTmp`
+* inner deployment package structure
+
+---
+
+# Bottom line
+
+Your project is still publishing through the old package pipeline.
+To get a normal IIS-ready folder, use:
+
+* `/p:DeployDefaultTarget=WebPublish`
+* `/p:WebPublishMethod=FileSystem`
+* `/p:PublishUrl=...`
+
+and remove package-specific properties.
+
+If you want, I can rewrite your full final `build-dotnet-framework-webapi.yml` exactly as it should be.
