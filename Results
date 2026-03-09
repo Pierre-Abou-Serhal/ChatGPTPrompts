@@ -1,4 +1,157 @@
-This is my deploy to IIS tempalte:
+Same error:
+This is mt build-dotnet-framework-webapi
+
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
+
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET Framework)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+- name: vsVersion
+  type: string
+  default: '17.0'
+
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: solution
+  type: string
+  default: '**/*.sln'
+
+- name: buildProject
+  type: string
+  default: ''
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
+
+- name: publishProject
+  type: string
+  default: ''
+
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - task: NuGetCommand@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      restoreSolution: '${{ parameters.solution }}'
+      feedsToUse: 'config'
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+
+  - task: VSBuild@1
+    displayName: 'Build Project'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+
+  # Tests (optional)
+  # - task: VSTest@2
+  #   displayName: 'Test'
+  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+  #   inputs:
+  #     testSelector: 'testAssemblies'
+  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
+  #     searchFolder: '$(System.DefaultWorkingDirectory)'
+  #     platform: '${{ parameters.buildPlatform }}'
+  #     configuration: '${{ parameters.buildConfiguration }}'
+  #     diagnosticsEnabled: true
+
+
+  - task: VSBuild@1
+    displayName: 'Publish (Package)'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: false
+      msbuildArgs: >
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+        /p:DeployOnBuild=true
+        /p:WebPublishMethod=Package
+        /p:PackageAsSingleFile=true
+        /p:SkipInvalidConfigurations=true
+        /p:PackageLocation="${{ parameters.packageLocation }}"
+        /p:AutoParameterizationWebConfigConnectionStrings=false
+
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
+
+This is my deploy-iis template:
 parameters:
 - name: deploymentName
   type: string
@@ -383,7 +536,7 @@ jobs:
             Write-Host "Website state: $siteState | AppPool state: $poolState"
           displayName: 'Start Website + App Pool'
 
-And this is my pipeline:
+And this is my pipiline for the AlternaCardManagement project:
 
 resources:
   repositories:
@@ -397,9 +550,8 @@ trigger:
     include:
     - sit
 
-
 stages:
-- stage: Build
+- stage: BuildMVC
   displayName: Build MVC + API
   jobs:
   # MVC
@@ -419,29 +571,12 @@ stages:
       zipName: 'AlternaCardManagementMVC.zip'
       packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
 
-  # API
-  - template: pipelines/build-dotnet-framework-webapi.yml@templates
-    parameters:
-      jobName: Build_API
-      jobDisplayName: 'Build Web API'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      vsVersion: '17.0'
-      buildConfiguration: 'Release'
-      solution: 'CardManagement/CardManagement.sln'
-      buildProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
-      nugetConfigPath: 'nuget.config'
-      runTests: false
-      testAssemblies: ''
-      zipName: 'AlternaCardManagementAPI.zip'
-      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
-
 # =========================
 # DEPLOY SIT MVC
 # =========================
 - stage: Deploy_MVC_SIT
   displayName: 'Deploy MVC to SIT'
-  dependsOn: Build
+  dependsOn: BuildMVC
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
   jobs:
   - template: pipelines/deploy-iis.yml@templates
@@ -478,7 +613,32 @@ stages:
       enableCustomXmlEdits: false
       customXmlEdits: {}
 
-I am receiving th efollowing error:
+- stage: BuildAPI
+  displayName: Build API
+  jobs:
+  # API
+  - template: pipelines/build-dotnet-framework-webapi.yml@templates
+    parameters:
+      jobName: Build_API
+      jobDisplayName: 'Build Web API'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      vsVersion: '17.0'
+      buildConfiguration: 'Release'
+      solution: 'CardManagement/CardManagement.sln'
+      buildProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
+      nugetConfigPath: 'nuget.config'
+      runTests: false
+      testAssemblies: ''
+      zipName: 'AlternaCardManagementAPI.zip'
+      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
+
+
+This is the error:
+XML appSettings substitution (.config)
+
+View raw log
+
 Starting: XML appSettings substitution (.config)
 ==============================================================================
 Task         : PowerShell
@@ -489,10 +649,10 @@ Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/p
 ==============================================================================
 Generating script.
 ========================== Starting Command Output ===========================
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\ac8a0b63-8507-477e-9a6a-84408a646f0d.ps1'"
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\fd09b3b0-59d9-4f0b-b7b3-d1829d21937a.ps1'"
 No config files matched xmlConfigFiles patterns under: 
 C:\agent\_work\2\extracted
-At C:\agent\_work\_temp\ac8a0b63-8507-477e-9a6a-84408a646f0d.ps1:43 char:3
+At C:\agent\_work\_temp\fd09b3b0-59d9-4f0b-b7b3-d1829d21937a.ps1:43 char:3
 +   throw "No config files matched xmlConfigFiles patterns under: $root ...
 +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     + CategoryInfo          : OperationStopped: (No config files...ork\2\extra 
@@ -501,8 +661,3 @@ At C:\agent\_work\_temp\ac8a0b63-8507-477e-9a6a-84408a646f0d.ps1:43 char:3
    under: C:\agent\_work\2\extracted
  
 ##[error]PowerShell exited with code '1'.
-
-The web.config files are located in the root of each project.
-Example:
-CardManagement\SGBL.CardManagement\Web.config
-CardManagement\SGBL.CardManagement.Host\Web.config
