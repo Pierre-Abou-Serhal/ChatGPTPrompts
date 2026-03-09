@@ -1,144 +1,508 @@
-Yes. Right now your `Build` step is building the whole solution because it uses:
-
-```yaml
-solution: '${{ parameters.solution }}'
-```
-
-If you want to build only one project, add a separate parameter for the build project and use that in the `Build` step.
-
-## Change the template
-
-Add a new parameter:
-
-```yaml
-- name: buildProject
+This is my deploy to IIS tempalte:
+parameters:
+- name: deploymentName
   type: string
-  default: ''
-```
+  default: 'DeployJob'
 
-Then change the `Build` step to use the project when provided, otherwise fall back to the solution.
-
-Use this:
-
-```yaml
-- task: VSBuild@1
-  displayName: 'Build'
-  inputs:
-    solution: ${{ if ne(parameters.buildProject, '') }}:
-                '${{ parameters.buildProject }}'
-              ${{ else }}:
-                '${{ parameters.solution }}'
-    vsVersion: '${{ parameters.vsVersion }}'
-    platform: '${{ parameters.buildPlatform }}'
-    configuration: '${{ parameters.buildConfiguration }}'
-    clean: true
-    msbuildArgs: >
-      /p:SkipInvalidConfigurations=true
-      /p:VisualStudioVersion=${{ parameters.vsVersion }}
-```
-
-But Azure template expressions inside one property like that can be awkward. The cleaner version is to create two conditional tasks.
-
-## Better version
-
-Replace your current `Build` task with these two tasks:
-
-```yaml
-  - task: VSBuild@1
-    displayName: 'Build Solution'
-    condition: and(succeeded(), eq('${{ parameters.buildProject }}', ''))
-    inputs:
-      solution: '${{ parameters.solution }}'
-      vsVersion: '${{ parameters.vsVersion }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: true
-      msbuildArgs: >
-        /p:SkipInvalidConfigurations=true
-        /p:VisualStudioVersion=${{ parameters.vsVersion }}
-
-  - task: VSBuild@1
-    displayName: 'Build Project'
-    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
-    inputs:
-      solution: '${{ parameters.buildProject }}'
-      vsVersion: '${{ parameters.vsVersion }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: true
-      msbuildArgs: >
-        /p:SkipInvalidConfigurations=true
-        /p:VisualStudioVersion=${{ parameters.vsVersion }}
-```
-
-## Full template change
-
-Add this near your parameters:
-
-```yaml
-- name: buildProject
+- name: deploymentDisplayName
   type: string
-  default: ''
-```
+  default: 'Deploy IIS'
 
-Then keep:
+- name: environmentName
+  type: string
 
-* `solution` for restore if you still want to restore the whole solution
-* `buildProject` for building only one `.csproj`
-* `publishProject` for packaging that same project
+- name: deployPool
+  type: string
 
-## Example usage
+- name: deployAgentName
+  type: string
 
-For MVC:
+- name: variableGroup
+  type: string
 
-```yaml
-- template: pipelines/build-dotnet-framework-webapi.yml@templates
-  parameters:
-    jobName: Build_MVC
-    jobDisplayName: 'Build MVC'
-    buildPool: 'Build Pool'
-    buildAgentName: 'UAT-ALTERNA-DK1'
-    vsVersion: '17.0'
-    buildConfiguration: 'Release'
-    solution: 'CardManagement/CardManagement.sln'
-    buildProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
-    nugetConfigPath: 'nuget.config'
-    runTests: false
-    testAssemblies: ''
-    publishProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
-    zipName: 'AlternaCardManagementMVC.zip'
-    packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
-```
+- name: zipName
+  type: string
 
-For API:
+- name: siteName
+  type: string
 
-```yaml
-- template: pipelines/build-dotnet-framework-webapi.yml@templates
-  parameters:
-    jobName: Build_API
-    jobDisplayName: 'Build Web API'
-    buildPool: 'Build Pool'
-    buildAgentName: 'UAT-ALTERNA-DK1'
-    vsVersion: '17.0'
-    buildConfiguration: 'Release'
-    solution: 'CardManagement/CardManagement.sln'
-    buildProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
-    nugetConfigPath: 'nuget.config'
-    runTests: false
-    testAssemblies: ''
-    publishProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
-    zipName: 'AlternaCardManagementAPI.zip'
-    packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
-```
+- name: appPoolName
+  type: string
 
-## One important note
+- name: iisTargetPath
+  type: string
 
-If you only build the project instead of the whole solution, project references should still build as dependencies, but solution-level behavior will no longer apply. That is usually fine if your `.csproj` is set up correctly.
+- name: cleanTargetBeforeCopy
+  type: boolean
+  default: true
 
-A clean final version is:
+- name: cleanExcludeCsv
+  type: string
+  default: 'web.config,logs,Keys'
 
-* `solution` → used for restore
-* `buildProject` → used for build
-* `publishProject` → used for package
+- name: enableJsonTransform
+  type: boolean
+  default: true
 
-If you want, I can rewrite your full template exactly as it should look.
+- name: jsonFiles
+  type: string
+  default: '**/appsettings.json'
+
+- name: enableXmlConfigTransform
+  type: boolean
+  default: false
+
+- name: xmlConfigFiles
+  type: object
+  default: []
+
+- name: xmlVariableValues
+  type: object
+  default: {}
+
+- name: enableCustomXmlEdits
+  type: boolean
+  default: false
+
+- name: customXmlEdits
+  type: object
+  default: []
+
+- name: customXmlVariableValues
+  type: object
+  default: {}
+
+jobs:
+- deployment: ${{ parameters.deploymentName }}
+  displayName: ${{ parameters.deploymentDisplayName }}
+
+  environment: ${{ parameters.environmentName }}
+
+  pool:
+    name: ${{ parameters.deployPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
+
+  variables:
+  - group: ${{ parameters.variableGroup }}
+
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - task: DownloadBuildArtifacts@0
+          displayName: 'Download Build Artifact'
+          inputs:
+            buildType: 'current'
+            downloadType: 'single'
+            artifactName: 'drop'
+            downloadPath: '$(Pipeline.Workspace)'
+
+        - task: ExtractFiles@1
+          displayName: 'Extract artifact'
+          inputs:
+            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
+            destinationFolder: '$(Pipeline.Workspace)\extracted'
+            cleanDestinationFolder: true
+
+        # JSON substitution (v2)
+        - task: FileTransform@2
+          displayName: 'JSON substitution (appsettings.json)'
+          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
+          inputs:
+            folderPath: '$(Pipeline.Workspace)\extracted'
+            enableXmlTransform: false
+            xmlTransformationRules: ''
+            jsonTargetFiles: ${{ parameters.jsonFiles }}
+
+        # XML substitution (v2)
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $root = "$(Pipeline.Workspace)\extracted"
+
+            $patternsJson = @'
+            ${{ convertToJson(parameters.xmlConfigFiles) }}
+            '@
+            $patterns = $patternsJson | ConvertFrom-Json
+
+            if (-not $patterns -or $patterns.Count -eq 0) {
+              Write-Host "No xmlConfigFiles patterns provided. Skipping."
+              exit 0
+            }
+
+            function Resolve-Files([string]$base, [string]$pattern) {
+              $pattern = $pattern -replace '\\','/'
+
+              if ($pattern.StartsWith("**/")) {
+                $name = $pattern.Substring(3)
+                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
+              }
+
+              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
+                $p = Join-Path $base ($pattern -replace '/','\')
+                return Get-Item $p -ErrorAction SilentlyContinue
+              }
+
+              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
+            }
+
+            # collect unique files
+            $files = @()
+            foreach ($pat in $patterns) {
+              $files += Resolve-Files $root ([string]$pat)
+            }
+            $files = $files | Where-Object { $_ } | Select-Object -Unique
+
+            if (-not $files -or $files.Count -eq 0) {
+              throw "No config files matched xmlConfigFiles patterns under: $root"
+            }
+
+            foreach ($f in $files) {
+              Write-Host "Editing: $($f.FullName)"
+              [xml]$xml = Get-Content -Raw -Path $f.FullName
+
+              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
+              if (-not $nodes -or $nodes.Count -eq 0) {
+                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
+                continue
+              }
+
+              $changed = 0
+
+              foreach ($n in $nodes) {
+                $key = [string]$n.GetAttribute("key")
+                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
+
+                # no variable provided => skip
+                if ([string]::IsNullOrWhiteSpace($val)) { continue }
+
+                $current = [string]$n.GetAttribute("value")
+                if ($current -ne $val) {
+                  $n.SetAttribute("value", $val)
+                  $changed++
+                }
+              }
+
+              $xml.Save($f.FullName)
+              Write-Host "Updated $changed setting(s) in $($f.Name)"
+            }
+          displayName: 'XML appSettings substitution (.config)'
+          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
+          env:
+            ${{ each pair in parameters.xmlVariableValues }}:
+              ${{ pair.key }}: ${{ pair.value }}
+
+          # ---- Custom XML substitution (XPath) ----
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $root = "$(Pipeline.Workspace)\extracted"
+
+            $rulesJson = @'
+            ${{ convertToJson(parameters.customXmlEdits) }}
+            '@
+            $rules = $rulesJson | ConvertFrom-Json
+
+            if (-not $rules -or $rules.Count -eq 0) {
+              Write-Host "No custom XML edits provided. Skipping."
+              exit 0
+            }
+
+            function Resolve-Files($base, $pattern) {
+              # supports: **/File.xml, File.xml, or folder\File.xml
+              $pattern = $pattern -replace '\\','/'
+              if ($pattern.StartsWith("**/")) {
+                $name = $pattern.Substring(3)
+                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
+              }
+              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
+                $p = Join-Path $base ($pattern -replace '/','\')
+                return Get-Item $p -ErrorAction SilentlyContinue
+              }
+              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
+            }
+
+            foreach ($r in $rules) {
+              $filePat = [string]$r.file
+              $xpath   = [string]$r.xpath
+              $varName = [string]$r.variable
+
+              if (-not $filePat -or -not $xpath -or -not $varName) {
+                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
+              }
+
+              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
+              if ([string]::IsNullOrWhiteSpace($value)) {
+                throw "Pipeline variable '$varName' is missing/empty."
+              }
+
+              $files = Resolve-Files $root $filePat
+              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
+
+              foreach ($f in @($files)) {
+                [xml]$xml = Get-Content -Raw -Path $f.FullName
+
+                if ($xpath -match "/@([^/]+)$") {
+                  $attrName = $Matches[1]
+                  $nodePath = $xpath -replace "/@[^/]+$",""
+                  $node = $xml.SelectSingleNode($nodePath)
+                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
+
+                  $attr = $node.Attributes[$attrName]
+                  if (-not $attr) {
+                    $attr = $xml.CreateAttribute($attrName)
+                    [void]$node.Attributes.Append($attr)
+                  }
+                  $attr.Value = $value
+                } else {
+                  $node = $xml.SelectSingleNode($xpath)
+                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
+                  $node.InnerText = $value
+                }
+
+                $xml.Save($f.FullName)
+                Write-Host "Updated $($f.Name): $xpath (from $varName)"
+              }
+            }
+          displayName: 'Custom XML substitution (XPath)'
+          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
+          env:
+            ${{ each pair in parameters.customXmlVariableValues }}:
+              ${{ pair.key }}: ${{ pair.value }}
+
+        # Stop website + app pool safely (idempotent)
+        - powershell: |
+            Import-Module WebAdministration
+
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
+
+            $site = Get-Website -Name $siteName
+            Write-Host "Website current state: $($site.State)"
+            if ($site.State -ne "Stopped") {
+              Write-Host "Stopping website: $siteName"
+              Stop-Website -Name $siteName
+            } else {
+              Write-Host "Website already stopped."
+            }
+
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            Write-Host "AppPool current state: $poolState"
+            if ($poolState -ne "Stopped") {
+              Write-Host "Stopping app pool: $appPool"
+              Stop-WebAppPool -Name $appPool
+            } else {
+              Write-Host "AppPool already stopped."
+            }
+
+            $maxTries = 30
+            for ($i = 1; $i -le $maxTries; $i++) {
+              $siteState = (Get-Website -Name $siteName).State
+              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+
+              Write-Host "Website state: $siteState | AppPool state: $poolState"
+
+              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
+                Write-Host "Website and App Pool are stopped."
+                break
+              }
+
+              Start-Sleep -Seconds 2
+            }
+
+            $finalSiteState = (Get-Website -Name $siteName).State
+            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
+
+            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
+              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
+            }
+
+            Start-Sleep -Seconds 2
+          displayName: 'Stop Website + App Pool'
+
+        - powershell: |
+            $target = '${{ parameters.iisTargetPath }}'
+
+            if (-not (Test-Path $target)) {
+              throw "Target folder does not exist: $target"
+            }
+
+            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
+            $exclude = @()
+
+            if ($excludeCsv) {
+              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            }
+
+            Write-Host "Cleaning target folder: $target"
+            Write-Host "Excluding: $($exclude -join ', ')"
+
+            Get-ChildItem -Path $target -Force | ForEach-Object {
+              if ($exclude -contains $_.Name) {
+                Write-Host "Skipping excluded item: $($_.FullName)"
+              } else {
+                Write-Host "Removing: $($_.FullName)"
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+              }
+            }
+          displayName: 'Clean target folder (before copy)'
+          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
+
+        - task: CopyFiles@2
+          displayName: 'Copy files'
+          inputs:
+            SourceFolder: '$(Pipeline.Workspace)\extracted'
+            Contents: '**'
+            TargetFolder: '${{ parameters.iisTargetPath }}'
+            OverWrite: true
+
+        # Start website + app pool safely (idempotent)
+        - powershell: |
+            Import-Module WebAdministration
+
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
+
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            if ($poolState -ne "Started") {
+              Write-Host "Starting app pool: $appPool"
+              Start-WebAppPool -Name $appPool
+            } else {
+              Write-Host "AppPool already started."
+            }
+
+            $siteState = (Get-Website -Name $siteName).State
+            if ($siteState -ne "Started") {
+              Write-Host "Starting website: $siteName"
+              Start-Website -Name $siteName
+            } else {
+              Write-Host "Website already started."
+            }
+
+            $siteState = (Get-Website -Name $siteName).State
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            Write-Host "Website state: $siteState | AppPool state: $poolState"
+          displayName: 'Start Website + App Pool'
+
+And this is my pipeline:
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - sit
+
+
+stages:
+- stage: Build
+  displayName: Build MVC + API
+  jobs:
+  # MVC
+  - template: pipelines/build-dotnet-framework-webapi.yml@templates
+    parameters:
+      jobName: Build_MVC
+      jobDisplayName: 'Build MVC'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      vsVersion: '17.0'
+      buildConfiguration: 'Release'
+      solution: 'CardManagement/CardManagement.sln'
+      buildProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
+      nugetConfigPath: 'nuget.config'
+      runTests: false
+      testAssemblies: ''
+      zipName: 'AlternaCardManagementMVC.zip'
+      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
+
+  # API
+  - template: pipelines/build-dotnet-framework-webapi.yml@templates
+    parameters:
+      jobName: Build_API
+      jobDisplayName: 'Build Web API'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      vsVersion: '17.0'
+      buildConfiguration: 'Release'
+      solution: 'CardManagement/CardManagement.sln'
+      buildProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
+      nugetConfigPath: 'nuget.config'
+      runTests: false
+      testAssemblies: ''
+      zipName: 'AlternaCardManagementAPI.zip'
+      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
+
+# =========================
+# DEPLOY SIT MVC
+# =========================
+- stage: Deploy_MVC_SIT
+  displayName: 'Deploy MVC to SIT'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
+  jobs:
+  - template: pipelines/deploy-iis.yml@templates
+    parameters:
+      deploymentName: 'DeploySIT'
+      deploymentDisplayName: 'Deploy MVC to SIT (IIS)'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-FN1'
+      variableGroup: 'SIT_MVC_VARIABLE_GROUP'
+      zipName: 'AlternaCardManagementMVC.zip'
+      siteName: 'AlternaCardManagement-AzureDevOps'
+      appPoolName: 'AlternaCardManagement-AzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
+      cleanTargetBeforeCopy: true
+      cleanExcludeCsv: ''
+      enableJsonTransform: false
+      jsonFiles: ''
+      enableXmlConfigTransform: true
+      xmlConfigFiles:
+        - '**/Web.config'
+
+      xmlVariableValues:
+        BaseUrl: $(BaseUrl)
+        BaseUrlOsb: $(BaseUrlOsb)
+        CDN_IP_LINK: $(CDN_IP_LINK)
+        DASHBOARD_LINK: $(DASHBOARD_LINK)
+        GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
+        GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
+        LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
+        UploadFilesPath: $(UploadFilesPath)
+        USER_GUIDE_LINK: $(USER_GUIDE_LINK)
+        
+      enableCustomXmlEdits: false
+      customXmlEdits: {}
+
+I am receiving th efollowing error:
+Starting: XML appSettings substitution (.config)
+==============================================================================
+Task         : PowerShell
+Description  : Run a PowerShell script on Linux, macOS, or Windows
+Version      : 2.232.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\ac8a0b63-8507-477e-9a6a-84408a646f0d.ps1'"
+No config files matched xmlConfigFiles patterns under: 
+C:\agent\_work\2\extracted
+At C:\agent\_work\_temp\ac8a0b63-8507-477e-9a6a-84408a646f0d.ps1:43 char:3
++   throw "No config files matched xmlConfigFiles patterns under: $root ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (No config files...ork\2\extra 
+   cted:String) [], RuntimeException
+    + FullyQualifiedErrorId : No config files matched xmlConfigFiles patterns  
+   under: C:\agent\_work\2\extracted
+ 
+##[error]PowerShell exited with code '1'.
+
+The web.config files are located in the root of each project.
+Example:
+CardManagement\SGBL.CardManagement\Web.config
+CardManagement\SGBL.CardManagement.Host\Web.config
