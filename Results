@@ -1,46 +1,144 @@
-I have manually added "vsstudio" capability and added the install directory: C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
 
-When the pipeline reaches the Build task:
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET Framework)'
 
-I go this:
+- name: buildPool
+  type: string
 
-"C:\agent\_work\6\s\CardManagement\CardManagement.sln" (Clean target) (1) ->
-"C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.BLL\SGBL.CardManagement.BLL.csproj" (Clean target) (6) ->
-  C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'". [C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.BLL\SGBL.CardManagement.BLL.csproj]
+- name: buildAgentName
+  type: string
+
+- name: vsVersion
+  type: string
+  default: '17.0'
+
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: solution
+  type: string
+  default: '**/*.sln'
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
+
+- name: publishProject
+  type: string
+  default: ''
+
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - task: NuGetCommand@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      restoreSolution: '${{ parameters.solution }}'
+      feedsToUse: 'config'
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+
+  - task: VSBuild@1
+    displayName: 'Build'
+    inputs:
+      solution: '${{ parameters.solution }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+
+  # Tests (optional)
+  # - task: VSTest@2
+  #   displayName: 'Test'
+  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+  #   inputs:
+  #     testSelector: 'testAssemblies'
+  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
+  #     searchFolder: '$(System.DefaultWorkingDirectory)'
+  #     platform: '${{ parameters.buildPlatform }}'
+  #     configuration: '${{ parameters.buildConfiguration }}'
+  #     diagnosticsEnabled: true
 
 
-"C:\agent\_work\6\s\CardManagement\CardManagement.sln" (Clean target) (1) ->
-"C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj" (Clean target) (7) ->
-  C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'". [C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj]
+  - task: VSBuild@1
+    displayName: 'Publish (Package)'
+    condition: and(succeeded(), ne('${{ parameters.publishProject }}', ''))
+    inputs:
+      solution: '${{ parameters.publishProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: false
+      msbuildArgs: >
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+        /p:DeployOnBuild=true
+        /p:WebPublishMethod=Package
+        /p:PackageAsSingleFile=true
+        /p:SkipInvalidConfigurations=true
+        /p:PackageLocation="${{ parameters.packageLocation }}"
+        /p:AutoParameterizationWebConfigConnectionStrings=false
 
-    0 Warning(s)
-    6 Error(s)
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
 
-Time Elapsed 00:00:00.23
-##[error]Process 'msbuild.exe' exited with code '1'.
-"C:\Windows\Microsoft.NET\Framework\v4.0.30319\msbuild.exe" "C:\agent\_work\6\s\CardManagement\CardManagement.sln" /nologo /nr:false /dl:CentralLogger,"C:\agent\_work\_tasks\VSBuild_71a9a2d3-a98a-4caa-96ab-affca411ecda\1.231.0\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\Microsoft.TeamFoundation.DistributedTask.MSBuild.Logger.dll";"RootDetailId=4ff70b4e-3cc0-4e13-af23-bf3017cfeba0|SolutionDir=C:\agent\_work\6\s\CardManagement|enableOrphanedProjectsLogs=true"*ForwardingLogger,"C:\agent\_work\_tasks\VSBuild_71a9a2d3-a98a-4caa-96ab-affca411ecda\1.231.0\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\Microsoft.TeamFoundation.DistributedTask.MSBuild.Logger.dll" /p:SkipInvalidConfigurations=true /p:VisualStudioVersion=latest /p:platform="Any CPU" /p:configuration="Release" /p:_MSDeployUserAgent="TFS_de6d64fc-44b6-41ed-b791-554c69e3c04c_build_5_0"
-Building the projects in this solution one at a time. To enable parallel build, please add the "/m" switch.
-Build started 3/9/2026 10:28:05 AM.
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" on node 1 (default targets).
-ValidateSolutionConfiguration:
-  Building solution configuration "Release|Any CPU".
-##[error]C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): Error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'".
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj" (2) on node 1 (default targets).
-C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'". [C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj]
-Done Building Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj" (default targets) -- FAILED.
-##[error]C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): Error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'".
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.BLL\SGBL.CardManagement.BLL.csproj" (3) on node 1 (default targets).
-C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'". [C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.BLL\SGBL.CardManagement.BLL.csproj]
-Done Building Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.BLL\SGBL.CardManagement.BLL.csproj" (default targets) -- FAILED.
-##[error]C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): Error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'".
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Common\SGBL.CardManagement.Common.csproj" (4) on node 1 (default targets).
-C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'". [C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Common\SGBL.CardManagement.Common.csproj]
-Done Building Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Common\SGBL.CardManagement.Common.csproj" (default targets) -- FAILED.
-##[error]C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): Error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'".
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.DAL\SGBL.CardManagement.DAL.csproj" (5) on node 1 (default targets).
-C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'". [C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.DAL\SGBL.CardManagement.DAL.csproj]
-Done Building Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.DAL\SGBL.CardManagement.DAL.csproj" (default targets) -- FAILED.
-##[error]C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): Error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'".
-Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Host\SGBL.CardManagement.Host.csproj" (6) on node 1 (default targets).
-C:\Windows\Microsoft.NET\Framework\v4.0.30319\Microsoft.Common.targets(63,25): error MSB4086: A numeric comparison was attempted on "$(VisualStudioVersion)" that evaluates to "latest" instead of a number, in condition "'$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' > '10.0'". [C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Host\SGBL.CardManagement.Host.csproj]
-Done Building Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Host\SGBL.CardManagement.Host.csproj" (default targets) -- FAILED.
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
