@@ -1,91 +1,52 @@
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildJob'
+Yes. Right now your `Build` step is building the whole solution because it uses:
 
-- name: jobDisplayName
-  type: string
-  default: 'Build (.NET Framework)'
+```yaml
+solution: '${{ parameters.solution }}'
+```
 
-- name: buildPool
-  type: string
+If you want to build only one project, add a separate parameter for the build project and use that in the `Build` step.
 
-- name: buildAgentName
-  type: string
+## Change the template
 
-- name: vsVersion
-  type: string
-  default: '17.0'
+Add a new parameter:
 
-- name: buildPlatform
-  type: string
-  default: 'Any CPU'
-
-- name: buildConfiguration
-  type: string
-  default: 'Release'
-
-- name: solution
-  type: string
-  default: '**/*.sln'
-
-- name: nugetConfigPath
-  type: string
-  default: 'nuget.config'
-
-- name: runTests
-  type: boolean
-  default: false
-
-- name: testAssemblies
-  type: string
-  default: |
-    **\*test*.dll
-    **\*tests*.dll
-    !**\obj\**
-    !**\bin\ref\**
-    !**\*TestAdapter.dll
-    !**\*vstest*.dll
-
-- name: publishProject
+```yaml
+- name: buildProject
   type: string
   default: ''
+```
 
-- name: packageLocation
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
+Then change the `Build` step to use the project when provided, otherwise fall back to the solution.
 
-- name: zipName
-  type: string
-  default: 'WebApp.zip'
+Use this:
 
-- name: artifactName
-  type: string
-  default: 'drop'
-
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
-
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
-
-  steps:
-  - checkout: self
+```yaml
+- task: VSBuild@1
+  displayName: 'Build'
+  inputs:
+    solution: ${{ if ne(parameters.buildProject, '') }}:
+                '${{ parameters.buildProject }}'
+              ${{ else }}:
+                '${{ parameters.solution }}'
+    vsVersion: '${{ parameters.vsVersion }}'
+    platform: '${{ parameters.buildPlatform }}'
+    configuration: '${{ parameters.buildConfiguration }}'
     clean: true
+    msbuildArgs: >
+      /p:SkipInvalidConfigurations=true
+      /p:VisualStudioVersion=${{ parameters.vsVersion }}
+```
 
-  - task: NuGetCommand@2
-    displayName: 'Restore'
-    inputs:
-      command: 'restore'
-      restoreSolution: '${{ parameters.solution }}'
-      feedsToUse: 'config'
-      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+But Azure template expressions inside one property like that can be awkward. The cleaner version is to create two conditional tasks.
 
+## Better version
+
+Replace your current `Build` task with these two tasks:
+
+```yaml
   - task: VSBuild@1
-    displayName: 'Build'
+    displayName: 'Build Solution'
+    condition: and(succeeded(), eq('${{ parameters.buildProject }}', ''))
     inputs:
       solution: '${{ parameters.solution }}'
       vsVersion: '${{ parameters.vsVersion }}'
@@ -96,49 +57,88 @@ jobs:
         /p:SkipInvalidConfigurations=true
         /p:VisualStudioVersion=${{ parameters.vsVersion }}
 
-  # Tests (optional)
-  # - task: VSTest@2
-  #   displayName: 'Test'
-  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-  #   inputs:
-  #     testSelector: 'testAssemblies'
-  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
-  #     searchFolder: '$(System.DefaultWorkingDirectory)'
-  #     platform: '${{ parameters.buildPlatform }}'
-  #     configuration: '${{ parameters.buildConfiguration }}'
-  #     diagnosticsEnabled: true
-
-
   - task: VSBuild@1
-    displayName: 'Publish (Package)'
-    condition: and(succeeded(), ne('${{ parameters.publishProject }}', ''))
+    displayName: 'Build Project'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
     inputs:
-      solution: '${{ parameters.publishProject }}'
+      solution: '${{ parameters.buildProject }}'
       vsVersion: '${{ parameters.vsVersion }}'
       platform: '${{ parameters.buildPlatform }}'
       configuration: '${{ parameters.buildConfiguration }}'
-      clean: false
+      clean: true
       msbuildArgs: >
-        /p:VisualStudioVersion=${{ parameters.vsVersion }}
-        /p:DeployOnBuild=true
-        /p:WebPublishMethod=Package
-        /p:PackageAsSingleFile=true
         /p:SkipInvalidConfigurations=true
-        /p:PackageLocation="${{ parameters.packageLocation }}"
-        /p:AutoParameterizationWebConfigConnectionStrings=false
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+```
 
-  - task: ArchiveFiles@2
-    displayName: 'Zip publish output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.packageLocation }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
+## Full template change
 
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'Container'
+Add this near your parameters:
+
+```yaml
+- name: buildProject
+  type: string
+  default: ''
+```
+
+Then keep:
+
+* `solution` for restore if you still want to restore the whole solution
+* `buildProject` for building only one `.csproj`
+* `publishProject` for packaging that same project
+
+## Example usage
+
+For MVC:
+
+```yaml
+- template: pipelines/build-dotnet-framework-webapi.yml@templates
+  parameters:
+    jobName: Build_MVC
+    jobDisplayName: 'Build MVC'
+    buildPool: 'Build Pool'
+    buildAgentName: 'UAT-ALTERNA-DK1'
+    vsVersion: '17.0'
+    buildConfiguration: 'Release'
+    solution: 'CardManagement/CardManagement.sln'
+    buildProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
+    nugetConfigPath: 'nuget.config'
+    runTests: false
+    testAssemblies: ''
+    publishProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
+    zipName: 'AlternaCardManagementMVC.zip'
+    packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
+```
+
+For API:
+
+```yaml
+- template: pipelines/build-dotnet-framework-webapi.yml@templates
+  parameters:
+    jobName: Build_API
+    jobDisplayName: 'Build Web API'
+    buildPool: 'Build Pool'
+    buildAgentName: 'UAT-ALTERNA-DK1'
+    vsVersion: '17.0'
+    buildConfiguration: 'Release'
+    solution: 'CardManagement/CardManagement.sln'
+    buildProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
+    nugetConfigPath: 'nuget.config'
+    runTests: false
+    testAssemblies: ''
+    publishProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
+    zipName: 'AlternaCardManagementAPI.zip'
+    packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
+```
+
+## One important note
+
+If you only build the project instead of the whole solution, project references should still build as dependencies, but solution-level behavior will no longer apply. That is usually fine if your `.csproj` is set up correctly.
+
+A clean final version is:
+
+* `solution` → used for restore
+* `buildProject` → used for build
+* `publishProject` → used for package
+
+If you want, I can rewrite your full template exactly as it should look.
