@@ -973,3 +973,46 @@ jobs:
       PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
       ArtifactName: '${{ parameters.artifactName }}'
       publishLocation: 'Container'
+
+And this is what my pipeline is showing when arriving at the build part:
+
+Done Building Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (Clean target(s)) -- FAILED.
+
+Build FAILED.
+
+"C:\agent\_work\6\s\CardManagement\CardManagement.sln" (Clean target) (1) ->
+"C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Host\SGBL.CardManagement.Host.csproj" (Clean target) (3) ->
+  C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Host\SGBL.CardManagement.Host.csproj(321,3): error MSB4019: The imported project "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.
+
+
+"C:\agent\_work\6\s\CardManagement\CardManagement.sln" (Clean target) (1) ->
+"C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.DAL\SGBL.CardManagement.DAL.csproj" (Clean target) (4) ->
+"C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.Common\SGBL.CardManagement.Common.csproj" (Clean target) (5) ->
+"C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj" (Clean target) (6) ->
+  C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj(785,3): error MSB4019: The imported project "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.
+
+
+"C:\agent\_work\6\s\CardManagement\CardManagement.sln" (Clean target) (1) ->
+"C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.BLL\SGBL.CardManagement.BLL.csproj" (Clean target) (7) ->
+"C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj" (Clean target) (6:2) ->
+  C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj(785,3): error MSB4019: The imported project "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.
+
+    0 Warning(s)
+    3 Error(s)
+
+Time Elapsed 00:00:00.37
+##[error]Process 'msbuild.exe' exited with code '1'.
+"C:\Windows\Microsoft.NET\Framework\v4.0.30319\msbuild.exe" "C:\agent\_work\6\s\CardManagement\CardManagement.sln" /nologo /nr:false /dl:CentralLogger,"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\Microsoft.TeamFoundation.DistributedTask.MSBuild.Logger.dll";"RootDetailId=|SolutionDir=C:\agent\_work\6\s\CardManagement|enableOrphanedProjectsLogs=true"*ForwardingLogger,"C:\agent\_work\_tasks\MSBuild_c6c4c611-aa2e-4a33-b606-5eaba2196824\1.231.4\node_modules\azure-pipelines-tasks-msbuildhelpers\tools\Microsoft.TeamFoundation.DistributedTask.MSBuild.Logger.dll" /p:SkipInvalidConfigurations=true /p:platform="Any CPU" /p:configuration="Release" /p:_MSDeployUserAgent="TFS_de6d64fc-44b6-41ed-b791-554c69e3c04c_build_5_0"
+Building the projects in this solution one at a time. To enable parallel build, please add the "/m" switch.
+Build started 3/9/2026 9:42:01 AM.
+Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" on node 1 (default targets).
+ValidateSolutionConfiguration:
+  Building solution configuration "Release|Any CPU".
+##[error]CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj(785,3): Error MSB4019: The imported project "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.
+Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj" (2) on node 1 (default targets).
+C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj(785,3): error MSB4019: The imported project "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets" was not found. Confirm that the path in the <Import> declaration is correct, and that the file exists on disk.
+Done Building Project "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement\SGBL.CardManagement.csproj" (default targets) -- FAILED.
+Project "C:\agent\_work\6\s\CardManagement\CardManagement.sln" (1) is building "C:\agent\_work\6\s\CardManagement\SGBL.CardManagement.BLL\SGBL.CardManagement.BLL.csproj" (3) on node 1 (default targets).
+Project file contains ToolsVersion="14.0". This toolset may be unknown or missing, in which case you may be able to resolve this by installing the appropriate version of MSBuild, or the build may have been forced to a particular ToolsVersion for policy reasons. Treating the project as if it had ToolsVersion="4.0". For more information, please see http://go.microsoft.com/fwlink/?LinkId=291333.
+PrepareForBuild:
+  Creating directory "bin\Release\".
