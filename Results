@@ -1,159 +1,127 @@
-This is what is being published to the IIS target folder:
+Those folders appear because your publish step is still mixing **package-style** and **file-system publish** settings.
 
+You changed to:
+
+```yaml
+/p:WebPublishMethod=FileSystem
+```
+
+but you still pass:
+
+```yaml
+/p:PackageLocation="..."
+```
+
+`PackageLocation` belongs to the **package/web deploy** flow, not the plain file-system publish flow. In Visual Studio web publishing, package settings and file-system publish settings are different concepts. ([Microsoft Learn][1])
+
+That is why you end up with a structure like:
+
+```text
 Archive\Content\C_C\agent\_work\6\s\CardManagement\SGBL.CardManagement\obj\Any CPU\Release\Package\PackageTmp
+```
 
-Inside PackageTmp, I have the correct files for IIS
+This is classic **web package archive structure**, where the real site content is placed under `PackageTmp`, and the archive preserves the source path. It is not the flat IIS-ready folder you want.
 
-WHy all these folders ?
+## What to change
 
-This is my Build template:
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildJob'
+In your build template, replace this publish step:
 
-- name: jobDisplayName
-  type: string
-  default: 'Build (.NET Framework)'
+```yaml
+- task: VSBuild@1
+  displayName: 'Publish (Package)'
+  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+  inputs:
+    solution: '${{ parameters.buildProject }}'
+    vsVersion: '${{ parameters.vsVersion }}'
+    platform: '${{ parameters.buildPlatform }}'
+    configuration: '${{ parameters.buildConfiguration }}'
+    clean: false
+    msbuildArgs: >
+      /p:VisualStudioVersion=${{ parameters.vsVersion }}
+      /p:DeployOnBuild=true
+      /p:WebPublishMethod=FileSystem
+      /p:DeleteExistingFiles=true
+      /p:PackageAsSingleFile=false
+      /p:SkipInvalidConfigurations=true
+      /p:PackageLocation="${{ parameters.packageLocation }}"
+      /p:AutoParameterizationWebConfigConnectionStrings=false
+```
 
-- name: buildPool
-  type: string
+with this:
 
-- name: buildAgentName
-  type: string
+```yaml
+- task: VSBuild@1
+  displayName: 'Publish to folder'
+  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+  inputs:
+    solution: '${{ parameters.buildProject }}'
+    vsVersion: '${{ parameters.vsVersion }}'
+    platform: '${{ parameters.buildPlatform }}'
+    configuration: '${{ parameters.buildConfiguration }}'
+    clean: false
+    msbuildArgs: >
+      /p:VisualStudioVersion=${{ parameters.vsVersion }}
+      /p:DeployOnBuild=true
+      /p:WebPublishMethod=FileSystem
+      /p:DeleteExistingFiles=true
+      /p:publishUrl="${{ parameters.packageLocation }}"
+      /p:SkipInvalidConfigurations=true
+      /p:AutoParameterizationWebConfigConnectionStrings=false
+```
 
-- name: vsVersion
-  type: string
-  default: '17.0'
+## Also remove these for file-system publish
 
-- name: buildPlatform
-  type: string
-  default: 'Any CPU'
+Do **not** use these together with `WebPublishMethod=FileSystem`:
 
-- name: buildConfiguration
-  type: string
-  default: 'Release'
+```yaml
+/p:PackageAsSingleFile=false
+/p:PackageLocation="..."
+```
 
-- name: solution
-  type: string
-  default: '**/*.sln'
+They are package-oriented settings, not file-copy publish settings. ([Microsoft Learn][1])
 
-- name: buildProject
-  type: string
-  default: ''
+## What you should get after the fix
 
-- name: nugetConfigPath
-  type: string
-  default: 'nuget.config'
+Inside `${{ parameters.packageLocation }}` you should see the actual website files directly, for example:
 
-- name: runTests
-  type: boolean
-  default: false
+```text
+Web.config
+bin\
+Content\
+Views\
+Global.asax
+```
 
-- name: testAssemblies
-  type: string
-  default: |
-    **\*test*.dll
-    **\*tests*.dll
-    !**\obj\**
-    !**\bin\ref\**
-    !**\*TestAdapter.dll
-    !**\*vstest*.dll
+Then `ArchiveFiles@2` will create a normal zip, and when your deploy stage extracts it, your `**/Web.config` rule will work.
 
-- name: publishProject
-  type: string
-  default: ''
+## Why `PackageTmp` showed up
 
-- name: packageLocation
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
+`PackageTmp` is the staging folder used by the old ASP.NET web publishing/package pipeline. It is normal in package scenarios, but it is not what you want for your current IIS copy deployment flow. ([Microsoft Learn][1])
 
-- name: zipName
-  type: string
-  default: 'WebApp.zip'
+## Final corrected publish section
 
-- name: artifactName
-  type: string
-  default: 'drop'
+Use this exact block:
 
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
+```yaml
+- task: VSBuild@1
+  displayName: 'Publish to folder'
+  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+  inputs:
+    solution: '${{ parameters.buildProject }}'
+    vsVersion: '${{ parameters.vsVersion }}'
+    platform: '${{ parameters.buildPlatform }}'
+    configuration: '${{ parameters.buildConfiguration }}'
+    clean: false
+    msbuildArgs: >
+      /p:VisualStudioVersion=${{ parameters.vsVersion }}
+      /p:DeployOnBuild=true
+      /p:WebPublishMethod=FileSystem
+      /p:DeleteExistingFiles=true
+      /p:publishUrl="${{ parameters.packageLocation }}"
+      /p:SkipInvalidConfigurations=true
+      /p:AutoParameterizationWebConfigConnectionStrings=false
+```
 
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
+After that, your deploy template should start seeing `Web.config` in the extracted folder.
 
-  steps:
-  - checkout: self
-    clean: true
-
-  - task: NuGetCommand@2
-    displayName: 'Restore'
-    inputs:
-      command: 'restore'
-      restoreSolution: '${{ parameters.solution }}'
-      feedsToUse: 'config'
-      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
-
-  - task: VSBuild@1
-    displayName: 'Build Project'
-    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
-    inputs:
-      solution: '${{ parameters.buildProject }}'
-      vsVersion: '${{ parameters.vsVersion }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: true
-      msbuildArgs: >
-        /p:SkipInvalidConfigurations=true
-        /p:VisualStudioVersion=${{ parameters.vsVersion }}
-
-  # Tests (optional)
-  # - task: VSTest@2
-  #   displayName: 'Test'
-  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-  #   inputs:
-  #     testSelector: 'testAssemblies'
-  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
-  #     searchFolder: '$(System.DefaultWorkingDirectory)'
-  #     platform: '${{ parameters.buildPlatform }}'
-  #     configuration: '${{ parameters.buildConfiguration }}'
-  #     diagnosticsEnabled: true
-
-
-  - task: VSBuild@1
-    displayName: 'Publish (Package)'
-    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
-    inputs:
-      solution: '${{ parameters.buildProject }}'
-      vsVersion: '${{ parameters.vsVersion }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: false
-      msbuildArgs: >
-        /p:VisualStudioVersion=${{ parameters.vsVersion }}
-        /p:DeployOnBuild=true
-        /p:WebPublishMethod=FileSystem
-        /p:DeleteExistingFiles=true
-        /p:PackageAsSingleFile=false
-        /p:SkipInvalidConfigurations=true
-        /p:PackageLocation="${{ parameters.packageLocation }}"
-        /p:AutoParameterizationWebConfigConnectionStrings=false
-
-  - task: ArchiveFiles@2
-    displayName: 'Zip publish output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.packageLocation }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
-
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'Container'
+[1]: https://learn.microsoft.com/en-us/previous-versions/aspnet/ff398069%28v%3Dvs.110%29?utm_source=chatgpt.com "Edit Deployment Settings in Publish Profile (.pubxml) Files"
