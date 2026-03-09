@@ -1,252 +1,159 @@
-The weird part is actually the answer.
+This is what is being published to the IIS target folder:
 
-You are **not publishing a normal website folder**. You are publishing a **Web Deploy package**.
+Archive\Content\C_C\agent\_work\6\s\CardManagement\SGBL.CardManagement\obj\Any CPU\Release\Package\PackageTmp
 
-That is why after extraction you see:
+Inside PackageTmp, I have the correct files for IIS
 
-* `SGBL.CardManagement.deploy.cmd`
-* `SGBL.CardManagement.deploy-readme.txt`
-* `SGBL.CardManagement.SetParameters.xml`
-* `SGBL.CardManagement.SourceManifest.xml`
-* `SGBL.CardManagement.zip`
+WHy all these folders ?
 
-And then inside that inner zip you see things like:
+This is my Build template:
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
 
-* `Content`
-* `archive.xml`
-* `parameters.xml`
-* `systemInfo.xml`
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET Framework)'
 
-So your deploy template is trying to do XML substitution in:
+- name: buildPool
+  type: string
 
-```text
-$(Pipeline.Workspace)\extracted
-```
+- name: buildAgentName
+  type: string
 
-but the actual `Web.config` is **inside the inner package zip**, not directly in the extracted folder.
+- name: vsVersion
+  type: string
+  default: '17.0'
 
-## Root cause
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
 
-This line in your build template is the reason:
+- name: buildConfiguration
+  type: string
+  default: 'Release'
 
-```yaml
-/p:WebPublishMethod=Package
-/p:PackageAsSingleFile=true
-```
+- name: solution
+  type: string
+  default: '**/*.sln'
 
-That creates a **Web Deploy package**, not a plain publish folder for IIS file copy.
+- name: buildProject
+  type: string
+  default: ''
 
-Your deploy template, however, is built for this flow:
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
 
-* download zip
-* extract files
-* edit `Web.config`
-* copy files to IIS folder
+- name: runTests
+  type: boolean
+  default: false
 
-Those two approaches do not match.
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
 
----
+- name: publishProject
+  type: string
+  default: ''
 
-# Two valid ways forward
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
 
-## Option 1 — Best for your current deploy template
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
 
-Publish to a **folder**, not a Web Deploy package.
-
-Change your publish step in `build-dotnet-framework-webapi.yml` from this:
-
-```yaml
-- task: VSBuild@1
-  displayName: 'Publish (Package)'
-  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
-  inputs:
-    solution: '${{ parameters.buildProject }}'
-    vsVersion: '${{ parameters.vsVersion }}'
-    platform: '${{ parameters.buildPlatform }}'
-    configuration: '${{ parameters.buildConfiguration }}'
-    clean: false
-    msbuildArgs: >
-      /p:VisualStudioVersion=${{ parameters.vsVersion }}
-      /p:DeployOnBuild=true
-      /p:WebPublishMethod=Package
-      /p:PackageAsSingleFile=true
-      /p:SkipInvalidConfigurations=true
-      /p:PackageLocation="${{ parameters.packageLocation }}"
-      /p:AutoParameterizationWebConfigConnectionStrings=false
-```
-
-to this:
-
-```yaml
-- task: VSBuild@1
-  displayName: 'Publish to folder'
-  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
-  inputs:
-    solution: '${{ parameters.buildProject }}'
-    vsVersion: '${{ parameters.vsVersion }}'
-    platform: '${{ parameters.buildPlatform }}'
-    configuration: '${{ parameters.buildConfiguration }}'
-    clean: false
-    msbuildArgs: >
-      /p:VisualStudioVersion=${{ parameters.vsVersion }}
-      /p:DeployOnBuild=true
-      /p:WebPublishMethod=FileSystem
-      /p:DeleteExistingFiles=true
-      /p:publishUrl="${{ parameters.packageLocation }}"
-      /p:SkipInvalidConfigurations=true
-      /p:AutoParameterizationWebConfigConnectionStrings=false
-```
-
-Then your `ArchiveFiles@2` step will zip a normal published website folder, and after extraction on the deploy server, `**/Web.config` will be found.
-
-This matches your current deploy template perfectly.
-
----
-
-## Option 2 — Keep Web Deploy package
-
-If you want to keep:
-
-```yaml
-/p:WebPublishMethod=Package
-/p:PackageAsSingleFile=true
-```
-
-then your deployment must use **MSDeploy/Web Deploy**, not `ExtractFiles + CopyFiles + edit Web.config in extracted folder`.
-
-That would be a different deployment template.
-
-Since your current deployment is file-copy-based, **Option 1 is the correct one**.
-
----
-
-# Why your current XML substitution fails
-
-Because after extraction, this folder:
-
-```text
-C:\agent\_work\2\extracted
-```
-
-contains only package metadata files and the inner deployment zip.
-
-It does **not** contain the actual site files directly, so this pattern finds nothing:
-
-```yaml
-xmlConfigFiles:
-  - '**/Web.config'
-```
-
-Your script is behaving correctly. The artifact format is the mismatch.
-
----
-
-# Exact fix to apply
-
-In `build-dotnet-framework-webapi.yml`, replace the publish task with this:
-
-```yaml
-- task: VSBuild@1
-  displayName: 'Publish to folder'
-  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
-  inputs:
-    solution: '${{ parameters.buildProject }}'
-    vsVersion: '${{ parameters.vsVersion }}'
-    platform: '${{ parameters.buildPlatform }}'
-    configuration: '${{ parameters.buildConfiguration }}'
-    clean: false
-    msbuildArgs: >
-      /p:VisualStudioVersion=${{ parameters.vsVersion }}
-      /p:DeployOnBuild=true
-      /p:WebPublishMethod=FileSystem
-      /p:DeleteExistingFiles=true
-      /p:publishUrl="${{ parameters.packageLocation }}"
-      /p:SkipInvalidConfigurations=true
-      /p:AutoParameterizationWebConfigConnectionStrings=false
-```
-
-Keep the zip step as-is:
-
-```yaml
-- task: ArchiveFiles@2
-  displayName: 'Zip publish output'
-  inputs:
-    rootFolderOrFile: '${{ parameters.packageLocation }}'
-    includeRootFolder: false
-    archiveType: 'zip'
-    archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-    replaceExistingArchive: true
-```
-
----
-
-# One more issue in your pipeline
-
-In your build template, you still have:
-
-```yaml
-artifactName:
+- name: artifactName
+  type: string
   default: 'drop'
-```
 
-And in deploy template, you download:
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
 
-```yaml
-artifactName: 'drop'
-```
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
 
-That is okay only if each stage has one build artifact to consume.
+  steps:
+  - checkout: self
+    clean: true
 
-But you split your stages into:
+  - task: NuGetCommand@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      restoreSolution: '${{ parameters.solution }}'
+      feedsToUse: 'config'
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
 
-* `BuildMVC`
-* `Deploy_MVC_SIT`
-* `BuildAPI`
+  - task: VSBuild@1
+    displayName: 'Build Project'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
 
-So for the MVC deploy, this is fine because it depends only on `BuildMVC`.
+  # Tests (optional)
+  # - task: VSTest@2
+  #   displayName: 'Test'
+  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+  #   inputs:
+  #     testSelector: 'testAssemblies'
+  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
+  #     searchFolder: '$(System.DefaultWorkingDirectory)'
+  #     platform: '${{ parameters.buildPlatform }}'
+  #     configuration: '${{ parameters.buildConfiguration }}'
+  #     diagnosticsEnabled: true
 
-Still, naming artifacts explicitly is cleaner.
 
-For example, in MVC build call:
+  - task: VSBuild@1
+    displayName: 'Publish (Package)'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: false
+      msbuildArgs: >
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+        /p:DeployOnBuild=true
+        /p:WebPublishMethod=FileSystem
+        /p:DeleteExistingFiles=true
+        /p:PackageAsSingleFile=false
+        /p:SkipInvalidConfigurations=true
+        /p:PackageLocation="${{ parameters.packageLocation }}"
+        /p:AutoParameterizationWebConfigConnectionStrings=false
 
-```yaml
-artifactName: 'mvc-drop'
-```
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
 
-and in deploy call:
-
-```yaml
-artifactName: 'mvc-drop'
-```
-
-Then update deploy template to accept an `artifactName` parameter.
-
-Not mandatory for this bug, but cleaner.
-
----
-
-# What you should expect after the fix
-
-After changing to `WebPublishMethod=FileSystem`, the extracted folder on the deploy server should contain actual site files like:
-
-* `Web.config`
-* `bin\...`
-* `Views\...`
-* `Content\...`
-
-Then this step will work:
-
-```yaml
-xmlConfigFiles:
-  - '**/Web.config'
-```
-
-and the copy-to-IIS approach will make sense.
-
----
-
-# In one sentence
-
-Your deployment is failing because you are building a **Web Deploy package**, but your deploy template expects a **plain published website folder**.
-
-If you want, I can rewrite both templates cleanly so they are aligned for classic .NET Framework MVC/API IIS deployment.
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
