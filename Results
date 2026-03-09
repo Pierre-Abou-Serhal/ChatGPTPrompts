@@ -1,208 +1,131 @@
-Your `.csproj` explains the problem very well.
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
 
-## What your project is doing
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET Framework)'
 
-At the bottom of your MVC `.csproj`, you have:
+- name: buildPool
+  type: string
 
-```xml
-<PropertyGroup>
-  <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
-  <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
-</PropertyGroup>
+- name: buildAgentName
+  type: string
 
-<Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="'$(VSToolsPath)' != ''" />
-```
+- name: vsVersion
+  type: string
+  default: '17.0'
 
-So the final path is built from:
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
 
-* `VisualStudioVersion`
-* then `VSToolsPath`
-* then `...\WebApplications\Microsoft.WebApplication.targets`
+- name: buildConfiguration
+  type: string
+  default: 'Release'
 
-## Why you are seeing `v11.0` instead of `v10.0`
+- name: solution
+  type: string
+  default: '**/*.sln'
 
-Because your default of `10.0` is only used **if `$(VisualStudioVersion)` is empty**.
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
 
-Your project says that clearly:
+- name: runTests
+  type: boolean
+  default: false
 
-```xml
-<VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
-```
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
 
-That means something in the build is already setting `VisualStudioVersion`, so your fallback `10.0` is ignored.
+- name: publishProject
+  type: string
+  default: ''
 
-And from the error:
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
 
-```text
-C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\Microsoft.WebApplication.targets
-```
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
 
-we know that during pipeline build, `$(VisualStudioVersion)` is ending up as `11.0`.
+- name: artifactName
+  type: string
+  default: 'drop'
 
-## The real issue is even bigger
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
 
-Your log shows this:
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
 
-```text
-"C:\Windows\Microsoft.NET\Framework\v4.0.30319\msbuild.exe"
-```
-
-and also:
-
-```text
-Project file contains ToolsVersion="14.0"... Treating the project as if it had ToolsVersion="4.0"
-```
-
-So Azure DevOps is not using Visual Studio MSBuild. It is using the old .NET Framework MSBuild from:
-
-```text
-C:\Windows\Microsoft.NET\Framework\v4.0.30319\msbuild.exe
-```
-
-That is the wrong build engine for this kind of classic ASP.NET web app. Microsoft’s guidance is that `VSBuild@1` builds with MSBuild and sets the Visual Studio version property, while `MSBuild@1` is more direct and can fall back to older framework MSBuild if no suitable VS instance is selected. ([Microsoft Learn][1])
-
-That is why you are getting:
-
-* wrong MSBuild toolchain
-* wrong `VisualStudioVersion`
-* missing `Microsoft.WebApplication.targets`
-
-## So the main problem is not your YAML syntax
-
-The main problem is that your pipeline is building with the wrong MSBuild executable.
-
-Right now it is using:
-
-```text
-C:\Windows\Microsoft.NET\Framework\v4.0.30319\msbuild.exe
-```
-
-instead of a Visual Studio / Build Tools MSBuild that knows about web application targets.
-
-## What you should do
-
-### Best fix
-
-Go back to `VSBuild@1` **after** making sure the agent exposes Visual Studio capability and after restarting/updating the agent.
-
-Why:
-
-* `VSBuild@1` is specifically meant to build with MSBuild and set the Visual Studio version property. ([Microsoft Learn][1])
-* your project is an old ASP.NET MVC web application project that depends on Visual Studio web targets
-
-### If you stay with `MSBuild@1`
-
-Then force it to use a Visual Studio MSBuild, not framework 4.0 MSBuild.
-
-Add these inputs to `MSBuild@1`:
-
-```yaml
-- task: MSBuild@1
-  displayName: 'Build'
-  inputs:
-    solution: '${{ parameters.solution }}'
-    platform: '${{ parameters.buildPlatform }}'
-    configuration: '${{ parameters.buildConfiguration }}'
-    msbuildVersion: '17.0'
-    msbuildArchitecture: 'x64'
+  steps:
+  - checkout: self
     clean: true
-    msbuildArguments: >
-      /p:SkipInvalidConfigurations=true
-      /p:VisualStudioVersion=17.0
-```
 
-And same idea for publish:
+  - task: NuGetCommand@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      restoreSolution: '${{ parameters.solution }}'
+      feedsToUse: 'config'
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
 
-```yaml
-- task: MSBuild@1
-  displayName: 'Publish (Package)'
-  condition: and(succeeded(), ne('${{ parameters.publishProject }}', ''))
-  inputs:
-    solution: '${{ parameters.publishProject }}'
-    platform: '${{ parameters.buildPlatform }}'
-    configuration: '${{ parameters.buildConfiguration }}'
-    msbuildVersion: '17.0'
-    msbuildArchitecture: 'x64'
-    clean: false
-    msbuildArguments: >
-      /p:VisualStudioVersion=17.0
-      /p:DeployOnBuild=true
-      /p:WebPublishMethod=Package
-      /p:PackageAsSingleFile=true
-      /p:SkipInvalidConfigurations=true
-      /p:PackageLocation="${{ parameters.packageLocation }}"
-      /p:AutoParameterizationWebConfigConnectionStrings=false
-```
+  - task: VSBuild@1
+    displayName: 'Build'
+    inputs:
+      solution: '${{ parameters.solution }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
 
-But this only works if the actual web targets exist on the server.
+  - task: VSBuild@1
+    displayName: 'Publish (Package)'
+    condition: and(succeeded(), ne('${{ parameters.publishProject }}', ''))
+    inputs:
+      solution: '${{ parameters.publishProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: false
+      msbuildArgs: >
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+        /p:DeployOnBuild=true
+        /p:WebPublishMethod=Package
+        /p:PackageAsSingleFile=true
+        /p:SkipInvalidConfigurations=true
+        /p:PackageLocation="${{ parameters.packageLocation }}"
+        /p:AutoParameterizationWebConfigConnectionStrings=false
 
-## What to check on the server
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
 
-Find where `Microsoft.WebApplication.targets` really exists.
-
-Usually it is in a Visual Studio Build Tools path, not here:
-
-```text
-C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\v11.0\WebApplications\
-```
-
-Check these:
-
-```bat
-dir /s "C:\Program Files (x86)\Microsoft Visual Studio\*\*\MSBuild\Microsoft\VisualStudio\*\WebApplications\Microsoft.WebApplication.targets"
-dir /s "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\*\WebApplications\Microsoft.WebApplication.targets"
-```
-
-## What I suspect is happening
-
-Most likely:
-
-* Build Tools is installed
-* but your pipeline task is still picking old framework MSBuild
-* that causes `VisualStudioVersion` to resolve in an old way
-* and your web targets are either not installed where that old MSBuild expects them, or not installed at all
-
-## Important detail from your `.csproj`
-
-Your project itself is not hardcoded to `v11.0`.
-
-It is hardcoded to:
-
-* default `10.0` only if empty
-* otherwise use whatever build environment passes in
-
-So the `v11.0` path is being produced by the build environment, not by the fallback you showed.
-
-## My recommendation
-
-For this project type, the clean path is:
-
-1. fix agent capability detection
-2. use `VSBuild@1` again
-3. ensure Build Tools has the web workload/targets installed
-4. restart the agent service
-
-If you want a fast test first, change your build task to force VS 2022 MSBuild with:
-
-```yaml
-msbuildVersion: '17.0'
-msbuildArchitecture: 'x64'
-```
-
-and add:
-
-```yaml
-/p:VisualStudioVersion=17.0
-```
-
-If that still fails, then the server is missing the actual web targets files, not just using the wrong MSBuild.
-
-Paste the output of this command from the build server:
-
-```bat
-dir /s "C:\Program Files (x86)\Microsoft Visual Studio\*\*\MSBuild\Microsoft\VisualStudio\*\WebApplications\Microsoft.WebApplication.targets"
-```
-
-That will tell us immediately whether the file exists and where.
-
-[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/vsbuild-v1?view=azure-pipelines&utm_source=chatgpt.com "VSBuild@1 - Visual Studio build v1 task"
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
