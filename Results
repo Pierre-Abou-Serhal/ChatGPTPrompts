@@ -1,677 +1,252 @@
-Same error:
-This is mt build-dotnet-framework-webapi
-
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildJob'
-
-- name: jobDisplayName
-  type: string
-  default: 'Build (.NET Framework)'
-
-- name: buildPool
-  type: string
-
-- name: buildAgentName
-  type: string
-
-- name: vsVersion
-  type: string
-  default: '17.0'
-
-- name: buildPlatform
-  type: string
-  default: 'Any CPU'
-
-- name: buildConfiguration
-  type: string
-  default: 'Release'
-
-- name: solution
-  type: string
-  default: '**/*.sln'
-
-- name: buildProject
-  type: string
-  default: ''
-
-- name: nugetConfigPath
-  type: string
-  default: 'nuget.config'
-
-- name: runTests
-  type: boolean
-  default: false
-
-- name: testAssemblies
-  type: string
-  default: |
-    **\*test*.dll
-    **\*tests*.dll
-    !**\obj\**
-    !**\bin\ref\**
-    !**\*TestAdapter.dll
-    !**\*vstest*.dll
-
-- name: publishProject
-  type: string
-  default: ''
-
-- name: packageLocation
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
-
-- name: zipName
-  type: string
-  default: 'WebApp.zip'
-
-- name: artifactName
-  type: string
-  default: 'drop'
-
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
-
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
-
-  steps:
-  - checkout: self
-    clean: true
-
-  - task: NuGetCommand@2
-    displayName: 'Restore'
-    inputs:
-      command: 'restore'
-      restoreSolution: '${{ parameters.solution }}'
-      feedsToUse: 'config'
-      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
-
-  - task: VSBuild@1
-    displayName: 'Build Project'
-    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
-    inputs:
-      solution: '${{ parameters.buildProject }}'
-      vsVersion: '${{ parameters.vsVersion }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: true
-      msbuildArgs: >
-        /p:SkipInvalidConfigurations=true
-        /p:VisualStudioVersion=${{ parameters.vsVersion }}
-
-  # Tests (optional)
-  # - task: VSTest@2
-  #   displayName: 'Test'
-  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-  #   inputs:
-  #     testSelector: 'testAssemblies'
-  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
-  #     searchFolder: '$(System.DefaultWorkingDirectory)'
-  #     platform: '${{ parameters.buildPlatform }}'
-  #     configuration: '${{ parameters.buildConfiguration }}'
-  #     diagnosticsEnabled: true
-
-
-  - task: VSBuild@1
-    displayName: 'Publish (Package)'
-    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
-    inputs:
-      solution: '${{ parameters.buildProject }}'
-      vsVersion: '${{ parameters.vsVersion }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: false
-      msbuildArgs: >
-        /p:VisualStudioVersion=${{ parameters.vsVersion }}
-        /p:DeployOnBuild=true
-        /p:WebPublishMethod=Package
-        /p:PackageAsSingleFile=true
-        /p:SkipInvalidConfigurations=true
-        /p:PackageLocation="${{ parameters.packageLocation }}"
-        /p:AutoParameterizationWebConfigConnectionStrings=false
-
-  - task: ArchiveFiles@2
-    displayName: 'Zip publish output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.packageLocation }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
-
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'Container'
-
-This is my deploy-iis template:
-parameters:
-- name: deploymentName
-  type: string
-  default: 'DeployJob'
-
-- name: deploymentDisplayName
-  type: string
-  default: 'Deploy IIS'
-
-- name: environmentName
-  type: string
-
-- name: deployPool
-  type: string
-
-- name: deployAgentName
-  type: string
-
-- name: variableGroup
-  type: string
-
-- name: zipName
-  type: string
-
-- name: siteName
-  type: string
-
-- name: appPoolName
-  type: string
-
-- name: iisTargetPath
-  type: string
-
-- name: cleanTargetBeforeCopy
-  type: boolean
-  default: true
-
-- name: cleanExcludeCsv
-  type: string
-  default: 'web.config,logs,Keys'
-
-- name: enableJsonTransform
-  type: boolean
-  default: true
-
-- name: jsonFiles
-  type: string
-  default: '**/appsettings.json'
-
-- name: enableXmlConfigTransform
-  type: boolean
-  default: false
-
-- name: xmlConfigFiles
-  type: object
-  default: []
-
-- name: xmlVariableValues
-  type: object
-  default: {}
-
-- name: enableCustomXmlEdits
-  type: boolean
-  default: false
-
-- name: customXmlEdits
-  type: object
-  default: []
-
-- name: customXmlVariableValues
-  type: object
-  default: {}
-
-jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
-
-  environment: ${{ parameters.environmentName }}
-
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
-
-  variables:
-  - group: ${{ parameters.variableGroup }}
-
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - task: DownloadBuildArtifacts@0
-          displayName: 'Download Build Artifact'
-          inputs:
-            buildType: 'current'
-            downloadType: 'single'
-            artifactName: 'drop'
-            downloadPath: '$(Pipeline.Workspace)'
-
-        - task: ExtractFiles@1
-          displayName: 'Extract artifact'
-          inputs:
-            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\extracted'
-            cleanDestinationFolder: true
-
-        # JSON substitution (v2)
-        - task: FileTransform@2
-          displayName: 'JSON substitution (appsettings.json)'
-          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            enableXmlTransform: false
-            xmlTransformationRules: ''
-            jsonTargetFiles: ${{ parameters.jsonFiles }}
-
-        # XML substitution (v2)
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $patternsJson = @'
-            ${{ convertToJson(parameters.xmlConfigFiles) }}
-            '@
-            $patterns = $patternsJson | ConvertFrom-Json
-
-            if (-not $patterns -or $patterns.Count -eq 0) {
-              Write-Host "No xmlConfigFiles patterns provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files([string]$base, [string]$pattern) {
-              $pattern = $pattern -replace '\\','/'
-
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            # collect unique files
-            $files = @()
-            foreach ($pat in $patterns) {
-              $files += Resolve-Files $root ([string]$pat)
-            }
-            $files = $files | Where-Object { $_ } | Select-Object -Unique
-
-            if (-not $files -or $files.Count -eq 0) {
-              throw "No config files matched xmlConfigFiles patterns under: $root"
-            }
-
-            foreach ($f in $files) {
-              Write-Host "Editing: $($f.FullName)"
-              [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
-              if (-not $nodes -or $nodes.Count -eq 0) {
-                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
-                continue
-              }
-
-              $changed = 0
-
-              foreach ($n in $nodes) {
-                $key = [string]$n.GetAttribute("key")
-                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
-
-                # no variable provided => skip
-                if ([string]::IsNullOrWhiteSpace($val)) { continue }
-
-                $current = [string]$n.GetAttribute("value")
-                if ($current -ne $val) {
-                  $n.SetAttribute("value", $val)
-                  $changed++
-                }
-              }
-
-              $xml.Save($f.FullName)
-              Write-Host "Updated $changed setting(s) in $($f.Name)"
-            }
-          displayName: 'XML appSettings substitution (.config)'
-          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-          env:
-            ${{ each pair in parameters.xmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-          # ---- Custom XML substitution (XPath) ----
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $rulesJson = @'
-            ${{ convertToJson(parameters.customXmlEdits) }}
-            '@
-            $rules = $rulesJson | ConvertFrom-Json
-
-            if (-not $rules -or $rules.Count -eq 0) {
-              Write-Host "No custom XML edits provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files($base, $pattern) {
-              # supports: **/File.xml, File.xml, or folder\File.xml
-              $pattern = $pattern -replace '\\','/'
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            foreach ($r in $rules) {
-              $filePat = [string]$r.file
-              $xpath   = [string]$r.xpath
-              $varName = [string]$r.variable
-
-              if (-not $filePat -or -not $xpath -or -not $varName) {
-                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
-              }
-
-              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
-              if ([string]::IsNullOrWhiteSpace($value)) {
-                throw "Pipeline variable '$varName' is missing/empty."
-              }
-
-              $files = Resolve-Files $root $filePat
-              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
-
-              foreach ($f in @($files)) {
-                [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-                if ($xpath -match "/@([^/]+)$") {
-                  $attrName = $Matches[1]
-                  $nodePath = $xpath -replace "/@[^/]+$",""
-                  $node = $xml.SelectSingleNode($nodePath)
-                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
-
-                  $attr = $node.Attributes[$attrName]
-                  if (-not $attr) {
-                    $attr = $xml.CreateAttribute($attrName)
-                    [void]$node.Attributes.Append($attr)
-                  }
-                  $attr.Value = $value
-                } else {
-                  $node = $xml.SelectSingleNode($xpath)
-                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
-                  $node.InnerText = $value
-                }
-
-                $xml.Save($f.FullName)
-                Write-Host "Updated $($f.Name): $xpath (from $varName)"
-              }
-            }
-          displayName: 'Custom XML substitution (XPath)'
-          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
-          env:
-            ${{ each pair in parameters.customXmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        # Stop website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $site = Get-Website -Name $siteName
-            Write-Host "Website current state: $($site.State)"
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website: $siteName"
-              Stop-Website -Name $siteName
-            } else {
-              Write-Host "Website already stopped."
-            }
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "AppPool current state: $poolState"
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool: $appPool"
-              Stop-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already stopped."
-            }
-
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $siteState = (Get-Website -Name $siteName).State
-              $poolState = (Get-WebAppPoolState -Name $appPool).Value
-
-              Write-Host "Website state: $siteState | AppPool state: $poolState"
-
-              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-                Write-Host "Website and App Pool are stopped."
-                break
-              }
-
-              Start-Sleep -Seconds 2
-            }
-
-            $finalSiteState = (Get-Website -Name $siteName).State
-            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
-
-            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool'
-
-        - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder (before copy)'
-          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
-
-        - task: CopyFiles@2
-          displayName: 'Copy files'
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
-
-        # Start website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool: $appPool"
-              Start-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website: $siteName"
-              Start-Website -Name $siteName
-            } else {
-              Write-Host "Website already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool'
-
-And this is my pipiline for the AlternaCardManagement project:
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-    - sit
-
-stages:
-- stage: BuildMVC
-  displayName: Build MVC + API
-  jobs:
-  # MVC
-  - template: pipelines/build-dotnet-framework-webapi.yml@templates
-    parameters:
-      jobName: Build_MVC
-      jobDisplayName: 'Build MVC'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      vsVersion: '17.0'
-      buildConfiguration: 'Release'
-      solution: 'CardManagement/CardManagement.sln'
-      buildProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
-      nugetConfigPath: 'nuget.config'
-      runTests: false
-      testAssemblies: ''
-      zipName: 'AlternaCardManagementMVC.zip'
-      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
-
-# =========================
-# DEPLOY SIT MVC
-# =========================
-- stage: Deploy_MVC_SIT
-  displayName: 'Deploy MVC to SIT'
-  dependsOn: BuildMVC
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
-  jobs:
-  - template: pipelines/deploy-iis.yml@templates
-    parameters:
-      deploymentName: 'DeploySIT'
-      deploymentDisplayName: 'Deploy MVC to SIT (IIS)'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-FN1'
-      variableGroup: 'SIT_MVC_VARIABLE_GROUP'
-      zipName: 'AlternaCardManagementMVC.zip'
-      siteName: 'AlternaCardManagement-AzureDevOps'
-      appPoolName: 'AlternaCardManagement-AzureDevOps'
-      iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
-      cleanTargetBeforeCopy: true
-      cleanExcludeCsv: ''
-      enableJsonTransform: false
-      jsonFiles: ''
-      enableXmlConfigTransform: true
-      xmlConfigFiles:
-        - '**/Web.config'
-
-      xmlVariableValues:
-        BaseUrl: $(BaseUrl)
-        BaseUrlOsb: $(BaseUrlOsb)
-        CDN_IP_LINK: $(CDN_IP_LINK)
-        DASHBOARD_LINK: $(DASHBOARD_LINK)
-        GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
-        GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
-        LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
-        UploadFilesPath: $(UploadFilesPath)
-        USER_GUIDE_LINK: $(USER_GUIDE_LINK)
-        
-      enableCustomXmlEdits: false
-      customXmlEdits: {}
-
-- stage: BuildAPI
-  displayName: Build API
-  jobs:
-  # API
-  - template: pipelines/build-dotnet-framework-webapi.yml@templates
-    parameters:
-      jobName: Build_API
-      jobDisplayName: 'Build Web API'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      vsVersion: '17.0'
-      buildConfiguration: 'Release'
-      solution: 'CardManagement/CardManagement.sln'
-      buildProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
-      nugetConfigPath: 'nuget.config'
-      runTests: false
-      testAssemblies: ''
-      zipName: 'AlternaCardManagementAPI.zip'
-      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
-
-
-This is the error:
-XML appSettings substitution (.config)
-
-View raw log
-
-Starting: XML appSettings substitution (.config)
-==============================================================================
-Task         : PowerShell
-Description  : Run a PowerShell script on Linux, macOS, or Windows
-Version      : 2.232.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\fd09b3b0-59d9-4f0b-b7b3-d1829d21937a.ps1'"
-No config files matched xmlConfigFiles patterns under: 
+The weird part is actually the answer.
+
+You are **not publishing a normal website folder**. You are publishing a **Web Deploy package**.
+
+That is why after extraction you see:
+
+* `SGBL.CardManagement.deploy.cmd`
+* `SGBL.CardManagement.deploy-readme.txt`
+* `SGBL.CardManagement.SetParameters.xml`
+* `SGBL.CardManagement.SourceManifest.xml`
+* `SGBL.CardManagement.zip`
+
+And then inside that inner zip you see things like:
+
+* `Content`
+* `archive.xml`
+* `parameters.xml`
+* `systemInfo.xml`
+
+So your deploy template is trying to do XML substitution in:
+
+```text
+$(Pipeline.Workspace)\extracted
+```
+
+but the actual `Web.config` is **inside the inner package zip**, not directly in the extracted folder.
+
+## Root cause
+
+This line in your build template is the reason:
+
+```yaml
+/p:WebPublishMethod=Package
+/p:PackageAsSingleFile=true
+```
+
+That creates a **Web Deploy package**, not a plain publish folder for IIS file copy.
+
+Your deploy template, however, is built for this flow:
+
+* download zip
+* extract files
+* edit `Web.config`
+* copy files to IIS folder
+
+Those two approaches do not match.
+
+---
+
+# Two valid ways forward
+
+## Option 1 — Best for your current deploy template
+
+Publish to a **folder**, not a Web Deploy package.
+
+Change your publish step in `build-dotnet-framework-webapi.yml` from this:
+
+```yaml
+- task: VSBuild@1
+  displayName: 'Publish (Package)'
+  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+  inputs:
+    solution: '${{ parameters.buildProject }}'
+    vsVersion: '${{ parameters.vsVersion }}'
+    platform: '${{ parameters.buildPlatform }}'
+    configuration: '${{ parameters.buildConfiguration }}'
+    clean: false
+    msbuildArgs: >
+      /p:VisualStudioVersion=${{ parameters.vsVersion }}
+      /p:DeployOnBuild=true
+      /p:WebPublishMethod=Package
+      /p:PackageAsSingleFile=true
+      /p:SkipInvalidConfigurations=true
+      /p:PackageLocation="${{ parameters.packageLocation }}"
+      /p:AutoParameterizationWebConfigConnectionStrings=false
+```
+
+to this:
+
+```yaml
+- task: VSBuild@1
+  displayName: 'Publish to folder'
+  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+  inputs:
+    solution: '${{ parameters.buildProject }}'
+    vsVersion: '${{ parameters.vsVersion }}'
+    platform: '${{ parameters.buildPlatform }}'
+    configuration: '${{ parameters.buildConfiguration }}'
+    clean: false
+    msbuildArgs: >
+      /p:VisualStudioVersion=${{ parameters.vsVersion }}
+      /p:DeployOnBuild=true
+      /p:WebPublishMethod=FileSystem
+      /p:DeleteExistingFiles=true
+      /p:publishUrl="${{ parameters.packageLocation }}"
+      /p:SkipInvalidConfigurations=true
+      /p:AutoParameterizationWebConfigConnectionStrings=false
+```
+
+Then your `ArchiveFiles@2` step will zip a normal published website folder, and after extraction on the deploy server, `**/Web.config` will be found.
+
+This matches your current deploy template perfectly.
+
+---
+
+## Option 2 — Keep Web Deploy package
+
+If you want to keep:
+
+```yaml
+/p:WebPublishMethod=Package
+/p:PackageAsSingleFile=true
+```
+
+then your deployment must use **MSDeploy/Web Deploy**, not `ExtractFiles + CopyFiles + edit Web.config in extracted folder`.
+
+That would be a different deployment template.
+
+Since your current deployment is file-copy-based, **Option 1 is the correct one**.
+
+---
+
+# Why your current XML substitution fails
+
+Because after extraction, this folder:
+
+```text
 C:\agent\_work\2\extracted
-At C:\agent\_work\_temp\fd09b3b0-59d9-4f0b-b7b3-d1829d21937a.ps1:43 char:3
-+   throw "No config files matched xmlConfigFiles patterns under: $root ...
-+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : OperationStopped: (No config files...ork\2\extra 
-   cted:String) [], RuntimeException
-    + FullyQualifiedErrorId : No config files matched xmlConfigFiles patterns  
-   under: C:\agent\_work\2\extracted
- 
-##[error]PowerShell exited with code '1'.
+```
 
+contains only package metadata files and the inner deployment zip.
 
-The weird part is that in the extracted folder on SIT-FN1, I have the following files:
+It does **not** contain the actual site files directly, so this pattern finds nothing:
 
-- SGBL.CardManagement.deploy.cmd
-- SGBL.CardManagement.deploy-readme.txt
-- SGBL.CardManagement.SetParameters.xml
-- SGBL.CardManagement.SourceManifest.xml
-- SGBL.CardManagement.zip
-and the zip contains:
-- Folder named Content
-- archive.xml
-- parameters.xml
-- systeminbfo.xml
+```yaml
+xmlConfigFiles:
+  - '**/Web.config'
+```
+
+Your script is behaving correctly. The artifact format is the mismatch.
+
+---
+
+# Exact fix to apply
+
+In `build-dotnet-framework-webapi.yml`, replace the publish task with this:
+
+```yaml
+- task: VSBuild@1
+  displayName: 'Publish to folder'
+  condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+  inputs:
+    solution: '${{ parameters.buildProject }}'
+    vsVersion: '${{ parameters.vsVersion }}'
+    platform: '${{ parameters.buildPlatform }}'
+    configuration: '${{ parameters.buildConfiguration }}'
+    clean: false
+    msbuildArgs: >
+      /p:VisualStudioVersion=${{ parameters.vsVersion }}
+      /p:DeployOnBuild=true
+      /p:WebPublishMethod=FileSystem
+      /p:DeleteExistingFiles=true
+      /p:publishUrl="${{ parameters.packageLocation }}"
+      /p:SkipInvalidConfigurations=true
+      /p:AutoParameterizationWebConfigConnectionStrings=false
+```
+
+Keep the zip step as-is:
+
+```yaml
+- task: ArchiveFiles@2
+  displayName: 'Zip publish output'
+  inputs:
+    rootFolderOrFile: '${{ parameters.packageLocation }}'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+    replaceExistingArchive: true
+```
+
+---
+
+# One more issue in your pipeline
+
+In your build template, you still have:
+
+```yaml
+artifactName:
+  default: 'drop'
+```
+
+And in deploy template, you download:
+
+```yaml
+artifactName: 'drop'
+```
+
+That is okay only if each stage has one build artifact to consume.
+
+But you split your stages into:
+
+* `BuildMVC`
+* `Deploy_MVC_SIT`
+* `BuildAPI`
+
+So for the MVC deploy, this is fine because it depends only on `BuildMVC`.
+
+Still, naming artifacts explicitly is cleaner.
+
+For example, in MVC build call:
+
+```yaml
+artifactName: 'mvc-drop'
+```
+
+and in deploy call:
+
+```yaml
+artifactName: 'mvc-drop'
+```
+
+Then update deploy template to accept an `artifactName` parameter.
+
+Not mandatory for this bug, but cleaner.
+
+---
+
+# What you should expect after the fix
+
+After changing to `WebPublishMethod=FileSystem`, the extracted folder on the deploy server should contain actual site files like:
+
+* `Web.config`
+* `bin\...`
+* `Views\...`
+* `Content\...`
+
+Then this step will work:
+
+```yaml
+xmlConfigFiles:
+  - '**/Web.config'
+```
+
+and the copy-to-IIS approach will make sense.
+
+---
+
+# In one sentence
+
+Your deployment is failing because you are building a **Web Deploy package**, but your deploy template expects a **plain published website folder**.
+
+If you want, I can rewrite both templates cleanly so they are aligned for classic .NET Framework MVC/API IIS deployment.
