@@ -1,89 +1,975 @@
-Because Azure DevOps is not checking “is Build Tools installed somewhere on disk?” It is checking whether the **agent detected Visual Studio/Build Tools as capabilities**.
+This is the csproj of my MVC app:
 
-Right now, your logs show the opposite:
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\build\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props" Condition="Exists('..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\build\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props')" />
+  <Import Project="..\packages\Microsoft.Net.Compilers.1.0.0\build\Microsoft.Net.Compilers.props" Condition="Exists('..\packages\Microsoft.Net.Compilers.1.0.0\build\Microsoft.Net.Compilers.props')" />
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>
+    </ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{BFE7CF65-2180-438C-AFF6-AA799726ED17}</ProjectGuid>
+    <ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>SGBL.CardManagement</RootNamespace>
+    <AssemblyName>SGBL.CardManagement</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <MvcBuildViews>false</MvcBuildViews>
+    <UseIISExpress>true</UseIISExpress>
+    <IISExpressSSLPort />
+    <IISExpressAnonymousAuthentication>enabled</IISExpressAnonymousAuthentication>
+    <IISExpressWindowsAuthentication>disabled</IISExpressWindowsAuthentication>
+    <IISExpressUseClassicPipelineMode />
+    <UseGlobalApplicationHostFile />
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+    <StyleCopTreatErrorsAsWarnings>false</StyleCopTreatErrorsAsWarnings>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+    <Use64BitIISExpress />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="ClosedXML, Version=0.96.0.0, Culture=neutral, PublicKeyToken=fd1eb21b62ae805b, processorArchitecture=MSIL">
+      <HintPath>..\packages\ClosedXML.0.96.0\lib\net40\ClosedXML.dll</HintPath>
+    </Reference>
+    <Reference Include="DocumentFormat.OpenXml, Version=2.20.0.0, Culture=neutral, PublicKeyToken=8fb06cb64d019a17, processorArchitecture=MSIL">
+      <HintPath>..\packages\DocumentFormat.OpenXml.2.20.0\lib\net40\DocumentFormat.OpenXml.dll</HintPath>
+    </Reference>
+    <Reference Include="DotNetZip, Version=1.13.7.0, Culture=neutral, PublicKeyToken=6583c7c814667745, processorArchitecture=MSIL">
+      <HintPath>..\packages\DotNetZip.1.13.7\lib\net40\DotNetZip.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="ExcelNumberFormat, Version=1.1.0.0, Culture=neutral, PublicKeyToken=23c6f5d73be07eca, processorArchitecture=MSIL">
+      <HintPath>..\packages\ExcelNumberFormat.1.1.0\lib\net20\ExcelNumberFormat.dll</HintPath>
+    </Reference>
+    <Reference Include="FastMember.Signed, Version=1.3.0.0, Culture=neutral, PublicKeyToken=9e8f22703bef9a29, processorArchitecture=MSIL">
+      <HintPath>..\packages\FastMember.Signed.1.3.0\lib\net45\FastMember.Signed.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib, Version=0.85.4.369, Culture=neutral, PublicKeyToken=1b03e6acf1164f73, processorArchitecture=MSIL">
+      <HintPath>..\packages\ICSharpCode.SharpZipLib.dll.0.85.4.369\lib\net20\ICSharpCode.SharpZipLib.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="LinqToExcel, Version=1.11.0.0, Culture=neutral, PublicKeyToken=9c8ea65a58f03f1f, processorArchitecture=MSIL">
+      <HintPath>..\packages\LinqToExcel.1.11.0\lib\LinqToExcel.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.AI.Agent.Intercept, Version=1.2.1.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ApplicationInsights.Agent.Intercept.1.2.1\lib\net45\Microsoft.AI.Agent.Intercept.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.AI.DependencyCollector, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ApplicationInsights.DependencyCollector.2.0.0\lib\net45\Microsoft.AI.DependencyCollector.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.AI.PerfCounterCollector, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ApplicationInsights.PerfCounterCollector.2.0.0\lib\net45\Microsoft.AI.PerfCounterCollector.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.AI.ServerTelemetryChannel, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ApplicationInsights.WindowsServer.TelemetryChannel.2.0.0\lib\net45\Microsoft.AI.ServerTelemetryChannel.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.AI.Web, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ApplicationInsights.Web.2.0.0\lib\net45\Microsoft.AI.Web.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.AI.WindowsServer, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ApplicationInsights.WindowsServer.2.0.0\lib\net45\Microsoft.AI.WindowsServer.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.ApplicationInsights, Version=2.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ApplicationInsights.2.0.0\lib\net45\Microsoft.ApplicationInsights.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.CodeDom.Providers.DotNetCompilerPlatform, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\lib\net45\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Microsoft.Office.Interop.Excel, Version=15.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c, processorArchitecture=MSIL">
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <HintPath>..\packages\Microsoft.Office.Interop.Excel.15.0.4795.1000\lib\net20\Microsoft.Office.Interop.Excel.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.ReportViewer.Common, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ReportViewer.11.0.3366.16\lib\Microsoft.ReportViewer.Common.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.ReportViewer.DataVisualization, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ReportViewer.11.0.3366.16\lib\Microsoft.ReportViewer.DataVisualization.DLL</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.ReportViewer.Design, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ReportViewer.11.0.3366.16\lib\Microsoft.ReportViewer.Design.DLL</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.ReportViewer.ProcessingObjectModel, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ReportViewer.11.0.3366.16\lib\Microsoft.ReportViewer.ProcessingObjectModel.DLL</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.ReportViewer.WebDesign, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ReportViewer.11.0.3366.16\lib\Microsoft.ReportViewer.WebDesign.DLL</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.ReportViewer.WebForms, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ReportViewer.11.0.3366.16\lib\Microsoft.ReportViewer.WebForms.DLL</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.ReportViewer.WinForms, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.ReportViewer.11.0.3366.16\lib\Microsoft.ReportViewer.WinForms.DLL</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.SqlServer.Types.11.0.1\lib\net20\Microsoft.SqlServer.Types.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="MoreLinq, Version=3.4.2.0, Culture=neutral, PublicKeyToken=384d532d7e88985d, processorArchitecture=MSIL">
+      <HintPath>..\packages\morelinq.3.4.2\lib\netstandard1.0\MoreLinq.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.12.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <HintPath>..\packages\NLog.4.5.4\lib\net45\NLog.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Remotion, Version=1.13.52.2, Culture=neutral, PublicKeyToken=0669cf0452175907, processorArchitecture=MSIL">
+      <HintPath>..\packages\LinqToExcel.1.11.0\lib\Remotion.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Remotion.Data.Linq, Version=1.13.52.2, Culture=neutral, PublicKeyToken=0669cf0452175907, processorArchitecture=MSIL">
+      <HintPath>..\packages\LinqToExcel.1.11.0\lib\Remotion.Data.Linq.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Remotion.Interfaces, Version=1.13.52.2, Culture=neutral, PublicKeyToken=0669cf0452175907, processorArchitecture=MSIL">
+      <HintPath>..\packages\LinqToExcel.1.11.0\lib\Remotion.Interfaces.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Renci.SshNet, Version=2020.0.2.0, Culture=neutral, PublicKeyToken=1cee9f8bde3db106, processorArchitecture=MSIL">
+      <HintPath>..\packages\SSH.NET.2020.0.2\lib\net40\Renci.SshNet.dll</HintPath>
+    </Reference>
+    <Reference Include="SGBL.Common.Model, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SGBL.Common.Model.dll.1.1.6\lib\net452\SGBL.Common.Model.dll</HintPath>
+    </Reference>
+    <Reference Include="SGBL.Utilities, Version=1.2.452.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SGBL.Utilities.dll.1.2.452\lib\net452\SGBL.Utilities.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.ComponentModel.Composition" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Drawing.Primitives, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Drawing.Primitives.4.3.0\lib\net45\System.Drawing.Primitives.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Net.Http.Formatting, Version=5.2.6.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.Client.5.2.6\lib\net45\System.Net.Http.Formatting.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Runtime.InteropServices.RuntimeInformation, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.InteropServices.RuntimeInformation.4.3.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Transactions" />
+    <Reference Include="System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ValueTuple.4.5.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.DynamicData" />
+    <Reference Include="System.Web.Entity" />
+    <Reference Include="System.Web.ApplicationServices" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Web.Http, Version=5.2.6.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.Core.5.2.6\lib\net45\System.Web.Http.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Web.Http.WebHost, Version=5.2.6.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.WebHost.5.2.6\lib\net45\System.Web.Http.WebHost.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Web.Abstractions" />
+    <Reference Include="System.Web.Routing" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Web.Services" />
+    <Reference Include="System.EnterpriseServices" />
+    <Reference Include="Microsoft.Web.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.Web.Infrastructure.1.0.0.0\lib\net40\Microsoft.Web.Infrastructure.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Http">
+    </Reference>
+    <Reference Include="System.Net.Http.WebRequest">
+    </Reference>
+    <Reference Include="System.Web.Helpers, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.Helpers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Mvc, Version=5.2.3.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.Mvc.5.2.3\lib\net45\System.Web.Mvc.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Optimization">
+      <HintPath>..\packages\Microsoft.AspNet.Web.Optimization.1.1.3\lib\net40\System.Web.Optimization.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.Razor.3.2.3\lib\net45\System.Web.Razor.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.WebPages, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.WebPages.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.WebPages.Deployment, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.WebPages.Deployment.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.WebPages.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.WebPages.Razor.dll</HintPath>
+    </Reference>
+    <Reference Include="WebGrease">
+      <Private>True</Private>
+      <HintPath>..\packages\WebGrease.1.5.2\lib\WebGrease.dll</HintPath>
+    </Reference>
+    <Reference Include="Antlr3.Runtime">
+      <Private>True</Private>
+      <HintPath>..\packages\Antlr.3.4.1.9004\lib\Antlr3.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="WindowsBase" />
+    <Reference Include="zxing, Version=0.16.4.0, Culture=neutral, PublicKeyToken=4e88037ac681fe60, processorArchitecture=MSIL">
+      <HintPath>..\packages\ZXing.Net.0.16.4\lib\net45\zxing.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="zxing.presentation, Version=0.16.4.0, Culture=neutral, PublicKeyToken=4e88037ac681fe60, processorArchitecture=MSIL">
+      <HintPath>..\packages\ZXing.Net.0.16.4\lib\net45\zxing.presentation.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="App_Start\BundleConfig.cs" />
+    <Compile Include="App_Start\FilterConfig.cs" />
+    <Compile Include="App_Start\RouteConfig.cs" />
+    <Compile Include="Controllers\AccountController.cs" />
+    <Compile Include="Controllers\BaseController.cs" />
+    <Compile Include="Controllers\CardController.cs" />
+    <Compile Include="Controllers\CardEventActionsController.cs" />
+    <Compile Include="Controllers\CardEventInquiryController.cs" />
+    <Compile Include="Controllers\CardEventSearchController.cs" />
+    <Compile Include="Controllers\CardParameterController.cs" />
+    <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="Controllers\MessageController.cs" />
+    <Compile Include="Controllers\PaymentFileController.cs" />
+    <Compile Include="Controllers\CardEventDashboardController.cs" />
+    <Compile Include="Controllers\SearchController.cs" />
+    <Compile Include="Controllers\UserPreferenceController.cs" />
+    <Compile Include="CrossCutting\Constants.cs" />
+    <Compile Include="CrossCutting\CustomAuthorizeAttribute.cs" />
+    <Compile Include="CrossCutting\Global.cs" />
+    <Compile Include="CrossCutting\HttpClientHelper.cs" />
+    <Compile Include="CrossCutting\SessionManager.cs" />
+    <Compile Include="Models\Batch.cs" />
+    <Compile Include="Models\CardAccountModification.cs" />
+    <Compile Include="Models\CardEventDisposed.cs" />
+    <Compile Include="Models\CardMailer.cs" />
+    <Compile Include="Models\CardParameter.cs" />
+    <Compile Include="Models\CardPin.cs" />
+    <Compile Include="Models\CardPinBranches.cs" />
+    <Compile Include="Models\CardPostponeApprovalBy.cs" />
+    <Compile Include="Models\CardProperty.cs" />
+    <Compile Include="Models\CardPropertyValue.cs" />
+    <Compile Include="Models\CardsCount.cs" />
+    <Compile Include="Models\CardSmsInfo.cs" />
+    <Compile Include="Models\CardType.cs" />
+    <Compile Include="Models\Company.cs" />
+    <Compile Include="Models\ConfigModel.cs" />
+    <Compile Include="Models\DisplaySearchCardManagement.cs" />
+    <Compile Include="Models\EditCardPinFlowStepModel.cs" />
+    <Compile Include="Models\Event.cs" />
+    <Compile Include="Models\EventParameter.cs" />
+    <Compile Include="Models\FileModel.cs" />
+    <Compile Include="Models\GetRolesRequest.cs" />
+    <Compile Include="Models\HealthCheckObject.cs" />
+    <Compile Include="Models\InputAccount.cs" />
+    <Compile Include="Models\LevelOption.cs" />
+    <Compile Include="Models\InputPayment.cs" />
+    <Compile Include="Models\ModelViews\CardEventDashboardModelView.cs" />
+    <Compile Include="Models\ModelViews\CardEventInquiryIndexViewModel.cs" />
+    <Compile Include="Models\ModelViews\CardEventSearchIndexViewModel.cs" />
+    <Compile Include="Models\ModelViews\PostponeCardEventViewModel.cs" />
+    <Compile Include="Models\ModelViews\SearchCardEventViewModel.cs" />
+    <Compile Include="Models\ModelViews\ViewCardEventInformationViewModel.cs" />
+    <Compile Include="Models\Parameter.cs" />
+    <Compile Include="Models\ParameterView.cs" />
+    <Compile Include="Models\CardEventFlowStepModel.cs" />
+    <Compile Include="Models\CardEventModel.cs" />
+    <Compile Include="Models\Reason.cs" />
+    <Compile Include="Models\Role.cs" />
+    <Compile Include="Models\SearchCardManagement.cs" />
+    <Compile Include="Models\Sms.cs" />
+    <Compile Include="Models\SubEvent.cs" />
+    <Compile Include="Models\SubEventParameter.cs" />
+    <Compile Include="Models\UserAccessInfoModel.cs" />
+    <Compile Include="Models\UserBranchModel.cs" />
+    <Compile Include="Models\ViewCardProperties.cs" />
+    <Compile Include="Models\ViewCardPropertieValue.cs" />
+    <Compile Include="Models\ViewEventParameters.cs" />
+    <Compile Include="Models\ViewSubEventParameters.cs" />
+    <Compile Include="Models\ViewSubEventParametersCustom.cs" />
+    <Compile Include="Models\ViewSubEvents.cs" />
+    <Compile Include="Reporting\ClsReport\CardMailer.cs" />
+    <Compile Include="Reporting\ClsReport\clsReceipt.cs" />
+    <Compile Include="Reporting\DataSet\ReportDS.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>ReportDS.xsd</DependentUpon>
+    </Compile>
+    <Compile Include="Reporting\frmDisplayRdlcPdf.aspx.cs">
+      <DependentUpon>frmDisplayRdlcPdf.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Reporting\frmDisplayRdlcPdf.aspx.designer.cs">
+      <DependentUpon>frmDisplayRdlcPdf.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="Reporting\RdlcReport.cs" />
+    <Compile Include="Reporting\RdlcReportFactory.cs" />
+    <Compile Include="Requests\BaseRequestModel.cs" />
+    <Compile Include="Models\LoggedInUserSession.cs" />
+    <Compile Include="CrossCutting\Logger.cs" />
+    <Compile Include="CrossCutting\Service.cs" />
+    <Compile Include="Global.asax.cs">
+      <DependentUpon>Global.asax</DependentUpon>
+    </Compile>
+    <Compile Include="Models\Message.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Requests\CardApprovalByRequest.cs" />
+    <Compile Include="Requests\CardPinRequest.cs" />
+    <Compile Include="Requests\CheckIfUserCanViewCustomerRequest.cs" />
+    <Compile Include="Requests\DeleteCardPropertyValueRequest.cs" />
+    <Compile Include="Requests\DeleteCardTypeRequest.cs" />
+    <Compile Include="Requests\DeleteSubEventCardPropertyValueRequest.cs" />
+    <Compile Include="Requests\DeleteUserSessionBySessionValueRequest.cs" />
+    <Compile Include="Requests\EditBatchRequest.cs" />
+    <Compile Include="Requests\EditCardPropertyValueRequest.cs" />
+    <Compile Include="Requests\EditCardTypeRequest.cs" />
+    <Compile Include="Requests\EditEventParameterRequest.cs" />
+    <Compile Include="Requests\EditInputPaymentListRequest.cs" />
+    <Compile Include="Requests\EditSubEventParameterRequest.cs" />
+    <Compile Include="Requests\EditSubEventRequest.cs" />
+    <Compile Include="Requests\GenerateBulkCreditCardsRequest.cs" />
+    <Compile Include="Requests\GenerateBulkDebitCardsRequest.cs" />
+    <Compile Include="Requests\GenerateCardsReportRequest.cs" />
+    <Compile Include="Requests\GenerateOutputPaymentRequest.cs" />
+    <Compile Include="Requests\GenerateUnloadingXmlFileRequest.cs" />
+    <Compile Include="Requests\GenerateXmlFinalPaymentRequest.cs" />
+    <Compile Include="Requests\GenerateXmlCardCancellationRequest.cs" />
+    <Compile Include="Requests\GenerateXmlChangeNumberRequest.cs" />
+    <Compile Include="Requests\GenerateXmlServicePackRequest.cs" />
+    <Compile Include="Requests\GenerateXmlUpdateBranchRequest.cs" />
+    <Compile Include="Requests\GenerateXmlUpdateParameterRequest.cs" />
+    <Compile Include="Requests\GenerateXmlAccountModificationRequest.cs" />
+    <Compile Include="Requests\GenerateXmlCashCardUsdRequest.cs" />
+    <Compile Include="Requests\GenerateXmlLimitZeroRequest.cs" />
+    <Compile Include="Requests\GetAllCompaniesRequest.cs" />
+    <Compile Include="Requests\GetCardEventDisposedByBranchNameRequest.cs" />
+    <Compile Include="Requests\GetCardEventTransferedByBranchNameRequest.cs" />
+    <Compile Include="Requests\GetCardMailerInfoByCardEventIdRequest.cs" />
+    <Compile Include="Requests\GetCardParameterByEventNameRequest.cs" />
+    <Compile Include="Requests\GetCardParameterEventsRequest.cs" />
+    <Compile Include="Requests\GetCardPinBranchesByCardEventIdRequest.cs" />
+    <Compile Include="Requests\GetCardPinStockEnquiryReportRequest.cs" />
+    <Compile Include="Requests\GetCardPropertiesRequest.cs" />
+    <Compile Include="Requests\GetCardPropertyByNameRequest.cs" />
+    <Compile Include="Requests\GetCardPropertyBySubEventIdRequest.cs" />
+    <Compile Include="Requests\GetCardPropertyValueBySubEventIdCardPropertyIdRequest.cs" />
+    <Compile Include="Requests\GetCardPropertyValuesByCardPropertyNameRequest.cs" />
+    <Compile Include="Requests\GetCardPropertyValuesRequest.cs" />
+    <Compile Include="Requests\GetCardsCountRequest.cs" />
+    <Compile Include="Requests\GetCardSmsInfoByCardEventIdRequest.cs" />
+    <Compile Include="Requests\GetCardTypesRequest.cs" />
+    <Compile Include="Requests\GetEventParameterByEventParameterIdRequest.cs" />
+    <Compile Include="Requests\GetEventParametersByEventIdRequest.cs" />
+    <Compile Include="Requests\GetEventsRequest.cs" />
+    <Compile Include="Requests\GetFlowStepByIdRequest.cs" />
+    <Compile Include="Requests\GetParameterByModuleNameRequest.cs" />
+    <Compile Include="Requests\GetParametersByEventNameSubEventRequest.cs" />
+    <Compile Include="Requests\GetCardEventDeliveredByBranchNameRequest.cs" />
+    <Compile Include="Requests\GetCardEventInformationByCardEventIdRequest.cs" />
+    <Compile Include="Requests\GetCardEventIssuedByBranchNameRequest.cs" />
+    <Compile Include="Requests\GetCardEventReceivedByBranchNameRequest.cs" />
+    <Compile Include="Requests\GetReasonsRequest.cs" />
+    <Compile Include="Requests\GetResultsBySearchValueRequest.cs" />
+    <Compile Include="Requests\GetRoleByUsernameRequest.cs" />
+    <Compile Include="Requests\GetRoleWithActivitiesByModuleNameRequest.cs" />
+    <Compile Include="Requests\GetSubEventBySubEventIdRequest.cs" />
+    <Compile Include="Requests\GetSubEventParametersBySubEventIdRequest.cs" />
+    <Compile Include="Requests\GetSubEventParametersCustomBySubEventIdRequest.cs" />
+    <Compile Include="Requests\GetSubEventsByEventNameRequest.cs" />
+    <Compile Include="Requests\GetUserBranchesByEmailRequest.cs" />
+    <Compile Include="Requests\GetUserCollectionRequest.cs" />
+    <Compile Include="Requests\GetUserDefaultPageByUsernameModuleNameRequest.cs" />
+    <Compile Include="Requests\GetUserPreferencesByUsernameModuleNameRequest.cs" />
+    <Compile Include="Requests\GetUserProfileByUsernameRequest.cs" />
+    <Compile Include="Requests\GetUserSessionBySessionValueRequest.cs" />
+    <Compile Include="Requests\IsBatchInProcessRequest.cs" />
+    <Compile Include="Requests\EditCardEventsFlowStepRequest.cs" />
+    <Compile Include="Requests\PostponeCardEventRequest.cs" />
+    <Compile Include="Requests\RefreshCardPinIdRequest.cs" />
+    <Compile Include="Requests\RefreshSmsStatusByCardPinIdRequest.cs" />
+    <Compile Include="Requests\SearchCardEventsByKeywordRequest.cs" />
+    <Compile Include="Requests\SendPinSmsRequest.cs" />
+    <Compile Include="Requests\SetActivityAsUserDefaultPageRequest.cs" />
+    <Compile Include="Requests\SetUserHomePageRequest.cs" />
+    <Compile Include="Requests\UndoLastStepRequest.cs" />
+    <Compile Include="Responses\BaseResponseModel.cs" />
+    <Compile Include="Responses\CardApprovalByResponse.cs" />
+    <Compile Include="Responses\CardPinResponse.cs" />
+    <Compile Include="Responses\CheckIfUserCanViewCustomerResponse.cs" />
+    <Compile Include="Responses\DeleteCardPropertyValueResponse.cs" />
+    <Compile Include="Responses\DeleteCardTypeResponse.cs" />
+    <Compile Include="Responses\DeleteSubEventCardPropertyValueResponse.cs" />
+    <Compile Include="Responses\DeleteUserSessionBySessionValueResponse.cs" />
+    <Compile Include="Responses\EditBatchResponse.cs" />
+    <Compile Include="Responses\EditCardPropertyValueResponse.cs" />
+    <Compile Include="Responses\EditCardTypeResponse.cs" />
+    <Compile Include="Responses\EditEventParameterResponse.cs" />
+    <Compile Include="Responses\EditSubEventParameterResponse.cs" />
+    <Compile Include="Responses\EditSubEventResponse.cs" />
+    <Compile Include="Responses\GenerateBulkCreditCardsResponse.cs" />
+    <Compile Include="Responses\GenerateBulkDebitCardsResponse.cs" />
+    <Compile Include="Responses\GenerateCardsReportResponse.cs" />
+    <Compile Include="Responses\GenerateOutputPaymentResponse.cs" />
+    <Compile Include="Responses\GenerateUnloadingXmlFileResponse.cs" />
+    <Compile Include="Responses\GenerateXmlAccountModificationResponse.cs" />
+    <Compile Include="Responses\EditInputPaymentListResponse.cs" />
+    <Compile Include="Responses\GenerateXmlFinalPaymentResponse.cs" />
+    <Compile Include="Responses\GenerateXmlCardCancellationResponse.cs" />
+    <Compile Include="Responses\GenerateXmlCashCardUsdResponse.cs" />
+    <Compile Include="Responses\GenerateXmlChangeNumberResponse.cs" />
+    <Compile Include="Responses\GenerateXmlLimitZeroResponse.cs" />
+    <Compile Include="Responses\GenerateXmlServicePackResponse.cs" />
+    <Compile Include="Responses\GenerateXmlUpdateBranchResponse.cs" />
+    <Compile Include="Responses\GenerateXmlUpdateParameterResponse.cs" />
+    <Compile Include="Responses\GetAllCompaniesResponse.cs" />
+    <Compile Include="Responses\GetCardEventDisposedByBranchNameResponse.cs" />
+    <Compile Include="Responses\GetCardEventTransferedByBranchNameResponse.cs" />
+    <Compile Include="Responses\GetCardMailerInfoByCardEventIdResponse.cs" />
+    <Compile Include="Responses\GetCardParameterByEventNameResponse.cs" />
+    <Compile Include="Responses\GetCardParameterEventsResponse.cs" />
+    <Compile Include="Responses\GetCardPinBranchesByCardEventIdResponse.cs" />
+    <Compile Include="Responses\GetCardPinStockEnquiryReportResponse.cs" />
+    <Compile Include="Responses\GetCardPropertiesResponse.cs" />
+    <Compile Include="Responses\GetCardPropertyByNameResponse.cs" />
+    <Compile Include="Responses\GetCardPropertyBySubEventIdResponse.cs" />
+    <Compile Include="Responses\GetCardPropertyValueBySubEventIdCardPropertyIdResponse.cs" />
+    <Compile Include="Responses\GetCardPropertyValuesByCardPropertyNameResponse.cs" />
+    <Compile Include="Responses\GetCardPropertyValuesResponse.cs" />
+    <Compile Include="Responses\GetCardsCountResponse.cs" />
+    <Compile Include="Responses\GetCardSmsInfoByCardEventIdResponse.cs" />
+    <Compile Include="Responses\GetCardTypesResponse.cs" />
+    <Compile Include="Responses\GetEventParameterByEventParameterIdResponse.cs" />
+    <Compile Include="Responses\GetEventParametersByEventIdResponse.cs" />
+    <Compile Include="Responses\GetEventsResponse.cs" />
+    <Compile Include="Responses\GetFlowStepByIdResponse.cs" />
+    <Compile Include="Responses\GetParameterByModuleNameResponse.cs" />
+    <Compile Include="Responses\GetParametersByEventNameSubEventResponse.cs" />
+    <Compile Include="Responses\GetCardEventDeliveredByBranchNameResponse.cs" />
+    <Compile Include="Responses\GetCardEventInformationByCardEventIdResponse.cs" />
+    <Compile Include="Responses\GetCardEventReceivedByBranchNameResponse.cs" />
+    <Compile Include="Responses\GetReasonsResponse.cs" />
+    <Compile Include="Responses\GetResultsBySearchValueResponse.cs" />
+    <Compile Include="Responses\GetRoleByUsernameResponse.cs" />
+    <Compile Include="Responses\GetRolesResponse.cs" />
+    <Compile Include="Responses\GetRoleWithActivitiesByModuleNameResponse.cs" />
+    <Compile Include="Responses\GetSubEventBySubEventIdResponse.cs" />
+    <Compile Include="Responses\GetSubEventParametersBySubEventIdResponse.cs" />
+    <Compile Include="Responses\GetSubEventParametersCustomBySubEventIdResponse.cs" />
+    <Compile Include="Responses\GetSubEventsByEventNameResponse.cs" />
+    <Compile Include="Responses\GetUserBranchesByEmailResponse.cs" />
+    <Compile Include="Responses\GetUserCollectionResponse.cs" />
+    <Compile Include="Responses\GetUserDefaultPageByUsernameModuleNameResponse.cs" />
+    <Compile Include="Responses\GetUserPreferencesByUsernameModuleNameResponse.cs" />
+    <Compile Include="Responses\GetUserProfileByUsernameResponse.cs" />
+    <Compile Include="Responses\GetUserSessionBySessionValueResponse.cs" />
+    <Compile Include="Responses\IsBatchInProcessResponse.cs" />
+    <Compile Include="Responses\EditCardEventsFlowStepResponse.cs" />
+    <Compile Include="Responses\PostponeCardEventResponse.cs" />
+    <Compile Include="Responses\RefreshCardPinIdResponse.cs" />
+    <Compile Include="Responses\RefreshSmsStatusByCardPinIdResponse.cs" />
+    <Compile Include="Responses\SearchCardEventsByKeywordResponse.cs" />
+    <Compile Include="Responses\SendPinSmsResponse.cs" />
+    <Compile Include="Responses\SetActivityAsUserDefaultPageResponse.cs" />
+    <Compile Include="Responses\SetUserHomePageResponse.cs" />
+    <Compile Include="Responses\UndoLastStepResponse.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="3PL\Microsoft.Office.Interop.Excel.dll" />
+    <Content Include="3PL\Microsoft.Office.Interop.Outlook.dll" />
+    <Content Include="3PL\Microsoft.Office.Interop.Word.dll" />
+    <Content Include="Content\bootstrap-toggle.min.css" />
+    <Content Include="Content\brands.css" />
+    <Content Include="Content\brands.min.css" />
+    <Content Include="Content\css\app.min.css" />
+    <Content Include="Content\css\bootstrap-datetimepicker.css" />
+    <Content Include="Content\css\bootstrap-extended.css" />
+    <Content Include="Content\css\bootstrap.css" />
+    <Content Include="Content\css\buttons.bootstrap4.min.css" />
+    <Content Include="Content\css\buttons.dataTables.min.css" />
+    <Content Include="Content\css\cash-flow.css" />
+    <Content Include="Content\css\climacons.min.css" />
+    <Content Include="Content\css\colors.css" />
+    <Content Include="Content\css\colReorder.dataTables.min.css" />
+    <Content Include="Content\css\components.css" />
+    <Content Include="Content\css\custom\cards.css" />
+    <Content Include="Content\css\custom\current-account.css" />
+    <Content Include="Content\css\custom\deposit-account.css" />
+    <Content Include="Content\css\custom\digital-banking.css" />
+    <Content Include="Content\css\custom\Guarantee.css" />
+    <Content Include="Content\css\custom\insurance.css" />
+    <Content Include="Content\css\custom\loan.css" />
+    <Content Include="Content\css\datatables.min.css" />
+    <Content Include="Content\css\daterange.min.css" />
+    <Content Include="Content\css\daterangepicker.css" />
+    <Content Include="Content\css\fixedHeader.dataTables.min.css" />
+    <Content Include="Content\css\font-awesome.min.css" />
+    <Content Include="Content\css\font-style.css" />
+    <Content Include="Content\css\horizontal-menu.min.css" />
+    <Content Include="Content\css\jquery-jvectormap-2.0.3.css" />
+    <Content Include="Content\css\jquery-ui.css" />
+    <Content Include="Content\css\jsgrid-theme.min.css" />
+    <Content Include="Content\css\jsgrid.min.css" />
+    <Content Include="Content\css\mandate.css" />
+    <Content Include="Content\css\morris.css" />
+    <Content Include="Content\css\pace.css" />
+    <Content Include="Content\css\palette-climacon.css" />
+    <Content Include="Content\css\pickadate.css" />
+    <Content Include="Content\css\dashboard.css" />
+    <Content Include="Content\css\responsive.dataTables.min.css" />
+    <Content Include="Content\css\search-customer.css" />
+    <Content Include="Content\css\select.dataTables.min.css" />
+    <Content Include="Content\css\Site.css" />
+    <Content Include="Content\css\style.css" />
+    <Content Include="Content\css\style.min.1.css" />
+    <Content Include="Content\css\style.min.css" />
+    <Content Include="Content\css\unslider.css" />
+    <Content Include="Content\css\vendors.min.css" />
+    <Content Include="Content\css\wizard.min.css" />
+    <Content Include="Content\custom-slider.css" />
+    <Content Include="Content\font-awesome.min.css" />
+    <Content Include="Content\fontawesome-all.css" />
+    <Content Include="Content\fontawesome-all.min.css" />
+    <Content Include="Content\fontawesome.css" />
+    <Content Include="Content\fontawesome.min.css" />
+    <Content Include="Content\my-style.css" />
+    <Content Include="Content\regular.css" />
+    <Content Include="Content\regular.min.css" />
+    <Content Include="Content\solid.css" />
+    <Content Include="Content\solid.min.css" />
+    <Content Include="Content\svg-with-js.css" />
+    <Content Include="Content\svg-with-js.min.css" />
+    <Content Include="Content\v4-shims.css" />
+    <Content Include="Content\v4-shims.min.css" />
+    <Content Include="favicon.ico" />
+    <Content Include="Global.asax" />
+    <Content Include="NLog.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="webfonts\fa-brands-400.svg" />
+    <Content Include="webfonts\fa-regular-400.svg" />
+    <Content Include="webfonts\fa-solid-900.svg" />
+    <None Include="NLog.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <Content Include="Reporting\frmDisplayRdlcPdf.aspx" />
+    <Content Include="Scripts\ai.0.22.9-build00167.js" />
+    <Content Include="Scripts\ai.0.22.9-build00167.min.js" />
+    <Content Include="Scripts\app-menu.min.js" />
+    <Content Include="Scripts\app.min.js" />
+    <Content Include="Scripts\bootstrap-datetime.min.js" />
+    <Content Include="Scripts\bootstrap-datetimepicker.min.js" />
+    <Content Include="Scripts\breadcrumbs-with-stats.min.js" />
+    <Content Include="Scripts\buttons.bootstrap4.min.js" />
+    <Content Include="Scripts\buttons.colVis.min.js" />
+    <Content Include="Scripts\chart.min.js" />
+    <Content Include="Scripts\charts-jquery.sparkline.min.js" />
+    <Content Include="Scripts\customizer.min.js" />
+    <Content Include="Scripts\dashboard-analytics.min.js" />
+    <Content Include="Scripts\datatable-responsive.min.js" />
+    <Content Include="Scripts\datatable-select.min.js" />
+    <Content Include="Scripts\dataTables.buttons.min.js" />
+    <Content Include="Scripts\dataTables.colReorder.min.js" />
+    <Content Include="Scripts\dataTables.fixedHeader.min.js" />
+    <Content Include="Scripts\datatables.min.js" />
+    <Content Include="Scripts\dataTables.responsive.min.js" />
+    <Content Include="Scripts\dataTables.select.min.js" />
+    <Content Include="Scripts\daterangepicker.js" />
+    <Content Include="Scripts\fontawesome\all.js" />
+    <Content Include="Scripts\fontawesome\all.min.js" />
+    <Content Include="Scripts\fontawesome\brands.js" />
+    <Content Include="Scripts\fontawesome\brands.min.js" />
+    <Content Include="Scripts\fontawesome\fontawesome.js" />
+    <Content Include="Scripts\fontawesome\fontawesome.min.js" />
+    <Content Include="Scripts\fontawesome\regular.js" />
+    <Content Include="Scripts\fontawesome\regular.min.js" />
+    <Content Include="Scripts\fontawesome\solid.js" />
+    <Content Include="Scripts\fontawesome\solid.min.js" />
+    <Content Include="Scripts\fontawesome\v4-shims.js" />
+    <Content Include="Scripts\fontawesome\v4-shims.min.js" />
+    <Content Include="Scripts\form-field.js" />
+    <Content Include="Scripts\griddata.js" />
+    <Content Include="Scripts\jquery-jvectormap-2.0.3.min.js" />
+    <Content Include="Scripts\jquery-jvectormap-world-mill.js" />
+    <Content Include="Scripts\jquery.knob.min.js" />
+    <Content Include="Scripts\jquery.sparkline.min.js" />
+    <Content Include="Scripts\jquery.steps.min.js" />
+    <Content Include="Scripts\jquery.sticky.js" />
+    <Content Include="Scripts\jquery.validate.js" />
+    <Content Include="Scripts\jquery.validate.min.js" />
+    <Content Include="Scripts\jquery.validate.unobtrusive.js" />
+    <Content Include="Scripts\jsgrid.min-1.js" />
+    <Content Include="Scripts\jsgrid.min.js" />
+    <Content Include="Scripts\knob.min.js" />
+    <Content Include="Scripts\legacy.js" />
+    <Content Include="Scripts\moment-with-locales.min.js" />
+    <Content Include="Scripts\morris.min.js" />
+    <Content Include="Scripts\MyCustomValidation.js" />
+    <Content Include="Scripts\MyLibrary.js" />
+    <Content Include="Scripts\numeral.js" />
+    <Content Include="Scripts\pick-a-datetime.min.js" />
+    <Content Include="Scripts\picker.date.js" />
+    <Content Include="Scripts\picker.js" />
+    <Content Include="Scripts\picker.time.js" />
+    <Content Include="Scripts\popover.min.js" />
+    <Content Include="Scripts\raphael-min.js" />
+    <Content Include="Scripts\unslider-min.js" />
+    <Content Include="Scripts\vendors.min.js" />
+    <Content Include="Scripts\visitor-data.js" />
+    <Content Include="Scripts\wizard-steps.min.js" />
+    <Content Include="Web.config">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Web.Debug.config">
+      <DependentUpon>Web.config</DependentUpon>
+    </Content>
+    <Content Include="Web.Release.config">
+      <DependentUpon>Web.config</DependentUpon>
+    </Content>
+    <Content Include="Views\_ViewStart.cshtml" />
+    <Content Include="Views\Shared\Error.cshtml" />
+    <Content Include="Views\Shared\_Layout.cshtml" />
+    <Content Include="Views\Home\Index.cshtml" />
+    <Content Include="Views\Message\DisplayMessage.cshtml" />
+    <Content Include="Views\UserPreference\UserPreferenceIndex.cshtml" />
+    <Content Include="Views\Search\SearchIndex.cshtml" />
+    <Content Include="webfonts\fa-brands-400.eot" />
+    <Content Include="webfonts\fa-brands-400.ttf" />
+    <Content Include="webfonts\fa-brands-400.woff" />
+    <Content Include="webfonts\fa-brands-400.woff2" />
+    <Content Include="webfonts\fa-regular-400.eot" />
+    <Content Include="webfonts\fa-regular-400.ttf" />
+    <Content Include="webfonts\fa-regular-400.woff" />
+    <Content Include="webfonts\fa-regular-400.woff2" />
+    <Content Include="webfonts\fa-solid-900.eot" />
+    <Content Include="webfonts\fa-solid-900.ttf" />
+    <Content Include="webfonts\fa-solid-900.woff" />
+    <Content Include="webfonts\fa-solid-900.woff2" />
+    <None Include="Properties\PublishProfiles\Alterna.CardManagement.pubxml" />
+    <Content Include="Views\Home\HealthCheck.cshtml" />
+    <Content Include="Views\PaymentFile\PaymentFileImport.cshtml" />
+    <Content Include="Views\Card\UploadExcelFile.cshtml" />
+    <Content Include="Views\Card\CardIndex.cshtml" />
+    <Content Include="Views\Account\AccountFileImport.cshtml" />
+    <Content Include="Views\Card\InternationalUsage.cshtml" />
+    <Content Include="Views\Card\CashCardUsd.cshtml" />
+    <Content Include="Views\Card\BulkDebitCards.cshtml" />
+    <Content Include="Views\Card\BulkCreditCards.cshtml" />
+    <Content Include="Views\CardParameter\CardParameterIndex.cshtml" />
+    <Content Include="Views\CardParameter\EventsParameters.cshtml" />
+    <Content Include="Views\Card\SubEventIndex.cshtml" />
+    <Content Include="Views\Card\CardsReport.cshtml" />
+    <Content Include="Views\Card\EventIndex.cshtml" />
+    <Content Include="Views\Card\SubEventCardParameter.cshtml" />
+    <Content Include="Views\CardParameter\SubEventsParameters.cshtml" />
+    <Content Include="Views\CardParameter\EditEventParameter.cshtml" />
+    <Content Include="Views\CardParameter\EditSubEvent.cshtml" />
+    <Content Include="Views\CardParameter\EditSubEventParameter.cshtml" />
+    <Content Include="Views\CardParameter\GetSubEventParameterCustom.cshtml" />
+    <Content Include="Views\CardParameter\CardPropertiesIndex.cshtml" />
+    <Content Include="Views\CardParameter\CardPropertieValuesIndex.cshtml" />
+    <Content Include="Views\Card\UpdateParameter.cshtml" />
+    <Content Include="Views\Card\CardCancellation.cshtml" />
+    <Content Include="Views\CardParameter\SubEventParametersIndex.cshtml" />
+    <Content Include="Views\CardParameter\EditSubEventParameterCustom.cshtml" />
+    <Content Include="Views\CardParameter\CardPropertyValueIndex.cshtml" />
+    <Content Include="Views\CardParameter\CardPropertyValueParameterIndex.cshtml" />
+    <Content Include="Views\CardParameter\EditCardPropertyValueParameter.cshtml" />
+    <Content Include="Views\Card\ServicePack.cshtml" />
+    <Content Include="Views\CardParameter\CardTypeIndex.cshtml" />
+    <Content Include="Views\CardParameter\EditCardType.cshtml" />
+    <Compile Include="Responses\GetCardEventIssuedByBranchNameResponse.cs" />
+    <Content Include="Views\CardEventDashboard\CardEventDashboardIndex.cshtml" />
+    <Content Include="Views\CardEventDashboard\SearchCardEventsIndex.cshtml" />
+    <Content Include="Views\CardEventDashboard\ViewCardEventInformation.cshtml" />
+    <Content Include="Views\CardEventActions\CardEventDisposedIndex.cshtml" />
+    <Content Include="Views\CardEventActions\PostponeCardEvent.cshtml" />
+    <Content Include="Views\CardEventActions\CardEventTransferIndex.cshtml" />
+    <Content Include="Views\CardEventSearch\CardEventSearchIndex.cshtml" />
+    <Content Include="Views\CardEventInquiry\CardEventInquiryIndex.cshtml" />
+    <Content Include="Views\Home\LandingPage.cshtml" />
+    <Content Include="Views\Card\UpdateBranch.cshtml" />
+    <Content Include="Views\Card\InternationalNumberChange.cshtml" />
+    <Content Include="Reporting\DataSet\ReportDS.xsc">
+      <DependentUpon>ReportDS.xsd</DependentUpon>
+    </Content>
+    <None Include="Reporting\DataSet\ReportDS.xsd">
+      <SubType>Designer</SubType>
+      <Generator>MSDataSetGenerator</Generator>
+      <LastGenOutput>ReportDS.Designer.cs</LastGenOutput>
+    </None>
+    <Content Include="Reporting\DataSet\ReportDS.xss">
+      <DependentUpon>ReportDS.xsd</DependentUpon>
+    </Content>
+    <Content Include="Views\CardEventDashboard\IssuedCards.cshtml" />
+    <Content Include="Views\CardEventDashboard\ReceivedCards.cshtml" />
+    <Content Include="Views\CardEventDashboard\DeliveredCards.cshtml" />
+    <Content Include="Views\CardEventDashboard\TransferredCards.cshtml" />
+    <Content Include="Views\CardEventDashboard\DisposedCards.cshtml" />
+    <Content Include="Views\web.config" />
+    <Content Include="Views\Card\PrepaidCardLoading.cshtml" />
+    <Content Include="Views\Card\PrepaidCardUnloading.cshtml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="App_Data\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="packages.config" />
+    <None Include="Project_Readme.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Reporting\Rdlc\rdlcCardMailer.rdlc" />
+  </ItemGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+  </PropertyGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="'$(VSToolsPath)' != ''" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v10.0\WebApplications\Microsoft.WebApplication.targets" Condition="false" />
+  <Target Name="MvcBuildViews" AfterTargets="AfterBuild" Condition="'$(MvcBuildViews)'=='true'">
+    <AspNetCompiler VirtualPath="temp" PhysicalPath="$(WebProjectOutputDir)" />
+  </Target>
+  <ProjectExtensions>
+    <VisualStudio>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
+        <WebProjectProperties>
+          <UseIIS>True</UseIIS>
+          <AutoAssignPort>True</AutoAssignPort>
+          <DevelopmentServerPort>60863</DevelopmentServerPort>
+          <DevelopmentServerVPath>/</DevelopmentServerVPath>
+          <IISUrl>http://localhost:60510/</IISUrl>
+          <NTLMAuthentication>False</NTLMAuthentication>
+          <UseCustomServer>False</UseCustomServer>
+          <CustomServerUrl>
+          </CustomServerUrl>
+          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
+        </WebProjectProperties>
+      </FlavorProperties>
+    </VisualStudio>
+  </ProjectExtensions>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Microsoft.Net.Compilers.1.0.0\build\Microsoft.Net.Compilers.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Net.Compilers.1.0.0\build\Microsoft.Net.Compilers.props'))" />
+    <Error Condition="!Exists('..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\build\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\build\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props'))" />
+  </Target>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target> -->
+</Project>
 
-* the agent capabilities page does **not** list `visualstudio`
-* `MSBuild@1` runs `vswhere.exe` and then falls back to
-  `C:\Windows\Microsoft.NET\Framework\v4.0.30319\msbuild.exe`
-* your build fails on missing `Microsoft.WebApplication.targets`
+And this is my build tempalte:
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
 
-That means the agent is **not seeing a usable Visual Studio / Build Tools installation** for web projects.
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET Framework)'
 
-## Why this happens
+- name: buildPool
+  type: string
 
-Most likely one of these is true:
+- name: buildAgentName
+  type: string
 
-### 1) The agent was not restarted after Build Tools was installed
+# Visual Studio used by VSBuild (self-hosted agent must have VS/Build Tools installed)
+- name: vsVersion
+  type: string
+  default: 'latest'
 
-Azure DevOps says that after installing new software on a self-hosted agent, you must **restart the agent** for new capabilities to appear. ([GitHub][1])
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
 
-### 2) The installed Build Tools do not include the right workload/components
+- name: buildConfiguration
+  type: string
+  default: 'Release'
 
-For classic ASP.NET/.NET Framework web projects, plain MSBuild alone is not enough. You need the **web build targets** too, which is why your build is failing on `Microsoft.WebApplication.targets`. That file comes from Visual Studio web tooling, not just the base .NET Framework. Your error is direct evidence that the needed web components are missing or not being found.
+# Restore/build input
+- name: solution
+  type: string
+  default: '**/*.sln'
 
-### 3) The agent version is old
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
 
-Earlier you showed `Agent.Version = 3.238.0`, and Azure DevOps was demanding a version greater than that. Microsoft recommends keeping self-hosted agents updated, and newer tasks can require a newer agent version. ([Microsoft Learn][2])
+# Tests
+- name: runTests
+  type: boolean
+  default: false
 
-### 4) `vswhere` cannot find the installation
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
 
-Your MSBuild task explicitly called `vswhere.exe` several times and did not find a Visual Studio / Build Tools instance to use, then fell back to framework MSBuild. That strongly suggests the installation is either incomplete, corrupted, or missing the product/workload that `vswhere` expects.
+# “Publish” / packaging
+# For .NET Framework web apps, the closest equivalent of dotnet publish is MSBuild Web Deploy packaging
+- name: publishProject
+  type: string
+  default: ''   # optional; if empty we build the whole solution
 
-## What to check on the build server
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
 
-Run these in CMD on the server.
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
 
-First:
+- name: artifactName
+  type: string
+  default: 'drop'
 
-```bat
-"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -all -products * -format json
-```
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
 
-Then:
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
 
-```bat
-"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -all -products Microsoft.VisualStudio.Product.BuildTools -format json
-```
+  steps:
+  - checkout: self
+    clean: true
 
-If those return nothing useful, Azure DevOps is not going to detect `visualstudio` either.
+  # Restore using nuget.config (classic .NET Framework)
+  - task: NuGetCommand@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      restoreSolution: '${{ parameters.solution }}'
+      feedsToUse: 'config'
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
 
-Then check whether this file exists:
+  # Build (solution)
+  - task: MSBuild@1
+    displayName: 'Build'
+    inputs:
+      solution: '${{ parameters.solution }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArguments: >
+        /p:SkipInvalidConfigurations=true
 
-```bat
-dir "C:\Program Files (x86)\MSBuild\Microsoft\VisualStudio\*\WebApplications\Microsoft.WebApplication.targets"
-```
+  # Tests (optional)
+  # - task: VSTest@2
+  #   displayName: 'Test'
+  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+  #   inputs:
+  #     testSelector: 'testAssemblies'
+  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
+  #     searchFolder: '$(System.DefaultWorkingDirectory)'
+  #     platform: '${{ parameters.buildPlatform }}'
+  #     configuration: '${{ parameters.buildConfiguration }}'
+  #     diagnosticsEnabled: true
 
-If nothing is found, your web build components are not installed.
+  # Publish/Package the web project (Web Deploy Package)
+  # This creates a deployable package under packageLocation (closest to dotnet publish)
+  - task: MSBuild@1
+    displayName: 'Publish (Package)'
+    condition: and(succeeded(), ne('${{ parameters.publishProject }}', ''))
+    inputs:
+      solution: '${{ parameters.publishProject }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: false
+      msbuildArguments: >
+        /p:DeployOnBuild=true
+        /p:WebPublishMethod=Package
+        /p:PackageAsSingleFile=true
+        /p:SkipInvalidConfigurations=true
+        /p:PackageLocation="${{ parameters.packageLocation }}"
+        /p:AutoParameterizationWebConfigConnectionStrings=false
 
-## What I would do now
+  # Zip package output (same as your dotnet core template)
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
 
-1. **Restart the Azure Pipelines agent service**
-2. **Update the agent** in Azure DevOps
-3. Run the two `vswhere` commands above
-4. If `vswhere` does not find Build Tools, modify the Build Tools installation and add the ASP.NET/web build components
-5. Check the agent capabilities page again
-
-## Important point
-
-Even if “Visual Studio Build Tools” is installed, that does **not automatically mean** the agent will show `visualstudio` capability. It only shows up if the agent can detect a valid installation and capabilities are refreshed.
-
-## Also, your current build log already proves the environment is incomplete
-
-This line is the giveaway:
-
-```text
-Treating the project as if it had ToolsVersion="4.0"
-```
-
-and this one:
-
-```text
-Microsoft.WebApplication.targets was not found
-```
-
-So the machine is currently behaving like a basic .NET Framework/MSBuild box, not a fully prepared ASP.NET web build agent.
-
-Paste the output of the `vswhere` commands and I’ll tell you exactly what is missing.
-
-[1]: https://github.com/MicrosoftDocs/azure-devops-docs/blob/main/docs/pipelines/agents/includes/capabilities.md "azure-devops-docs/docs/pipelines/agents/includes/capabilities.md at main · MicrosoftDocs/azure-devops-docs · GitHub"
-[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/agents/agents?view=azure-devops "Azure Pipelines Agents - Azure Pipelines | Microsoft Learn"
+  # Publish artifact
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
