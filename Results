@@ -661,3 +661,17 @@ At C:\agent\_work\_temp\fd09b3b0-59d9-4f0b-b7b3-d1829d21937a.ps1:43 char:3
    under: C:\agent\_work\2\extracted
  
 ##[error]PowerShell exited with code '1'.
+
+
+The weird part is that in the extracted folder on SIT-FN1, I have the following files:
+
+- SGBL.CardManagement.deploy.cmd
+- SGBL.CardManagement.deploy-readme.txt
+- SGBL.CardManagement.SetParameters.xml
+- SGBL.CardManagement.SourceManifest.xml
+- SGBL.CardManagement.zip
+and the zip contains:
+- Folder named Content
+- archive.xml
+- parameters.xml
+- systeminbfo.xml
