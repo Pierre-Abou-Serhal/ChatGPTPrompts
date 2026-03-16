@@ -1,39 +1,70 @@
 
-Using dacpac: C:\agent\_work\7\db-drop\database.dacpac
-Publishing to database 'Alterna.CardManagement_SIT' on server 'DEV-SQL2016\PERFAPP'.
-Initializing deployment (Start)
-*** The type for column Test3 in table [dbo].[NewTable] is currently  NVARCHAR (10) NOT NULL but is being changed to  NCHAR (10) NULL. Data loss could occur and deployment may fail if the column contains data that is incompatible with type  NCHAR (10) NULL.
-*** The type for column Test4 in table [dbo].[NewTable] is currently  NVARCHAR (10) NOT NULL but is being changed to  NCHAR (10) NULL. Data loss could occur and deployment may fail if the column contains data that is incompatible with type  NCHAR (10) NULL.
-Initializing deployment (Complete)
-Analyzing deployment plan (Start)
-Analyzing deployment plan (Complete)
-Updating database (Start)
-An error occurred while the batch was being executed.
-Updating database (Failed)
-*** Could not deploy package.
-Warning SQL72015: The type for column Test3 in table [dbo].[NewTable] is currently  NVARCHAR (10) NOT NULL but is being changed to  NCHAR (10) NULL. Data loss could occur and deployment may fail if the column contains data that is incompatible with type  NCHAR (10) NULL.
-Warning SQL72015: The type for column Test4 in table [dbo].[NewTable] is currently  NVARCHAR (10) NOT NULL but is being changed to  NCHAR (10) NULL. Data loss could occur and deployment may fail if the column contains data that is incompatible with type  NCHAR (10) NULL.
-Error SQL72014: Core Microsoft SqlClient Data Provider: Msg 50000, Level 16, State 127, Line 8 Rows were detected. The schema update is terminating because data loss might occur.
-Error SQL72045: Script execution error.  The executed script:
-IF EXISTS (SELECT TOP 1 1
-           FROM   [dbo].[NewTable])
-    RAISERROR (N'Rows were detected. The schema update is terminating because data loss might occur.', 16, 127)
-        WITH NOWAIT;
+# 4) How your API deploy should depend on DB deployment
 
+Your **API templates should not directly depend on `deploy-database.yml`**.
 
+Instead, the **API release pipeline** should depend on the **DB pipeline** as a **pipeline resource**.
 
-Time elapsed 0:00:25.86
-FullName                                   
---------                                   
-C:\agent\_work\7\a                         
-C:\agent\_work\7\b                         
-C:\agent\_work\7\db-drop                   
-C:\agent\_work\7\s                         
-C:\agent\_work\7\TestResults               
-C:\agent\_work\7\db-drop\database.dacpac   
-C:\agent\_work\7\db-drop\deploy-report.xml 
-C:\agent\_work\7\db-drop\preview-deploy.sql
+That is the right Azure DevOps model for cross-pipeline dependencies. Pipeline resources can trigger another pipeline and can be filtered by branch. When the pipeline is triggered by that resource, Azure DevOps sets `Build.Reason=ResourceTrigger` and fills `resources.triggeringAlias`. ([Microsoft Learn][2])
 
+A clean API release pipeline looks like this:
 
-##[error]PowerShell exited with code '1'.
-Finishing: Publish database
+```yaml
+resources:
+  pipelines:
+  - pipeline: dbRelease
+    source: 'Database-CI-CD'
+    trigger:
+      branches:
+        include:
+        - refs/heads/sit
+        - refs/heads/uat
+        - refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - sit
+    - uat
+    - main
+
+variables:
+- name: IsDbTriggeredRun
+  value: $[eq(variables['Build.Reason'], 'ResourceTrigger')]
+
+stages:
+- stage: Build_API
+  displayName: 'Build API'
+  jobs:
+  - template: templates/build-dotnet-core-webapi.yml
+    parameters:
+      jobName: 'BuildApi'
+      jobDisplayName: 'Build API'
+      buildPool: 'BuildPool'
+      buildAgentName: 'BUILD-01'
+      publishProject: 'src/MyApi/MyApi.csproj'
+      zipName: 'MyApi.zip'
+
+- stage: Deploy_API
+  displayName: 'Deploy API'
+  dependsOn:
+  - Build_API
+  condition: succeeded()
+  jobs:
+  - template: templates/deploy-iis.yml
+    parameters:
+      deploymentName: 'DeployApi'
+      deploymentDisplayName: 'Deploy API to IIS'
+      environmentName: 'API-PROD'
+      deployPool: 'IisDeployPool'
+      deployAgentName: 'IIS-01'
+      variableGroup: 'API-PROD-Vars'
+      zipName: 'MyApi.zip'
+      siteName: 'MyApi'
+      appPoolName: 'MyApiPool'
+      iisTargetPath: 'C:\Apps\MyApi'
+```
+
+If you want the **API deployment itself** to require DBA approval too, put that approval on the **API deployment environment** as well, or keep a single approval on the DB environment and make API deploy happen only after DB deploy succeeded in an orchestrator pipeline. Environment approvals are attached to the environment being consumed by the deployment job. ([Microsoft Learn][5])
+
+---
