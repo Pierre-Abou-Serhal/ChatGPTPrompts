@@ -1,101 +1,39 @@
-The artifact is downloading, but your path to the dacpac is wrong.
 
-Right now your deploy step looks for:
+Using dacpac: C:\agent\_work\7\db-drop\database.dacpac
+Publishing to database 'Alterna.CardManagement_SIT' on server 'DEV-SQL2016\PERFAPP'.
+Initializing deployment (Start)
+*** The type for column Test3 in table [dbo].[NewTable] is currently  NVARCHAR (10) NOT NULL but is being changed to  NCHAR (10) NULL. Data loss could occur and deployment may fail if the column contains data that is incompatible with type  NCHAR (10) NULL.
+*** The type for column Test4 in table [dbo].[NewTable] is currently  NVARCHAR (10) NOT NULL but is being changed to  NCHAR (10) NULL. Data loss could occur and deployment may fail if the column contains data that is incompatible with type  NCHAR (10) NULL.
+Initializing deployment (Complete)
+Analyzing deployment plan (Start)
+Analyzing deployment plan (Complete)
+Updating database (Start)
+An error occurred while the batch was being executed.
+Updating database (Failed)
+*** Could not deploy package.
+Warning SQL72015: The type for column Test3 in table [dbo].[NewTable] is currently  NVARCHAR (10) NOT NULL but is being changed to  NCHAR (10) NULL. Data loss could occur and deployment may fail if the column contains data that is incompatible with type  NCHAR (10) NULL.
+Warning SQL72015: The type for column Test4 in table [dbo].[NewTable] is currently  NVARCHAR (10) NOT NULL but is being changed to  NCHAR (10) NULL. Data loss could occur and deployment may fail if the column contains data that is incompatible with type  NCHAR (10) NULL.
+Error SQL72014: Core Microsoft SqlClient Data Provider: Msg 50000, Level 16, State 127, Line 8 Rows were detected. The schema update is terminating because data loss might occur.
+Error SQL72045: Script execution error.  The executed script:
+IF EXISTS (SELECT TOP 1 1
+           FROM   [dbo].[NewTable])
+    RAISERROR (N'Rows were detected. The schema update is terminating because data loss might occur.', 16, 127)
+        WITH NOWAIT;
 
-```powershell
-$(Pipeline.Workspace)\database.dacpac
-```
 
-But `DownloadBuildArtifacts@0` with:
 
-```yaml
-artifactName: 'db-drop'
-downloadPath: '$(Pipeline.Workspace)'
-```
+Time elapsed 0:00:25.86
+FullName                                   
+--------                                   
+C:\agent\_work\7\a                         
+C:\agent\_work\7\b                         
+C:\agent\_work\7\db-drop                   
+C:\agent\_work\7\s                         
+C:\agent\_work\7\TestResults               
+C:\agent\_work\7\db-drop\database.dacpac   
+C:\agent\_work\7\db-drop\deploy-report.xml 
+C:\agent\_work\7\db-drop\preview-deploy.sql
 
-downloads into a subfolder named after the artifact, so the file is usually here:
 
-```powershell
-$(Pipeline.Workspace)\db-drop\database.dacpac
-```
-
-Sometimes it can also be nested one level deeper depending on what was published, so the safest fix is to search for the dacpac.
-
-## Fix in `deploy-database.yml`
-
-Replace this:
-
-```yaml
-- powershell: |
-    $dacpac = "$(Pipeline.Workspace)\database.dacpac"
-
-    if (!(Test-Path $dacpac)) {
-      throw "database.dacpac not found at: $dacpac"
-    }
-
-    & "${{ parameters.sqlPackagePath }}" /Action:Publish `
-      /SourceFile:"$dacpac" `
-      /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
-      ${{ parameters.sqlPackageArgs }}
-
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-  displayName: 'Publish database'
-```
-
-with this:
-
-```yaml
-- powershell: |
-    Write-Host "Pipeline.Workspace = $(Pipeline.Workspace)"
-    Write-Host "Artifact name = ${{ parameters.artifactName }}"
-
-    Get-ChildItem "$(Pipeline.Workspace)" -Recurse | Select-Object FullName
-
-    $dacpac = Get-ChildItem "$(Pipeline.Workspace)\${{ parameters.artifactName }}" -Recurse -Filter database.dacpac |
-              Select-Object -First 1
-
-    if (-not $dacpac) {
-      throw "database.dacpac not found under $(Pipeline.Workspace)\${{ parameters.artifactName }}"
-    }
-
-    Write-Host "Using dacpac: $($dacpac.FullName)"
-
-    & "${{ parameters.sqlPackagePath }}" /Action:Publish `
-      /SourceFile:"$($dacpac.FullName)" `
-      /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
-      ${{ parameters.sqlPackageArgs }}
-
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-  displayName: 'Publish database'
-```
-
-## Why this happens
-
-In build, you publish this folder:
-
-```yaml
-PathtoPublish: '${{ parameters.outputFolder }}'
-ArtifactName: '${{ parameters.artifactName }}'
-```
-
-So Azure DevOps stores the contents under the artifact name, and when you download it, the files are not placed directly at the root of `$(Pipeline.Workspace)`.
-
-## Also check this
-
-Your message shows both templates merged into one pasted block. Make sure `build-database-project.yml` and `deploy-database.yml` are actually **separate files** in the templates repo. The deploy template should not contain the build template content above it in the same file unless that is intentional.
-
-## Final expected path
-
-With your current settings, the likely real path is:
-
-```text
-C:\agent\_work\7\db-drop\database.dacpac
-```
-
-not:
-
-```text
-C:\agent\_work\7\database.dacpac
-```
-
-So the immediate fix is to search under `$(Pipeline.Workspace)\${{ parameters.artifactName }}`.
+##[error]PowerShell exited with code '1'.
+Finishing: Publish database
