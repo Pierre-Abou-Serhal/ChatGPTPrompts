@@ -1,20 +1,55 @@
-Look at what I have untill now:
+Yes. With what you have now, the clean way is:
 
-I want to have two additional templates:
-build-database-project.yml and deploy-database.yml
+1. add **two new templates**:
 
-I also want the bellow templates to depend on deploy-database.yml (if there was any datbase changes on the branches of the database project: sit, uat or main)
-I also want the API deploy to depend on DBA approval
+   * `build-database-project.yml`
+   * `deploy-database.yml`
 
-build-dotnet-core-webapi.yml:
+2. keep your current API templates mostly as they are
+
+3. put the **dependency logic in the calling pipeline**, not inside the templates themselves
+
+That is the important part: YAML templates are reusable blocks, but `dependsOn`, resource triggers, and approvals are controlled by the pipeline that calls them. Azure DevOps supports template reuse, pipeline-resource triggers, branch filters, stage conditions, and environment approvals exactly for this pattern. ([Microsoft Learn][1])
+
+## What I recommend for your setup
+
+Use **three pipelines**, not one overloaded pipeline:
+
+* **DB pipeline** in the database repo
+* **API build pipeline** in the API repo
+* **API deploy / release pipeline** in the API repo
+
+Why this is better:
+
+* the DB repo can trigger only on DB changes for `sit`, `uat`, and `main`
+* the DB pipeline can build, generate preview SQL, wait for DBA approval, then deploy
+* the API deploy pipeline can be triggered by:
+
+  * normal API changes, or
+  * DB pipeline completion
+* the API deploy stage can wait on the DB release path when the run came from the DB pipeline resource
+
+Azure DevOps pipeline resources support consuming another pipeline’s artifacts and triggering a pipeline from that pipeline, with branch filters. When a run is started by a pipeline resource trigger, `Build.Reason` becomes `ResourceTrigger` and `resources.triggeringAlias` is populated. ([Microsoft Learn][2])
+
+## One important correction to your current templates
+
+For new work, I recommend using **Pipeline Artifacts** instead of **Build Artifacts**. Microsoft recommends `PublishPipelineArtifact` / `DownloadPipelineArtifact` for better performance, and `DownloadPipelineArtifact@2` works for current or other pipelines. Your current templates can keep working, but for the DB flow and future API flow, Pipeline Artifacts are the better default. ([Microsoft Learn][3])
+
+---
+
+# 1) `build-database-project.yml`
+
+This matches the style of your existing build templates and builds a SQL project, produces a `.dacpac`, and optionally generates the exact SQL preview script and deploy report for the DBA.
+
+```yaml
 parameters:
 - name: jobName
   type: string
-  default: 'BuildJob'
+  default: 'BuildDatabase'
 
 - name: jobDisplayName
   type: string
-  default: 'Build (.NET)'
+  default: 'Build Database Project'
 
 - name: buildPool
   type: string
@@ -22,267 +57,49 @@ parameters:
 - name: buildAgentName
   type: string
 
-- name: buildConfiguration
+- name: sqlProjectPath
   type: string
-  default: 'Release'
-
-- name: restoreProjects
-  type: string
-  default: '**/*.csproj'
-
-- name: runTests
-  type: boolean
-  default: false
-
-- name: testProjects
-  type: string
-  default: '**/*Tests/*.csproj'
-
-- name: publishProject
-  type: string
-
-- name: nugetConfigPath
-  type: string
-  default: 'nuget.config'
-
-- name: zipName
-  type: string
-  default: 'WebApp.zip'
-
-- name: publishOutputFolder
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
-
-- name: deploymentMode
-  type: string
-  default: 'framework-dependent'
-  values:
-  - framework-dependent
-  - self-contained
-
-- name: targetRuntime
-  type: string
-  default: ''
-
-- name: produceSingleFile
-  type: boolean
-  default: false
-
-- name: readyToRun
-  type: boolean
-  default: false
-
-- name: trim
-  type: boolean
-  default: false
-
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
-
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
-
-  variables:
-
-  - name: publishArgsNoRestore
-    value: '--no-restore'
-
-  - name: publishArgsBase
-    value: >-
-      --configuration ${{ parameters.buildConfiguration }}
-      --output "${{ parameters.publishOutputFolder }}"
-
-  - name: publishArgsRuntime
-    value: ''
-
-  - name: publishArgsSelfContained
-    value: ''
-
-  - name: publishArgsSingleFile
-    value: ''
-
-  - name: publishArgsReadyToRun
-    value: ''
-
-  - name: publishArgsTrim
-    value: ''
-  
-  - name: restoreArgs
-    value: ''
-
-  - ${{ if ne(parameters.targetRuntime, '') }}:
-    - name: publishArgsRuntime
-      value: '-r ${{ parameters.targetRuntime }}'
-
-  - ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
-    - name: publishArgsSelfContained
-      value: '--self-contained true'
-
-  - ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
-    - name: publishArgsSelfContained
-      value: '--self-contained false'
-
-  - ${{ if eq(parameters.produceSingleFile, true) }}:
-    - name: publishArgsSingleFile
-      value: '/p:PublishSingleFile=true'
-
-  - ${{ if eq(parameters.readyToRun, true) }}:
-    - name: publishArgsReadyToRun
-      value: '/p:PublishReadyToRun=true'
-
-  - ${{ if eq(parameters.trim, true) }}:
-    - name: publishArgsTrim
-      value: '/p:PublishTrimmed=true'
-
-  - ${{ if ne(parameters.targetRuntime, '') }}:
-    - name: restoreArgs
-      value: '-r ${{ parameters.targetRuntime }}'
-
-  - ${{ if ne(parameters.targetRuntime, '') }}:
-    - name: publishArgsNoRestore
-      value: ''
-
-  steps:
-  - checkout: self
-    clean: true
-
-  # Restore using nuget.config
-  - task: DotNetCoreCLI@2
-    displayName: 'Restore'
-    inputs:
-      command: 'restore'
-      projects: ${{ parameters.restoreProjects }}
-      feedsToUse: 'config'
-      nugetConfigPath: ${{ parameters.nugetConfigPath }}
-      arguments: >-
-        $(restoreArgs)
-
-  # Building project: dotnet build
-  - task: DotNetCoreCLI@2
-    displayName: 'Build'
-    inputs:
-      command: 'build'
-      projects: ${{ parameters.restoreProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
-
-  # Running tests if available: dotnet test
-  - task: DotNetCoreCLI@2
-    displayName: 'Test'
-    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-    inputs:
-      command: 'test'
-      projects: ${{ parameters.testProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
-      publishTestResults: true
-
-  # Publish the API project (with deployment-mode / runtime / single-file options)
-  - task: DotNetCoreCLI@2
-    displayName: 'Publish'
-    inputs:
-      command: 'publish'
-      projects: ${{ parameters.publishProject }}
-      publishWebProjects: false
-      zipAfterPublish: false
-      modifyOutputPath: false
-      arguments: >-
-        $(publishArgsBase)
-        $(publishArgsNoRestore)
-        $(publishArgsRuntime)
-        $(publishArgsSelfContained)
-        $(publishArgsSingleFile)
-        $(publishArgsReadyToRun)
-        $(publishArgsTrim)
-
-  # Zipping published files
-  - task: ArchiveFiles@2
-    displayName: 'Zip publish output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
-
-  # Uploading zipped files to Azure
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: 'drop'
-      publishLocation: 'Container'
-
-build-dotnet-framework-webapi.yml:
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildJob'
-
-- name: jobDisplayName
-  type: string
-  default: 'Build (.NET Framework)'
-
-- name: buildPool
-  type: string
-
-- name: buildAgentName
-  type: string
-
-- name: vsVersion
-  type: string
-  default: '17.0'
-
-- name: buildPlatform
-  type: string
-  default: 'Any CPU'
 
 - name: buildConfiguration
   type: string
   default: 'Release'
-
-- name: solution
-  type: string
-  default: '**/*.sln'
-
-- name: buildProject
-  type: string
-  default: ''
-
-- name: nugetConfigPath
-  type: string
-  default: 'nuget.config'
-
-- name: runTests
-  type: boolean
-  default: false
-
-- name: testAssemblies
-  type: string
-  default: |
-    **\*test*.dll
-    **\*tests*.dll
-    !**\obj\**
-    !**\bin\ref\**
-    !**\*TestAdapter.dll
-    !**\*vstest*.dll
-
-- name: publishProject
-  type: string
-  default: ''
-
-- name: packageLocation
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
-
-- name: zipName
-  type: string
-  default: 'WebApp.zip'
 
 - name: artifactName
   type: string
-  default: 'drop'
+  default: 'db-drop'
+
+- name: outputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\db'
+
+- name: dacpacFileName
+  type: string
+  default: 'database.dacpac'
+
+- name: generatePreview
+  type: boolean
+  default: true
+
+- name: sqlPackagePath
+  type: string
+  default: 'SqlPackage'
+
+- name: previewConnectionString
+  type: string
+  default: ''
+
+- name: targetDatabaseName
+  type: string
+  default: ''
+
+- name: sqlPackageArgs
+  type: string
+  default: >
+    /p:IgnorePermissions=true
+    /p:IgnoreRoleMembership=true
+    /p:IgnoreUserSettingsObjects=true
+    /p:BlockOnPossibleDataLoss=true
+    /p:DropObjectsNotInSource=false
 
 jobs:
 - job: ${{ parameters.jobName }}
@@ -297,84 +114,94 @@ jobs:
   - checkout: self
     clean: true
 
-  - task: NuGetCommand@2
-    displayName: 'Restore'
+  - task: UseDotNet@2
+    displayName: 'Use .NET SDK'
     inputs:
-      command: 'restore'
-      restoreSolution: '${{ parameters.solution }}'
-      feedsToUse: 'config'
-      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+      packageType: 'sdk'
+      version: '8.x'
 
-  - task: VSBuild@1
-    displayName: 'Build Project'
-    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+  - powershell: |
+      dotnet build "${{ parameters.sqlProjectPath }}" -c "${{ parameters.buildConfiguration }}"
+    displayName: 'Build SQL project'
+
+  - powershell: |
+      $dacpac = Get-ChildItem "$(Build.SourcesDirectory)" -Recurse -Filter *.dacpac |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -First 1
+
+      if (-not $dacpac) {
+        throw "No .dacpac found after build."
+      }
+
+      New-Item -Path "${{ parameters.outputFolder }}" -ItemType Directory -Force | Out-Null
+      Copy-Item $dacpac.FullName "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}" -Force
+
+      Write-Host "DACPAC copied to ${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
+    displayName: 'Collect dacpac'
+
+  - powershell: |
+      if ('${{ parameters.generatePreview }}' -ne 'true') {
+        Write-Host "Preview generation disabled."
+        exit 0
+      }
+
+      if ([string]::IsNullOrWhiteSpace("${{ parameters.previewConnectionString }}")) {
+        Write-Host "No previewConnectionString provided. Skipping preview generation."
+        exit 0
+      }
+
+      if ([string]::IsNullOrWhiteSpace("${{ parameters.targetDatabaseName }}")) {
+        throw "targetDatabaseName is required when generatePreview=true."
+      }
+
+      $dacpac = "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
+      $script = "${{ parameters.outputFolder }}\preview-deploy.sql"
+      $report = "${{ parameters.outputFolder }}\deploy-report.xml"
+
+      & "${{ parameters.sqlPackagePath }}" /Action:Script `
+        /SourceFile:"$dacpac" `
+        /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
+        /TargetDatabaseName:"${{ parameters.targetDatabaseName }}" `
+        /OutputPath:"$script" `
+        ${{ parameters.sqlPackageArgs }}
+
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      & "${{ parameters.sqlPackagePath }}" /Action:DeployReport `
+        /SourceFile:"$dacpac" `
+        /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
+        /TargetDatabaseName:"${{ parameters.targetDatabaseName }}" `
+        /OutputPath:"$report" `
+        ${{ parameters.sqlPackageArgs }}
+
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    displayName: 'Generate DBA preview files'
+
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish DB pipeline artifact'
     inputs:
-      solution: '${{ parameters.buildProject }}'
-      vsVersion: '${{ parameters.vsVersion }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: true
-      msbuildArgs: >
-        /p:SkipInvalidConfigurations=true
-        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+      targetPath: '${{ parameters.outputFolder }}'
+      artifact: '${{ parameters.artifactName }}'
+      publishLocation: 'pipeline'
+```
 
-  # Tests (optional)
-  # - task: VSTest@2
-  #   displayName: 'Test'
-  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-  #   inputs:
-  #     testSelector: 'testAssemblies'
-  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
-  #     searchFolder: '$(System.DefaultWorkingDirectory)'
-  #     platform: '${{ parameters.buildPlatform }}'
-  #     configuration: '${{ parameters.buildConfiguration }}'
-  #     diagnosticsEnabled: true
+This build template matches Microsoft’s SQL project automation model: build the SQL project, produce a `.dacpac`, and optionally generate a deployment script and deploy report with `SqlPackage` before deployment. ([Microsoft Learn][4])
 
+---
 
-  - task: VSBuild@1
-    displayName: 'Publish to folder'
-    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
-    inputs:
-      solution: '${{ parameters.buildProject }}'
-      vsVersion: '${{ parameters.vsVersion }}'
-      platform: '${{ parameters.buildPlatform }}'
-      configuration: '${{ parameters.buildConfiguration }}'
-      clean: false
-      msbuildArgs: >
-        /p:SkipInvalidConfigurations=true
-        /p:VisualStudioVersion=${{ parameters.vsVersion }}
-        /p:DeployOnBuild=true
-        /p:DeployDefaultTarget=WebPublish
-        /p:WebPublishMethod=FileSystem
-        /p:PublishUrl="${{ parameters.packageLocation }}"
-        /p:DeleteExistingFiles=true
-        /p:AutoParameterizationWebConfigConnectionStrings=false
+# 2) `deploy-database.yml`
 
-  - task: ArchiveFiles@2
-    displayName: 'Zip publish output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.packageLocation }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
+This uses a **deployment job** and an **environment** so the DBA approval lives in Azure DevOps UI under **Approvals and checks**.
 
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'Container'
-
-deploy-iis.yml:
+```yaml
 parameters:
 - name: deploymentName
   type: string
-  default: 'DeployJob'
+  default: 'DeployDatabase'
 
 - name: deploymentDisplayName
   type: string
-  default: 'Deploy IIS'
+  default: 'Deploy Database'
 
 - name: environmentName
   type: string
@@ -385,60 +212,28 @@ parameters:
 - name: deployAgentName
   type: string
 
-- name: variableGroup
+- name: artifactName
+  type: string
+  default: 'db-drop'
+
+- name: targetConnectionString
   type: string
 
-- name: zipName
+- name: targetDatabaseName
   type: string
 
-- name: siteName
+- name: sqlPackagePath
   type: string
+  default: 'SqlPackage'
 
-- name: appPoolName
+- name: sqlPackageArgs
   type: string
-
-- name: iisTargetPath
-  type: string
-
-- name: cleanTargetBeforeCopy
-  type: boolean
-  default: true
-
-- name: cleanExcludeCsv
-  type: string
-  default: 'web.config,logs,Keys'
-
-- name: enableJsonTransform
-  type: boolean
-  default: true
-
-- name: jsonFiles
-  type: string
-  default: '**/appsettings.json'
-
-- name: enableXmlConfigTransform
-  type: boolean
-  default: false
-
-- name: xmlConfigFiles
-  type: object
-  default: []
-
-- name: xmlVariableValues
-  type: object
-  default: {}
-
-- name: enableCustomXmlEdits
-  type: boolean
-  default: false
-
-- name: customXmlEdits
-  type: object
-  default: []
-
-- name: customXmlVariableValues
-  type: object
-  default: {}
+  default: >
+    /p:IgnorePermissions=true
+    /p:IgnoreRoleMembership=true
+    /p:IgnoreUserSettingsObjects=true
+    /p:BlockOnPossibleDataLoss=true
+    /p:DropObjectsNotInSource=false
 
 jobs:
 - deployment: ${{ parameters.deploymentName }}
@@ -451,791 +246,268 @@ jobs:
     demands:
     - Agent.Name -equals ${{ parameters.deployAgentName }}
 
-  variables:
-  - group: ${{ parameters.variableGroup }}
-
   strategy:
     runOnce:
       deploy:
         steps:
-        - task: DownloadBuildArtifacts@0
-          displayName: 'Download Build Artifact'
+        - task: DownloadPipelineArtifact@2
+          displayName: 'Download DB pipeline artifact'
           inputs:
             buildType: 'current'
-            downloadType: 'single'
-            artifactName: 'drop'
-            downloadPath: '$(Pipeline.Workspace)'
-
-        - task: ExtractFiles@1
-          displayName: 'Extract artifact'
-          inputs:
-            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\extracted'
-            cleanDestinationFolder: true
-
-        # JSON substitution (v2)
-        - task: FileTransform@2
-          displayName: 'JSON substitution (appsettings.json)'
-          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            enableXmlTransform: false
-            xmlTransformationRules: ''
-            jsonTargetFiles: ${{ parameters.jsonFiles }}
-
-        # XML substitution (v2)
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $patternsJson = @'
-            ${{ convertToJson(parameters.xmlConfigFiles) }}
-            '@
-            $patterns = $patternsJson | ConvertFrom-Json
-
-            if (-not $patterns -or $patterns.Count -eq 0) {
-              Write-Host "No xmlConfigFiles patterns provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files([string]$base, [string]$pattern) {
-              $pattern = $pattern -replace '\\','/'
-
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            # collect unique files
-            $files = @()
-            foreach ($pat in $patterns) {
-              $files += Resolve-Files $root ([string]$pat)
-            }
-            $files = $files | Where-Object { $_ } | Select-Object -Unique
-
-            if (-not $files -or $files.Count -eq 0) {
-              throw "No config files matched xmlConfigFiles patterns under: $root"
-            }
-
-            foreach ($f in $files) {
-              Write-Host "Editing: $($f.FullName)"
-              [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
-              if (-not $nodes -or $nodes.Count -eq 0) {
-                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
-                continue
-              }
-
-              $changed = 0
-
-              foreach ($n in $nodes) {
-                $key = [string]$n.GetAttribute("key")
-                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
-
-                # no variable provided => skip
-                if ([string]::IsNullOrWhiteSpace($val)) { continue }
-
-                $current = [string]$n.GetAttribute("value")
-                if ($current -ne $val) {
-                  $n.SetAttribute("value", $val)
-                  $changed++
-                }
-              }
-
-              $xml.Save($f.FullName)
-              Write-Host "Updated $changed setting(s) in $($f.Name)"
-            }
-          displayName: 'XML appSettings substitution (.config)'
-          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-          env:
-            ${{ each pair in parameters.xmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-          # ---- Custom XML substitution (XPath) ----
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $rulesJson = @'
-            ${{ convertToJson(parameters.customXmlEdits) }}
-            '@
-            $rules = $rulesJson | ConvertFrom-Json
-
-            if (-not $rules -or $rules.Count -eq 0) {
-              Write-Host "No custom XML edits provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files($base, $pattern) {
-              # supports: **/File.xml, File.xml, or folder\File.xml
-              $pattern = $pattern -replace '\\','/'
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            foreach ($r in $rules) {
-              $filePat = [string]$r.file
-              $xpath   = [string]$r.xpath
-              $varName = [string]$r.variable
-
-              if (-not $filePat -or -not $xpath -or -not $varName) {
-                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
-              }
-
-              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
-              if ([string]::IsNullOrWhiteSpace($value)) {
-                throw "Pipeline variable '$varName' is missing/empty."
-              }
-
-              $files = Resolve-Files $root $filePat
-              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
-
-              foreach ($f in @($files)) {
-                [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-                if ($xpath -match "/@([^/]+)$") {
-                  $attrName = $Matches[1]
-                  $nodePath = $xpath -replace "/@[^/]+$",""
-                  $node = $xml.SelectSingleNode($nodePath)
-                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
-
-                  $attr = $node.Attributes[$attrName]
-                  if (-not $attr) {
-                    $attr = $xml.CreateAttribute($attrName)
-                    [void]$node.Attributes.Append($attr)
-                  }
-                  $attr.Value = $value
-                } else {
-                  $node = $xml.SelectSingleNode($xpath)
-                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
-                  $node.InnerText = $value
-                }
-
-                $xml.Save($f.FullName)
-                Write-Host "Updated $($f.Name): $xpath (from $varName)"
-              }
-            }
-          displayName: 'Custom XML substitution (XPath)'
-          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
-          env:
-            ${{ each pair in parameters.customXmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        # Stop website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $site = Get-Website -Name $siteName
-            Write-Host "Website current state: $($site.State)"
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website: $siteName"
-              Stop-Website -Name $siteName
-            } else {
-              Write-Host "Website already stopped."
-            }
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "AppPool current state: $poolState"
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool: $appPool"
-              Stop-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already stopped."
-            }
-
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $siteState = (Get-Website -Name $siteName).State
-              $poolState = (Get-WebAppPoolState -Name $appPool).Value
-
-              Write-Host "Website state: $siteState | AppPool state: $poolState"
-
-              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-                Write-Host "Website and App Pool are stopped."
-                break
-              }
-
-              Start-Sleep -Seconds 2
-            }
-
-            $finalSiteState = (Get-Website -Name $siteName).State
-            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
-
-            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool'
+            artifactName: '${{ parameters.artifactName }}'
+            targetPath: '$(Pipeline.Workspace)\db'
 
         - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
+            $dacpac = "$(Pipeline.Workspace)\db\database.dacpac"
 
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
+            if (!(Test-Path $dacpac)) {
+              throw "database.dacpac not found at: $dacpac"
             }
 
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
+            & "${{ parameters.sqlPackagePath }}" /Action:Publish `
+              /SourceFile:"$dacpac" `
+              /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
+              /TargetDatabaseName:"${{ parameters.targetDatabaseName }}" `
+              ${{ parameters.sqlPackageArgs }}
 
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          displayName: 'Publish database'
+```
 
-            Write-Host "Cleaning target folder: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
+Approvals and checks are configured on the **environment**, and deployment jobs are the mechanism that consumes those checks. That is the right place for your DBA approval. ([Microsoft Learn][5])
 
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder (before copy)'
-          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
+---
 
-        - task: CopyFiles@2
-          displayName: 'Copy files'
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
+# 3) DB repo pipeline
 
-        # Start website + app pool safely (idempotent)
-        - powershell: |
-            Import-Module WebAdministration
+This pipeline lives in the **database repo** and runs only when the database project changes on `sit`, `uat`, or `main`.
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
+```yaml
+trigger:
+  branches:
+    include:
+    - sit
+    - uat
+    - main
+  paths:
+    include:
+    - DatabaseProjectAlterna.CardManagement/**
+    - templates/**
+    - azure-pipelines.yml
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool: $appPool"
-              Start-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already started."
-            }
+pr:
+  branches:
+    include:
+    - sit
+    - uat
+    - main
+  paths:
+    include:
+    - DatabaseProjectAlterna.CardManagement/**
+    - templates/**
+    - azure-pipelines.yml
 
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website: $siteName"
-              Start-Website -Name $siteName
-            } else {
-              Write-Host "Website already started."
-            }
+variables:
+- group: DB-CICD-Secrets
 
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool'
+stages:
+- stage: Build_DB
+  displayName: 'Build DB'
+  jobs:
+  - template: templates/build-database-project.yml
+    parameters:
+      jobName: 'BuildDb'
+      jobDisplayName: 'Build database project'
+      buildPool: 'BuildPool'
+      buildAgentName: 'BUILD-01'
+      sqlProjectPath: 'DatabaseProjectAlterna.CardManagement/Alterna.CardManagement.sqlproj'
+      artifactName: 'db-drop'
+      previewConnectionString: '$(DbPreviewConnectionString)'
+      targetDatabaseName: 'AlternaCardManagement'
 
-deploy-windows-service.yml:
-parameters:
-- name: deploymentName
+- stage: Deploy_DB
+  displayName: 'Deploy DB'
+  dependsOn: Build_DB
+  condition: succeeded()
+  jobs:
+  - template: templates/deploy-database.yml
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy database'
+      environmentName: 'DB-PROD'
+      deployPool: 'DbDeployPool'
+      deployAgentName: 'DB-DEPLOY-01'
+      artifactName: 'db-drop'
+      targetConnectionString: '$(DbTargetConnectionString)'
+      targetDatabaseName: 'AlternaCardManagement'
+```
+
+Path filters are case-sensitive and are the correct way to run the DB pipeline only when DB files changed. ([Microsoft Learn][6])
+
+---
+
+# 4) How your API deploy should depend on DB deployment
+
+Your **API templates should not directly depend on `deploy-database.yml`**.
+
+Instead, the **API release pipeline** should depend on the **DB pipeline** as a **pipeline resource**.
+
+That is the right Azure DevOps model for cross-pipeline dependencies. Pipeline resources can trigger another pipeline and can be filtered by branch. When the pipeline is triggered by that resource, Azure DevOps sets `Build.Reason=ResourceTrigger` and fills `resources.triggeringAlias`. ([Microsoft Learn][2])
+
+A clean API release pipeline looks like this:
+
+```yaml
+resources:
+  pipelines:
+  - pipeline: dbRelease
+    source: 'Database-CI-CD'
+    trigger:
+      branches:
+        include:
+        - refs/heads/sit
+        - refs/heads/uat
+        - refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - sit
+    - uat
+    - main
+
+variables:
+- name: IsDbTriggeredRun
+  value: $[eq(variables['Build.Reason'], 'ResourceTrigger')]
+
+stages:
+- stage: Build_API
+  displayName: 'Build API'
+  jobs:
+  - template: templates/build-dotnet-core-webapi.yml
+    parameters:
+      jobName: 'BuildApi'
+      jobDisplayName: 'Build API'
+      buildPool: 'BuildPool'
+      buildAgentName: 'BUILD-01'
+      publishProject: 'src/MyApi/MyApi.csproj'
+      zipName: 'MyApi.zip'
+
+- stage: Deploy_API
+  displayName: 'Deploy API'
+  dependsOn:
+  - Build_API
+  condition: succeeded()
+  jobs:
+  - template: templates/deploy-iis.yml
+    parameters:
+      deploymentName: 'DeployApi'
+      deploymentDisplayName: 'Deploy API to IIS'
+      environmentName: 'API-PROD'
+      deployPool: 'IisDeployPool'
+      deployAgentName: 'IIS-01'
+      variableGroup: 'API-PROD-Vars'
+      zipName: 'MyApi.zip'
+      siteName: 'MyApi'
+      appPoolName: 'MyApiPool'
+      iisTargetPath: 'C:\Apps\MyApi'
+```
+
+If you want the **API deployment itself** to require DBA approval too, put that approval on the **API deployment environment** as well, or keep a single approval on the DB environment and make API deploy happen only after DB deploy succeeded in an orchestrator pipeline. Environment approvals are attached to the environment being consumed by the deployment job. ([Microsoft Learn][5])
+
+---
+
+# 5) Best structure for your exact requirement
+
+Because you said:
+
+* DB repo is separate
+* DB deploy should happen only if DB changed
+* API deploy should wait on DB deploy when DB changed
+* API deploy should also wait on DBA approval
+
+the most robust production shape is this:
+
+### DB pipeline
+
+* runs only on DB repo changes for `sit`, `uat`, `main`
+* builds `.dacpac`
+* generates preview SQL + deploy report
+* waits for DBA approval on environment
+* deploys DB
+
+### API build pipeline
+
+* runs on API repo changes
+* builds artifact
+
+### API release pipeline
+
+* deploys API
+* can also be triggered by DB pipeline completion when needed
+* uses an environment with approval if you want an explicit second approval
+
+That separation uses the native Azure DevOps model cleanly: path triggers for “only when DB changes”, pipeline resources for cross-pipeline dependency, deployment jobs for environment approvals, and pipeline artifacts for artifacts between stages/pipelines. ([Microsoft Learn][6])
+
+---
+
+# 6) Two concrete improvements to your current templates
+
+I recommend these updates to your existing templates too:
+
+### In `deploy-iis.yml`
+
+Replace `DownloadBuildArtifacts@0` with `DownloadPipelineArtifact@2`, and make the artifact name a parameter instead of hardcoded `drop`. Microsoft recommends pipeline artifacts for performance. ([Microsoft Learn][3])
+
+Add:
+
+```yaml
+- name: artifactName
   type: string
-  default: 'DeployJob'
+  default: 'drop'
+```
 
-- name: deploymentDisplayName
-  type: string
-  default: 'Deploy Windows Service'
+Then replace the download step with:
 
-- name: environmentName
-  type: string
+```yaml
+- task: DownloadPipelineArtifact@2
+  displayName: 'Download Build Artifact'
+  inputs:
+    buildType: 'current'
+    artifactName: '${{ parameters.artifactName }}'
+    targetPath: '$(Pipeline.Workspace)\artifact'
+```
 
-- name: deployPool
-  type: string
+And replace the extract path with:
 
-- name: deployAgentName
-  type: string
+```yaml
+archiveFilePatterns: '$(Pipeline.Workspace)\artifact\${{ parameters.zipName }}'
+```
 
-- name: variableGroup
-  type: string
+### In `deploy-windows-service.yml`
 
-- name: zipName
-  type: string
+Do the same artifact change there.
 
-# --- Windows Service specific ---
-- name: serviceName
-  type: string
+That keeps your API and DB delivery style aligned.
 
-- name: serviceDisplayName
-  type: string
-  default: ''
+---
 
-- name: serviceDescription
-  type: string
-  default: ''
+# 7) What I would do next
 
-# Path where service binaries will live (like iisTargetPath)
-- name: serviceTargetPath
-  type: string
+I would implement this in this order:
 
-# Optional: if you want to run under a specific account
-- name: serviceUser
-  type: string
-  default: ''         # e.g. DOMAIN\svc_user
+1. create `build-database-project.yml`
+2. create `deploy-database.yml`
+3. create the **DB repo pipeline**
+4. migrate your deploy templates from Build Artifacts to Pipeline Artifacts
+5. create an **API release pipeline** that uses pipeline resources from the DB pipeline
 
-- name: servicePassword
-  type: string
-  default: ''         # supply via variable group/secret
+That gives you a stable foundation without mixing too much logic into one YAML.
 
-# If service does not exist, create it.
-- name: createServiceIfMissing
-  type: boolean
-  default: true
+Paste your current **main pipeline YAML** for the API repo and I’ll wire these templates into it exactly, branch by branch for `sit`, `uat`, and `main`.
 
-# If service exists, optionally update its binPath (points to exe in target)
-- name: updateBinPathIfExists
-  type: boolean
-  default: true
-
-# exe name inside target folder, used to set binPath (e.g. MySvc.exe)
-- name: serviceExeName
-  type: string
-
-# Start type: auto | demand | disabled
-- name: serviceStartType
-  type: string
-  default: 'auto'
-
-# --- Same clean/transform knobs as IIS template ---
-- name: cleanTargetBeforeCopy
-  type: boolean
-  default: true
-
-- name: cleanExcludeCsv
-  type: string
-  default: 'logs,Keys'
-
-- name: enableJsonTransform
-  type: boolean
-  default: true
-
-- name: jsonFiles
-  type: string
-  default: '**/appsettings.json'
-
-- name: enableXmlConfigTransform
-  type: boolean
-  default: false
-
-- name: xmlConfigFiles
-  type: object
-  default: []
-
-- name: xmlVariableValues
-  type: object
-  default: {}
-
-- name: enableCustomXmlEdits
-  type: boolean
-  default: false
-
-- name: customXmlEdits
-  type: object
-  default: []
-
-- name: customXmlVariableValues
-  type: object
-  default: {}
-
-jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
-
-  environment: ${{ parameters.environmentName }}
-
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
-
-  variables:
-  - group: ${{ parameters.variableGroup }}
-
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - task: DownloadBuildArtifacts@0
-          displayName: 'Download Build Artifact'
-          inputs:
-            buildType: 'current'
-            downloadType: 'single'
-            artifactName: 'drop'
-            downloadPath: '$(Pipeline.Workspace)'
-
-        - task: ExtractFiles@1
-          displayName: 'Extract artifact'
-          inputs:
-            archiveFilePatterns: '$(Pipeline.Workspace)\drop\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\extracted'
-            cleanDestinationFolder: true
-
-        # JSON substitution (v2)
-        - task: FileTransform@2
-          displayName: 'JSON substitution (appsettings.json)'
-          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            enableXmlTransform: false
-            xmlTransformationRules: ''
-            jsonTargetFiles: ${{ parameters.jsonFiles }}
-
-        # XML substitution (v2)
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $patternsJson = @'
-            ${{ convertToJson(parameters.xmlConfigFiles) }}
-            '@
-            $patterns = $patternsJson | ConvertFrom-Json
-
-            if (-not $patterns -or $patterns.Count -eq 0) {
-              Write-Host "No xmlConfigFiles patterns provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files([string]$base, [string]$pattern) {
-              $pattern = $pattern -replace '\\','/'
-
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            # collect unique files
-            $files = @()
-            foreach ($pat in $patterns) {
-              $files += Resolve-Files $root ([string]$pat)
-            }
-            $files = $files | Where-Object { $_ } | Select-Object -Unique
-
-            if (-not $files -or $files.Count -eq 0) {
-              throw "No config files matched xmlConfigFiles patterns under: $root"
-            }
-
-            foreach ($f in $files) {
-              Write-Host "Editing: $($f.FullName)"
-              [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
-              if (-not $nodes -or $nodes.Count -eq 0) {
-                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
-                continue
-              }
-
-              $changed = 0
-
-              foreach ($n in $nodes) {
-                $key = [string]$n.GetAttribute("key")
-                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
-
-                # no variable provided => skip
-                if ([string]::IsNullOrWhiteSpace($val)) { continue }
-
-                $current = [string]$n.GetAttribute("value")
-                if ($current -ne $val) {
-                  $n.SetAttribute("value", $val)
-                  $changed++
-                }
-              }
-
-              $xml.Save($f.FullName)
-              Write-Host "Updated $changed setting(s) in $($f.Name)"
-            }
-          displayName: 'XML appSettings substitution (.config)'
-          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-          env:
-            ${{ each pair in parameters.xmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        # ---- Custom XML substitution (XPath) ----
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $rulesJson = @'
-            ${{ convertToJson(parameters.customXmlEdits) }}
-            '@
-            $rules = $rulesJson | ConvertFrom-Json
-
-            if (-not $rules -or $rules.Count -eq 0) {
-              Write-Host "No custom XML edits provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files($base, $pattern) {
-              # supports: **/File.xml, File.xml, or folder\File.xml
-              $pattern = $pattern -replace '\\','/'
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            foreach ($r in $rules) {
-              $filePat = [string]$r.file
-              $xpath   = [string]$r.xpath
-              $varName = [string]$r.variable
-
-              if (-not $filePat -or -not $xpath -or -not $varName) {
-                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
-              }
-
-              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
-              if ([string]::IsNullOrWhiteSpace($value)) {
-                throw "Pipeline variable '$varName' is missing/empty."
-              }
-
-              $files = Resolve-Files $root $filePat
-              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
-
-              foreach ($f in @($files)) {
-                [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-                if ($xpath -match "/@([^/]+)$") {
-                  $attrName = $Matches[1]
-                  $nodePath = $xpath -replace "/@[^/]+$",""
-                  $node = $xml.SelectSingleNode($nodePath)
-                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
-
-                  $attr = $node.Attributes[$attrName]
-                  if (-not $attr) {
-                    $attr = $xml.CreateAttribute($attrName)
-                    [void]$node.Attributes.Append($attr)
-                  }
-                  $attr.Value = $value
-                } else {
-                  $node = $xml.SelectSingleNode($xpath)
-                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
-                  $node.InnerText = $value
-                }
-
-                $xml.Save($f.FullName)
-                Write-Host "Updated $($f.Name): $xpath (from $varName)"
-              }
-            }
-          displayName: 'Custom XML substitution (XPath)'
-          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
-          env:
-            ${{ each pair in parameters.customXmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        # Stop Windows Service safely (idempotent)
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $svcName = "${{ parameters.serviceName }}"
-
-            $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
-            if (-not $svc) {
-              Write-Host "Service '$svcName' not found. Nothing to stop."
-              exit 0
-            }
-
-            Write-Host "Service current status: $($svc.Status)"
-            if ($svc.Status -ne "Stopped") {
-              Write-Host "Stopping service: $svcName"
-              Stop-Service -Name $svcName -Force -ErrorAction Stop
-            } else {
-              Write-Host "Service already stopped."
-            }
-
-            $maxTries = 30
-            for ($i=1; $i -le $maxTries; $i++) {
-              $status = (Get-Service -Name $svcName).Status
-              Write-Host "Service status: $status"
-              if ($status -eq "Stopped") {
-                Write-Host "Service is stopped."
-                break
-              }
-              Start-Sleep -Seconds 2
-            }
-
-            $final = (Get-Service -Name $svcName).Status
-            if ($final -ne "Stopped") {
-              throw "Failed to stop service '$svcName'. Final status: $final"
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Windows Service'
-
-        - powershell: |
-            $target = '${{ parameters.serviceTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder (before copy)'
-          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
-
-        - task: CopyFiles@2
-          displayName: 'Copy files'
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.serviceTargetPath }}'
-            OverWrite: true
-
-        # Create or update Windows Service to point to the deployed EXE
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $svcName   = "${{ parameters.serviceName }}"
-            $exeName   = "${{ parameters.serviceExeName }}"
-            $targetDir = "${{ parameters.serviceTargetPath }}"
-            $exePath   = Join-Path $targetDir $exeName
-
-            if (-not (Test-Path $exePath)) {
-              throw "Service executable not found: $exePath"
-            }
-
-            $displayName = "${{ parameters.serviceDisplayName }}"
-            if ([string]::IsNullOrWhiteSpace($displayName)) { $displayName = $svcName }
-
-            $desc = "${{ parameters.serviceDescription }}"
-            $startType = "${{ parameters.serviceStartType }}"  # auto|demand|disabled
-
-            $user = "${{ parameters.serviceUser }}"
-            $pass = "${{ parameters.servicePassword }}"
-
-            $existing = Get-Service -Name $svcName -ErrorAction SilentlyContinue
-
-            function Set-StartType([string]$name, [string]$st) {
-              switch ($st.ToLowerInvariant()) {
-                "auto"     { sc.exe config $name start= auto    | Out-Host }
-                "demand"   { sc.exe config $name start= demand  | Out-Host }
-                "disabled" { sc.exe config $name start= disabled| Out-Host }
-                default    { throw "Invalid serviceStartType: $st (use auto|demand|disabled)" }
-              }
-            }
-
-            if (-not $existing) {
-              if ('${{ parameters.createServiceIfMissing }}' -ne 'true') {
-                throw "Service '$svcName' does not exist and createServiceIfMissing=false."
-              }
-
-              Write-Host "Creating service: $svcName"
-              # Important: sc.exe spacing rules (space after '=')
-              if (-not [string]::IsNullOrWhiteSpace($user)) {
-                if ([string]::IsNullOrWhiteSpace($pass)) { throw "servicePassword is required when serviceUser is set." }
-
-                sc.exe create $svcName binPath= "`"$exePath`"" DisplayName= "`"$displayName`"" start= $startType obj= "`"$user`"" password= "`"$pass`"" | Out-Host
-              } else {
-                sc.exe create $svcName binPath= "`"$exePath`"" DisplayName= "`"$displayName`"" start= $startType | Out-Host
-              }
-
-              if (-not [string]::IsNullOrWhiteSpace($desc)) {
-                sc.exe description $svcName "`"$desc`"" | Out-Host
-              }
-            }
-            else {
-              Write-Host "Service exists: $svcName"
-
-              if ('${{ parameters.updateBinPathIfExists }}' -eq 'true') {
-                Write-Host "Updating binPath to: $exePath"
-                # binPath is updated using 'config'
-                sc.exe config $svcName binPath= "`"$exePath`"" | Out-Host
-              }
-
-              # Keep start type aligned
-              Set-StartType $svcName $startType
-
-              if (-not [string]::IsNullOrWhiteSpace($desc)) {
-                sc.exe description $svcName "`"$desc`"" | Out-Host
-              }
-
-              if (-not [string]::IsNullOrWhiteSpace($user)) {
-                if ([string]::IsNullOrWhiteSpace($pass)) { throw "servicePassword is required when serviceUser is set." }
-                sc.exe config $svcName obj= "`"$user`"" password= "`"$pass`"" | Out-Host
-              }
-            }
-          displayName: 'Create/Update Windows Service'
-
-        # Start Windows Service safely (idempotent)
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $svcName = "${{ parameters.serviceName }}"
-
-            $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
-            if (-not $svc) { throw "Service '$svcName' not found." }
-
-            if ($svc.Status -ne "Running") {
-              Write-Host "Starting service: $svcName"
-              Start-Service -Name $svcName -ErrorAction Stop
-            } else {
-              Write-Host "Service already running."
-            }
-
-            $maxTries = 30
-            for ($i=1; $i -le $maxTries; $i++) {
-              $status = (Get-Service -Name $svcName).Status
-              Write-Host "Service status: $status"
-              if ($status -eq "Running") {
-                Write-Host "Service is running."
-                break
-              }
-              Start-Sleep -Seconds 2
-            }
-
-            $final = (Get-Service -Name $svcName).Status
-            if ($final -ne "Running") {
-              throw "Failed to start service '$svcName'. Final status: $final"
-            }
-          displayName: 'Start Windows Service'
-
+[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops&utm_source=chatgpt.com "Use YAML templates in pipelines for reusable and secure ..."
+[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/yaml-schema/resources-pipelines-pipeline?view=azure-pipelines&utm_source=chatgpt.com "resources.pipelines.pipeline definition"
+[3]: https://learn.microsoft.com/en-us/azure/devops/pipelines/artifacts/build-artifacts?view=azure-devops&utm_source=chatgpt.com "Publish and download build artifacts - Azure Pipelines"
+[4]: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/publish-pipeline-artifact-v1?view=azure-pipelines&utm_source=chatgpt.com "PublishPipelineArtifact@1 - Publish Pipeline Artifacts v1 task"
+[5]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/approvals?view=azure-devops&utm_source=chatgpt.com "Define approvals and checks - Azure DevOps"
+[6]: https://learn.microsoft.com/en-us/azure/devops/pipelines/build/triggers?view=azure-devops&utm_source=chatgpt.com "Triggers in Azure Pipelines"
