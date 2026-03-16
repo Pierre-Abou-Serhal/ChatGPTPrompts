@@ -172,9 +172,8 @@ jobs:
     inputs:
       PathtoPublish: '${{ parameters.outputFolder }}'
       ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'pipeline'
+      publishLocation: 'Container'
 
-And this is my deploy-database.yml:
 parameters:
 - name: deploymentName
   type: string
@@ -237,7 +236,7 @@ jobs:
             downloadPath: '$(Pipeline.Workspace)'
 
         - powershell: |
-            $dacpac = "$(Pipeline.Workspace)\db\database.dacpac"
+            $dacpac = "$(Pipeline.Workspace)\database.dacpac"
 
             if (!(Test-Path $dacpac)) {
               throw "database.dacpac not found at: $dacpac"
@@ -251,6 +250,23 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           displayName: 'Publish database'
 
-I am getting the following error in the Download DB pipeline artifact task:
-Downloading artifacts for build: 237
-##[error]Artifact db-drop not found for build 237. Please ensure you have published artifacts in any previous phases of the current build.
+I am getting the following error in the Publish database task:
+ask         : PowerShell
+Description  : Run a PowerShell script on Linux, macOS, or Windows
+Version      : 2.232.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\2a8b554b-b7be-43b8-b5cc-1dfcb780a277.ps1'"
+database.dacpac not found at: C:\agent\_work\7\database.dacpac
+At C:\agent\_work\_temp\2a8b554b-b7be-43b8-b5cc-1dfcb780a277.ps1:7 char:3
++   throw "database.dacpac not found at: $dacpac"
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (database.dacpac...database.da 
+   cpac:String) [], RuntimeException
+    + FullyQualifiedErrorId : database.dacpac not found at: C:\agent\_work\7\d 
+   atabase.dacpac
+ 
+##[error]PowerShell exited with code '1'.
