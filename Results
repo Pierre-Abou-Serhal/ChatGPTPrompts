@@ -1,70 +1,134 @@
-
-# 4) How your API deploy should depend on DB deployment
-
-Your **API templates should not directly depend on `deploy-database.yml`**.
-
-Instead, the **API release pipeline** should depend on the **DB pipeline** as a **pipeline resource**.
-
-That is the right Azure DevOps model for cross-pipeline dependencies. Pipeline resources can trigger another pipeline and can be filtered by branch. When the pipeline is triggered by that resource, Azure DevOps sets `Build.Reason=ResourceTrigger` and fills `resources.triggeringAlias`. ([Microsoft Learn][2])
-
-A clean API release pipeline looks like this:
-
-```yaml
+So for example in this:
 resources:
-  pipelines:
-  - pipeline: dbRelease
-    source: 'Database-CI-CD'
-    trigger:
-      branches:
-        include:
-        - refs/heads/sit
-        - refs/heads/uat
-        - refs/heads/main
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
 
 trigger:
   branches:
     include:
     - sit
-    - uat
-    - main
-
-variables:
-- name: IsDbTriggeredRun
-  value: $[eq(variables['Build.Reason'], 'ResourceTrigger')]
 
 stages:
-- stage: Build_API
-  displayName: 'Build API'
+- stage: BuildMVC
+  displayName: Build MVC + API
   jobs:
-  - template: templates/build-dotnet-core-webapi.yml
+  # MVC
+  - template: pipelines/build-dotnet-framework-webapi.yml@templates
     parameters:
-      jobName: 'BuildApi'
-      jobDisplayName: 'Build API'
-      buildPool: 'BuildPool'
-      buildAgentName: 'BUILD-01'
-      publishProject: 'src/MyApi/MyApi.csproj'
-      zipName: 'MyApi.zip'
+      jobName: Build_MVC
+      jobDisplayName: 'Build MVC'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      vsVersion: '17.0'
+      buildConfiguration: 'Release'
+      solution: 'CardManagement/CardManagement.sln'
+      buildProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
+      nugetConfigPath: 'nuget.config'
+      runTests: false
+      testAssemblies: ''
+      zipName: 'AlternaCardManagementMVC.zip'
+      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
 
-- stage: Deploy_API
-  displayName: 'Deploy API'
-  dependsOn:
-  - Build_API
-  condition: succeeded()
+# =========================
+# DEPLOY SIT MVC
+# =========================
+- stage: Deploy_MVC_SIT
+  displayName: 'Deploy MVC to SIT'
+  dependsOn: BuildMVC
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
   jobs:
-  - template: templates/deploy-iis.yml
+  - template: pipelines/deploy-iis.yml@templates
     parameters:
-      deploymentName: 'DeployApi'
-      deploymentDisplayName: 'Deploy API to IIS'
-      environmentName: 'API-PROD'
-      deployPool: 'IisDeployPool'
-      deployAgentName: 'IIS-01'
-      variableGroup: 'API-PROD-Vars'
-      zipName: 'MyApi.zip'
-      siteName: 'MyApi'
-      appPoolName: 'MyApiPool'
-      iisTargetPath: 'C:\Apps\MyApi'
-```
+      deploymentName: 'DeploySIT'
+      deploymentDisplayName: 'Deploy MVC to SIT (IIS)'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-FN1'
+      variableGroup: 'SIT_MVC_VARIABLE_GROUP'
+      zipName: 'AlternaCardManagementMVC.zip'
+      siteName: 'AlternaCardManagement-AzureDevOps'
+      appPoolName: 'AlternaCardManagement-AzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
+      cleanTargetBeforeCopy: true
+      cleanExcludeCsv: ''
+      enableJsonTransform: false
+      jsonFiles: ''
+      enableXmlConfigTransform: true
+      xmlConfigFiles:
+        - '**/Web.config'
 
-If you want the **API deployment itself** to require DBA approval too, put that approval on the **API deployment environment** as well, or keep a single approval on the DB environment and make API deploy happen only after DB deploy succeeded in an orchestrator pipeline. Environment approvals are attached to the environment being consumed by the deployment job. ([Microsoft Learn][5])
+      xmlVariableValues:
+        BaseUrl: $(BaseUrl)
+        BaseUrlOsb: $(BaseUrlOsb)
+        CDN_IP_LINK: $(CDN_IP_LINK)
+        DASHBOARD_LINK: $(DASHBOARD_LINK)
+        GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
+        GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
+        LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
+        UploadFilesPath: $(UploadFilesPath)
+        USER_GUIDE_LINK: $(USER_GUIDE_LINK)
+        
+      enableCustomXmlEdits: false
+      customXmlEdits: {}
 
----
+- stage: BuildAPI
+  displayName: Build API
+  jobs:
+  # API
+  - template: pipelines/build-dotnet-framework-webapi.yml@templates
+    parameters:
+      jobName: Build_API
+      jobDisplayName: 'Build Web API'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      vsVersion: '17.0'
+      buildConfiguration: 'Release'
+      solution: 'CardManagement/CardManagement.sln'
+      buildProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
+      nugetConfigPath: 'nuget.config'
+      runTests: false
+      testAssemblies: ''
+      zipName: 'AlternaCardManagementAPI.zip'
+      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
+
+# =========================
+# DEPLOY SIT API
+# =========================
+- stage: Deploy_API_SIT
+  displayName: 'Deploy API to SIT'
+  dependsOn: BuildAPI
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
+  jobs:
+  - template: pipelines/deploy-iis.yml@templates
+    parameters:
+      deploymentName: 'DeploySIT'
+      deploymentDisplayName: 'Deploy API to SIT (IIS)'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      variableGroup: 'SIT_API_VARIABLE_GROUP'
+      zipName: 'AlternaCardManagementAPI.zip'
+      siteName: 'AlternaCardManagement-AzureDevOps'
+      appPoolName: 'AlternaCardManagement-AzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
+      cleanTargetBeforeCopy: true
+      cleanExcludeCsv: ''
+      enableJsonTransform: false
+      jsonFiles: ''
+      enableXmlConfigTransform: true
+      xmlConfigFiles:
+        - '**/Web.config'
+
+      xmlVariableValues:
+        BaseUrl: $(BaseUrl)
+        BrefBaseUrl: $(BrefBaseUrl)
+        CONN_STRING: $(CONN_STRING)
+        SMSUrl: $(SMSUrl)
+        
+      enableCustomXmlEdits: false
+      customXmlEdits: {}
+
+Do i need to add a reference to my DB project pipeline ?
