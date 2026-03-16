@@ -1,8 +1,53 @@
-What to fix in both of these
+This is my main pipeline:
 
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
 
-build-database-project.yml:
+trigger:
+  branches:
+    include:
+    - sit
+  paths:
+    include:
+    - DatabaseProjectAlterna.CardManagement/**
 
+variables:
+- group: SIT_API_VARIABLE_GROUP
+
+stages:
+- stage: Build_DB
+  displayName: 'Build DB'
+  jobs:
+  - template: pipelines/build-database-project.yml@templates
+    parameters:
+      jobName: 'BuildDb'
+      jobDisplayName: 'Build database project'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      sqlProjectPath: 'DatabaseProjectAlterna.CardManagement/DatabaseProjectAlterna.CardManagement.sqlproj'
+      artifactName: 'db-drop'
+      previewConnectionString: '$(CONN_STRING)'
+
+- stage: Deploy_DB
+  displayName: 'Deploy DB'
+  dependsOn: Build_DB
+  condition: succeeded()
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy database'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'db-drop'
+      targetConnectionString: '$(CONN_STRING)'
+
+This is my build-database-project.yml:
 parameters:
 - name: jobName
   type: string
@@ -46,10 +91,6 @@ parameters:
   default: 'SqlPackage'
 
 - name: previewConnectionString
-  type: string
-  default: ''
-
-- name: targetDatabaseName
   type: string
   default: ''
 
@@ -105,10 +146,6 @@ jobs:
         exit 0
       }
 
-      if ([string]::IsNullOrWhiteSpace("${{ parameters.targetDatabaseName }}")) {
-        throw "targetDatabaseName is required when generatePreview=true."
-      }
-
       $dacpac = "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
       $script = "${{ parameters.outputFolder }}\preview-deploy.sql"
       $report = "${{ parameters.outputFolder }}\deploy-report.xml"
@@ -116,7 +153,6 @@ jobs:
       & "${{ parameters.sqlPackagePath }}" /Action:Script `
         /SourceFile:"$dacpac" `
         /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
-        /TargetDatabaseName:"${{ parameters.targetDatabaseName }}" `
         /OutputPath:"$script" `
         ${{ parameters.sqlPackageArgs }}
 
@@ -125,22 +161,20 @@ jobs:
       & "${{ parameters.sqlPackagePath }}" /Action:DeployReport `
         /SourceFile:"$dacpac" `
         /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
-        /TargetDatabaseName:"${{ parameters.targetDatabaseName }}" `
         /OutputPath:"$report" `
         ${{ parameters.sqlPackageArgs }}
 
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     displayName: 'Generate DBA preview files'
 
-  - task: PublishPipelineArtifact@1
+  - task: PublishBuildArtifacts@1
     displayName: 'Publish DB pipeline artifact'
     inputs:
-      targetPath: '${{ parameters.outputFolder }}'
-      artifact: '${{ parameters.artifactName }}'
+      PathtoPublish: '${{ parameters.outputFolder }}'
+      ArtifactName: '${{ parameters.artifactName }}'
       publishLocation: 'pipeline'
 
-
-deploy-database.yml:
+And this is my deploy-database.yml:
 parameters:
 - name: deploymentName
   type: string
@@ -164,9 +198,6 @@ parameters:
   default: 'db-drop'
 
 - name: targetConnectionString
-  type: string
-
-- name: targetDatabaseName
   type: string
 
 - name: sqlPackagePath
@@ -197,12 +228,13 @@ jobs:
     runOnce:
       deploy:
         steps:
-        - task: DownloadPipelineArtifact@2
+        - task: DownloadBuildArtifacts@0
           displayName: 'Download DB pipeline artifact'
           inputs:
             buildType: 'current'
+            downloadType: 'single'
             artifactName: '${{ parameters.artifactName }}'
-            targetPath: '$(Pipeline.Workspace)\db'
+            downloadPath: '$(Pipeline.Workspace)'
 
         - powershell: |
             $dacpac = "$(Pipeline.Workspace)\db\database.dacpac"
@@ -214,8 +246,11 @@ jobs:
             & "${{ parameters.sqlPackagePath }}" /Action:Publish `
               /SourceFile:"$dacpac" `
               /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
-              /TargetDatabaseName:"${{ parameters.targetDatabaseName }}" `
               ${{ parameters.sqlPackageArgs }}
 
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           displayName: 'Publish database'
+
+I am getting the following error in the Download DB pipeline artifact task:
+Downloading artifacts for build: 237
+##[error]Artifact db-drop not found for build 237. Please ensure you have published artifacts in any previous phases of the current build.
