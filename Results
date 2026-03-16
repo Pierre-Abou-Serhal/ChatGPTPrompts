@@ -1,272 +1,101 @@
-This is my main pipeline:
+The artifact is downloading, but your path to the dacpac is wrong.
 
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
+Right now your deploy step looks for:
 
-trigger:
-  branches:
-    include:
-    - sit
-  paths:
-    include:
-    - DatabaseProjectAlterna.CardManagement/**
+```powershell
+$(Pipeline.Workspace)\database.dacpac
+```
 
-variables:
-- group: SIT_API_VARIABLE_GROUP
+But `DownloadBuildArtifacts@0` with:
 
-stages:
-- stage: Build_DB
-  displayName: 'Build DB'
-  jobs:
-  - template: pipelines/build-database-project.yml@templates
-    parameters:
-      jobName: 'BuildDb'
-      jobDisplayName: 'Build database project'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      sqlProjectPath: 'DatabaseProjectAlterna.CardManagement/DatabaseProjectAlterna.CardManagement.sqlproj'
-      artifactName: 'db-drop'
-      previewConnectionString: '$(CONN_STRING)'
+```yaml
+artifactName: 'db-drop'
+downloadPath: '$(Pipeline.Workspace)'
+```
 
-- stage: Deploy_DB
-  displayName: 'Deploy DB'
-  dependsOn: Build_DB
-  condition: succeeded()
-  jobs:
-  - template: pipelines/deploy-database.yml@templates
-    parameters:
-      deploymentName: 'DeployDb'
-      deploymentDisplayName: 'Deploy database'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-BN1'
-      artifactName: 'db-drop'
-      targetConnectionString: '$(CONN_STRING)'
+downloads into a subfolder named after the artifact, so the file is usually here:
 
-This is my build-database-project.yml:
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildDatabase'
+```powershell
+$(Pipeline.Workspace)\db-drop\database.dacpac
+```
 
-- name: jobDisplayName
-  type: string
-  default: 'Build Database Project'
+Sometimes it can also be nested one level deeper depending on what was published, so the safest fix is to search for the dacpac.
 
-- name: buildPool
-  type: string
+## Fix in `deploy-database.yml`
 
-- name: buildAgentName
-  type: string
+Replace this:
 
-- name: sqlProjectPath
-  type: string
+```yaml
+- powershell: |
+    $dacpac = "$(Pipeline.Workspace)\database.dacpac"
 
-- name: buildConfiguration
-  type: string
-  default: 'Release'
+    if (!(Test-Path $dacpac)) {
+      throw "database.dacpac not found at: $dacpac"
+    }
 
-- name: artifactName
-  type: string
-  default: 'db-drop'
+    & "${{ parameters.sqlPackagePath }}" /Action:Publish `
+      /SourceFile:"$dacpac" `
+      /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
+      ${{ parameters.sqlPackageArgs }}
 
-- name: outputFolder
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\db'
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  displayName: 'Publish database'
+```
 
-- name: dacpacFileName
-  type: string
-  default: 'database.dacpac'
+with this:
 
-- name: generatePreview
-  type: boolean
-  default: true
+```yaml
+- powershell: |
+    Write-Host "Pipeline.Workspace = $(Pipeline.Workspace)"
+    Write-Host "Artifact name = ${{ parameters.artifactName }}"
 
-- name: sqlPackagePath
-  type: string
-  default: 'SqlPackage'
+    Get-ChildItem "$(Pipeline.Workspace)" -Recurse | Select-Object FullName
 
-- name: previewConnectionString
-  type: string
-  default: ''
+    $dacpac = Get-ChildItem "$(Pipeline.Workspace)\${{ parameters.artifactName }}" -Recurse -Filter database.dacpac |
+              Select-Object -First 1
 
-- name: sqlPackageArgs
-  type: string
-  default: >
-    /p:IgnorePermissions=true
-    /p:IgnoreRoleMembership=true
-    /p:IgnoreUserSettingsObjects=true
-    /p:BlockOnPossibleDataLoss=true
-    /p:DropObjectsNotInSource=false
+    if (-not $dacpac) {
+      throw "database.dacpac not found under $(Pipeline.Workspace)\${{ parameters.artifactName }}"
+    }
 
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
+    Write-Host "Using dacpac: $($dacpac.FullName)"
 
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
+    & "${{ parameters.sqlPackagePath }}" /Action:Publish `
+      /SourceFile:"$($dacpac.FullName)" `
+      /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
+      ${{ parameters.sqlPackageArgs }}
 
-  steps:
-  - checkout: self
-    clean: true
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  displayName: 'Publish database'
+```
 
-  - powershell: |
-      dotnet build "${{ parameters.sqlProjectPath }}" -c "${{ parameters.buildConfiguration }}"
-    displayName: 'Build SQL project'
+## Why this happens
 
-  - powershell: |
-      $dacpac = Get-ChildItem "$(Build.SourcesDirectory)" -Recurse -Filter *.dacpac |
-                Sort-Object LastWriteTime -Descending |
-                Select-Object -First 1
+In build, you publish this folder:
 
-      if (-not $dacpac) {
-        throw "No .dacpac found after build."
-      }
+```yaml
+PathtoPublish: '${{ parameters.outputFolder }}'
+ArtifactName: '${{ parameters.artifactName }}'
+```
 
-      New-Item -Path "${{ parameters.outputFolder }}" -ItemType Directory -Force | Out-Null
-      Copy-Item $dacpac.FullName "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}" -Force
+So Azure DevOps stores the contents under the artifact name, and when you download it, the files are not placed directly at the root of `$(Pipeline.Workspace)`.
 
-      Write-Host "DACPAC copied to ${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
-    displayName: 'Collect dacpac'
+## Also check this
 
-  - powershell: |
-      if ('${{ parameters.generatePreview }}' -ne 'true') {
-        Write-Host "Preview generation disabled."
-        exit 0
-      }
+Your message shows both templates merged into one pasted block. Make sure `build-database-project.yml` and `deploy-database.yml` are actually **separate files** in the templates repo. The deploy template should not contain the build template content above it in the same file unless that is intentional.
 
-      if ([string]::IsNullOrWhiteSpace("${{ parameters.previewConnectionString }}")) {
-        Write-Host "No previewConnectionString provided. Skipping preview generation."
-        exit 0
-      }
+## Final expected path
 
-      $dacpac = "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
-      $script = "${{ parameters.outputFolder }}\preview-deploy.sql"
-      $report = "${{ parameters.outputFolder }}\deploy-report.xml"
+With your current settings, the likely real path is:
 
-      & "${{ parameters.sqlPackagePath }}" /Action:Script `
-        /SourceFile:"$dacpac" `
-        /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
-        /OutputPath:"$script" `
-        ${{ parameters.sqlPackageArgs }}
+```text
+C:\agent\_work\7\db-drop\database.dacpac
+```
 
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+not:
 
-      & "${{ parameters.sqlPackagePath }}" /Action:DeployReport `
-        /SourceFile:"$dacpac" `
-        /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
-        /OutputPath:"$report" `
-        ${{ parameters.sqlPackageArgs }}
+```text
+C:\agent\_work\7\database.dacpac
+```
 
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    displayName: 'Generate DBA preview files'
-
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish DB pipeline artifact'
-    inputs:
-      PathtoPublish: '${{ parameters.outputFolder }}'
-      ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'Container'
-
-parameters:
-- name: deploymentName
-  type: string
-  default: 'DeployDatabase'
-
-- name: deploymentDisplayName
-  type: string
-  default: 'Deploy Database'
-
-- name: environmentName
-  type: string
-
-- name: deployPool
-  type: string
-
-- name: deployAgentName
-  type: string
-
-- name: artifactName
-  type: string
-  default: 'db-drop'
-
-- name: targetConnectionString
-  type: string
-
-- name: sqlPackagePath
-  type: string
-  default: 'SqlPackage'
-
-- name: sqlPackageArgs
-  type: string
-  default: >
-    /p:IgnorePermissions=true
-    /p:IgnoreRoleMembership=true
-    /p:IgnoreUserSettingsObjects=true
-    /p:BlockOnPossibleDataLoss=true
-    /p:DropObjectsNotInSource=false
-
-jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
-
-  environment: ${{ parameters.environmentName }}
-
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
-
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - task: DownloadBuildArtifacts@0
-          displayName: 'Download DB pipeline artifact'
-          inputs:
-            buildType: 'current'
-            downloadType: 'single'
-            artifactName: '${{ parameters.artifactName }}'
-            downloadPath: '$(Pipeline.Workspace)'
-
-        - powershell: |
-            $dacpac = "$(Pipeline.Workspace)\database.dacpac"
-
-            if (!(Test-Path $dacpac)) {
-              throw "database.dacpac not found at: $dacpac"
-            }
-
-            & "${{ parameters.sqlPackagePath }}" /Action:Publish `
-              /SourceFile:"$dacpac" `
-              /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
-              ${{ parameters.sqlPackageArgs }}
-
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          displayName: 'Publish database'
-
-I am getting the following error in the Publish database task:
-ask         : PowerShell
-Description  : Run a PowerShell script on Linux, macOS, or Windows
-Version      : 2.232.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\2a8b554b-b7be-43b8-b5cc-1dfcb780a277.ps1'"
-database.dacpac not found at: C:\agent\_work\7\database.dacpac
-At C:\agent\_work\_temp\2a8b554b-b7be-43b8-b5cc-1dfcb780a277.ps1:7 char:3
-+   throw "database.dacpac not found at: $dacpac"
-+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : OperationStopped: (database.dacpac...database.da 
-   cpac:String) [], RuntimeException
-    + FullyQualifiedErrorId : database.dacpac not found at: C:\agent\_work\7\d 
-   atabase.dacpac
- 
-##[error]PowerShell exited with code '1'.
+So the immediate fix is to search under `$(Pipeline.Workspace)\${{ parameters.artifactName }}`.
