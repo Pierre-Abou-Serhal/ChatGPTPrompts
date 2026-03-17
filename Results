@@ -1,4 +1,4 @@
-So for example in this:
+This is my API+MVS build and deploy yaml file:
 resources:
   repositories:
   - repository: templates
@@ -131,4 +131,57 @@ stages:
       enableCustomXmlEdits: false
       customXmlEdits: {}
 
-Do i need to add a reference to my DB project pipeline ?
+And this this the yaml file for my database:
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - sit
+  paths:
+    include:
+    - DatabaseProjectAlterna.CardManagement/**
+
+variables:
+- group: SIT_API_VARIABLE_GROUP
+
+stages:
+- stage: Build_DB
+  displayName: 'Build DB'
+  jobs:
+  - template: pipelines/build-database-project.yml@templates
+    parameters:
+      jobName: 'BuildDb'
+      jobDisplayName: 'Build database project'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      sqlProjectPath: 'DatabaseProjectAlterna.CardManagement/DatabaseProjectAlterna.CardManagement.sqlproj'
+      artifactName: 'db-drop'
+      previewConnectionString: '$(CONN_STRING)'
+
+- stage: Deploy_DB
+  displayName: 'Deploy DB'
+  dependsOn: Build_DB
+  condition: succeeded()
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy database'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'db-drop'
+      targetConnectionString: '$(CONN_STRING)'
+
+What I want to do now, is to have a build yaml file for each project:
+one for building MVC+API
+And one for building the sql project
+
+I will hav another pipeline that will run a yaml file that will have the option to deploy API+MVC and database depending on what the resposnasble want to deploy
