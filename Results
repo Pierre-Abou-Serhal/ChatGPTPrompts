@@ -1,3 +1,113 @@
+A few things should be fixed.
+
+The good news is: now that your deploy templates can download artifacts from **specific build pipelines**, your release YAML can be much simpler.
+
+## What should change
+
+### 1. Remove `trigger: none`? Keep it
+
+Keep:
+
+```yaml
+trigger: none
+pr: none
+```
+
+That is correct for a release pipeline.
+
+### 2. Your `resources.pipelines` block is optional now
+
+Since your deploy templates now download artifacts using:
+
+* `artifactDefinitionId`
+* `artifactBranch`
+
+you do **not** need `resources.pipelines` unless you specifically want:
+
+* pipeline-completion triggering
+* pipeline resource metadata variables
+
+For a **manual release pipeline**, I would remove:
+
+```yaml
+resources:
+  pipelines:
+  - pipeline: appBuild
+    source: 'Build-App-SIT'
+    branch: sit
+    trigger: none
+
+  - pipeline: dbBuild
+    source: 'Build-DB-SIT'
+    branch: sit
+    trigger: none
+```
+
+and keep only the `templates` repository.
+
+Pipeline resources are useful, but in your current design the deploy templates are not consuming them directly. ([Microsoft Learn][1])
+
+### 3. Your top-level variable group is okay, but only for DB variables
+
+This line:
+
+```yaml
+variables:
+- group: SIT_API_VARIABLE_GROUP
+```
+
+is valid.
+
+But in your release pipeline, it is only needed for variables used **directly in the release YAML**, like:
+
+```yaml
+targetConnectionString: '$(CONN_STRING)'
+```
+
+For MVC and API deploys, your templates already load their own variable groups internally through the `variableGroup` parameter. So the top-level group is **not** needed for MVC/API deployment settings.
+
+I would either:
+
+* keep it if `CONN_STRING` is inside `SIT_API_VARIABLE_GROUP`, or
+* better rename/use a DB-focused group like `SIT_DB_VARIABLE_GROUP`
+
+### 4. Pass the new artifact download parameters
+
+This is the main missing part.
+
+Your release YAML must now pass:
+
+* `artifactBuildType`
+* `artifactProject`
+* `artifactDefinitionId`
+* `artifactBranch`
+* `artifactName`
+
+to each deploy template.
+
+### 5. You do not need explicit `dependsOn` here
+
+Because your stages are already in the order:
+
+1. `Deploy_DB`
+2. `Deploy_MVC_SIT`
+3. `Deploy_API_SIT`
+
+and Azure Pipelines runs stages sequentially by default, you can simply rely on stage order.
+
+That gives you:
+
+* if DB is selected, it runs first
+* then MVC
+* then API
+
+No extra `dependsOn` is necessary unless you want non-linear behavior. Conditions and stage order are enough here. ([Microsoft Learn][2])
+
+## Rewritten release YAML
+
+Here is the version I recommend you use:
+
+```yaml
 parameters:
 - name: deployDatabase
   type: boolean
@@ -18,22 +128,13 @@ resources:
     name: 'Azure Templates/Azure Templates'
     ref: refs/heads/main
 
-  pipelines:
-  - pipeline: appBuild
-    source: 'Build-App-SIT'
-    branch: sit
-    trigger: none
-
-  - pipeline: dbBuild
-    source: 'Build-DB-SIT'
-    branch: sit
-    trigger: none
-
 trigger: none
 pr: none
 
 variables:
-- group: SIT_API_VARIABLE_GROUP   # or better: SIT_DB_VARIABLE_GROUP if only DB uses it
+- group: SIT_API_VARIABLE_GROUP
+# Better later:
+# - group: SIT_DB_VARIABLE_GROUP
 
 stages:
 
@@ -49,16 +150,15 @@ stages:
         deployPool: 'Deployment Pool'
         deployAgentName: 'SIT-ALTERNA-BN1'
         artifactName: 'db-drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: 'BUILD_DB_PIPELINE_DEFINITION_ID'
+        artifactBranch: 'refs/heads/sit'
         targetConnectionString: '$(CONN_STRING)'
-        # plus future parameters to download from dbBuild pipeline resource
 
 - ${{ if eq(parameters.deployMvc, true) }}:
   - stage: Deploy_MVC_SIT
     displayName: 'Deploy MVC to SIT'
-    dependsOn:
-    - ${{ if eq(parameters.deployDatabase, true) }}:
-      - Deploy_DB
-    condition: succeeded()
     jobs:
     - template: pipelines/deploy-iis.yml@templates
       parameters:
@@ -68,18 +168,38 @@ stages:
         deployPool: 'Deployment Pool'
         deployAgentName: 'SIT-ALTERNA-FN1'
         variableGroup: 'SIT_MVC_VARIABLE_GROUP'
+        artifactName: 'drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: 'BUILD_APP_PIPELINE_DEFINITION_ID'
+        artifactBranch: 'refs/heads/sit'
         zipName: 'AlternaCardManagementMVC.zip'
         siteName: 'AlternaCardManagement-AzureDevOps'
         appPoolName: 'AlternaCardManagement-AzureDevOps'
         iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+          - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BaseUrlOsb: $(BaseUrlOsb)
+          CDN_IP_LINK: $(CDN_IP_LINK)
+          DASHBOARD_LINK: $(DASHBOARD_LINK)
+          GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
+          GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
+          LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
+          UploadFilesPath: $(UploadFilesPath)
+          USER_GUIDE_LINK: $(USER_GUIDE_LINK)
+        enableCustomXmlEdits: false
+        customXmlEdits: {}
 
 - ${{ if eq(parameters.deployApi, true) }}:
   - stage: Deploy_API_SIT
     displayName: 'Deploy API to SIT'
-    dependsOn:
-    - ${{ if eq(parameters.deployDatabase, true) }}:
-      - Deploy_DB
-    condition: succeeded()
     jobs:
     - template: pipelines/deploy-iis.yml@templates
       parameters:
@@ -89,7 +209,53 @@ stages:
         deployPool: 'Deployment Pool'
         deployAgentName: 'SIT-ALTERNA-BN1'
         variableGroup: 'SIT_API_VARIABLE_GROUP'
+        artifactName: 'drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: 'BUILD_APP_PIPELINE_DEFINITION_ID'
+        artifactBranch: 'refs/heads/sit'
         zipName: 'AlternaCardManagementAPI.zip'
         siteName: 'AlternaCardManagement-AzureDevOps'
         appPoolName: 'AlternaCardManagement-AzureDevOps'
         iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+          - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BrefBaseUrl: $(BrefBaseUrl)
+          CONN_STRING: $(CONN_STRING)
+          SMSUrl: $(SMSUrl)
+        enableCustomXmlEdits: false
+        customXmlEdits: {}
+```
+
+## What you need to replace
+
+Replace these placeholders with the real build pipeline definition IDs:
+
+* `BUILD_DB_PIPELINE_DEFINITION_ID`
+* `BUILD_APP_PIPELINE_DEFINITION_ID`
+
+These are the IDs of:
+
+* your DB build pipeline
+* your app build pipeline
+
+## Final notes
+
+Your variable-group usage is correct:
+
+* top-level group: only for values used directly in release YAML
+* template-level `variableGroup`: correct for MVC/API deploy templates
+
+The only thing I would improve is using a separate DB variable group for DB deploy settings.
+
+If you want, I can next rewrite this file with your actual pipeline names/IDs once you share them.
+
+[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/yaml-schema/resources-pipelines-pipeline?view=azure-pipelines "resources.pipelines.pipeline definition | Microsoft Learn"
+[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/conditions?view=azure-devops "Pipeline conditions - Azure Pipelines | Microsoft Learn"
