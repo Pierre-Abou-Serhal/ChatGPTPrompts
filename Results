@@ -23,6 +23,8 @@ pr: none
 
 variables:
 - group: SIT_API_VARIABLE_GROUP
+# Better later:
+# - group: SIT_DB_VARIABLE_GROUP
 
 stages:
 
@@ -85,6 +87,15 @@ stages:
         enableCustomXmlEdits: false
         customXmlEdits: {}
 
+        enableHealthCheck: true
+        healthCheckUrl: 'http://YOUR-SIT-MVC-URL/'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        rollbackTag: 'LKG-SIT-MVC'
+        tagSuccessfulBuild: true
+
 - ${{ if eq(parameters.deployApi, true) }}:
   - stage: Deploy_API_SIT
     displayName: 'Deploy API to SIT'
@@ -120,3 +131,12 @@ stages:
           SMSUrl: $(SMSUrl)
         enableCustomXmlEdits: false
         customXmlEdits: {}
+
+        enableHealthCheck: true
+        healthCheckUrl: 'http://YOUR-SIT-API-URL/health'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        rollbackTag: 'LKG-SIT-API'
+        tagSuccessfulBuild: true
