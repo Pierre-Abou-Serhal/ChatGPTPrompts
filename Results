@@ -1,113 +1,4 @@
-A few things should be fixed.
-
-The good news is: now that your deploy templates can download artifacts from **specific build pipelines**, your release YAML can be much simpler.
-
-## What should change
-
-### 1. Remove `trigger: none`? Keep it
-
-Keep:
-
-```yaml
-trigger: none
-pr: none
-```
-
-That is correct for a release pipeline.
-
-### 2. Your `resources.pipelines` block is optional now
-
-Since your deploy templates now download artifacts using:
-
-* `artifactDefinitionId`
-* `artifactBranch`
-
-you do **not** need `resources.pipelines` unless you specifically want:
-
-* pipeline-completion triggering
-* pipeline resource metadata variables
-
-For a **manual release pipeline**, I would remove:
-
-```yaml
-resources:
-  pipelines:
-  - pipeline: appBuild
-    source: 'Build-App-SIT'
-    branch: sit
-    trigger: none
-
-  - pipeline: dbBuild
-    source: 'Build-DB-SIT'
-    branch: sit
-    trigger: none
-```
-
-and keep only the `templates` repository.
-
-Pipeline resources are useful, but in your current design the deploy templates are not consuming them directly. ([Microsoft Learn][1])
-
-### 3. Your top-level variable group is okay, but only for DB variables
-
-This line:
-
-```yaml
-variables:
-- group: SIT_API_VARIABLE_GROUP
-```
-
-is valid.
-
-But in your release pipeline, it is only needed for variables used **directly in the release YAML**, like:
-
-```yaml
-targetConnectionString: '$(CONN_STRING)'
-```
-
-For MVC and API deploys, your templates already load their own variable groups internally through the `variableGroup` parameter. So the top-level group is **not** needed for MVC/API deployment settings.
-
-I would either:
-
-* keep it if `CONN_STRING` is inside `SIT_API_VARIABLE_GROUP`, or
-* better rename/use a DB-focused group like `SIT_DB_VARIABLE_GROUP`
-
-### 4. Pass the new artifact download parameters
-
-This is the main missing part.
-
-Your release YAML must now pass:
-
-* `artifactBuildType`
-* `artifactProject`
-* `artifactDefinitionId`
-* `artifactBranch`
-* `artifactName`
-
-to each deploy template.
-
-### 5. You do not need explicit `dependsOn` here
-
-Because your stages are already in the order:
-
-1. `Deploy_DB`
-2. `Deploy_MVC_SIT`
-3. `Deploy_API_SIT`
-
-and Azure Pipelines runs stages sequentially by default, you can simply rely on stage order.
-
-That gives you:
-
-* if DB is selected, it runs first
-* then MVC
-* then API
-
-No extra `dependsOn` is necessary unless you want non-linear behavior. Conditions and stage order are enough here. ([Microsoft Learn][2])
-
-## Rewritten release YAML
-
-Here is the version I recommend you use:
-
-```yaml
+This is my release-azure-pipelines-sit.yml:
 parameters:
 - name: deployDatabase
   type: boolean
@@ -133,8 +24,6 @@ pr: none
 
 variables:
 - group: SIT_API_VARIABLE_GROUP
-# Better later:
-# - group: SIT_DB_VARIABLE_GROUP
 
 stages:
 
@@ -152,7 +41,7 @@ stages:
         artifactName: 'db-drop'
         artifactBuildType: 'specific'
         artifactProject: '$(System.TeamProject)'
-        artifactDefinitionId: 'BUILD_DB_PIPELINE_DEFINITION_ID'
+        artifactDefinitionId: '18'
         artifactBranch: 'refs/heads/sit'
         targetConnectionString: '$(CONN_STRING)'
 
@@ -171,7 +60,7 @@ stages:
         artifactName: 'drop'
         artifactBuildType: 'specific'
         artifactProject: '$(System.TeamProject)'
-        artifactDefinitionId: 'BUILD_APP_PIPELINE_DEFINITION_ID'
+        artifactDefinitionId: '13'
         artifactBranch: 'refs/heads/sit'
         zipName: 'AlternaCardManagementMVC.zip'
         siteName: 'AlternaCardManagement-AzureDevOps'
@@ -212,7 +101,7 @@ stages:
         artifactName: 'drop'
         artifactBuildType: 'specific'
         artifactProject: '$(System.TeamProject)'
-        artifactDefinitionId: 'BUILD_APP_PIPELINE_DEFINITION_ID'
+        artifactDefinitionId: '13'
         artifactBranch: 'refs/heads/sit'
         zipName: 'AlternaCardManagementAPI.zip'
         siteName: 'AlternaCardManagement-AzureDevOps'
@@ -232,30 +121,1632 @@ stages:
           SMSUrl: $(SMSUrl)
         enableCustomXmlEdits: false
         customXmlEdits: {}
-```
 
-## What you need to replace
+And this is my build-azure-pipelines-sit.yml
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
 
-Replace these placeholders with the real build pipeline definition IDs:
+trigger:
+  branches:
+    include:
+    - sit
+  paths:
+    include:
+    - DatabaseProjectAlterna.CardManagement/**
 
-* `BUILD_DB_PIPELINE_DEFINITION_ID`
-* `BUILD_APP_PIPELINE_DEFINITION_ID`
+variables:
+- group: SIT_API_VARIABLE_GROUP
 
-These are the IDs of:
+stages:
+- stage: Build_DB
+  displayName: 'Build DB'
+  jobs:
+  - template: pipelines/build-database-project.yml@templates
+    parameters:
+      jobName: 'BuildDb'
+      jobDisplayName: 'Build database project'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      sqlProjectPath: 'DatabaseProjectAlterna.CardManagement/DatabaseProjectAlterna.CardManagement.sqlproj'
+      artifactName: 'db-drop'
+      previewConnectionString: '$(CONN_STRING)'
 
-* your DB build pipeline
-* your app build pipeline
+And this is my build-azure-pipelines-sit.yml:
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
 
-## Final notes
+trigger:
+  branches:
+    include:
+    - sit
+  paths:
+    include:
+    - CardManagement/**
 
-Your variable-group usage is correct:
+stages:
+- stage: BuildMVC
+  displayName: Build MVC
+  jobs:
+  # MVC
+  - template: pipelines/build-dotnet-framework-webapi.yml@templates
+    parameters:
+      jobName: Build_MVC
+      jobDisplayName: 'Build MVC'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      vsVersion: '17.0'
+      buildConfiguration: 'Release'
+      solution: 'CardManagement/CardManagement.sln'
+      buildProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
+      nugetConfigPath: 'nuget.config'
+      runTests: false
+      testAssemblies: ''
+      zipName: 'AlternaCardManagementMVC.zip'
+      artifactName: 'drop'
+      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
 
-* top-level group: only for values used directly in release YAML
-* template-level `variableGroup`: correct for MVC/API deploy templates
+- stage: BuildAPI
+  displayName: Build API
+  jobs:
+  # API
+  - template: pipelines/build-dotnet-framework-webapi.yml@templates
+    parameters:
+      jobName: Build_API
+      jobDisplayName: 'Build Web API'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      vsVersion: '17.0'
+      buildConfiguration: 'Release'
+      solution: 'CardManagement/CardManagement.sln'
+      buildProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
+      nugetConfigPath: 'nuget.config'
+      runTests: false
+      testAssemblies: ''
+      zipName: 'AlternaCardManagementAPI.zip'
+      artifactName: 'drop'
+      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
 
-The only thing I would improve is using a separate DB variable group for DB deploy settings.
+These are my build and deploy templates:
 
-If you want, I can next rewrite this file with your actual pipeline names/IDs once you share them.
+build-dotnet-framework-webapi.yml
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
 
-[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/yaml-schema/resources-pipelines-pipeline?view=azure-pipelines "resources.pipelines.pipeline definition | Microsoft Learn"
-[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/conditions?view=azure-devops "Pipeline conditions - Azure Pipelines | Microsoft Learn"
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET Framework)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+- name: vsVersion
+  type: string
+  default: '17.0'
+
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: solution
+  type: string
+  default: '**/*.sln'
+
+- name: buildProject
+  type: string
+  default: ''
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
+
+- name: publishProject
+  type: string
+  default: ''
+
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - task: NuGetCommand@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      restoreSolution: '${{ parameters.solution }}'
+      feedsToUse: 'config'
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+
+  - task: VSBuild@1
+    displayName: 'Build Project'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+
+  # Tests (optional)
+  # - task: VSTest@2
+  #   displayName: 'Test'
+  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+  #   inputs:
+  #     testSelector: 'testAssemblies'
+  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
+  #     searchFolder: '$(System.DefaultWorkingDirectory)'
+  #     platform: '${{ parameters.buildPlatform }}'
+  #     configuration: '${{ parameters.buildConfiguration }}'
+  #     diagnosticsEnabled: true
+
+
+  - task: VSBuild@1
+    displayName: 'Publish to folder'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: false
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+        /p:DeployOnBuild=true
+        /p:DeployDefaultTarget=WebPublish
+        /p:WebPublishMethod=FileSystem
+        /p:PublishUrl="${{ parameters.packageLocation }}"
+        /p:DeleteExistingFiles=true
+        /p:AutoParameterizationWebConfigConnectionStrings=false
+
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
+
+
+deploy-database.yml:
+parameters:
+- name: deploymentName
+  type: string
+  default: 'DeployDatabase'
+
+- name: deploymentDisplayName
+  type: string
+  default: 'Deploy Database'
+
+- name: environmentName
+  type: string
+
+- name: deployPool
+  type: string
+
+- name: deployAgentName
+  type: string
+
+- name: artifactName
+  type: string
+  default: 'db-drop'
+
+- name: artifactBuildType
+  type: string
+  default: 'specific'   # current | specific
+
+- name: artifactProject
+  type: string
+  default: '$(System.TeamProject)'
+
+- name: artifactDefinitionId
+  type: string
+  default: ''           # Build pipeline definition ID when buildType = specific
+
+- name: artifactBranch
+  type: string
+  default: 'refs/heads/sit'
+
+- name: artifactDownloadPath
+  type: string
+  default: '$(Pipeline.Workspace)'
+
+- name: targetConnectionString
+  type: string
+
+- name: sqlPackagePath
+  type: string
+  default: 'SqlPackage'
+
+- name: sqlPackageArgs
+  type: string
+  default: >
+    /p:IgnorePermissions=true
+    /p:IgnoreRoleMembership=true
+    /p:IgnoreUserSettingsObjects=true
+    /p:BlockOnPossibleDataLoss=false
+    /p:DropObjectsNotInSource=false
+
+jobs:
+- deployment: ${{ parameters.deploymentName }}
+  displayName: ${{ parameters.deploymentDisplayName }}
+
+  environment: ${{ parameters.environmentName }}
+
+  pool:
+    name: ${{ parameters.deployPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
+
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - task: DownloadBuildArtifacts@0
+          displayName: 'Download DB build artifact'
+          inputs:
+            buildType: '${{ parameters.artifactBuildType }}'
+            project: '${{ parameters.artifactProject }}'
+            pipeline: '${{ parameters.artifactDefinitionId }}'
+            buildVersionToDownload: 'latestFromBranch'
+            branchName: '${{ parameters.artifactBranch }}'
+            downloadType: 'single'
+            artifactName: '${{ parameters.artifactName }}'
+            downloadPath: '${{ parameters.artifactDownloadPath }}'
+
+        - powershell: |
+            Write-Host "Artifact root = ${{ parameters.artifactDownloadPath }}"
+            Write-Host "Artifact name = ${{ parameters.artifactName }}"
+
+            Get-ChildItem "${{ parameters.artifactDownloadPath }}" -Recurse | Select-Object FullName
+
+            $dacpac = Get-ChildItem "${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}" -Recurse -Filter database.dacpac |
+                      Select-Object -First 1
+
+            if (-not $dacpac) {
+              throw "database.dacpac not found under ${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}"
+            }
+
+            Write-Host "Using dacpac: $($dacpac.FullName)"
+
+            & "${{ parameters.sqlPackagePath }}" /Action:Publish `
+              /SourceFile:"$($dacpac.FullName)" `
+              /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
+              ${{ parameters.sqlPackageArgs }}
+
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          displayName: 'Publish database'
+
+deploy-iis.yml:
+parameters:
+- name: deploymentName
+  type: string
+  default: 'DeployJob'
+
+- name: deploymentDisplayName
+  type: string
+  default: 'Deploy IIS'
+
+- name: environmentName
+  type: string
+
+- name: deployPool
+  type: string
+
+- name: deployAgentName
+  type: string
+
+- name: variableGroup
+  type: string
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+- name: artifactBuildType
+  type: string
+  default: 'specific'   # current | specific
+
+- name: artifactProject
+  type: string
+  default: '$(System.TeamProject)'
+
+- name: artifactDefinitionId
+  type: string
+  default: ''           # Build pipeline definition ID when buildType = specific
+
+- name: artifactBranch
+  type: string
+  default: ''
+
+- name: artifactDownloadPath
+  type: string
+  default: '$(Pipeline.Workspace)'
+
+- name: zipName
+  type: string
+
+- name: siteName
+  type: string
+
+- name: appPoolName
+  type: string
+
+- name: iisTargetPath
+  type: string
+
+- name: cleanTargetBeforeCopy
+  type: boolean
+  default: true
+
+- name: cleanExcludeCsv
+  type: string
+  default: 'web.config,logs,Keys'
+
+- name: enableJsonTransform
+  type: boolean
+  default: true
+
+- name: jsonFiles
+  type: string
+  default: '**/appsettings.json'
+
+- name: enableXmlConfigTransform
+  type: boolean
+  default: false
+
+- name: xmlConfigFiles
+  type: object
+  default: []
+
+- name: xmlVariableValues
+  type: object
+  default: {}
+
+- name: enableCustomXmlEdits
+  type: boolean
+  default: false
+
+- name: customXmlEdits
+  type: object
+  default: []
+
+- name: customXmlVariableValues
+  type: object
+  default: {}
+
+jobs:
+- deployment: ${{ parameters.deploymentName }}
+  displayName: ${{ parameters.deploymentDisplayName }}
+
+  environment: ${{ parameters.environmentName }}
+
+  pool:
+    name: ${{ parameters.deployPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
+
+  variables:
+  - group: ${{ parameters.variableGroup }}
+
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - task: DownloadBuildArtifacts@0
+          displayName: 'Download Build Artifact'
+          inputs:
+            buildType: '${{ parameters.artifactBuildType }}'
+            project: '${{ parameters.artifactProject }}'
+            pipeline: '${{ parameters.artifactDefinitionId }}'
+            buildVersionToDownload: 'latestFromBranch'
+            branchName: '${{ parameters.artifactBranch }}'
+            downloadType: 'single'
+            artifactName: '${{ parameters.artifactName }}'
+            downloadPath: '${{ parameters.artifactDownloadPath }}'
+
+        - task: ExtractFiles@1
+          displayName: 'Extract artifact'
+          inputs:
+            archiveFilePatterns: '${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}\${{ parameters.zipName }}'
+            destinationFolder: '$(Pipeline.Workspace)\extracted'
+            cleanDestinationFolder: true
+
+        - task: FileTransform@2
+          displayName: 'JSON substitution (appsettings.json)'
+          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
+          inputs:
+            folderPath: '$(Pipeline.Workspace)\extracted'
+            enableXmlTransform: false
+            xmlTransformationRules: ''
+            jsonTargetFiles: ${{ parameters.jsonFiles }}
+
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $root = "$(Pipeline.Workspace)\extracted"
+
+            $patternsJson = @'
+            ${{ convertToJson(parameters.xmlConfigFiles) }}
+            '@
+            $patterns = $patternsJson | ConvertFrom-Json
+
+            if (-not $patterns -or $patterns.Count -eq 0) {
+              Write-Host "No xmlConfigFiles patterns provided. Skipping."
+              exit 0
+            }
+
+            function Resolve-Files([string]$base, [string]$pattern) {
+              $pattern = $pattern -replace '\\','/'
+
+              if ($pattern.StartsWith("**/")) {
+                $name = $pattern.Substring(3)
+                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
+              }
+
+              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
+                $p = Join-Path $base ($pattern -replace '/','\')
+                return Get-Item $p -ErrorAction SilentlyContinue
+              }
+
+              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
+            }
+
+            # collect unique files
+            $files = @()
+            foreach ($pat in $patterns) {
+              $files += Resolve-Files $root ([string]$pat)
+            }
+            $files = $files | Where-Object { $_ } | Select-Object -Unique
+
+            if (-not $files -or $files.Count -eq 0) {
+              throw "No config files matched xmlConfigFiles patterns under: $root"
+            }
+
+            foreach ($f in $files) {
+              Write-Host "Editing: $($f.FullName)"
+              [xml]$xml = Get-Content -Raw -Path $f.FullName
+
+              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
+              if (-not $nodes -or $nodes.Count -eq 0) {
+                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
+                continue
+              }
+
+              $changed = 0
+
+              foreach ($n in $nodes) {
+                $key = [string]$n.GetAttribute("key")
+                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
+
+                # no variable provided => skip
+                if ([string]::IsNullOrWhiteSpace($val)) { continue }
+
+                $current = [string]$n.GetAttribute("value")
+                if ($current -ne $val) {
+                  $n.SetAttribute("value", $val)
+                  $changed++
+                }
+              }
+
+              $xml.Save($f.FullName)
+              Write-Host "Updated $changed setting(s) in $($f.Name)"
+            }
+          displayName: 'XML appSettings substitution (.config)'
+          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
+          env:
+            ${{ each pair in parameters.xmlVariableValues }}:
+              ${{ pair.key }}: ${{ pair.value }}
+
+        # ---- Custom XML substitution (XPath) ----
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $root = "$(Pipeline.Workspace)\extracted"
+
+            $rulesJson = @'
+            ${{ convertToJson(parameters.customXmlEdits) }}
+            '@
+            $rules = $rulesJson | ConvertFrom-Json
+
+            if (-not $rules -or $rules.Count -eq 0) {
+              Write-Host "No custom XML edits provided. Skipping."
+              exit 0
+            }
+
+            function Resolve-Files($base, $pattern) {
+              # supports: **/File.xml, File.xml, or folder\File.xml
+              $pattern = $pattern -replace '\\','/'
+              if ($pattern.StartsWith("**/")) {
+                $name = $pattern.Substring(3)
+                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
+              }
+              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
+                $p = Join-Path $base ($pattern -replace '/','\')
+                return Get-Item $p -ErrorAction SilentlyContinue
+              }
+              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
+            }
+
+            foreach ($r in $rules) {
+              $filePat = [string]$r.file
+              $xpath   = [string]$r.xpath
+              $varName = [string]$r.variable
+
+              if (-not $filePat -or -not $xpath -or -not $varName) {
+                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
+              }
+
+              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
+              if ([string]::IsNullOrWhiteSpace($value)) {
+                throw "Pipeline variable '$varName' is missing/empty."
+              }
+
+              $files = Resolve-Files $root $filePat
+              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
+
+              foreach ($f in @($files)) {
+                [xml]$xml = Get-Content -Raw -Path $f.FullName
+
+                if ($xpath -match "/@([^/]+)$") {
+                  $attrName = $Matches[1]
+                  $nodePath = $xpath -replace "/@[^/]+$",""
+                  $node = $xml.SelectSingleNode($nodePath)
+                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
+
+                  $attr = $node.Attributes[$attrName]
+                  if (-not $attr) {
+                    $attr = $xml.CreateAttribute($attrName)
+                    [void]$node.Attributes.Append($attr)
+                  }
+                  $attr.Value = $value
+                } else {
+                  $node = $xml.SelectSingleNode($xpath)
+                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
+                  $node.InnerText = $value
+                }
+
+                $xml.Save($f.FullName)
+                Write-Host "Updated $($f.Name): $xpath (from $varName)"
+              }
+            }
+          displayName: 'Custom XML substitution (XPath)'
+          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
+          env:
+            ${{ each pair in parameters.customXmlVariableValues }}:
+              ${{ pair.key }}: ${{ pair.value }}
+
+        # Stop website + app pool safely (idempotent)
+        - powershell: |
+            Import-Module WebAdministration
+
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
+
+            $site = Get-Website -Name $siteName
+            Write-Host "Website current state: $($site.State)"
+            if ($site.State -ne "Stopped") {
+              Write-Host "Stopping website: $siteName"
+              Stop-Website -Name $siteName
+            } else {
+              Write-Host "Website already stopped."
+            }
+
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            Write-Host "AppPool current state: $poolState"
+            if ($poolState -ne "Stopped") {
+              Write-Host "Stopping app pool: $appPool"
+              Stop-WebAppPool -Name $appPool
+            } else {
+              Write-Host "AppPool already stopped."
+            }
+
+            $maxTries = 30
+            for ($i = 1; $i -le $maxTries; $i++) {
+              $siteState = (Get-Website -Name $siteName).State
+              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+
+              Write-Host "Website state: $siteState | AppPool state: $poolState"
+
+              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
+                Write-Host "Website and App Pool are stopped."
+                break
+              }
+
+              Start-Sleep -Seconds 2
+            }
+
+            $finalSiteState = (Get-Website -Name $siteName).State
+            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
+
+            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
+              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
+            }
+
+            Start-Sleep -Seconds 2
+          displayName: 'Stop Website + App Pool'
+
+        - powershell: |
+            $target = '${{ parameters.iisTargetPath }}'
+
+            if (-not (Test-Path $target)) {
+              throw "Target folder does not exist: $target"
+            }
+
+            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
+            $exclude = @()
+
+            if ($excludeCsv) {
+              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            }
+
+            Write-Host "Cleaning target folder: $target"
+            Write-Host "Excluding: $($exclude -join ', ')"
+
+            Get-ChildItem -Path $target -Force | ForEach-Object {
+              if ($exclude -contains $_.Name) {
+                Write-Host "Skipping excluded item: $($_.FullName)"
+              } else {
+                Write-Host "Removing: $($_.FullName)"
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+              }
+            }
+          displayName: 'Clean target folder (before copy)'
+          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
+
+        - task: CopyFiles@2
+          displayName: 'Copy files'
+          inputs:
+            SourceFolder: '$(Pipeline.Workspace)\extracted'
+            Contents: '**'
+            TargetFolder: '${{ parameters.iisTargetPath }}'
+            OverWrite: true
+
+        # Start website + app pool safely (idempotent)
+        - powershell: |
+            Import-Module WebAdministration
+
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
+
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            if ($poolState -ne "Started") {
+              Write-Host "Starting app pool: $appPool"
+              Start-WebAppPool -Name $appPool
+            } else {
+              Write-Host "AppPool already started."
+            }
+
+            $siteState = (Get-Website -Name $siteName).State
+            if ($siteState -ne "Started") {
+              Write-Host "Starting website: $siteName"
+              Start-Website -Name $siteName
+            } else {
+              Write-Host "Website already started."
+            }
+
+            $siteState = (Get-Website -Name $siteName).State
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            Write-Host "Website state: $siteState | AppPool state: $poolState"
+          displayName: 'Start Website + App Pool'
+
+deploy-windows-service.yml:
+parameters:
+- name: deploymentName
+  type: string
+  default: 'DeployJob'
+
+- name: deploymentDisplayName
+  type: string
+  default: 'Deploy Windows Service'
+
+- name: environmentName
+  type: string
+
+- name: deployPool
+  type: string
+
+- name: deployAgentName
+  type: string
+
+- name: variableGroup
+  type: string
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+- name: artifactBuildType
+  type: string
+  default: 'specific'   # current | specific
+
+- name: artifactProject
+  type: string
+  default: '$(System.TeamProject)'
+
+- name: artifactDefinitionId
+  type: string
+  default: ''           # Build pipeline definition ID when buildType = specific
+
+- name: artifactBranch
+  type: string
+  default: 'refs/heads/sit'
+
+- name: artifactDownloadPath
+  type: string
+  default: '$(Pipeline.Workspace)'
+
+- name: zipName
+  type: string
+
+- name: serviceName
+  type: string
+
+- name: serviceDisplayName
+  type: string
+  default: ''
+
+- name: serviceDescription
+  type: string
+  default: ''
+
+- name: serviceTargetPath
+  type: string
+
+- name: serviceUser
+  type: string
+  default: ''
+
+- name: servicePassword
+  type: string
+  default: ''
+
+- name: createServiceIfMissing
+  type: boolean
+  default: true
+
+- name: updateBinPathIfExists
+  type: boolean
+  default: true
+
+- name: serviceExeName
+  type: string
+
+- name: serviceStartType
+  type: string
+  default: 'auto'
+
+- name: cleanTargetBeforeCopy
+  type: boolean
+  default: true
+
+- name: cleanExcludeCsv
+  type: string
+  default: 'logs,Keys'
+
+- name: enableJsonTransform
+  type: boolean
+  default: true
+
+- name: jsonFiles
+  type: string
+  default: '**/appsettings.json'
+
+- name: enableXmlConfigTransform
+  type: boolean
+  default: false
+
+- name: xmlConfigFiles
+  type: object
+  default: []
+
+- name: xmlVariableValues
+  type: object
+  default: {}
+
+- name: enableCustomXmlEdits
+  type: boolean
+  default: false
+
+- name: customXmlEdits
+  type: object
+  default: []
+
+- name: customXmlVariableValues
+  type: object
+  default: {}
+
+jobs:
+- deployment: ${{ parameters.deploymentName }}
+  displayName: ${{ parameters.deploymentDisplayName }}
+
+  environment: ${{ parameters.environmentName }}
+
+  pool:
+    name: ${{ parameters.deployPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
+
+  variables:
+  - group: ${{ parameters.variableGroup }}
+
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - task: DownloadBuildArtifacts@0
+          displayName: 'Download Build Artifact'
+          inputs:
+            buildType: '${{ parameters.artifactBuildType }}'
+            project: '${{ parameters.artifactProject }}'
+            pipeline: '${{ parameters.artifactDefinitionId }}'
+            buildVersionToDownload: 'latestFromBranch'
+            branchName: '${{ parameters.artifactBranch }}'
+            downloadType: 'single'
+            artifactName: '${{ parameters.artifactName }}'
+            downloadPath: '${{ parameters.artifactDownloadPath }}'
+
+        - task: ExtractFiles@1
+          displayName: 'Extract artifact'
+          inputs:
+            archiveFilePatterns: '${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}\${{ parameters.zipName }}'
+            destinationFolder: '$(Pipeline.Workspace)\extracted'
+            cleanDestinationFolder: true
+
+        - task: FileTransform@2
+          displayName: 'JSON substitution (appsettings.json)'
+          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
+          inputs:
+            folderPath: '$(Pipeline.Workspace)\extracted'
+            enableXmlTransform: false
+            xmlTransformationRules: ''
+            jsonTargetFiles: ${{ parameters.jsonFiles }}
+
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $root = "$(Pipeline.Workspace)\extracted"
+
+            $patternsJson = @'
+            ${{ convertToJson(parameters.xmlConfigFiles) }}
+            '@
+            $patterns = $patternsJson | ConvertFrom-Json
+
+            if (-not $patterns -or $patterns.Count -eq 0) {
+              Write-Host "No xmlConfigFiles patterns provided. Skipping."
+              exit 0
+            }
+
+            function Resolve-Files([string]$base, [string]$pattern) {
+              $pattern = $pattern -replace '\\','/'
+
+              if ($pattern.StartsWith("**/")) {
+                $name = $pattern.Substring(3)
+                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
+              }
+
+              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
+                $p = Join-Path $base ($pattern -replace '/','\')
+                return Get-Item $p -ErrorAction SilentlyContinue
+              }
+
+              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
+            }
+
+            # collect unique files
+            $files = @()
+            foreach ($pat in $patterns) {
+              $files += Resolve-Files $root ([string]$pat)
+            }
+            $files = $files | Where-Object { $_ } | Select-Object -Unique
+
+            if (-not $files -or $files.Count -eq 0) {
+              throw "No config files matched xmlConfigFiles patterns under: $root"
+            }
+
+            foreach ($f in $files) {
+              Write-Host "Editing: $($f.FullName)"
+              [xml]$xml = Get-Content -Raw -Path $f.FullName
+
+              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
+              if (-not $nodes -or $nodes.Count -eq 0) {
+                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
+                continue
+              }
+
+              $changed = 0
+
+              foreach ($n in $nodes) {
+                $key = [string]$n.GetAttribute("key")
+                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
+
+                # no variable provided => skip
+                if ([string]::IsNullOrWhiteSpace($val)) { continue }
+
+                $current = [string]$n.GetAttribute("value")
+                if ($current -ne $val) {
+                  $n.SetAttribute("value", $val)
+                  $changed++
+                }
+              }
+
+              $xml.Save($f.FullName)
+              Write-Host "Updated $changed setting(s) in $($f.Name)"
+            }
+          displayName: 'XML appSettings substitution (.config)'
+          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
+          env:
+            ${{ each pair in parameters.xmlVariableValues }}:
+              ${{ pair.key }}: ${{ pair.value }}
+
+        # ---- Custom XML substitution (XPath) ----
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $root = "$(Pipeline.Workspace)\extracted"
+
+            $rulesJson = @'
+            ${{ convertToJson(parameters.customXmlEdits) }}
+            '@
+            $rules = $rulesJson | ConvertFrom-Json
+
+            if (-not $rules -or $rules.Count -eq 0) {
+              Write-Host "No custom XML edits provided. Skipping."
+              exit 0
+            }
+
+            function Resolve-Files($base, $pattern) {
+              # supports: **/File.xml, File.xml, or folder\File.xml
+              $pattern = $pattern -replace '\\','/'
+              if ($pattern.StartsWith("**/")) {
+                $name = $pattern.Substring(3)
+                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
+              }
+              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
+                $p = Join-Path $base ($pattern -replace '/','\')
+                return Get-Item $p -ErrorAction SilentlyContinue
+              }
+              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
+            }
+
+            foreach ($r in $rules) {
+              $filePat = [string]$r.file
+              $xpath   = [string]$r.xpath
+              $varName = [string]$r.variable
+
+              if (-not $filePat -or -not $xpath -or -not $varName) {
+                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
+              }
+
+              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
+              if ([string]::IsNullOrWhiteSpace($value)) {
+                throw "Pipeline variable '$varName' is missing/empty."
+              }
+
+              $files = Resolve-Files $root $filePat
+              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
+
+              foreach ($f in @($files)) {
+                [xml]$xml = Get-Content -Raw -Path $f.FullName
+
+                if ($xpath -match "/@([^/]+)$") {
+                  $attrName = $Matches[1]
+                  $nodePath = $xpath -replace "/@[^/]+$",""
+                  $node = $xml.SelectSingleNode($nodePath)
+                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
+
+                  $attr = $node.Attributes[$attrName]
+                  if (-not $attr) {
+                    $attr = $xml.CreateAttribute($attrName)
+                    [void]$node.Attributes.Append($attr)
+                  }
+                  $attr.Value = $value
+                } else {
+                  $node = $xml.SelectSingleNode($xpath)
+                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
+                  $node.InnerText = $value
+                }
+
+                $xml.Save($f.FullName)
+                Write-Host "Updated $($f.Name): $xpath (from $varName)"
+              }
+            }
+          displayName: 'Custom XML substitution (XPath)'
+          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
+          env:
+            ${{ each pair in parameters.customXmlVariableValues }}:
+              ${{ pair.key }}: ${{ pair.value }}
+
+        # Stop Windows Service safely (idempotent)
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $svcName = "${{ parameters.serviceName }}"
+
+            $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+            if (-not $svc) {
+              Write-Host "Service '$svcName' not found. Nothing to stop."
+              exit 0
+            }
+
+            Write-Host "Service current status: $($svc.Status)"
+            if ($svc.Status -ne "Stopped") {
+              Write-Host "Stopping service: $svcName"
+              Stop-Service -Name $svcName -Force -ErrorAction Stop
+            } else {
+              Write-Host "Service already stopped."
+            }
+
+            $maxTries = 30
+            for ($i=1; $i -le $maxTries; $i++) {
+              $status = (Get-Service -Name $svcName).Status
+              Write-Host "Service status: $status"
+              if ($status -eq "Stopped") {
+                Write-Host "Service is stopped."
+                break
+              }
+              Start-Sleep -Seconds 2
+            }
+
+            $final = (Get-Service -Name $svcName).Status
+            if ($final -ne "Stopped") {
+              throw "Failed to stop service '$svcName'. Final status: $final"
+            }
+
+            Start-Sleep -Seconds 2
+          displayName: 'Stop Windows Service'
+
+        - powershell: |
+            $target = '${{ parameters.serviceTargetPath }}'
+
+            if (-not (Test-Path $target)) {
+              throw "Target folder does not exist: $target"
+            }
+
+            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
+            $exclude = @()
+
+            if ($excludeCsv) {
+              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            }
+
+            Write-Host "Cleaning target folder: $target"
+            Write-Host "Excluding: $($exclude -join ', ')"
+
+            Get-ChildItem -Path $target -Force | ForEach-Object {
+              if ($exclude -contains $_.Name) {
+                Write-Host "Skipping excluded item: $($_.FullName)"
+              } else {
+                Write-Host "Removing: $($_.FullName)"
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+              }
+            }
+          displayName: 'Clean target folder (before copy)'
+          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
+
+        - task: CopyFiles@2
+          displayName: 'Copy files'
+          inputs:
+            SourceFolder: '$(Pipeline.Workspace)\extracted'
+            Contents: '**'
+            TargetFolder: '${{ parameters.serviceTargetPath }}'
+            OverWrite: true
+
+        # Create or update Windows Service to point to the deployed EXE
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+
+            $svcName   = "${{ parameters.serviceName }}"
+            $exeName   = "${{ parameters.serviceExeName }}"
+            $targetDir = "${{ parameters.serviceTargetPath }}"
+            $exePath   = Join-Path $targetDir $exeName
+
+            if (-not (Test-Path $exePath)) {
+              throw "Service executable not found: $exePath"
+            }
+
+            $displayName = "${{ parameters.serviceDisplayName }}"
+            if ([string]::IsNullOrWhiteSpace($displayName)) { $displayName = $svcName }
+
+            $desc = "${{ parameters.serviceDescription }}"
+            $startType = "${{ parameters.serviceStartType }}"  # auto|demand|disabled
+
+            $user = "${{ parameters.serviceUser }}"
+            $pass = "${{ parameters.servicePassword }}"
+
+            $existing = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+
+            function Set-StartType([string]$name, [string]$st) {
+              switch ($st.ToLowerInvariant()) {
+                "auto"     { sc.exe config $name start= auto    | Out-Host }
+                "demand"   { sc.exe config $name start= demand  | Out-Host }
+                "disabled" { sc.exe config $name start= disabled| Out-Host }
+                default    { throw "Invalid serviceStartType: $st (use auto|demand|disabled)" }
+              }
+            }
+
+            if (-not $existing) {
+              if ('${{ parameters.createServiceIfMissing }}' -ne 'true') {
+                throw "Service '$svcName' does not exist and createServiceIfMissing=false."
+              }
+
+              Write-Host "Creating service: $svcName"
+              # Important: sc.exe spacing rules (space after '=')
+              if (-not [string]::IsNullOrWhiteSpace($user)) {
+                if ([string]::IsNullOrWhiteSpace($pass)) { throw "servicePassword is required when serviceUser is set." }
+
+                sc.exe create $svcName binPath= "`"$exePath`"" DisplayName= "`"$displayName`"" start= $startType obj= "`"$user`"" password= "`"$pass`"" | Out-Host
+              } else {
+                sc.exe create $svcName binPath= "`"$exePath`"" DisplayName= "`"$displayName`"" start= $startType | Out-Host
+              }
+
+              if (-not [string]::IsNullOrWhiteSpace($desc)) {
+                sc.exe description $svcName "`"$desc`"" | Out-Host
+              }
+            }
+            else {
+              Write-Host "Service exists: $svcName"
+
+              if ('${{ parameters.updateBinPathIfExists }}' -eq 'true') {
+                Write-Host "Updating binPath to: $exePath"
+                # binPath is updated using 'config'
+                sc.exe config $svcName binPath= "`"$exePath`"" | Out-Host
+              }
+
+              # Keep start type aligned
+              Set-StartType $svcName $startType
+
+              if (-not [string]::IsNullOrWhiteSpace($desc)) {
+                sc.exe description $svcName "`"$desc`"" | Out-Host
+              }
+
+              if (-not [string]::IsNullOrWhiteSpace($user)) {
+                if ([string]::IsNullOrWhiteSpace($pass)) { throw "servicePassword is required when serviceUser is set." }
+                sc.exe config $svcName obj= "`"$user`"" password= "`"$pass`"" | Out-Host
+              }
+            }
+          displayName: 'Create/Update Windows Service'
+
+        # Start Windows Service safely (idempotent)
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $svcName = "${{ parameters.serviceName }}"
+
+            $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+            if (-not $svc) { throw "Service '$svcName' not found." }
+
+            if ($svc.Status -ne "Running") {
+              Write-Host "Starting service: $svcName"
+              Start-Service -Name $svcName -ErrorAction Stop
+            } else {
+              Write-Host "Service already running."
+            }
+
+            $maxTries = 30
+            for ($i=1; $i -le $maxTries; $i++) {
+              $status = (Get-Service -Name $svcName).Status
+              Write-Host "Service status: $status"
+              if ($status -eq "Running") {
+                Write-Host "Service is running."
+                break
+              }
+              Start-Sleep -Seconds 2
+            }
+
+            $final = (Get-Service -Name $svcName).Status
+            if ($final -ne "Running") {
+              throw "Failed to start service '$svcName'. Final status: $final"
+            }
+          displayName: 'Start Windows Service'
+
+build-dotnet-core-webapi.yml:
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
+
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: restoreProjects
+  type: string
+  default: '**/*.csproj'
+
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testProjects
+  type: string
+  default: '**/*Tests/*.csproj'
+
+- name: publishProject
+  type: string
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+- name: deploymentMode
+  type: string
+  default: 'framework-dependent'
+  values:
+  - framework-dependent
+  - self-contained
+
+- name: targetRuntime
+  type: string
+  default: ''
+
+- name: produceSingleFile
+  type: boolean
+  default: false
+
+- name: readyToRun
+  type: boolean
+  default: false
+
+- name: trim
+  type: boolean
+  default: false
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  variables:
+
+  - name: publishArgsNoRestore
+    value: '--no-restore'
+
+  - name: publishArgsBase
+    value: >-
+      --configuration ${{ parameters.buildConfiguration }}
+      --output "${{ parameters.publishOutputFolder }}"
+
+  - name: publishArgsRuntime
+    value: ''
+
+  - name: publishArgsSelfContained
+    value: ''
+
+  - name: publishArgsSingleFile
+    value: ''
+
+  - name: publishArgsReadyToRun
+    value: ''
+
+  - name: publishArgsTrim
+    value: ''
+  
+  - name: restoreArgs
+    value: ''
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: publishArgsRuntime
+      value: '-r ${{ parameters.targetRuntime }}'
+
+  - ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained true'
+
+  - ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained false'
+
+  - ${{ if eq(parameters.produceSingleFile, true) }}:
+    - name: publishArgsSingleFile
+      value: '/p:PublishSingleFile=true'
+
+  - ${{ if eq(parameters.readyToRun, true) }}:
+    - name: publishArgsReadyToRun
+      value: '/p:PublishReadyToRun=true'
+
+  - ${{ if eq(parameters.trim, true) }}:
+    - name: publishArgsTrim
+      value: '/p:PublishTrimmed=true'
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: restoreArgs
+      value: '-r ${{ parameters.targetRuntime }}'
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: publishArgsNoRestore
+      value: ''
+
+  steps:
+  - checkout: self
+    clean: true
+
+  # Restore using nuget.config
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      projects: ${{ parameters.restoreProjects }}
+      feedsToUse: 'config'
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}
+      arguments: >-
+        $(restoreArgs)
+
+  # Building project: dotnet build
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: ${{ parameters.restoreProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
+
+  # Running tests if available: dotnet test
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    inputs:
+      command: 'test'
+      projects: ${{ parameters.testProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
+      publishTestResults: true
+
+  # Publish the API project (with deployment-mode / runtime / single-file options)
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish'
+    inputs:
+      command: 'publish'
+      projects: ${{ parameters.publishProject }}
+      publishWebProjects: false
+      zipAfterPublish: false
+      modifyOutputPath: false
+      arguments: >-
+        $(publishArgsBase)
+        $(publishArgsNoRestore)
+        $(publishArgsRuntime)
+        $(publishArgsSelfContained)
+        $(publishArgsSingleFile)
+        $(publishArgsReadyToRun)
+        $(publishArgsTrim)
+
+  # Zipping published files
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  # Uploading zipped files to Azure
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
+
+build-angular-webapp.yml:
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildAngular'
+
+- name: jobDisplayName
+  type: string
+  default: 'Build (Angular)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+# Where your Angular project lives relative to repo root
+- name: workingDirectory
+  type: string
+  default: '.'
+
+# Node version to use (must exist on server or be installed)
+- name: nodeVersion
+  type: string
+  default: '22.x'
+
+# install command
+- name: installCommand
+  type: string
+  default: 'ci'   # npm install
+
+# whether to run tests
+- name: runTests
+  type: boolean
+  default: false
+
+# test command (customizable)
+- name: testCommand
+  type: string
+  default: 'test -- --watch=false --browsers=ChromeHeadless'
+
+# build configuration / command
+- name: buildCommand
+  type: string
+  default: 'npx ng build'
+
+# Angular dist folder (relative to workingDirectory)
+# Example: 'dist/my-app'
+- name: distFolder
+  type: string
+
+# Zip file name produced as artifact
+- name: zipName
+  type: string
+  default: 'AngularApp.zip'
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+# Where to stage files before zipping
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - powershell: |
+      Write-Host "Working directory: ${{ parameters.workingDirectory }}"
+      if (-not (Test-Path "${{ parameters.workingDirectory }}")) {
+        throw "Working directory not found: ${{ parameters.workingDirectory }}"
+      }
+    displayName: 'Validate working directory'
+
+  - script: |
+      whoami
+      npm config list -l
+      node -p "process.env.HTTP_PROXY"
+      node -p "process.env.HTTPS_PROXY"
+      nslookup registry.npmjs.org
+      npm ping --registry=https://registry.npmjs.org/
+    displayName: 'Diagnose npm network'
+
+  # Install dependencies
+  - script: |
+      npm ${{ parameters.installCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Install dependencies (npm)'
+
+  # Optional tests
+  - script: |
+      npm ${{ parameters.testCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Run tests'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    # If you use yarn/pnpm tests, switch this command accordingly.
+
+  # Build
+  - script: |
+      ${{ parameters.buildCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Build Angular'
+
+  # Copy dist output to staging folder (clean staging first)
+  - task: CopyFiles@2
+    displayName: 'Copy dist to staging folder'
+    inputs:
+      SourceFolder: '${{ parameters.workingDirectory }}\${{ parameters.distFolder }}'
+      Contents: '**'
+      TargetFolder: '${{ parameters.publishOutputFolder }}'
+      OverWrite: true
+
+  # Zip staged files (no nested dist folder in zip)
+  - task: ArchiveFiles@2
+    displayName: 'Zip dist output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  # Publish artifact (on-prem compatible)
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
+
+What to change in order to implementRollback, tags and helth checks ?
