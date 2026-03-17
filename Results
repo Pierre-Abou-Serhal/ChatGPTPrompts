@@ -1,187 +1,263 @@
-This is my API+MVS build and deploy yaml file:
+What you want is the right next step.
+
+Use **two CI build pipelines** and **one release pipeline**.
+
+## Recommended setup
+
+Create:
+
+### CI pipelines
+
+* `azure-pipelines-build-app-sit.yml`
+* `azure-pipelines-build-db-sit.yml`
+
+These only **build artifacts**:
+
+* app pipeline builds MVC + API zips
+* DB pipeline builds `.dacpac` + preview SQL + deploy report
+
+### Release pipeline
+
+* `azure-pipelines-release-sit.yml`
+
+This one **deploys** based on parameters:
+
+* deploy DB only
+* deploy MVC only
+* deploy API only
+* deploy DB + MVC + API
+
+This is a cleaner separation of CI and CD. Azure Pipelines supports runtime parameters for choosing behavior at run time, and stage/job dependencies with `dependsOn` and conditions. ([Microsoft Learn][1])
+
+---
+
+# Why this is better than your current setup
+
+Right now your app pipeline both:
+
+* builds
+* deploys
+
+and your DB pipeline both:
+
+* builds
+* deploys
+
+That works, but it makes release coordination harder.
+
+With the split:
+
+* build pipelines run automatically on push
+* release pipeline is controlled by the responsible person
+* release pipeline decides what to deploy
+
+That matches your requirement exactly:
+
+* sometimes DB only
+* sometimes API/MVC only
+* sometimes both
+
+---
+
+# What each pipeline should do
+
+## 1) App build pipeline
+
+It should:
+
+* build MVC
+* build API
+* publish artifacts only
+
+**No deploy stages**.
+
+So your current API+MVC YAML should become a **build-only** pipeline.
+
+## 2) DB build pipeline
+
+It should:
+
+* build SQL project
+* generate preview SQL
+* generate deploy report
+* publish build artifact only
+
+**No deploy stage**.
+
+So your current DB YAML should also become a **build-only** pipeline.
+
+## 3) Release pipeline
+
+It should:
+
+* optionally download DB build artifact
+* optionally deploy DB
+* optionally download MVC/API build artifacts
+* optionally deploy MVC
+* optionally deploy API
+
+And if DB is selected together with app deployment:
+
+* deploy DB first
+* deploy MVC/API after DB succeeds
+
+That is where `dependsOn` should be applied. Stages run sequentially by default, and explicit dependencies are supported with `dependsOn`. ([Microsoft Learn][2])
+
+---
+
+# Important point about artifacts
+
+Because you are on **Azure DevOps Server / on-prem**, keep using **Build Artifacts**, not Pipeline Artifacts. Microsoft explicitly says Pipeline Artifact tasks are Azure DevOps Services-only, and Azure DevOps Server should use Build Artifact tasks instead. ([Microsoft Learn][3])
+
+---
+
+# Practical structure for SIT
+
+## A. `azure-pipelines-build-app-sit.yml`
+
+This should keep only:
+
+* `BuildMVC`
+* `BuildAPI`
+
+Remove:
+
+* `Deploy_MVC_SIT`
+* `Deploy_API_SIT`
+
+## B. `azure-pipelines-build-db-sit.yml`
+
+This should keep only:
+
+* `Build_DB`
+
+Remove:
+
+* `Deploy_DB`
+
+## C. `azure-pipelines-release-sit.yml`
+
+This should:
+
+* consume artifacts from the app build pipeline and DB build pipeline
+* offer parameters like:
+
+  * `deployDatabase`
+  * `deployMvc`
+  * `deployApi`
+
+If `deployDatabase=true`, run DB deploy.
+If `deployMvc=true`, run MVC deploy.
+If `deployApi=true`, run API deploy.
+
+If DB and API/MVC are both true:
+
+* app deploy depends on DB deploy
+
+---
+
+# How the release pipeline can reference the build pipelines
+
+Use **pipeline resources**.
+
+Azure DevOps supports pipeline resources so one pipeline can consume artifacts from another pipeline, and on Azure DevOps Server 2020+ pipeline completion triggers are also supported through pipeline resources. ([Microsoft Learn][4])
+
+Example conceptually:
+
+```yaml
 resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
+  pipelines:
+  - pipeline: appBuild
+    source: 'Build-App-SIT'
+  - pipeline: dbBuild
+    source: 'Build-DB-SIT'
+```
 
-trigger:
-  branches:
-    include:
-    - sit
+Then in deploy jobs you download artifacts from those pipeline runs.
 
-stages:
-- stage: BuildMVC
-  displayName: Build MVC + API
-  jobs:
-  # MVC
-  - template: pipelines/build-dotnet-framework-webapi.yml@templates
-    parameters:
-      jobName: Build_MVC
-      jobDisplayName: 'Build MVC'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      vsVersion: '17.0'
-      buildConfiguration: 'Release'
-      solution: 'CardManagement/CardManagement.sln'
-      buildProject: 'CardManagement/SGBL.CardManagement/SGBL.CardManagement.csproj'
-      nugetConfigPath: 'nuget.config'
-      runTests: false
-      testAssemblies: ''
-      zipName: 'AlternaCardManagementMVC.zip'
-      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-mvc'
+---
 
-# =========================
-# DEPLOY SIT MVC
-# =========================
-- stage: Deploy_MVC_SIT
-  displayName: 'Deploy MVC to SIT'
-  dependsOn: BuildMVC
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
-  jobs:
-  - template: pipelines/deploy-iis.yml@templates
-    parameters:
-      deploymentName: 'DeploySIT'
-      deploymentDisplayName: 'Deploy MVC to SIT (IIS)'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-FN1'
-      variableGroup: 'SIT_MVC_VARIABLE_GROUP'
-      zipName: 'AlternaCardManagementMVC.zip'
-      siteName: 'AlternaCardManagement-AzureDevOps'
-      appPoolName: 'AlternaCardManagement-AzureDevOps'
-      iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
-      cleanTargetBeforeCopy: true
-      cleanExcludeCsv: ''
-      enableJsonTransform: false
-      jsonFiles: ''
-      enableXmlConfigTransform: true
-      xmlConfigFiles:
-        - '**/Web.config'
+# What the responsible person does
 
-      xmlVariableValues:
-        BaseUrl: $(BaseUrl)
-        BaseUrlOsb: $(BaseUrlOsb)
-        CDN_IP_LINK: $(CDN_IP_LINK)
-        DASHBOARD_LINK: $(DASHBOARD_LINK)
-        GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
-        GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
-        LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
-        UploadFilesPath: $(UploadFilesPath)
-        USER_GUIDE_LINK: $(USER_GUIDE_LINK)
-        
-      enableCustomXmlEdits: false
-      customXmlEdits: {}
+When they start the release pipeline, they choose:
 
-- stage: BuildAPI
-  displayName: Build API
-  jobs:
-  # API
-  - template: pipelines/build-dotnet-framework-webapi.yml@templates
-    parameters:
-      jobName: Build_API
-      jobDisplayName: 'Build Web API'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      vsVersion: '17.0'
-      buildConfiguration: 'Release'
-      solution: 'CardManagement/CardManagement.sln'
-      buildProject: 'CardManagement/SGBL.CardManagement.Host/SGBL.CardManagement.Host.csproj'
-      nugetConfigPath: 'nuget.config'
-      runTests: false
-      testAssemblies: ''
-      zipName: 'AlternaCardManagementAPI.zip'
-      packageLocation: '$(Build.ArtifactStagingDirectory)\AlternaCardManagement-package-api'
+* DB only
+* MVC only
+* API only
+* DB + MVC
+* DB + API
+* DB + MVC + API
 
-# =========================
-# DEPLOY SIT API
-# =========================
-- stage: Deploy_API_SIT
-  displayName: 'Deploy API to SIT'
-  dependsOn: BuildAPI
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
-  jobs:
-  - template: pipelines/deploy-iis.yml@templates
-    parameters:
-      deploymentName: 'DeploySIT'
-      deploymentDisplayName: 'Deploy API to SIT (IIS)'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-BN1'
-      variableGroup: 'SIT_API_VARIABLE_GROUP'
-      zipName: 'AlternaCardManagementAPI.zip'
-      siteName: 'AlternaCardManagement-AzureDevOps'
-      appPoolName: 'AlternaCardManagement-AzureDevOps'
-      iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
-      cleanTargetBeforeCopy: true
-      cleanExcludeCsv: ''
-      enableJsonTransform: false
-      jsonFiles: ''
-      enableXmlConfigTransform: true
-      xmlConfigFiles:
-        - '**/Web.config'
+That is the cleanest operational model.
 
-      xmlVariableValues:
-        BaseUrl: $(BaseUrl)
-        BrefBaseUrl: $(BrefBaseUrl)
-        CONN_STRING: $(CONN_STRING)
-        SMSUrl: $(SMSUrl)
-        
-      enableCustomXmlEdits: false
-      customXmlEdits: {}
+---
 
-And this this the yaml file for my database:
+# My recommendation for your exact files
 
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
+## Your current app YAML
 
-trigger:
-  branches:
-    include:
-    - sit
-  paths:
-    include:
-    - DatabaseProjectAlterna.CardManagement/**
+Split it into:
 
-variables:
-- group: SIT_API_VARIABLE_GROUP
+* `azure-pipelines-build-app-sit.yml` → keep only build stages
+* `azure-pipelines-release-sit.yml` → move deploy stages there
 
-stages:
-- stage: Build_DB
-  displayName: 'Build DB'
-  jobs:
-  - template: pipelines/build-database-project.yml@templates
-    parameters:
-      jobName: 'BuildDb'
-      jobDisplayName: 'Build database project'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      sqlProjectPath: 'DatabaseProjectAlterna.CardManagement/DatabaseProjectAlterna.CardManagement.sqlproj'
-      artifactName: 'db-drop'
-      previewConnectionString: '$(CONN_STRING)'
+## Your current DB YAML
 
-- stage: Deploy_DB
-  displayName: 'Deploy DB'
-  dependsOn: Build_DB
-  condition: succeeded()
-  jobs:
-  - template: pipelines/deploy-database.yml@templates
-    parameters:
-      deploymentName: 'DeployDb'
-      deploymentDisplayName: 'Deploy database'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-BN1'
-      artifactName: 'db-drop'
-      targetConnectionString: '$(CONN_STRING)'
+Split it into:
 
-What I want to do now, is to have a build yaml file for each project:
-one for building MVC+API
-And one for building the sql project
+* `azure-pipelines-build-db-sit.yml` → keep only `Build_DB`
+* `azure-pipelines-release-sit.yml` → move `Deploy_DB` there
 
-I will hav another pipeline that will run a yaml file that will have the option to deploy API+MVC and database depending on what the resposnasble want to deploy
+So the release pipeline becomes the single place where deployment decisions are made.
+
+---
+
+# Suggested release parameters
+
+In `azure-pipelines-release-sit.yml`:
+
+```yaml
+parameters:
+- name: deployDatabase
+  type: boolean
+  default: false
+
+- name: deployMvc
+  type: boolean
+  default: false
+
+- name: deployApi
+  type: boolean
+  default: false
+```
+
+Then:
+
+* `Deploy_DB` runs only if `deployDatabase=true`
+* `Deploy_MVC` runs only if `deployMvc=true`
+* `Deploy_API` runs only if `deployApi=true`
+
+And if DB is selected, app stages depend on DB.
+
+Runtime parameters are designed for this kind of run-time selection. ([Microsoft Learn][1])
+
+---
+
+# Final recommendation
+
+Yes, do this:
+
+* one YAML for **building MVC+API**
+* one YAML for **building DB**
+* one YAML for **releasing/deploying** what the responsible person selects
+
+That is the cleanest model for your scenario.
+
+Next, I can write the first version of:
+`azure-pipelines-release-sit.yml`
+using your existing `deploy-iis.yml` and `deploy-database.yml` templates.
+
+[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/runtime-parameters?view=azure-devops&utm_source=chatgpt.com "Use runtime and type-safe parameters - Azure Pipelines"
+[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/conditions?view=azure-devops&utm_source=chatgpt.com "Pipeline conditions - Azure"
+[3]: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/download-pipeline-artifact-v2?view=azure-pipelines&utm_source=chatgpt.com "Download Pipeline Artifacts v2 task - Azure DevOps"
+[4]: https://learn.microsoft.com/en-us/azure/devops/pipelines/yaml-schema/resources-pipelines-pipeline?view=azure-pipelines&utm_source=chatgpt.com "resources.pipelines.pipeline definition"
