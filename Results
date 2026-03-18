@@ -1,105 +1,143 @@
-Because the tag that got stored was almost certainly **not** `LKG-SIT-MVC` when the REST call actually executed.
+        - task: DownloadBuildArtifacts@0
+          name: DownloadRollbackArtifact
+          displayName: 'Download rollback artifact (last known good)'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
+          inputs:
+            buildType: 'specific'
+            project: '${{ parameters.artifactProject }}'
+            pipeline: '${{ parameters.artifactDefinitionId }}'
+            buildVersionToDownload: 'latestFromBranch'
+            branchName: '${{ parameters.artifactBranch }}'
+            tags: '${{ parameters.rollbackTag }}'
+            # enable only if you want tagged partially-succeeded builds to be valid rollback candidates
+            # allowPartiallySucceededBuilds: true
+            downloadType: 'single'
+            artifactName: '${{ parameters.artifactName }}'
+            downloadPath: '$(Pipeline.Workspace)\rollback-download'
 
-The clue is the exact value you saw: **`-version=7.0`**. That matches the **API version fragment** from your REST request, not your intended tag. Your tag call is built as:
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $zip = '$(Pipeline.Workspace)\rollback-download\${{ parameters.artifactName }}\${{ parameters.zipName }}'
 
-```powershell
-.../tags/$tagEscaped?api-version=$apiVersion
-```
+            if (Test-Path $zip) {
+              Write-Host "Rollback zip found: $zip"
+              Write-Host "##vso[task.setvariable variable=RollbackZipReady]true"
+            } else {
+              Write-Host "##vso[task.setvariable variable=RollbackZipReady]false"
+              throw "Rollback artifact download failed or expected zip not found: $zip"
+            }
+          displayName: 'Validate rollback artifact download'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
-and Azure DevOps expects the real tag to be the `{tag}` path segment, while `api-version` belongs in the query string. ([Microsoft Learn][1])
+        - task: ExtractFiles@1
+          displayName: 'Extract rollback artifact'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackZipReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
+          inputs:
+            archiveFilePatterns: '$(Pipeline.Workspace)\rollback-download\${{ parameters.artifactName }}\${{ parameters.zipName }}'
+            destinationFolder: '$(Pipeline.Workspace)\rollback-extracted'
+            cleanDestinationFolder: true
 
-So when the UI later shows `-version=7.0` in the Tags filter, the most likely explanation is:
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+            $folder = '$(Pipeline.Workspace)\rollback-extracted'
 
-* the request that reached Azure DevOps did **not** have `LKG-SIT-MVC` correctly populated in the `{tag}` path segment
-* and the server ended up storing a malformed value derived from the version part instead
+            if ((Test-Path $folder) -and (Get-ChildItem -Path $folder -Force | Measure-Object).Count -gt 0) {
+              Write-Host "Rollback extraction is valid."
+              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]true"
+            } else {
+              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
+              throw "Rollback extraction folder is missing or empty: $folder"
+            }
+          displayName: 'Validate rollback extraction'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackZipReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
-That is an inference from the exact bad tag value and your script shape.
+        - powershell: |
+            Import-Module WebAdministration
 
-## The two most likely causes
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
 
-### 1) `rollbackTag` was empty or not what you thought at execution time
+            $site = Get-Website -Name $siteName
+            if ($site.State -ne "Stopped") {
+              Write-Host "Stopping website for rollback: $siteName"
+              Stop-Website -Name $siteName
+            }
 
-If `${{ parameters.rollbackTag }}` resolved to empty, your URI would effectively become:
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            if ($poolState -ne "Stopped") {
+              Write-Host "Stopping app pool for rollback: $appPool"
+              Stop-WebAppPool -Name $appPool
+            }
 
-```text
-.../tags/?api-version=7.0
-```
+            Start-Sleep -Seconds 2
+          displayName: 'Stop Website + App Pool for rollback'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
-At that point, Azure DevOps Server can behave oddly, and the bad tag you saw is consistent with that kind of malformed call.
+        - powershell: |
+            $target = '${{ parameters.iisTargetPath }}'
 
-### 2) You are passing the API version twice
+            if (-not (Test-Path $target)) {
+              throw "Target folder does not exist: $target"
+            }
 
-The docs say the API version can be specified **either** in the `Accept` header **or** as a query parameter. ([Microsoft Learn][2])
+            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
+            $exclude = @()
 
-You currently do both:
+            if ($excludeCsv) {
+              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            }
 
-```powershell
-$uri = "...?api-version=7.0"
+            Write-Host "Cleaning target folder for rollback: $target"
+            Write-Host "Excluding: $($exclude -join ', ')"
 
-$headers = @{
-  Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-  Accept        = "application/json; api-version=7.0"
-}
-```
+            Get-ChildItem -Path $target -Force | ForEach-Object {
+              if ($exclude -contains $_.Name) {
+                Write-Host "Skipping excluded item: $($_.FullName)"
+              } else {
+                Write-Host "Removing: $($_.FullName)"
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+              }
+            }
+          displayName: 'Clean target folder for rollback'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
-That is unnecessary, and on Azure DevOps Server it is safer to keep **only the query parameter**.
+        - task: CopyFiles@2
+          displayName: 'Restore rollback files'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
+          inputs:
+            SourceFolder: '$(Pipeline.Workspace)\rollback-extracted'
+            Contents: '**'
+            TargetFolder: '${{ parameters.iisTargetPath }}'
+            OverWrite: true
 
-## What to change
+        - powershell: |
+            Import-Module WebAdministration
 
-Use this version:
+            $siteName = "${{ parameters.siteName }}"
+            $appPool  = "${{ parameters.appPoolName }}"
 
-```powershell
-$buildId = "$(DownloadRequestedArtifact.BuildNumber)"
-$tag     = '${{ parameters.rollbackTag }}'.Trim()
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            if ($poolState -ne "Started") {
+              Start-WebAppPool -Name $appPool
+            }
 
-if ([string]::IsNullOrWhiteSpace($buildId)) {
-  throw "Source build id is empty."
-}
+            $siteState = (Get-Website -Name $siteName).State
+            if ($siteState -ne "Started") {
+              Start-Website -Name $siteName
+            }
 
-if ([string]::IsNullOrWhiteSpace($tag)) {
-  throw "rollbackTag is empty before calling the Build Tag API."
-}
+            $siteState = (Get-Website -Name $siteName).State
+            $poolState = (Get-WebAppPoolState -Name $appPool).Value
+            Write-Host "After rollback => Website state: $siteState | AppPool state: $poolState"
+          displayName: 'Start Website + App Pool after rollback'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
-$collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-$projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-$tagEscaped    = [System.Uri]::EscapeDataString($tag)
-$apiVersion    = "7.0"
+        - powershell: |
+            throw "Deployment failed health check. Rollback was executed successfully."
+          displayName: 'Fail deployment after rollback'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
-$uri = "$collectionUri/$projectName/_apis/build/builds/$buildId/tags/$tagEscaped?api-version=$apiVersion"
-
-Write-Host "Resolved tag     : [$tag]"
-Write-Host "Resolved build id: [$buildId]"
-Write-Host "URI              : [$uri]"
-
-$headers = @{
-  Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-}
-
-Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-Write-Host "Tagged source build successfully."
-```
-
-## What to check in your last successful run
-
-Open the log of the tagging step and verify these lines:
-
-* `Resolved tag : [LKG-SIT-MVC]`
-* `URI : .../tags/LKG-SIT-MVC?api-version=7.0`
-
-If instead you see:
-
-* empty tag
-* `$(SomeVariableName)`
-* or a wrong literal value
-
-then the problem is in how the parent pipeline passes `rollbackTag` into this template.
-
-## One stronger improvement
-
-Instead of the path-based single-tag endpoint, use the **Update Build Tags** API with a JSON body. It is less fragile than embedding the tag in the URL path. Microsoft documents that API separately. ([Microsoft Learn][3])
-
-If you want, I’ll rewrite your tagging step to use the body-based API and add validation so this cannot silently create a bad tag again.
-
-[1]: https://learn.microsoft.com/en-us/rest/api/azure/devops/build/tags/add-build-tag?view=azure-devops-rest-7.1 "Tags - Add Build Tag - REST API (Azure DevOps Build) | Microsoft Learn"
-[2]: https://learn.microsoft.com/en-us/azure/devops/integrate/concepts/rest-api-versioning?view=azure-devops "REST API Versioning for Azure DevOps - Azure DevOps | Microsoft Learn"
-[3]: https://learn.microsoft.com/en-us/rest/api/azure/devops/build/tags/update-build-tags?view=azure-devops-rest-7.1&utm_source=chatgpt.com "Tags - Update Build Tags - REST API (Azure DevOps Build)"
+        - powershell: |
+            throw "Deployment failed health check, but no valid rollback artifact was available. Rollback destructive steps were skipped to avoid deleting the IIS app."
+          displayName: 'Fail safely when rollback artifact is unavailable'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), ne(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
