@@ -1,3 +1,4 @@
+deploy-iis.yml:
 parameters:
 - name: deploymentName
   type: string
@@ -672,3 +673,145 @@ jobs:
             throw "Deployment failed health check, but no valid rollback artifact was available. Rollback destructive steps were skipped to avoid deleting the IIS app."
           displayName: 'Fail safely when rollback artifact is unavailable'
           condition: and(failed(), eq(variables['RollbackRequested'], 'true'), ne(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
+
+release-azure-pipelines-sit.yml:
+parameters:
+- name: deployDatabase
+  type: boolean
+  default: false
+
+- name: deployMvc
+  type: boolean
+  default: false
+
+- name: deployApi
+  type: boolean
+  default: false
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger: none
+pr: none
+
+variables:
+- group: SIT_API_VARIABLE_GROUP
+
+stages:
+
+- ${{ if eq(parameters.deployMvc, true) }}:
+  - stage: Deploy_MVC_SIT
+    displayName: 'Deploy MVC to SIT'
+    jobs:
+    - template: pipelines/deploy-iis.yml@templates
+      parameters:
+        deploymentName: 'DeployMVC'
+        deploymentDisplayName: 'Deploy MVC to SIT (IIS)'
+        environmentName: 'SIT'
+        deployPool: 'Deployment Pool'
+        deployAgentName: 'SIT-ALTERNA-FN1'
+        variableGroup: 'SIT_MVC_VARIABLE_GROUP'
+        artifactName: 'mvc-drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '13'
+        artifactBranch: 'refs/heads/sit'
+        zipName: 'AlternaCardManagementMVC.zip'
+        siteName: 'AlternaCardManagement-AzureDevOps'
+        appPoolName: 'AlternaCardManagement-AzureDevOps'
+        iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+          - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BaseUrlOsb: $(BaseUrlOsb)
+          CDN_IP_LINK: $(CDN_IP_LINK)
+          DASHBOARD_LINK: $(DASHBOARD_LINK)
+          GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
+          GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
+          LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
+          UploadFilesPath: $(UploadFilesPath)
+          USER_GUIDE_LINK: $(USER_GUIDE_LINK)
+        enableCustomXmlEdits: false
+        customXmlEdits: {}
+
+        enableHealthCheck: true
+        healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+        healthCheckExpectedStatusCode: '500'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        rollbackTag: 'LKG-SIT-MVC'
+        tagSuccessfulBuild: true
+
+- ${{ if eq(parameters.deployApi, true) }}:
+  - stage: Deploy_API_SIT
+    displayName: 'Deploy API to SIT'
+    jobs:
+    - template: pipelines/deploy-iis.yml@templates
+      parameters:
+        deploymentName: 'DeployAPI'
+        deploymentDisplayName: 'Deploy API to SIT (IIS)'
+        environmentName: 'SIT'
+        deployPool: 'Deployment Pool'
+        deployAgentName: 'SIT-ALTERNA-BN1'
+        variableGroup: 'SIT_API_VARIABLE_GROUP'
+        artifactName: 'api-drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '13'
+        artifactBranch: 'refs/heads/sit'
+        zipName: 'AlternaCardManagementAPI.zip'
+        siteName: 'AlternaCardManagement-AzureDevOps'
+        appPoolName: 'AlternaCardManagement-AzureDevOps'
+        iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+          - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BrefBaseUrl: $(BrefBaseUrl)
+          CONN_STRING: $(CONN_STRING)
+          SMSUrl: $(SMSUrl)
+        enableCustomXmlEdits: false
+        customXmlEdits: {}
+
+        enableHealthCheck: true
+        healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        rollbackTag: 'LKG-SIT-API'
+        tagSuccessfulBuild: true
+
+- ${{ if eq(parameters.deployDatabase, true) }}:
+  - stage: Deploy_DB
+    displayName: 'Deploy DB'
+    jobs:
+    - template: pipelines/deploy-database.yml@templates
+      parameters:
+        deploymentName: 'DeployDb'
+        deploymentDisplayName: 'Deploy database'
+        environmentName: 'SIT'
+        deployPool: 'Deployment Pool'
+        deployAgentName: 'SIT-ALTERNA-BN1'
+        artifactName: 'db-drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '18'
+        artifactBranch: 'refs/heads/sit'
+        targetConnectionString: '$(CONN_STRING)'                
