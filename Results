@@ -1,4 +1,3 @@
-deploy-iis.yml:
 parameters:
 - name: deploymentName
   type: string
@@ -20,6 +19,10 @@ parameters:
 - name: variableGroup
   type: string
 
+- name: componentName
+  type: string
+  default: ''
+
 - name: artifactName
   type: string
   default: 'drop'
@@ -35,6 +38,10 @@ parameters:
 - name: artifactDefinitionId
   type: string
   default: ''           # Build pipeline definition ID when buildType = specific
+
+- name: artifactBuildId
+  type: string
+  default: ''           # Optional exact build ID to download
 
 - name: artifactBranch
   type: string
@@ -96,7 +103,7 @@ parameters:
   type: object
   default: {}
 
-# Health check / rollback / tagging
+# Health check / local rollback / tagging
 - name: enableHealthCheck
   type: boolean
   default: false
@@ -120,6 +127,14 @@ parameters:
 - name: enableRollbackOnHealthCheckFailure
   type: boolean
   default: true
+
+- name: enableLocalBackup
+  type: boolean
+  default: true
+
+- name: backupRoot
+  type: string
+  default: 'C:\DeployBackups'
 
 - name: rollbackTag
   type: string
@@ -147,18 +162,40 @@ jobs:
     runOnce:
       deploy:
         steps:
-        - task: DownloadBuildArtifacts@0
-          name: DownloadRequestedArtifact
-          displayName: 'Download requested build artifact'
-          inputs:
-            buildType: '${{ parameters.artifactBuildType }}'
-            project: '${{ parameters.artifactProject }}'
-            pipeline: '${{ parameters.artifactDefinitionId }}'
-            buildVersionToDownload: 'latestFromBranch'
-            branchName: '${{ parameters.artifactBranch }}'
-            downloadType: 'single'
-            artifactName: '${{ parameters.artifactName }}'
-            downloadPath: '${{ parameters.artifactDownloadPath }}'
+
+        - powershell: |
+            Write-Host "##vso[task.setvariable variable=RollbackRequested]false"
+            Write-Host "##vso[task.setvariable variable=LocalBackupReady]false"
+            Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
+          displayName: 'Initialize rollback variables'
+
+        - ${{ if ne(parameters.artifactBuildId, '') }}:
+          - task: DownloadBuildArtifacts@0
+            name: DownloadRequestedArtifact
+            displayName: 'Download requested build artifact (specific build)'
+            inputs:
+              buildType: 'specific'
+              project: '${{ parameters.artifactProject }}'
+              pipeline: '${{ parameters.artifactDefinitionId }}'
+              buildVersionToDownload: 'specific'
+              buildId: '${{ parameters.artifactBuildId }}'
+              downloadType: 'single'
+              artifactName: '${{ parameters.artifactName }}'
+              downloadPath: '${{ parameters.artifactDownloadPath }}'
+
+        - ${{ if eq(parameters.artifactBuildId, '') }}:
+          - task: DownloadBuildArtifacts@0
+            name: DownloadRequestedArtifact
+            displayName: 'Download requested build artifact (latest from branch)'
+            inputs:
+              buildType: '${{ parameters.artifactBuildType }}'
+              project: '${{ parameters.artifactProject }}'
+              pipeline: '${{ parameters.artifactDefinitionId }}'
+              buildVersionToDownload: 'latestFromBranch'
+              branchName: '${{ parameters.artifactBranch }}'
+              downloadType: 'single'
+              artifactName: '${{ parameters.artifactName }}'
+              downloadPath: '${{ parameters.artifactDownloadPath }}'
 
         - task: ExtractFiles@1
           displayName: 'Extract requested artifact'
@@ -326,6 +363,48 @@ jobs:
               ${{ pair.key }}: ${{ pair.value }}
 
         - powershell: |
+            $ErrorActionPreference = "Stop"
+
+            if ('${{ parameters.enableLocalBackup }}' -ne 'true') {
+              Write-Host "Local backup disabled."
+              exit 0
+            }
+
+            $component = '${{ parameters.componentName }}'.Trim()
+            if ([string]::IsNullOrWhiteSpace($component)) {
+              throw "componentName is required when enableLocalBackup=true."
+            }
+
+            $source = '${{ parameters.iisTargetPath }}'
+            if (-not (Test-Path $source)) {
+              throw "IIS target path does not exist: $source"
+            }
+
+            $backupPath = Join-Path '${{ parameters.backupRoot }}' "${{ parameters.environmentName }}\$component\$(Build.BuildId)"
+
+            if (Test-Path $backupPath) {
+              Remove-Item -LiteralPath $backupPath -Recurse -Force
+            }
+
+            New-Item -ItemType Directory -Path $backupPath -Force | Out-Null
+
+            $items = Get-ChildItem -Path $source -Force
+            if ($items -and $items.Count -gt 0) {
+              foreach ($item in $items) {
+                Copy-Item -LiteralPath $item.FullName -Destination $backupPath -Recurse -Force
+              }
+              Write-Host "Backup created at: $backupPath"
+              Write-Host "##vso[task.setvariable variable=LocalBackupReady]true"
+            } else {
+              Write-Host "Source folder is empty. Backup folder created but contains no files."
+              Write-Host "##vso[task.setvariable variable=LocalBackupReady]false"
+            }
+
+            Write-Host "##vso[task.setvariable variable=LocalBackupPath]$backupPath"
+          displayName: 'Create local rollback backup'
+          condition: and(succeeded(), eq('${{ parameters.enableLocalBackup }}','true'))
+
+        - powershell: |
             Import-Module WebAdministration
 
             $siteName = "${{ parameters.siteName }}"
@@ -489,99 +568,28 @@ jobs:
         - powershell: |
             $ErrorActionPreference = "Stop"
 
-            if ('${{ parameters.tagSuccessfulBuild }}' -ne 'true') {
-              Write-Host "Tagging disabled."
+            if ('${{ parameters.enableLocalBackup }}' -ne 'true') {
+              Write-Host "Local backup disabled. Nothing to validate for rollback."
+              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
               exit 0
             }
 
-            $buildId = "$(DownloadRequestedArtifact.BuildNumber)"
-            $tag     = '${{ parameters.rollbackTag }}'.Trim()
+            $backup = '$(LocalBackupPath)'
 
-            if ([string]::IsNullOrWhiteSpace($buildId)) {
-              throw "Source build id is empty."
+            if ([string]::IsNullOrWhiteSpace($backup)) {
+              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
+              throw "Local backup path variable is empty."
             }
 
-            if ([string]::IsNullOrWhiteSpace($tag)) {
-              throw "rollbackTag is empty before calling the Build Tag API."
-            }
-
-            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
-            $apiVersion    = "7.0"
-
-            $uri = '{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}' -f `
-              $collectionUri,
-              $projectName,
-              $buildId,
-              $tagEscaped,
-              $apiVersion
-
-            Write-Host "Resolved tag     : [$tag]"
-            Write-Host "Resolved build id: [$buildId]"
-            Write-Host "URI              : [$uri]"
-
-            $headers = @{
-              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-            }
-
-            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-            Write-Host "Tagged source build successfully."
-          displayName: 'Tag source build as last known good'
-          condition: succeeded()
-          env:
-            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-        - task: DownloadBuildArtifacts@0
-          name: DownloadRollbackArtifact
-          displayName: 'Download rollback artifact (last known good)'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-          inputs:
-            buildType: 'specific'
-            project: '${{ parameters.artifactProject }}'
-            pipeline: '${{ parameters.artifactDefinitionId }}'
-            buildVersionToDownload: 'latestFromBranch'
-            branchName: '${{ parameters.artifactBranch }}'
-            tags: '${{ parameters.rollbackTag }}'
-            downloadType: 'single'
-            artifactName: '${{ parameters.artifactName }}'
-            downloadPath: '$(Pipeline.Workspace)\rollback-download'
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $zip = '$(Pipeline.Workspace)\rollback-download\${{ parameters.artifactName }}\${{ parameters.zipName }}'
-
-            if (Test-Path $zip) {
-              Write-Host "Rollback zip found: $zip"
-              Write-Host "##vso[task.setvariable variable=RollbackZipReady]true"
-            } else {
-              Write-Host "##vso[task.setvariable variable=RollbackZipReady]false"
-              throw "Rollback artifact download failed or expected zip not found: $zip"
-            }
-          displayName: 'Validate rollback artifact download'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-        - task: ExtractFiles@1
-          displayName: 'Extract rollback artifact'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackZipReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-          inputs:
-            archiveFilePatterns: '$(Pipeline.Workspace)\rollback-download\${{ parameters.artifactName }}\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\rollback-extracted'
-            cleanDestinationFolder: true
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $folder = '$(Pipeline.Workspace)\rollback-extracted'
-
-            if ((Test-Path $folder) -and (Get-ChildItem -Path $folder -Force | Measure-Object).Count -gt 0) {
-              Write-Host "Rollback extraction is valid."
+            if ((Test-Path $backup) -and (Get-ChildItem -Path $backup -Force | Measure-Object).Count -gt 0) {
+              Write-Host "Local rollback backup is valid: $backup"
               Write-Host "##vso[task.setvariable variable=RollbackExtractReady]true"
             } else {
               Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-              throw "Rollback extraction folder is missing or empty: $folder"
+              throw "Local rollback backup is missing or empty: $backup"
             }
-          displayName: 'Validate rollback extraction'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackZipReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
+          displayName: 'Validate local rollback backup'
+          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
         - powershell: |
             Import-Module WebAdministration
@@ -633,14 +641,28 @@ jobs:
           displayName: 'Clean target folder for rollback'
           condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
-        - task: CopyFiles@2
-          displayName: 'Restore rollback files'
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+
+            $backup = '$(LocalBackupPath)'
+            $target = '${{ parameters.iisTargetPath }}'
+
+            if (-not (Test-Path $backup)) {
+              throw "Local backup path not found: $backup"
+            }
+
+            $items = Get-ChildItem -Path $backup -Force
+            if (-not $items -or $items.Count -eq 0) {
+              throw "Local backup path is empty: $backup"
+            }
+
+            foreach ($item in $items) {
+              Copy-Item -LiteralPath $item.FullName -Destination $target -Recurse -Force
+            }
+
+            Write-Host "Rollback restore completed from local backup."
+          displayName: 'Restore rollback files from local backup'
           condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\rollback-extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
 
         - powershell: |
             Import-Module WebAdministration
@@ -665,153 +687,57 @@ jobs:
           condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
         - powershell: |
-            throw "Deployment failed health check. Rollback was executed successfully."
+            $ErrorActionPreference = "Stop"
+
+            if ('${{ parameters.tagSuccessfulBuild }}' -ne 'true') {
+              Write-Host "Tagging disabled."
+              exit 0
+            }
+
+            $buildId = "$(DownloadRequestedArtifact.BuildNumber)"
+            $tag     = '${{ parameters.rollbackTag }}'.Trim()
+
+            if ([string]::IsNullOrWhiteSpace($buildId)) {
+              throw "Source build id is empty."
+            }
+
+            if ([string]::IsNullOrWhiteSpace($tag)) {
+              throw "rollbackTag is empty before calling the Build Tag API."
+            }
+
+            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
+            $apiVersion    = "7.0"
+
+            $uri = '{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}' -f `
+              $collectionUri,
+              $projectName,
+              $buildId,
+              $tagEscaped,
+              $apiVersion
+
+            Write-Host "Resolved tag     : [$tag]"
+            Write-Host "Resolved build id: [$buildId]"
+            Write-Host "URI              : [$uri]"
+
+            $headers = @{
+              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+            }
+
+            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+            Write-Host "Tagged source build successfully."
+          displayName: 'Tag source build as last known good'
+          condition: succeeded()
+          env:
+            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+        - powershell: |
+            throw "Deployment failed health check. Local rollback was executed successfully."
           displayName: 'Fail deployment after rollback'
           condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
 
         - powershell: |
-            throw "Deployment failed health check, but no valid rollback artifact was available. Rollback destructive steps were skipped to avoid deleting the IIS app."
-          displayName: 'Fail safely when rollback artifact is unavailable'
+            throw "Deployment failed health check, but no valid local rollback backup was available. Destructive rollback steps were skipped."
+          displayName: 'Fail safely when local rollback is unavailable'
           condition: and(failed(), eq(variables['RollbackRequested'], 'true'), ne(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-release-azure-pipelines-sit.yml:
-parameters:
-- name: deployDatabase
-  type: boolean
-  default: false
-
-- name: deployMvc
-  type: boolean
-  default: false
-
-- name: deployApi
-  type: boolean
-  default: false
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger: none
-pr: none
-
-variables:
-- group: SIT_API_VARIABLE_GROUP
-
-stages:
-
-- ${{ if eq(parameters.deployMvc, true) }}:
-  - stage: Deploy_MVC_SIT
-    displayName: 'Deploy MVC to SIT'
-    jobs:
-    - template: pipelines/deploy-iis.yml@templates
-      parameters:
-        deploymentName: 'DeployMVC'
-        deploymentDisplayName: 'Deploy MVC to SIT (IIS)'
-        environmentName: 'SIT'
-        deployPool: 'Deployment Pool'
-        deployAgentName: 'SIT-ALTERNA-FN1'
-        variableGroup: 'SIT_MVC_VARIABLE_GROUP'
-        artifactName: 'mvc-drop'
-        artifactBuildType: 'specific'
-        artifactProject: '$(System.TeamProject)'
-        artifactDefinitionId: '13'
-        artifactBranch: 'refs/heads/sit'
-        zipName: 'AlternaCardManagementMVC.zip'
-        siteName: 'AlternaCardManagement-AzureDevOps'
-        appPoolName: 'AlternaCardManagement-AzureDevOps'
-        iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
-        cleanTargetBeforeCopy: true
-        cleanExcludeCsv: ''
-        enableJsonTransform: false
-        jsonFiles: ''
-        enableXmlConfigTransform: true
-        xmlConfigFiles:
-          - '**/Web.config'
-        xmlVariableValues:
-          BaseUrl: $(BaseUrl)
-          BaseUrlOsb: $(BaseUrlOsb)
-          CDN_IP_LINK: $(CDN_IP_LINK)
-          DASHBOARD_LINK: $(DASHBOARD_LINK)
-          GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
-          GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
-          LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
-          UploadFilesPath: $(UploadFilesPath)
-          USER_GUIDE_LINK: $(USER_GUIDE_LINK)
-        enableCustomXmlEdits: false
-        customXmlEdits: {}
-
-        enableHealthCheck: true
-        healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
-        healthCheckExpectedStatusCode: '500'
-        healthCheckRetries: 6
-        healthCheckDelaySeconds: 10
-        enableRollbackOnHealthCheckFailure: true
-        rollbackTag: 'LKG-SIT-MVC'
-        tagSuccessfulBuild: true
-
-- ${{ if eq(parameters.deployApi, true) }}:
-  - stage: Deploy_API_SIT
-    displayName: 'Deploy API to SIT'
-    jobs:
-    - template: pipelines/deploy-iis.yml@templates
-      parameters:
-        deploymentName: 'DeployAPI'
-        deploymentDisplayName: 'Deploy API to SIT (IIS)'
-        environmentName: 'SIT'
-        deployPool: 'Deployment Pool'
-        deployAgentName: 'SIT-ALTERNA-BN1'
-        variableGroup: 'SIT_API_VARIABLE_GROUP'
-        artifactName: 'api-drop'
-        artifactBuildType: 'specific'
-        artifactProject: '$(System.TeamProject)'
-        artifactDefinitionId: '13'
-        artifactBranch: 'refs/heads/sit'
-        zipName: 'AlternaCardManagementAPI.zip'
-        siteName: 'AlternaCardManagement-AzureDevOps'
-        appPoolName: 'AlternaCardManagement-AzureDevOps'
-        iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
-        cleanTargetBeforeCopy: true
-        cleanExcludeCsv: ''
-        enableJsonTransform: false
-        jsonFiles: ''
-        enableXmlConfigTransform: true
-        xmlConfigFiles:
-          - '**/Web.config'
-        xmlVariableValues:
-          BaseUrl: $(BaseUrl)
-          BrefBaseUrl: $(BrefBaseUrl)
-          CONN_STRING: $(CONN_STRING)
-          SMSUrl: $(SMSUrl)
-        enableCustomXmlEdits: false
-        customXmlEdits: {}
-
-        enableHealthCheck: true
-        healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
-        healthCheckExpectedStatusCode: '200'
-        healthCheckRetries: 6
-        healthCheckDelaySeconds: 10
-        enableRollbackOnHealthCheckFailure: true
-        rollbackTag: 'LKG-SIT-API'
-        tagSuccessfulBuild: true
-
-- ${{ if eq(parameters.deployDatabase, true) }}:
-  - stage: Deploy_DB
-    displayName: 'Deploy DB'
-    jobs:
-    - template: pipelines/deploy-database.yml@templates
-      parameters:
-        deploymentName: 'DeployDb'
-        deploymentDisplayName: 'Deploy database'
-        environmentName: 'SIT'
-        deployPool: 'Deployment Pool'
-        deployAgentName: 'SIT-ALTERNA-BN1'
-        artifactName: 'db-drop'
-        artifactBuildType: 'specific'
-        artifactProject: '$(System.TeamProject)'
-        artifactDefinitionId: '18'
-        artifactBranch: 'refs/heads/sit'
-        targetConnectionString: '$(CONN_STRING)'                
