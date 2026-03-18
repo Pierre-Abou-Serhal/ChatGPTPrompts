@@ -1,62 +1,28 @@
-For **Azure DevOps Server 2022.2**, use **`api-version=7.0`**, not `7.1`. Microsoft’s REST API versioning page shows Azure DevOps Server 2022 supports REST API versions up to **7.0**. It also says every request must include an API version either in the query string or the `Accept` header. ([Microsoft Learn][1])
-
-So replace your **“Tag source build as last known good”** step with this:
-
-```yaml
-- powershell: |
-    $ErrorActionPreference = "Stop"
-
-    if ('${{ parameters.tagSuccessfulBuild }}' -ne 'true') {
-      Write-Host "Tagging disabled."
-      exit 0
-    }
-
-    $buildId = "$(DownloadRequestedArtifact.BuildNumber)"
-    if ([string]::IsNullOrWhiteSpace($buildId)) {
-      throw "Source build id is empty. DownloadRequestedArtifact.BuildNumber was not populated."
-    }
-
-    $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-    $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-    $tag           = '${{ parameters.rollbackTag }}'
-    $tagEscaped    = [System.Uri]::EscapeDataString($tag)
-
-    # Azure DevOps Server 2022 supports up to REST API 7.0
-    $apiVersion = "7.0"
-
-    $uri = "$collectionUri/$projectName/_apis/build/builds/$buildId/tags/$tagEscaped?api-version=$apiVersion"
-
-    Write-Host "Tagging source build $buildId with '$tag'"
-    Write-Host "URI: $uri"
-
-    $headers = @{
-      Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-      Accept        = "application/json; api-version=$apiVersion"
-    }
-
-    Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-    Write-Host "Tagged source build successfully."
-  displayName: 'Tag source build as last known good'
-  condition: succeeded()
-  env:
-    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-```
-
-### Why this fixes it
-
-* changes `api-version` from `7.1` to `7.0`, which matches Azure DevOps Server 2022 support ([Microsoft Learn][1])
-* sends the version in **both** places:
-
-  * query string
-  * `Accept` header
-    Microsoft says either method is valid. ([Microsoft Learn][1])
-* builds the URL more safely by trimming the collection URL and URL-encoding the project/tag
-
-### One more thing to verify
-
-Make sure the build service identity for this release pipeline has permission to update build metadata/tags. The Build Tags REST API requires build-execute level access. ([Microsoft Learn][2])
-
-If you want, paste the new error after this change and I’ll pinpoint the next fix.
-
-[1]: https://learn.microsoft.com/en-us/azure/devops/integrate/concepts/rest-api-versioning?view=azure-devops "REST API Versioning for Azure DevOps - Azure DevOps | Microsoft Learn"
-[2]: https://learn.microsoft.com/en-us/rest/api/azure/devops/build/tags/add-build-tag?view=azure-devops-rest-7.1&utm_source=chatgpt.com "Tags - Add Build Tag - REST API (Azure DevOps Build)"
+Starting: Tag source build as last known good
+==============================================================================
+Task         : PowerShell
+Description  : Run a PowerShell script on Linux, macOS, or Windows
+Version      : 2.232.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\199e8fe5-4ebb-4d83-9403-f1c0d926314c.ps1'"
+Tagging source build 247 with 'LKG-SIT-MVC'
+URI: http://uat-azure/DEV/AlternaCardManagement/_apis/build/builds/247/tags/-version=7.0
+Invoke-RestMethod : {"$id":"1","innerException":null,"message":"Access denied. 
+AlternaCardManagement Build Service (DEV) needs Edit build quality permissions 
+for vstfs:///Build/Build/247 in team project AlternaCardManagement to perform 
+the action.","typeName":"Microsoft.TeamFoundation.Build.WebApi.AccessDeniedExce
+ption, Microsoft.TeamFoundation.Build2.WebApi","typeKey":"AccessDeniedException
+","errorCode":0,"eventId":3000}
+At C:\agent\_work\_temp\199e8fe5-4ebb-4d83-9403-f1c0d926314c.ps1:34 char:1
++ Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:Htt 
+   pWebRequest) [Invoke-RestMethod], WebException
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShe 
+   ll.Commands.InvokeRestMethodCommand
+##[error]PowerShell exited with code '1'.
+Finishing: Tag source build as last known good
