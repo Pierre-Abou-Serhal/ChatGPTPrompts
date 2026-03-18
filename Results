@@ -1,75 +1,40 @@
-        - powershell: |
-            $ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
-            if ('${{ parameters.tagSuccessfulBuild }}' -ne 'true') {
-              Write-Host "Tagging disabled."
-              exit 0
-            }
+if ('${{ parameters.tagSuccessfulBuild }}' -ne 'true') {
+  Write-Host "Tagging disabled."
+  exit 0
+}
 
-            $buildId = "$(DownloadRequestedArtifact.BuildNumber)"
-            $tag     = '${{ parameters.rollbackTag }}'.Trim()
+$buildId = "$(DownloadRequestedArtifact.BuildNumber)"
+$tag     = '${{ parameters.rollbackTag }}'.Trim()
 
-            if ([string]::IsNullOrWhiteSpace($buildId)) {
-              throw "Source build id is empty."
-            }
+if ([string]::IsNullOrWhiteSpace($buildId)) {
+  throw "Source build id is empty."
+}
 
-            if ([string]::IsNullOrWhiteSpace($tag)) {
-              throw "rollbackTag is empty before calling the Build Tag API."
-            }
+if ([string]::IsNullOrWhiteSpace($tag)) {
+  throw "rollbackTag is empty before calling the Build Tag API."
+}
 
-            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
-            $apiVersion    = "7.0"
+$collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+$projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+$tagEscaped    = [System.Uri]::EscapeDataString($tag)
+$apiVersion    = "7.0"
 
-            $uri = "$collectionUri/$projectName/_apis/build/builds/$buildId/tags/$tagEscaped?api-version=$apiVersion"
+$uri = '{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}' -f `
+  $collectionUri,
+  $projectName,
+  $buildId,
+  $tagEscaped,
+  $apiVersion
 
-            Write-Host "Resolved tag     : [$tag]"
-            Write-Host "Resolved build id: [$buildId]"
-            Write-Host "URI              : [$uri]"
+Write-Host "Resolved tag     : [$tag]"
+Write-Host "Resolved build id: [$buildId]"
+Write-Host "URI              : [$uri]"
 
-            $headers = @{
-              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-            }
+$headers = @{
+  Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+}
 
-            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-            Write-Host "Tagged source build successfully."
-          displayName: 'Tag source build as last known good'
-          condition: succeeded()
-          env:
-            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-Rturned this:
-Starting: Tag source build as last known good
-==============================================================================
-Task         : PowerShell
-Description  : Run a PowerShell script on Linux, macOS, or Windows
-Version      : 2.232.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\dce900e4-cc18-4222-9862-a466c206e4a9.ps1'"
-Resolved tag     : [LKG-SIT-MVC]
-Resolved build id: [247]
-URI              : [http://uat-azure/DEV/AlternaCardManagement/_apis/build/builds/247/tags/-version=7.0]
-Invoke-RestMethod : {"$id":"1","innerException":null,"message":"No api-version 
-was supplied for the \"PUT\" request. The version must be supplied either as 
-part of the Accept header (e.g. \"application/json; api-version=1.0\") or as a 
-query parameter (e.g. \"?api-version=1.0\").","typeName":"Microsoft.VisualStudi
-o.Services.WebApi.VssVersionNotSpecifiedException, Microsoft.VisualStudio.Servi
-ces.WebApi","typeKey":"VssVersionNotSpecifiedException","errorCode":0,"eventId"
-:3000}
-At C:\agent\_work\_temp\dce900e4-cc18-4222-9862-a466c206e4a9.ps1:37 char:1
-+ Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:Htt 
-   pWebRequest) [Invoke-RestMethod], WebException
-    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShe 
-   ll.Commands.InvokeRestMethodCommand
-##[error]PowerShell exited with code '1'.
-Finishing: Tag source build as last known good
-
-
-It seems that the tagEscaped variable is not correctly pop[ulated or not correctly concatenated to the URL
+Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+Write-Host "Tagged source build successfully."
