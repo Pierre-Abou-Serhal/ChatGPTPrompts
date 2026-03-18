@@ -1,657 +1,105 @@
-Download rollback artifact (last known good)
+Because the tag that got stored was almost certainly **not** `LKG-SIT-MVC` when the REST call actually executed.
 
-View raw log
-Starting: Download rollback artifact (last known good)
-==============================================================================
-Task         : Download build artifacts
-Description  : Download files that were saved as artifacts of a completed build
-Version      : 0.235.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/download-build-artifacts
-==============================================================================
-##[error]Latest build from branch refs/heads/sit not found
-Finishing: Download rollback artifact (last known good)
+The clue is the exact value you saw: **`-version=7.0`**. That matches the **API version fragment** from your REST request, not your intended tag. Your tag call is built as:
 
-The health check failed (I did it intentionnaly in order to test the rollback_
+```powershell
+.../tags/$tagEscaped?api-version=$apiVersion
+```
 
-But I got this,
-The previus release did sucessfully tag a build.
+and Azure DevOps expects the real tag to be the `{tag}` path segment, while `api-version` belongs in the query string. ([Microsoft Learn][1])
 
-Also, the pipeline continued its execution even after Download rollback artifact (last known good) failed, so it stopped the website + poole, deleted all files and since there was no downloaded build, Restore rollback files failed and the app gor removed from the IIS folder 
+So when the UI later shows `-version=7.0` in the Tags filter, the most likely explanation is:
 
-This is my deploy-iis.yml:
-parameters:
-- name: deploymentName
-  type: string
-  default: 'DeployJob'
+* the request that reached Azure DevOps did **not** have `LKG-SIT-MVC` correctly populated in the `{tag}` path segment
+* and the server ended up storing a malformed value derived from the version part instead
 
-- name: deploymentDisplayName
-  type: string
-  default: 'Deploy IIS'
+That is an inference from the exact bad tag value and your script shape.
 
-- name: environmentName
-  type: string
+## The two most likely causes
 
-- name: deployPool
-  type: string
+### 1) `rollbackTag` was empty or not what you thought at execution time
 
-- name: deployAgentName
-  type: string
+If `${{ parameters.rollbackTag }}` resolved to empty, your URI would effectively become:
 
-- name: variableGroup
-  type: string
+```text
+.../tags/?api-version=7.0
+```
 
-- name: artifactName
-  type: string
-  default: 'drop'
+At that point, Azure DevOps Server can behave oddly, and the bad tag you saw is consistent with that kind of malformed call.
 
-- name: artifactBuildType
-  type: string
-  default: 'specific'   # current | specific
+### 2) You are passing the API version twice
 
-- name: artifactProject
-  type: string
-  default: '$(System.TeamProject)'
+The docs say the API version can be specified **either** in the `Accept` header **or** as a query parameter. ([Microsoft Learn][2])
 
-- name: artifactDefinitionId
-  type: string
-  default: ''           # Build pipeline definition ID when buildType = specific
+You currently do both:
 
-- name: artifactBranch
-  type: string
-  default: ''
+```powershell
+$uri = "...?api-version=7.0"
 
-- name: artifactDownloadPath
-  type: string
-  default: '$(Pipeline.Workspace)'
+$headers = @{
+  Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+  Accept        = "application/json; api-version=7.0"
+}
+```
 
-- name: zipName
-  type: string
+That is unnecessary, and on Azure DevOps Server it is safer to keep **only the query parameter**.
 
-- name: siteName
-  type: string
+## What to change
 
-- name: appPoolName
-  type: string
-
-- name: iisTargetPath
-  type: string
-
-- name: cleanTargetBeforeCopy
-  type: boolean
-  default: true
-
-- name: cleanExcludeCsv
-  type: string
-  default: 'web.config,logs,Keys'
-
-- name: enableJsonTransform
-  type: boolean
-  default: true
-
-- name: jsonFiles
-  type: string
-  default: '**/appsettings.json'
-
-- name: enableXmlConfigTransform
-  type: boolean
-  default: false
-
-- name: xmlConfigFiles
-  type: object
-  default: []
-
-- name: xmlVariableValues
-  type: object
-  default: {}
-
-- name: enableCustomXmlEdits
-  type: boolean
-  default: false
-
-- name: customXmlEdits
-  type: object
-  default: []
-
-- name: customXmlVariableValues
-  type: object
-  default: {}
-
-# Health check / rollback / tagging
-- name: enableHealthCheck
-  type: boolean
-  default: false
-
-- name: healthCheckUrl
-  type: string
-  default: ''
-
-- name: healthCheckExpectedStatusCode
-  type: string
-  default: '200'
-
-- name: healthCheckRetries
-  type: number
-  default: 6
-
-- name: healthCheckDelaySeconds
-  type: number
-  default: 10
-
-- name: enableRollbackOnHealthCheckFailure
-  type: boolean
-  default: true
-
-- name: rollbackTag
-  type: string
-  default: 'LKG-SIT'
-
-- name: tagSuccessfulBuild
-  type: boolean
-  default: true
-
-jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
-
-  environment: ${{ parameters.environmentName }}
-
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
-
-  variables:
-  - group: ${{ parameters.variableGroup }}
-
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - task: DownloadBuildArtifacts@0
-          name: DownloadRequestedArtifact
-          displayName: 'Download requested build artifact'
-          inputs:
-            buildType: '${{ parameters.artifactBuildType }}'
-            project: '${{ parameters.artifactProject }}'
-            pipeline: '${{ parameters.artifactDefinitionId }}'
-            buildVersionToDownload: 'latestFromBranch'
-            branchName: '${{ parameters.artifactBranch }}'
-            downloadType: 'single'
-            artifactName: '${{ parameters.artifactName }}'
-            downloadPath: '${{ parameters.artifactDownloadPath }}'
-
-        - task: ExtractFiles@1
-          displayName: 'Extract requested artifact'
-          inputs:
-            archiveFilePatterns: '${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\extracted'
-            cleanDestinationFolder: true
-
-        - task: FileTransform@2
-          displayName: 'JSON substitution (appsettings.json)'
-          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            enableXmlTransform: false
-            xmlTransformationRules: ''
-            jsonTargetFiles: ${{ parameters.jsonFiles }}
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $patternsJson = @'
-            ${{ convertToJson(parameters.xmlConfigFiles) }}
-            '@
-            $patterns = $patternsJson | ConvertFrom-Json
-
-            if (-not $patterns -or $patterns.Count -eq 0) {
-              Write-Host "No xmlConfigFiles patterns provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files([string]$base, [string]$pattern) {
-              $pattern = $pattern -replace '\\','/'
-
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            $files = @()
-            foreach ($pat in $patterns) {
-              $files += Resolve-Files $root ([string]$pat)
-            }
-            $files = $files | Where-Object { $_ } | Select-Object -Unique
-
-            if (-not $files -or $files.Count -eq 0) {
-              throw "No config files matched xmlConfigFiles patterns under: $root"
-            }
-
-            foreach ($f in $files) {
-              Write-Host "Editing: $($f.FullName)"
-              [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
-              if (-not $nodes -or $nodes.Count -eq 0) {
-                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
-                continue
-              }
-
-              $changed = 0
-
-              foreach ($n in $nodes) {
-                $key = [string]$n.GetAttribute("key")
-                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
-
-                if ([string]::IsNullOrWhiteSpace($val)) { continue }
-
-                $current = [string]$n.GetAttribute("value")
-                if ($current -ne $val) {
-                  $n.SetAttribute("value", $val)
-                  $changed++
-                }
-              }
-
-              $xml.Save($f.FullName)
-              Write-Host "Updated $changed setting(s) in $($f.Name)"
-            }
-          displayName: 'XML appSettings substitution (.config)'
-          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-          env:
-            ${{ each pair in parameters.xmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $rulesJson = @'
-            ${{ convertToJson(parameters.customXmlEdits) }}
-            '@
-            $rules = $rulesJson | ConvertFrom-Json
-
-            if (-not $rules -or $rules.Count -eq 0) {
-              Write-Host "No custom XML edits provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files($base, $pattern) {
-              $pattern = $pattern -replace '\\','/'
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            foreach ($r in $rules) {
-              $filePat = [string]$r.file
-              $xpath   = [string]$r.xpath
-              $varName = [string]$r.variable
-
-              if (-not $filePat -or -not $xpath -or -not $varName) {
-                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
-              }
-
-              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
-              if ([string]::IsNullOrWhiteSpace($value)) {
-                throw "Pipeline variable '$varName' is missing/empty."
-              }
-
-              $files = Resolve-Files $root $filePat
-              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
-
-              foreach ($f in @($files)) {
-                [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-                if ($xpath -match "/@([^/]+)$") {
-                  $attrName = $Matches[1]
-                  $nodePath = $xpath -replace "/@[^/]+$",""
-                  $node = $xml.SelectSingleNode($nodePath)
-                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
-
-                  $attr = $node.Attributes[$attrName]
-                  if (-not $attr) {
-                    $attr = $xml.CreateAttribute($attrName)
-                    [void]$node.Attributes.Append($attr)
-                  }
-                  $attr.Value = $value
-                } else {
-                  $node = $xml.SelectSingleNode($xpath)
-                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
-                  $node.InnerText = $value
-                }
-
-                $xml.Save($f.FullName)
-                Write-Host "Updated $($f.Name): $xpath (from $varName)"
-              }
-            }
-          displayName: 'Custom XML substitution (XPath)'
-          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
-          env:
-            ${{ each pair in parameters.customXmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $site = Get-Website -Name $siteName
-            Write-Host "Website current state: $($site.State)"
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website: $siteName"
-              Stop-Website -Name $siteName
-            } else {
-              Write-Host "Website already stopped."
-            }
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "AppPool current state: $poolState"
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool: $appPool"
-              Stop-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already stopped."
-            }
-
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $siteState = (Get-Website -Name $siteName).State
-              $poolState = (Get-WebAppPoolState -Name $appPool).Value
-
-              Write-Host "Website state: $siteState | AppPool state: $poolState"
-
-              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-                Write-Host "Website and App Pool are stopped."
-                break
-              }
-
-              Start-Sleep -Seconds 2
-            }
-
-            $finalSiteState = (Get-Website -Name $siteName).State
-            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
-
-            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool'
-
-        - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder (before copy)'
-          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
-
-        - task: CopyFiles@2
-          displayName: 'Copy files'
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
-
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool: $appPool"
-              Start-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website: $siteName"
-              Start-Website -Name $siteName
-            } else {
-              Write-Host "Website already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool'
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            if ('${{ parameters.enableHealthCheck }}' -ne 'true') {
-              Write-Host "Health check disabled."
-              exit 0
-            }
-
-            if ([string]::IsNullOrWhiteSpace('${{ parameters.healthCheckUrl }}')) {
-              throw "enableHealthCheck=true but healthCheckUrl is empty."
-            }
-
-            $url = '${{ parameters.healthCheckUrl }}'
-            $expected = [int]'${{ parameters.healthCheckExpectedStatusCode }}'
-            $retries = [int]'${{ parameters.healthCheckRetries }}'
-            $delay = [int]'${{ parameters.healthCheckDelaySeconds }}'
-            $passed = $false
-
-            for ($i = 1; $i -le $retries; $i++) {
-              try {
-                Write-Host "Health check attempt $i/$retries => $url"
-                $response = Invoke-WebRequest -Uri $url -Method Get -UseBasicParsing -TimeoutSec 30
-                $statusCode = [int]$response.StatusCode
-                Write-Host "Health check status code: $statusCode"
-
-                if ($statusCode -eq $expected) {
-                  $passed = $true
-                  break
-                }
-              }
-              catch {
-                Write-Host "Health check failed on attempt ${i}: $($_.Exception.Message)"
-              }
-
-              if ($i -lt $retries) {
-                Start-Sleep -Seconds $delay
-              }
-            }
-
-            if (-not $passed) {
-              Write-Host "##vso[task.setvariable variable=RollbackRequested]true"
-              throw "Health check failed after $retries attempt(s)."
-            }
-
-            Write-Host "##vso[task.setvariable variable=RollbackRequested]false"
-            Write-Host "Health check passed."
-          displayName: 'Health check'
-          condition: and(succeeded(), eq('${{ parameters.enableHealthCheck }}','true'))
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            if ('${{ parameters.tagSuccessfulBuild }}' -ne 'true') {
-              Write-Host "Tagging disabled."
-              exit 0
-            }
-
-            $buildId = "$(DownloadRequestedArtifact.BuildNumber)"
-            if ([string]::IsNullOrWhiteSpace($buildId)) {
-              throw "Source build id is empty. DownloadRequestedArtifact.BuildNumber was not populated."
-            }
-
-            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-            $tag           = '${{ parameters.rollbackTag }}'
-            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
-
-            # Azure DevOps Server 2022 supports up to REST API 7.0
-            $apiVersion = "7.0"
-
-            $uri = "$collectionUri/$projectName/_apis/build/builds/$buildId/tags/$tagEscaped?api-version=$apiVersion"
-
-            Write-Host "Tagging source build $buildId with '$tag'"
-            Write-Host "URI: $uri"
-
-            $headers = @{
-              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-              Accept        = "application/json; api-version=$apiVersion"
-            }
-
-            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-            Write-Host "Tagged source build successfully."
-          displayName: 'Tag source build as last known good'
-          condition: succeeded()
-          env:
-            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-        - task: DownloadBuildArtifacts@0
-          name: DownloadRollbackArtifact
-          displayName: 'Download rollback artifact (last known good)'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-          inputs:
-            buildType: 'specific'
-            project: '${{ parameters.artifactProject }}'
-            pipeline: '${{ parameters.artifactDefinitionId }}'
-            buildVersionToDownload: 'latestFromBranch'
-            branchName: '${{ parameters.artifactBranch }}'
-            tags: '${{ parameters.rollbackTag }}'
-            downloadType: 'single'
-            artifactName: '${{ parameters.artifactName }}'
-            downloadPath: '$(Pipeline.Workspace)\rollback-download'
-
-        - task: ExtractFiles@1
-          displayName: 'Extract rollback artifact'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-          inputs:
-            archiveFilePatterns: '$(Pipeline.Workspace)\rollback-download\${{ parameters.artifactName }}\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\rollback-extracted'
-            cleanDestinationFolder: true
-
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $site = Get-Website -Name $siteName
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website for rollback: $siteName"
-              Stop-Website -Name $siteName
-            }
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool for rollback: $appPool"
-              Stop-WebAppPool -Name $appPool
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool for rollback'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-        - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder for rollback: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder for rollback'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-        - task: CopyFiles@2
-          displayName: 'Restore rollback files'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\rollback-extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
-
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool after rollback: $appPool"
-              Start-WebAppPool -Name $appPool
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website after rollback: $siteName"
-              Start-Website -Name $siteName
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "After rollback => Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool after rollback'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-        - powershell: |
-            throw "Deployment failed health check. Rollback to the latest tagged last-known-good artifact was executed."
-          displayName: 'Fail deployment after rollback'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
+Use this version:
+
+```powershell
+$buildId = "$(DownloadRequestedArtifact.BuildNumber)"
+$tag     = '${{ parameters.rollbackTag }}'.Trim()
+
+if ([string]::IsNullOrWhiteSpace($buildId)) {
+  throw "Source build id is empty."
+}
+
+if ([string]::IsNullOrWhiteSpace($tag)) {
+  throw "rollbackTag is empty before calling the Build Tag API."
+}
+
+$collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+$projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+$tagEscaped    = [System.Uri]::EscapeDataString($tag)
+$apiVersion    = "7.0"
+
+$uri = "$collectionUri/$projectName/_apis/build/builds/$buildId/tags/$tagEscaped?api-version=$apiVersion"
+
+Write-Host "Resolved tag     : [$tag]"
+Write-Host "Resolved build id: [$buildId]"
+Write-Host "URI              : [$uri]"
+
+$headers = @{
+  Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+}
+
+Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+Write-Host "Tagged source build successfully."
+```
+
+## What to check in your last successful run
+
+Open the log of the tagging step and verify these lines:
+
+* `Resolved tag : [LKG-SIT-MVC]`
+* `URI : .../tags/LKG-SIT-MVC?api-version=7.0`
+
+If instead you see:
+
+* empty tag
+* `$(SomeVariableName)`
+* or a wrong literal value
+
+then the problem is in how the parent pipeline passes `rollbackTag` into this template.
+
+## One stronger improvement
+
+Instead of the path-based single-tag endpoint, use the **Update Build Tags** API with a JSON body. It is less fragile than embedding the tag in the URL path. Microsoft documents that API separately. ([Microsoft Learn][3])
+
+If you want, I’ll rewrite your tagging step to use the body-based API and add validation so this cannot silently create a bad tag again.
+
+[1]: https://learn.microsoft.com/en-us/rest/api/azure/devops/build/tags/add-build-tag?view=azure-devops-rest-7.1 "Tags - Add Build Tag - REST API (Azure DevOps Build) | Microsoft Learn"
+[2]: https://learn.microsoft.com/en-us/azure/devops/integrate/concepts/rest-api-versioning?view=azure-devops "REST API Versioning for Azure DevOps - Azure DevOps | Microsoft Learn"
+[3]: https://learn.microsoft.com/en-us/rest/api/azure/devops/build/tags/update-build-tags?view=azure-devops-rest-7.1&utm_source=chatgpt.com "Tags - Update Build Tags - REST API (Azure DevOps Build)"
