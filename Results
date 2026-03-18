@@ -1,143 +1,75 @@
-        - task: DownloadBuildArtifacts@0
-          name: DownloadRollbackArtifact
-          displayName: 'Download rollback artifact (last known good)'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-          inputs:
-            buildType: 'specific'
-            project: '${{ parameters.artifactProject }}'
-            pipeline: '${{ parameters.artifactDefinitionId }}'
-            buildVersionToDownload: 'latestFromBranch'
-            branchName: '${{ parameters.artifactBranch }}'
-            tags: '${{ parameters.rollbackTag }}'
-            # enable only if you want tagged partially-succeeded builds to be valid rollback candidates
-            # allowPartiallySucceededBuilds: true
-            downloadType: 'single'
-            artifactName: '${{ parameters.artifactName }}'
-            downloadPath: '$(Pipeline.Workspace)\rollback-download'
-
         - powershell: |
             $ErrorActionPreference = "Stop"
-            $zip = '$(Pipeline.Workspace)\rollback-download\${{ parameters.artifactName }}\${{ parameters.zipName }}'
 
-            if (Test-Path $zip) {
-              Write-Host "Rollback zip found: $zip"
-              Write-Host "##vso[task.setvariable variable=RollbackZipReady]true"
-            } else {
-              Write-Host "##vso[task.setvariable variable=RollbackZipReady]false"
-              throw "Rollback artifact download failed or expected zip not found: $zip"
-            }
-          displayName: 'Validate rollback artifact download'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-        - task: ExtractFiles@1
-          displayName: 'Extract rollback artifact'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackZipReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-          inputs:
-            archiveFilePatterns: '$(Pipeline.Workspace)\rollback-download\${{ parameters.artifactName }}\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\rollback-extracted'
-            cleanDestinationFolder: true
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $folder = '$(Pipeline.Workspace)\rollback-extracted'
-
-            if ((Test-Path $folder) -and (Get-ChildItem -Path $folder -Force | Measure-Object).Count -gt 0) {
-              Write-Host "Rollback extraction is valid."
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]true"
-            } else {
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-              throw "Rollback extraction folder is missing or empty: $folder"
-            }
-          displayName: 'Validate rollback extraction'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackZipReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $site = Get-Website -Name $siteName
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website for rollback: $siteName"
-              Stop-Website -Name $siteName
+            if ('${{ parameters.tagSuccessfulBuild }}' -ne 'true') {
+              Write-Host "Tagging disabled."
+              exit 0
             }
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool for rollback: $appPool"
-              Stop-WebAppPool -Name $appPool
+            $buildId = "$(DownloadRequestedArtifact.BuildNumber)"
+            $tag     = '${{ parameters.rollbackTag }}'.Trim()
+
+            if ([string]::IsNullOrWhiteSpace($buildId)) {
+              throw "Source build id is empty."
             }
 
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool for rollback'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-        - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
+            if ([string]::IsNullOrWhiteSpace($tag)) {
+              throw "rollbackTag is empty before calling the Build Tag API."
             }
 
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
+            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
+            $apiVersion    = "7.0"
 
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            $uri = "$collectionUri/$projectName/_apis/build/builds/$buildId/tags/$tagEscaped?api-version=$apiVersion"
+
+            Write-Host "Resolved tag     : [$tag]"
+            Write-Host "Resolved build id: [$buildId]"
+            Write-Host "URI              : [$uri]"
+
+            $headers = @{
+              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
             }
 
-            Write-Host "Cleaning target folder for rollback: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
+            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+            Write-Host "Tagged source build successfully."
+          displayName: 'Tag source build as last known good'
+          condition: succeeded()
+          env:
+            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder for rollback'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
+Rturned this:
+Starting: Tag source build as last known good
+==============================================================================
+Task         : PowerShell
+Description  : Run a PowerShell script on Linux, macOS, or Windows
+Version      : 2.232.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\dce900e4-cc18-4222-9862-a466c206e4a9.ps1'"
+Resolved tag     : [LKG-SIT-MVC]
+Resolved build id: [247]
+URI              : [http://uat-azure/DEV/AlternaCardManagement/_apis/build/builds/247/tags/-version=7.0]
+Invoke-RestMethod : {"$id":"1","innerException":null,"message":"No api-version 
+was supplied for the \"PUT\" request. The version must be supplied either as 
+part of the Accept header (e.g. \"application/json; api-version=1.0\") or as a 
+query parameter (e.g. \"?api-version=1.0\").","typeName":"Microsoft.VisualStudi
+o.Services.WebApi.VssVersionNotSpecifiedException, Microsoft.VisualStudio.Servi
+ces.WebApi","typeKey":"VssVersionNotSpecifiedException","errorCode":0,"eventId"
+:3000}
+At C:\agent\_work\_temp\dce900e4-cc18-4222-9862-a466c206e4a9.ps1:37 char:1
++ Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:Htt 
+   pWebRequest) [Invoke-RestMethod], WebException
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShe 
+   ll.Commands.InvokeRestMethodCommand
+##[error]PowerShell exited with code '1'.
+Finishing: Tag source build as last known good
 
-        - task: CopyFiles@2
-          displayName: 'Restore rollback files'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\rollback-extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
 
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Start-WebAppPool -Name $appPool
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Start-Website -Name $siteName
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "After rollback => Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool after rollback'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-        - powershell: |
-            throw "Deployment failed health check. Rollback was executed successfully."
-          displayName: 'Fail deployment after rollback'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), eq(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
-
-        - powershell: |
-            throw "Deployment failed health check, but no valid rollback artifact was available. Rollback destructive steps were skipped to avoid deleting the IIS app."
-          displayName: 'Fail safely when rollback artifact is unavailable'
-          condition: and(failed(), eq(variables['RollbackRequested'], 'true'), ne(variables['RollbackExtractReady'], 'true'), eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true'))
+It seems that the tagEscaped variable is not correctly pop[ulated or not correctly concatenated to the URL
