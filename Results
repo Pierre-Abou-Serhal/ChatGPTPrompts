@@ -1,343 +1,27 @@
-name: ACM_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
+Yes — the error is coming from the **template-expression wrapper around the stage item**.
 
-parameters:
-- name: deployDatabase
-  type: boolean
-  default: false
+Your line:
 
-- name: deployMvc
-  type: boolean
-  default: false
-
-- name: deployApi
-  type: boolean
-  default: false
-
-- name: mvcBuildNumber
-  type: string
-  default: ''
-
-- name: apiBuildNumber
-  type: string
-  default: ''
-
-- name: dbBuildNumber
-  type: string
-  default: ''
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger: none
-pr: none
-
-variables:
-- group: SIT_API_VARIABLE_GROUP
-
-- name: mvcPipelineName
-  value: 'SIT - BUILD - MVC - AlternaCardManagement'
-
-- name: apiPipelineName
-  value: 'SIT - BUILD - API - AlternaCardManagement'
-
-- name: dbPipelineName
-  value: 'SIT - BUILD - DB - AlternaCardManagement'
-
-stages:
-- stage: Resolve_Selected_Builds
-  displayName: 'Resolve selected build numbers'
-  jobs:
-  - job: ResolveBuildNumbers
-    displayName: 'Resolve pipeline names and build numbers'
-    pool:
-      name: 'Deployment Pool'
-      demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
-    steps:
-    - checkout: none
-
-    - powershell: |
-        $ErrorActionPreference = 'Stop'
-
-        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-        $apiVersion    = '7.1'
-
-        $headers = @{
-          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-        }
-
-        $deployMvc = "${{ parameters.deployMvc }}".ToLower() -eq 'true'
-        $deployApi = "${{ parameters.deployApi }}".ToLower() -eq 'true'
-        $deployDb  = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
-
-        if (-not ($deployMvc -or $deployApi -or $deployDb)) {
-          throw 'At least one deployment target must be selected: MVC, API, or Database.'
-        }
-
-        function Resolve-DefinitionIdByName {
-          param(
-            [string]$Label,
-            [string]$PipelineName
-          )
-
-          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
-            throw "$Label pipeline name is empty."
-          }
-
-          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
-          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
-            $collectionUri,
-            $projectName,
-            $encodedName,
-            $apiVersion
-
-          Write-Host "Resolving $Label pipeline name [$PipelineName]"
-          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-          if (-not $response.value -or $response.count -lt 1) {
-            throw "No pipeline definition found for $Label with name [$PipelineName]."
-          }
-
-          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
-
-          if ($exactMatches.Count -eq 0) {
-            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
-          }
-
-          if ($exactMatches.Count -gt 1) {
-            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
-          }
-
-          $definition = $exactMatches[0]
-
-          Write-Host "$Label definition resolved:"
-          Write-Host "  Definition ID   = $($definition.id)"
-          Write-Host "  Definition Name = $($definition.name)"
-
-          return $definition.id
-        }
-
-        function Resolve-Build {
-          param(
-            [string]$Label,
-            [string]$PipelineName,
-            [string]$BuildNumber
-          )
-
-          if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
-            throw "$Label build number is required because deployment of $Label was selected."
-          }
-
-          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
-          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
-
-          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-            $collectionUri,
-            $projectName,
-            $definitionId,
-            $encodedBuildNumber,
-            $apiVersion
-
-          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
-          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-          if (-not $response.value -or $response.count -lt 1) {
-            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
-          }
-
-          $build = $response.value[0]
-
-          if ($build.sourceBranch -ne 'refs/heads/sit') {
-            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
-          }
-
-          Write-Host "$Label build resolved:"
-          Write-Host "  Build ID         = $($build.id)"
-          Write-Host "  Build Number     = $($build.buildNumber)"
-          Write-Host "  Definition ID    = $definitionId"
-          Write-Host "  Definition Name  = $PipelineName"
-          Write-Host "  Branch           = $($build.sourceBranch)"
-
-          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
-          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
-          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-        }
-
-        if ($deployMvc) {
-          Resolve-Build -Label 'Mvc' -PipelineName '$(mvcPipelineName)' -BuildNumber '${{ parameters.mvcBuildNumber }}'
-        } else {
-          Write-Host '##vso[task.setvariable variable=MvcPipelineDefinitionId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=MvcBuildId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=MvcResolvedBuildNumber;isOutput=true]'
-        }
-
-        if ($deployApi) {
-          Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
-        } else {
-          Write-Host '##vso[task.setvariable variable=ApiPipelineDefinitionId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=ApiBuildId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=ApiResolvedBuildNumber;isOutput=true]'
-        }
-
-        if ($deployDb) {
-          Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
-        } else {
-          Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
-        }
-      name: Resolve
-      displayName: 'Resolve pipeline names and build numbers'
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
+```yaml
 - ${{ if or(eq(parameters.deployApi, true), eq(parameters.deployMvc, true)) }}:
-  - stage: Deploy_Applications_SIT
-    displayName: 'Deploy applications to SIT'
-    dependsOn:
-    - Resolve_Selected_Builds
-    variables:
-      ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
-      ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
-      MvcPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcPipelineDefinitionId'] ]
-      MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
-    jobs:
-    - ${{ if eq(parameters.deployApi, true) }}:
-      - template: pipelines/deploy-iis.yml@templates
-        parameters:
-          jobDependsOn: []
-          jobCondition: succeeded()
-          deploymentName: 'DeployAPI'
-          deploymentDisplayName: 'Deploy API to SIT (IIS)'
-          environmentName: 'SIT'
-          deployPool: 'Deployment Pool'
-          deployAgentName: 'SIT-ALTERNA-BN1'
-          variableGroup: 'SIT_API_VARIABLE_GROUP'
-          componentName: 'API'
-          artifactName: 'api-drop'
-          artifactBuildType: 'specific'
-          artifactProject: '$(System.TeamProject)'
-          artifactDefinitionId: '$(ApiPipelineDefinitionId)'
-          artifactBuildId: '$(ApiBuildId)'
-          artifactBranch: 'refs/heads/sit'
-          zipName: 'AlternaCardManagementAPI.zip'
-          siteName: 'AlternaCardManagement-AzureDevOps'
-          appPoolName: 'AlternaCardManagement-AzureDevOps'
-          iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
-          cleanTargetBeforeCopy: true
-          cleanExcludeCsv: ''
-          enableJsonTransform: false
-          jsonFiles: ''
-          enableXmlConfigTransform: true
-          xmlConfigFiles:
-          - '**/*.config'
-          xmlVariableValues:
-            BaseUrl: $(BaseUrl)
-            BrefBaseUrl: $(BrefBaseUrl)
-            CONN_STRING: $(CONN_STRING)
-            SMSUrl: $(SMSUrl)
-          enableCustomXmlEdits: false
-          customXmlEdits: []
-          enableHealthCheck: true
-          healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
-          healthCheckExpectedStatusCode: '200'
-          healthCheckRetries: 6
-          healthCheckDelaySeconds: 10
-          enableRollbackOnHealthCheckFailure: true
-          enableLocalBackup: true
-          backupRoot: 'C:\DeployBackups'
-          backupPath: 'C:\DeployBackups\SIT\API\$(Build.BuildId)'
-          orchestratedRollback: ${{ parameters.deployMvc }}
-          rollbackTag: 'LKG-SIT-API'
-          tagSuccessfulBuild: false
+```
 
-    - ${{ if eq(parameters.deployMvc, true) }}:
-      - template: pipelines/deploy-iis.yml@templates
-        parameters:
-          ${{ if eq(parameters.deployApi, true) }}:
-            jobDependsOn:
-            - DeployAPI
-          ${{ if eq(parameters.deployApi, false) }}:
-            jobDependsOn: []
-          jobCondition: succeeded()
-          deploymentName: 'DeployMVC'
-          deploymentDisplayName: 'Deploy MVC to SIT (IIS)'
-          environmentName: 'SIT'
-          deployPool: 'Deployment Pool'
-          deployAgentName: 'SIT-ALTERNA-FN1'
-          variableGroup: 'SIT_MVC_VARIABLE_GROUP'
-          componentName: 'MVC'
-          artifactName: 'mvc-drop'
-          artifactBuildType: 'specific'
-          artifactProject: '$(System.TeamProject)'
-          artifactDefinitionId: '$(MvcPipelineDefinitionId)'
-          artifactBuildId: '$(MvcBuildId)'
-          artifactBranch: 'refs/heads/sit'
-          zipName: 'AlternaCardManagementMVC.zip'
-          siteName: 'AlternaCardManagement-AzureDevOps'
-          appPoolName: 'AlternaCardManagement-AzureDevOps'
-          iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
-          cleanTargetBeforeCopy: true
-          cleanExcludeCsv: ''
-          enableJsonTransform: false
-          jsonFiles: ''
-          enableXmlConfigTransform: true
-          xmlConfigFiles:
-          - '**/Web.config'
-          xmlVariableValues:
-            BaseUrl: $(BaseUrl)
-            BaseUrlOsb: $(BaseUrlOsb)
-            CDN_IP_LINK: $(CDN_IP_LINK)
-            DASHBOARD_LINK: $(DASHBOARD_LINK)
-            GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
-            GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
-            LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
-            UploadFilesPath: $(UploadFilesPath)
-            USER_GUIDE_LINK: $(USER_GUIDE_LINK)
-          enableCustomXmlEdits: false
-          customXmlEdits: []
-          enableHealthCheck: true
-          healthCheckUrl: 'http://10.0.40.41:8046/'
-          healthCheckExpectedStatusCode: '200'
-          healthCheckRetries: 6
-          healthCheckDelaySeconds: 10
-          enableRollbackOnHealthCheckFailure: true
-          enableLocalBackup: true
-          backupRoot: 'C:\DeployBackups'
-          backupPath: 'C:\DeployBackups\SIT\MVC\$(Build.BuildId)'
-          orchestratedRollback: ${{ parameters.deployApi }}
-          rollbackTag: 'LKG-SIT-MVC'
-          tagSuccessfulBuild: false
+is valid in some Azure DevOps contexts, but at the **`stages:` root** it is one of the places that often triggers **“Invalid YAML structure”** depending on how the parser expands the surrounding blocks.
 
-- ${{ if and(eq(parameters.deployApi, true), eq(parameters.deployMvc, true)) }}:
-  - stage: Rollback_API_After_MVC_Failure_SIT
-    displayName: 'Rollback API because MVC failed'
-    dependsOn:
-    - Deploy_Applications_SIT
-    condition: and(
-      always(),
-      eq(dependencies.Deploy_Applications_SIT.outputs['DeployAPI.publishSuccessOutcome.DeploymentHealthy'], 'true'),
-      ne(dependencies.Deploy_Applications_SIT.outputs['DeployMVC.publishSuccessOutcome.DeploymentHealthy'], 'true')
-    )
-    jobs:
-    - template: pipelines/rollback-iis.yml@templates
-      parameters:
-        deploymentName: 'RollbackAPIAfterMVCFailure'
-        deploymentDisplayName: 'Rollback API from local backup because MVC failed'
-        environmentName: 'SIT'
-        deployPool: 'Deployment Pool'
-        deployAgentName: 'SIT-ALTERNA-BN1'
-        siteName: 'AlternaCardManagement-AzureDevOps'
-        appPoolName: 'AlternaCardManagement-AzureDevOps'
-        iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
-        backupPath: 'C:\DeployBackups\SIT\API\$(Build.BuildId)'
-        cleanExcludeCsv: ''
+The safest fix is:
 
+**do not wrap whole stages with `- ${{ if ... }}:`**
+Use a **normal stage** and put the logic in the stage’s `condition:` instead.
+
+That is the correction I recommend for all your conditional stages.
+
+---
+
+# What to correct exactly
+
+## 1) Replace this block
+
+```yaml
 - ${{ if or(eq(parameters.deployApi, true), eq(parameters.deployMvc, true)) }}:
   - stage: Tag_APP_LKG_SIT
     displayName: 'Tag successful application builds as LKG'
@@ -345,115 +29,171 @@ stages:
     - Resolve_Selected_Builds
     - Deploy_Applications_SIT
     condition: succeeded('Deploy_Applications_SIT')
-    variables:
-      ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
-      MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
-    jobs:
-    - job: TagApplicationBuilds
-      displayName: 'Tag MVC / API builds'
-      pool:
-        name: 'Deployment Pool'
-        demands:
-        - Agent.Name -equals SIT-ALTERNA-BN1
-      steps:
-      - checkout: none
-      - powershell: |
-          $ErrorActionPreference = 'Stop'
+```
 
-          $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-          $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-          $apiVersion    = '7.1'
+## With this
 
-          $headers = @{
-            Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-          }
+```yaml
+- stage: Tag_APP_LKG_SIT
+  displayName: 'Tag successful application builds as LKG'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Deploy_Applications_SIT
+  condition: and(
+    succeeded('Deploy_Applications_SIT'),
+    or(
+      eq('${{ parameters.deployApi }}', 'true'),
+      eq('${{ parameters.deployMvc }}', 'true')
+    )
+  )
+```
 
-          function Add-BuildTag {
-            param(
-              [string]$BuildId,
-              [string]$Tag
-            )
+---
 
-            if ([string]::IsNullOrWhiteSpace($BuildId)) {
-              return
-            }
+# I recommend doing the same for the other conditional stages too
 
-            $tagEscaped = [System.Uri]::EscapeDataString($Tag)
-            $uri = "{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}" -f `
-              $collectionUri,
-              $projectName,
-              $BuildId,
-              $tagEscaped,
-              $apiVersion
+That will make the whole release pipeline much more stable.
 
-            Write-Host "Tagging build [$BuildId] with [$Tag]"
-            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-          }
+---
 
-          if ('${{ parameters.deployApi }}' -eq 'true') {
-            Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'LKG-SIT-API'
-            Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'DEPLOYED-SIT-API'
-          }
+## 2) Replace `Deploy_Applications_SIT`
 
-          if ('${{ parameters.deployMvc }}' -eq 'true') {
-            Add-BuildTag -BuildId '$(MvcBuildId)' -Tag 'LKG-SIT-MVC'
-            Add-BuildTag -BuildId '$(MvcBuildId)' -Tag 'DEPLOYED-SIT-MVC'
-          }
-        displayName: 'Tag deployed application builds'
-        env:
-          SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+### Instead of this:
 
-- ${{ if and(eq(parameters.deployDatabase, true), or(eq(parameters.deployApi, true), eq(parameters.deployMvc, true))) }}:
-  - stage: Deploy_DB_SIT
-    displayName: 'Deploy DB to SIT'
+```yaml
+- ${{ if or(eq(parameters.deployApi, true), eq(parameters.deployMvc, true)) }}:
+  - stage: Deploy_Applications_SIT
+    displayName: 'Deploy applications to SIT'
     dependsOn:
     - Resolve_Selected_Builds
-    - Tag_APP_LKG_SIT
-    condition: succeeded('Tag_APP_LKG_SIT')
-    variables:
-      DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-      DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    jobs:
-    - template: pipelines/deploy-database.yml@templates
-      parameters:
-        deploymentName: 'DeployDb'
-        deploymentDisplayName: 'Deploy database'
-        environmentName: 'SIT-DB'
-        deployPool: 'Deployment Pool'
-        deployAgentName: 'SIT-ALTERNA-BN1'
-        artifactName: 'db-drop'
-        artifactBuildType: 'specific'
-        artifactProject: '$(System.TeamProject)'
-        artifactDefinitionId: '$(DbPipelineDefinitionId)'
-        artifactBuildId: '$(DbBuildId)'
-        artifactBranch: 'refs/heads/sit'
-        targetConnectionString: '$(CONN_STRING)'
-        tagSuccessfulBuild: true
-        successTag: 'DEPLOYED-SIT-DB'
+```
 
-- ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployApi, false), eq(parameters.deployMvc, false)) }}:
-  - stage: Deploy_DB_SIT
-    displayName: 'Deploy DB to SIT'
-    dependsOn:
-    - Resolve_Selected_Builds
-    condition: succeeded('Resolve_Selected_Builds')
-    variables:
-      DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-      DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    jobs:
-    - template: pipelines/deploy-database.yml@templates
-      parameters:
-        deploymentName: 'DeployDb'
-        deploymentDisplayName: 'Deploy database'
-        environmentName: 'SIT-DB'
-        deployPool: 'Deployment Pool'
-        deployAgentName: 'SIT-ALTERNA-BN1'
-        artifactName: 'db-drop'
-        artifactBuildType: 'specific'
-        artifactProject: '$(System.TeamProject)'
-        artifactDefinitionId: '$(DbPipelineDefinitionId)'
-        artifactBuildId: '$(DbBuildId)'
-        artifactBranch: 'refs/heads/sit'
-        targetConnectionString: '$(CONN_STRING)'
-        tagSuccessfulBuild: true
-        successTag: 'DEPLOYED-SIT-DB'
+### Use this:
+
+```yaml
+- stage: Deploy_Applications_SIT
+  displayName: 'Deploy applications to SIT'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: and(
+    succeeded('Resolve_Selected_Builds'),
+    or(
+      eq('${{ parameters.deployApi }}', 'true'),
+      eq('${{ parameters.deployMvc }}', 'true')
+    )
+  )
+```
+
+The jobs inside it can stay conditional as they are.
+
+---
+
+## 3) Replace `Rollback_API_After_MVC_Failure_SIT`
+
+### Instead of this:
+
+```yaml
+- ${{ if and(eq(parameters.deployApi, true), eq(parameters.deployMvc, true)) }}:
+  - stage: Rollback_API_After_MVC_Failure_SIT
+```
+
+### Use this:
+
+```yaml
+- stage: Rollback_API_After_MVC_Failure_SIT
+  displayName: 'Rollback API because MVC failed'
+  dependsOn:
+  - Deploy_Applications_SIT
+  condition: and(
+    always(),
+    eq('${{ parameters.deployApi }}', 'true'),
+    eq('${{ parameters.deployMvc }}', 'true'),
+    eq(dependencies.Deploy_Applications_SIT.outputs['DeployAPI.publishSuccessOutcome.DeploymentHealthy'], 'true'),
+    ne(dependencies.Deploy_Applications_SIT.outputs['DeployMVC.publishSuccessOutcome.DeploymentHealthy'], 'true')
+  )
+```
+
+---
+
+## 4) Replace the two DB stages the same way
+
+You currently have two separate conditional wrappers around two stages with the same name `Deploy_DB_SIT`.
+
+That is also risky.
+
+A cleaner approach is to make them **two different stage names**.
+
+### First DB stage: DB after app deployment
+
+```yaml
+- stage: Deploy_DB_After_Apps_SIT
+  displayName: 'Deploy DB to SIT after applications'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Tag_APP_LKG_SIT
+  condition: and(
+    succeeded('Tag_APP_LKG_SIT'),
+    eq('${{ parameters.deployDatabase }}', 'true'),
+    or(
+      eq('${{ parameters.deployApi }}', 'true'),
+      eq('${{ parameters.deployMvc }}', 'true')
+    )
+  )
+```
+
+### Second DB stage: DB only
+
+```yaml
+- stage: Deploy_DB_Only_SIT
+  displayName: 'Deploy DB to SIT'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: and(
+    succeeded('Resolve_Selected_Builds'),
+    eq('${{ parameters.deployDatabase }}', 'true'),
+    eq('${{ parameters.deployApi }}', 'false'),
+    eq('${{ parameters.deployMvc }}', 'false')
+  )
+```
+
+---
+
+# Why this fixes it
+
+Because now every item under `stages:` is a **real stage object**, which Azure DevOps parses cleanly.
+
+You are moving the logic from:
+
+* compile-time stage insertion
+
+to:
+
+* runtime stage condition
+
+That is much less fragile.
+
+---
+
+# One more correction you should keep
+
+Your rollback stage condition is now using the correct output path:
+
+```yaml
+dependencies.Deploy_Applications_SIT.outputs['DeployAPI.publishSuccessOutcome.DeploymentHealthy']
+```
+
+That part is good.
+
+---
+
+# My direct answer
+
+Your release pipeline logic is mostly good, but the **invalid YAML structure** is caused by the `- ${{ if ... }}:` wrappers around stages.
+
+## Best correction:
+
+* remove all top-level `- ${{ if ... }}:` around stages
+* define the stages normally
+* use `condition:` inside each stage
+
+If you want, I’ll rewrite your **entire release pipeline** in the corrected form so you can paste it directly.
