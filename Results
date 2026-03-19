@@ -1,1 +1,108 @@
-/release-azure-pipelines-sit.yml: (Line: 211, Col: 3, Idx: 7538) - (Line: 211, Col: 3, Idx: 7538): While scanning a simple key, could not find expected ':'.
+Yes — I can see the most likely cause.
+
+The **extra API rollback stage did not run because the output-variable path is wrong** for a **deployment job across stages**.
+
+I need to correct something I told you earlier: for **stage-to-stage output references from a deployment job**, Microsoft’s syntax is:
+
+```text
+dependencies.<stage-name>.outputs['<deployment-job-name>.<deployment-job-name>.<step-name>.<variable-name>']
+```
+
+So for your case, the correct form is the **duplicated deployment job name** form, not the shorter one. Microsoft documents this explicitly for “Stage to stage dependency (deployment job).” ([Microsoft Learn][1])
+
+That means this condition:
+
+```yaml
+eq(dependencies.Deploy_Applications_SIT.outputs['DeployAPI.publishSuccessOutcome.DeploymentHealthy'], 'true')
+```
+
+is wrong for a deployment job used across stages. Because the condition evaluates against a missing key, the stage never starts. By default, later stages only run if dependencies succeed, unless your custom condition evaluates to true. ([Microsoft Learn][2])
+
+## What to change
+
+Replace your rollback stage condition with this:
+
+```yaml
+- stage: Rollback_API_After_MVC_Failure_SIT
+  displayName: 'Rollback API because MVC failed'
+  dependsOn:
+  - Deploy_Applications_SIT
+  condition: and(
+    always(),
+    eq('${{ parameters.deployApi }}', 'true'),
+    eq('${{ parameters.deployMvc }}', 'true'),
+    eq(dependencies.Deploy_Applications_SIT.outputs['DeployAPI.DeployAPI.publishSuccessOutcome.DeploymentHealthy'], 'true'),
+    ne(dependencies.Deploy_Applications_SIT.outputs['DeployMVC.DeployMVC.publishSuccessOutcome.DeploymentHealthy'], 'true')
+  )
+  jobs:
+  - template: pipelines/rollback-iis.yml@templates
+    parameters:
+      deploymentName: 'RollbackAPIAfterMVCFailure'
+      deploymentDisplayName: 'Rollback API from local backup because MVC failed'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      siteName: 'AlternaCardManagement-AzureDevOps'
+      appPoolName: 'AlternaCardManagement-AzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
+      backupPath: 'C:\DeployBackups\SIT\API\$(Build.BuildId)'
+      cleanExcludeCsv: ''
+```
+
+## Why this matches what happened
+
+When MVC failed its health check:
+
+* MVC rolled itself back inside `deploy-iis.yml`
+* `Deploy_Applications_SIT` failed
+* your next stage checked API success using the wrong output path
+* Azure DevOps therefore did not see the condition as true, so the coordinated rollback stage did not start
+
+That behavior is consistent with Azure DevOps condition/dependency rules and deployment-job output syntax. ([Microsoft Learn][2])
+
+## Keep this step in `deploy-iis.yml`
+
+This part is correct and should stay:
+
+```yaml
+- powershell: |
+    Write-Host "##vso[task.setvariable variable=DeploymentHealthy;isOutput=true]true"
+  name: publishSuccessOutcome
+  displayName: 'Publish successful deployment outcome'
+  condition: succeeded()
+```
+
+Because the API job reaches it only when API truly finished healthy.
+
+## One more thing I recommend
+
+Add a small diagnostic stage/job once, just to print the dependencies object when testing. Microsoft suggests printing dependency/output data for troubleshooting output variables. ([Microsoft Learn][3])
+
+For example, temporarily add this after `Deploy_Applications_SIT`:
+
+```yaml
+- stage: Debug_Stage_Dependencies
+  dependsOn:
+  - Deploy_Applications_SIT
+  condition: always()
+  jobs:
+  - job: PrintDeps
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    variables:
+      deps: $[ convertToJson(dependencies) ]
+    steps:
+    - powershell: |
+        Write-Host 'Dependencies JSON:'
+        Write-Host '$(deps)'
+```
+
+That lets you confirm the exact key names Azure DevOps produced in your run.
+
+So the short answer is: **the rollback logic itself is fine; the stage-to-stage deployment-job output reference was the issue.**
+
+[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops "Expressions - Azure Pipelines | Microsoft Learn"
+[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/conditions?view=azure-devops "Pipeline conditions - Azure Pipelines | Microsoft Learn"
+[3]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/set-variables-scripts?view=azure-devops&utm_source=chatgpt.com "Set variables in scripts - Azure Pipelines"
