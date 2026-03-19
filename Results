@@ -817,7 +817,29 @@ jobs:
 
 
 windows service:
+parameters:
+- name: deploymentName
+  type: string
+  default: 'DeployJob'
 
+- name: deploymentDisplayName
+  type: string
+  default: 'Deploy Windows Service'
+
+- name: environmentName
+  type: string
+
+- name: deployPool
+  type: string
+
+- name: deployAgentName
+  type: string
+
+- name: jobDependsOn
+  type: object
+  default: []
+
+- name: jobCondition
   type: string
   default: 'succeeded()'
 
