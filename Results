@@ -1,5 +1,24 @@
-Depl;oy database tempalte:
+Yes — here are both templates cleaned of everything related to tagging.
 
+Removed from **deploy-database.yml**:
+
+* `tagSuccessfulBuild`
+* `successTag`
+* `Resolve source build id`
+* `Tag source DB build as deployed`
+
+Removed from **deploy-windows-service.yml**:
+
+* `rollbackTag`
+* `tagSuccessfulBuild`
+* `Resolve source build ID`
+* `Tag source build as last known good`
+
+---
+
+## `deploy-database.yml` cleaned
+
+```yaml
 parameters:
 - name: deploymentName
   type: string
@@ -70,14 +89,6 @@ parameters:
     /p:BlockOnPossibleDataLoss=false
     /p:DropObjectsNotInSource=false
 
-- name: tagSuccessfulBuild
-  type: boolean
-  default: true
-
-- name: successTag
-  type: string
-  default: 'DEPLOYED-SIT-DB'
-
 jobs:
 - deployment: ${{ parameters.deploymentName }}
   displayName: ${{ parameters.deploymentDisplayName }}
@@ -125,19 +136,6 @@ jobs:
         - powershell: |
             $ErrorActionPreference = 'Stop'
 
-            $sourceBuildId = '$(DownloadRequestedArtifact.BuildNumber)'.Trim()
-
-            if ([string]::IsNullOrWhiteSpace($sourceBuildId)) {
-              throw 'Unable to resolve source build id from DownloadBuildArtifacts output.'
-            }
-
-            Write-Host "Resolved source build id: $sourceBuildId"
-            Write-Host "##vso[task.setvariable variable=SourceBuildId]$sourceBuildId"
-          displayName: 'Resolve source build id'
-
-        - powershell: |
-            $ErrorActionPreference = 'Stop'
-
             Write-Host "Artifact root = ${{ parameters.artifactDownloadPath }}"
             Write-Host "Artifact name = ${{ parameters.artifactName }}"
 
@@ -171,52 +169,13 @@ jobs:
               exit $LASTEXITCODE
             }
           displayName: 'Publish database'
+```
 
-        - powershell: |
-            $ErrorActionPreference = 'Stop'
+---
 
-            $buildId = '$(SourceBuildId)'.Trim()
-            $tag     = '${{ parameters.successTag }}'.Trim()
+## `deploy-windows-service.yml` cleaned
 
-            if ([string]::IsNullOrWhiteSpace($buildId)) {
-              throw 'Source build id is empty before calling the Build Tag API.'
-            }
-
-            if ([string]::IsNullOrWhiteSpace($tag)) {
-              throw 'successTag is empty before calling the Build Tag API.'
-            }
-
-            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
-            $apiVersion    = '7.0'
-
-            $uri = '{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}' -f `
-              $collectionUri,
-              $projectName,
-              $buildId,
-              $tagEscaped,
-              $apiVersion
-
-            Write-Host "Resolved tag     : [$tag]"
-            Write-Host "Resolved build id: [$buildId]"
-            Write-Host "URI              : [$uri]"
-
-            $headers = @{
-              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-            }
-
-            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-            Write-Host 'Tagged DB build successfully.'
-          displayName: 'Tag source DB build as deployed'
-          condition: and(succeeded(), eq('${{ parameters.tagSuccessfulBuild }}','true'))
-          env:
-            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-
-
-Deploy-windows service:
-
+```yaml
 parameters:
 - name: deploymentName
   type: string
@@ -363,14 +322,6 @@ parameters:
   type: string
   default: ''
 
-- name: rollbackTag
-  type: string
-  default: 'LKG-SIT'
-
-- name: tagSuccessfulBuild
-  type: boolean
-  default: true
-
 jobs:
 - deployment: ${{ parameters.deploymentName }}
   displayName: ${{ parameters.deploymentDisplayName }}
@@ -423,23 +374,6 @@ jobs:
               downloadType: 'single'
               artifactName: '${{ parameters.artifactName }}'
               downloadPath: '${{ parameters.artifactDownloadPath }}'
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $sourceBuildId = '${{ parameters.artifactBuildId }}'.Trim()
-
-            if ([string]::IsNullOrWhiteSpace($sourceBuildId)) {
-              $sourceBuildId = '$(DownloadRequestedArtifact.BuildNumber)'.Trim()
-            }
-
-            if ([string]::IsNullOrWhiteSpace($sourceBuildId)) {
-              throw "Unable to resolve the source build ID for tagging."
-            }
-
-            Write-Host "Resolved source build ID: $sourceBuildId"
-            Write-Host "##vso[task.setvariable variable=SourceBuildId]$sourceBuildId"
-          displayName: 'Resolve source build ID'
 
         - task: ExtractFiles@1
           displayName: 'Extract requested artifact'
@@ -974,47 +908,6 @@ jobs:
             )
 
         - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $buildId = "$(SourceBuildId)"
-            $tag     = '${{ parameters.rollbackTag }}'.Trim()
-
-            if ([string]::IsNullOrWhiteSpace($buildId)) {
-              throw "Source build id is empty."
-            }
-
-            if ([string]::IsNullOrWhiteSpace($tag)) {
-              throw "rollbackTag is empty before calling the Build Tag API."
-            }
-
-            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
-            $apiVersion    = "7.0"
-
-            $uri = '{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}' -f `
-              $collectionUri,
-              $projectName,
-              $buildId,
-              $tagEscaped,
-              $apiVersion
-
-            Write-Host "Resolved tag     : [$tag]"
-            Write-Host "Resolved build id: [$buildId]"
-            Write-Host "URI              : [$uri]"
-
-            $headers = @{
-              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-            }
-
-            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-            Write-Host "Tagged source build successfully."
-          displayName: 'Tag source build as last known good'
-          condition: and(succeeded(), eq('${{ parameters.tagSuccessfulBuild }}','true'))
-          env:
-            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-        - powershell: |
             throw "Deployment failed after files were touched. Local rollback was executed successfully."
           displayName: 'Fail deployment after rollback'
           condition: and(
@@ -1033,3 +926,8 @@ jobs:
             eq(variables['DeploymentTouched'], 'true'),
             eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
             )
+```
+
+One small note: your cleaned `deploy-database.yml` no longer needs to know the source build ID, which is correct, because tagging will now happen centrally in your release pipeline/template.
+
+If you want, the next useful cleanup is to remove any `rollbackTag` / `tagSuccessfulBuild` parameters that are still being passed from release pipelines into these templates, since they no longer exist.
