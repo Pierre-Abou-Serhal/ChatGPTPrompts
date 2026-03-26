@@ -1,3 +1,44 @@
+This is my Alterna-DataExport API pipeline (SIT - BUILD - API - Alterna-DataExport):
+name: DTE_API_SIT_$(Date:yyyyMMdd).$(Rev:r)
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: 'Azure Templates/Azure Templates'
+      ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+      - sit
+  paths:
+    include:
+      - Alterna-DataExport/**
+
+pr: none
+
+stages:
+- stage: Build
+  displayName: 'Build & Publish Artifact'
+  jobs:
+  - template: pipelines/build-dotnet-core-webapi.yml@templates
+    parameters:
+      jobName: 'BuildJob'
+      jobDisplayName: 'Build DataExport'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      buildConfiguration: 'Release'
+      restoreProjects: '**/*.csproj'
+      runTests: false
+      testProjects: ''
+      publishProject: 'Alterna-DataExport/Alterna-DataExport/Alterna-DataExport.csproj'
+      nugetConfigPath: 'nuget.config'
+      zipName: 'Alterna-DataExport.zip'
+      artifactName: 'data-export-api-drop'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport'
+
+And this is the Altern-DataExport Database pipeline (SIT - BUILD - DB - Alterna-DataExport):
 name: DTE_DB_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
 resources:
@@ -31,5 +72,9 @@ stages:
       buildPool: 'Build Pool'
       buildAgentName: 'UAT-ALTERNA-DK1'
       sqlProjectPath: 'DatabaseProjectAlterna_DataExport/DatabaseProjectAlterna_DataExport.sqlproj'
-      artifactName: 'card-managemenmt-db-drop'
-      previewConnectionString: '$(CONN_STRING)'
+      artifactName: 'data-export-db-drop'
+      previewConnectionString: '$(AppSettings.DataExportConnectionString)'
+
+I want to create a release pipline that similar to what we did in Card management, but in yhis project, htere are no project that depends on each other, so we either deploy API, if it fails, we rollback
+Or we deploy database and if it fails we do nothing. Or we deploy both.
+We always begin with API relase
