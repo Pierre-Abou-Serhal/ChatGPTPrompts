@@ -9,8 +9,6 @@ parameters:
   type: boolean
   default: false
 
-# Use sentinel values so the fields appear in Run Pipeline
-# but are only validated when the related deploy flag is true.
 - name: apiBuildNumber
   type: string
   default: '__EMPTY__'
@@ -200,17 +198,9 @@ stages:
     ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
     ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
   jobs:
-  - job: StageAnchor
-    displayName: 'Stage anchor'
-    pool: server
-    steps:
-    - powershell: |
-        Write-Host 'Stage anchor'
-
   - template: pipelines/deploy-iis.yml@templates
     parameters:
-      jobDependsOn:
-      - StageAnchor
+      jobDependsOn: []
       jobCondition: succeeded()
       deploymentName: 'DeployAPI'
       deploymentDisplayName: 'Deploy DataExport API to SIT (IIS)'
@@ -318,17 +308,9 @@ stages:
     DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
     DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
   jobs:
-  - job: StageAnchor
-    displayName: 'Stage anchor'
-    pool: server
-    steps:
-    - powershell: |
-        Write-Host 'Stage anchor'
-
   - template: pipelines/deploy-database.yml@templates
     parameters:
-      jobDependsOn:
-      - StageAnchor
+      jobDependsOn: []
       jobCondition: succeeded()
       deploymentName: 'DeployDb'
       deploymentDisplayName: 'Deploy DataExport database'
@@ -354,17 +336,9 @@ stages:
     DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
     DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
   jobs:
-  - job: StageAnchor
-    displayName: 'Stage anchor'
-    pool: server
-    steps:
-    - powershell: |
-        Write-Host 'Stage anchor'
-
   - template: pipelines/deploy-database.yml@templates
     parameters:
-      jobDependsOn:
-      - StageAnchor
+      jobDependsOn: []
       jobCondition: succeeded()
       deploymentName: 'DeployDb'
       deploymentDisplayName: 'Deploy DataExport database'
