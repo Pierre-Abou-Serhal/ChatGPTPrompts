@@ -1,355 +1,40 @@
-This is my build angular tempalte:
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildAngular'
-
-- name: jobDisplayName
-  type: string
-  default: 'Build (Angular)'
-
-- name: buildPool
-  type: string
-
-- name: buildAgentName
-  type: string
-
-# Where your Angular project lives relative to repo root
-- name: workingDirectory
-  type: string
-  default: '.'
-
-# Node version to use (must exist on server or be installed)
-- name: nodeVersion
-  type: string
-  default: '22.x'
-
-# install command
-- name: installCommand
-  type: string
-  default: 'ci'   # npm install
-
-# whether to run tests
-- name: runTests
-  type: boolean
-  default: false
-
-# test command (customizable)
-- name: testCommand
-  type: string
-  default: 'test -- --watch=false --browsers=ChromeHeadless'
-
-# build configuration / command
-- name: buildCommand
-  type: string
-  default: 'npx ng build'
-
-# Angular dist folder (relative to workingDirectory)
-# Example: 'dist/my-app'
-- name: distFolder
-  type: string
-
-# Zip file name produced as artifact
-- name: zipName
-  type: string
-  default: 'AngularApp.zip'
-
-- name: artifactName
-  type: string
-  default: 'drop'
-
-# Where to stage files before zipping
-- name: publishOutputFolder
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
-
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
-
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
-
-  steps:
-  - checkout: self
-    clean: true
-
-  - powershell: |
-      Write-Host "Working directory: ${{ parameters.workingDirectory }}"
-      if (-not (Test-Path "${{ parameters.workingDirectory }}")) {
-        throw "Working directory not found: ${{ parameters.workingDirectory }}"
-      }
-    displayName: 'Validate working directory'
-
-  - script: |
-      whoami
-      npm config list -l
-      node -p "process.env.HTTP_PROXY"
-      node -p "process.env.HTTPS_PROXY"
-      nslookup registry.npmjs.org
-      npm ping --registry=https://registry.npmjs.org/
-    displayName: 'Diagnose npm network'
-
-  # Install dependencies
-  - script: |
-      npm ${{ parameters.installCommand }}
-    workingDirectory: ${{ parameters.workingDirectory }}
-    displayName: 'Install dependencies (npm)'
-
-  # Optional tests
-  - script: |
-      npm ${{ parameters.testCommand }}
-    workingDirectory: ${{ parameters.workingDirectory }}
-    displayName: 'Run tests'
-    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-    # If you use yarn/pnpm tests, switch this command accordingly.
-
-  # Build
-  - script: |
-      ${{ parameters.buildCommand }}
-    workingDirectory: ${{ parameters.workingDirectory }}
-    displayName: 'Build Angular'
-
-  # Copy dist output to staging folder (clean staging first)
-  - task: CopyFiles@2
-    displayName: 'Copy dist to staging folder'
-    inputs:
-      SourceFolder: '${{ parameters.workingDirectory }}\${{ parameters.distFolder }}'
-      Contents: '**'
-      TargetFolder: '${{ parameters.publishOutputFolder }}'
-      OverWrite: true
-
-  # Zip staged files (no nested dist folder in zip)
-  - task: ArchiveFiles@2
-    displayName: 'Zip dist output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
-
-  # Publish artifact (on-prem compatible)
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'Container'
-
-And this is my build-dotnet-core-webapi.yml
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildJob'
-
-- name: jobDisplayName
-  type: string
-  default: 'Build (.NET)'
-
-- name: buildPool
-  type: string
-
-- name: buildAgentName
-  type: string
-
-- name: buildConfiguration
-  type: string
-  default: 'Release'
-
-- name: restoreProjects
-  type: string
-  default: '**/*.csproj'
-
-- name: runTests
-  type: boolean
-  default: false
-
-- name: testProjects
-  type: string
-  default: '**/*Tests/*.csproj'
-
-- name: publishProject
-  type: string
-
-- name: nugetConfigPath
-  type: string
-  default: 'nuget.config'
-
-- name: zipName
-  type: string
-  default: 'WebApp.zip'
-
-- name: artifactName
-  type: string
-  default: 'drop'
-
-
-- name: publishOutputFolder
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\publish'
-
-- name: deploymentMode
-  type: string
-  default: 'framework-dependent'
-  values:
-  - framework-dependent
-  - self-contained
-
-- name: targetRuntime
-  type: string
-  default: ''
-
-- name: produceSingleFile
-  type: boolean
-  default: false
-
-- name: readyToRun
-  type: boolean
-  default: false
-
-- name: trim
-  type: boolean
-  default: false
-
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
-
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
-
-  variables:
-
-  - name: publishArgsNoRestore
-    value: '--no-restore'
-
-  - name: publishArgsBase
-    value: >-
-      --configuration ${{ parameters.buildConfiguration }}
-      --output "${{ parameters.publishOutputFolder }}"
-
-  - name: publishArgsRuntime
-    value: ''
-
-  - name: publishArgsSelfContained
-    value: ''
-
-  - name: publishArgsSingleFile
-    value: ''
-
-  - name: publishArgsReadyToRun
-    value: ''
-
-  - name: publishArgsTrim
-    value: ''
-  
-  - name: restoreArgs
-    value: ''
-
-  - ${{ if ne(parameters.targetRuntime, '') }}:
-    - name: publishArgsRuntime
-      value: '-r ${{ parameters.targetRuntime }}'
-
-  - ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
-    - name: publishArgsSelfContained
-      value: '--self-contained true'
-
-  - ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
-    - name: publishArgsSelfContained
-      value: '--self-contained false'
-
-  - ${{ if eq(parameters.produceSingleFile, true) }}:
-    - name: publishArgsSingleFile
-      value: '/p:PublishSingleFile=true'
-
-  - ${{ if eq(parameters.readyToRun, true) }}:
-    - name: publishArgsReadyToRun
-      value: '/p:PublishReadyToRun=true'
-
-  - ${{ if eq(parameters.trim, true) }}:
-    - name: publishArgsTrim
-      value: '/p:PublishTrimmed=true'
-
-  - ${{ if ne(parameters.targetRuntime, '') }}:
-    - name: restoreArgs
-      value: '-r ${{ parameters.targetRuntime }}'
-
-  - ${{ if ne(parameters.targetRuntime, '') }}:
-    - name: publishArgsNoRestore
-      value: ''
-
-  steps:
-  - checkout: self
-    clean: true
-
-  # Restore using nuget.config
-  - task: DotNetCoreCLI@2
-    displayName: 'Restore'
-    inputs:
-      command: 'restore'
-      projects: ${{ parameters.restoreProjects }}
-      feedsToUse: 'config'
-      nugetConfigPath: ${{ parameters.nugetConfigPath }}
-      arguments: >-
-        $(restoreArgs)
-
-  # Building project: dotnet build
-  - task: DotNetCoreCLI@2
-    displayName: 'Build'
-    inputs:
-      command: 'build'
-      projects: ${{ parameters.restoreProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
-
-  # Running tests if available: dotnet test
-  - task: DotNetCoreCLI@2
-    displayName: 'Test'
-    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
-    inputs:
-      command: 'test'
-      projects: ${{ parameters.testProjects }}
-      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
-      publishTestResults: true
-
-  # Publish the API project (with deployment-mode / runtime / single-file options)
-  - task: DotNetCoreCLI@2
-    displayName: 'Publish'
-    inputs:
-      command: 'publish'
-      projects: ${{ parameters.publishProject }}
-      publishWebProjects: false
-      zipAfterPublish: false
-      modifyOutputPath: false
-      arguments: >-
-        $(publishArgsBase)
-        $(publishArgsNoRestore)
-        $(publishArgsRuntime)
-        $(publishArgsSelfContained)
-        $(publishArgsSingleFile)
-        $(publishArgsReadyToRun)
-        $(publishArgsTrim)
-
-  # Zipping published files
-  - task: ArchiveFiles@2
-    displayName: 'Zip publish output'
-    inputs:
-      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      replaceExistingArchive: true
-
-  # Uploading zipped files to Azure
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Build Artifact'
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
-      ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'Container'
-
-Given the changes that we did, is there any change to do for these templates ?
+name: ACM_API_SIT_$(Date:yyyyMMdd).$(Rev:r)
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: 'Azure Templates/Azure Templates'
+      ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+      - sit
+  paths:
+    include:
+      - Alterna-DataExport/**
+
+pr: none
+
+stages:
+# =========================
+# BUILD
+# =========================
+- stage: Build
+  displayName: 'Build & Publish Artifact'
+  jobs:
+  - template: pipelines/build-dotnet-core-webapi.yml@templates
+    parameters:
+      jobName: 'BuildJob'
+      jobDisplayName: 'Build DataExport'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      buildConfiguration: 'Release'
+      restoreProjects: '**/*.csproj'
+      runTests: false
+      testProjects: ''
+      publishProject: 'Alterna-DataExport/Alterna-DataExport/Alterna-DataExport.csproj'
+      nugetConfigPath: 'nuget.config'
+      zipName: 'Alterna-DataExport.zip'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport'
