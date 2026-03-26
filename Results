@@ -1,3 +1,222 @@
+Depl;oy database tempalte:
+
+parameters:
+- name: deploymentName
+  type: string
+  default: 'DeployDatabase'
+
+- name: deploymentDisplayName
+  type: string
+  default: 'Deploy Database'
+
+- name: environmentName
+  type: string
+
+- name: deployPool
+  type: string
+
+- name: deployAgentName
+  type: string
+
+- name: jobDependsOn
+  type: object
+  default: []
+
+- name: jobCondition
+  type: string
+  default: 'succeeded()'
+
+- name: artifactName
+  type: string
+  default: 'db-drop'
+
+- name: artifactBuildType
+  type: string
+  default: 'specific'   # current | specific
+
+- name: artifactProject
+  type: string
+  default: '$(System.TeamProject)'
+
+- name: artifactDefinitionId
+  type: string
+  default: ''
+
+- name: artifactBuildId
+  type: string
+  default: ''
+
+- name: artifactBranch
+  type: string
+  default: 'refs/heads/sit'
+
+- name: artifactDownloadPath
+  type: string
+  default: '$(Pipeline.Workspace)'
+
+- name: targetConnectionString
+  type: string
+
+- name: sqlPackagePath
+  type: string
+  default: 'SqlPackage'
+
+- name: sqlPackageArgs
+  type: string
+  default: >
+    /p:IgnorePermissions=true
+    /p:IgnoreRoleMembership=true
+    /p:IgnoreUserSettingsObjects=true
+    /p:BlockOnPossibleDataLoss=false
+    /p:DropObjectsNotInSource=false
+
+- name: tagSuccessfulBuild
+  type: boolean
+  default: true
+
+- name: successTag
+  type: string
+  default: 'DEPLOYED-SIT-DB'
+
+jobs:
+- deployment: ${{ parameters.deploymentName }}
+  displayName: ${{ parameters.deploymentDisplayName }}
+  environment: ${{ parameters.environmentName }}
+  dependsOn: ${{ parameters.jobDependsOn }}
+  condition: ${{ parameters.jobCondition }}
+
+  pool:
+    name: ${{ parameters.deployPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
+
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - ${{ if ne(parameters.artifactBuildId, '') }}:
+          - task: DownloadBuildArtifacts@0
+            name: DownloadRequestedArtifact
+            displayName: 'Download DB build artifact (specific build)'
+            inputs:
+              buildType: 'specific'
+              project: '${{ parameters.artifactProject }}'
+              pipeline: '${{ parameters.artifactDefinitionId }}'
+              buildVersionToDownload: 'specific'
+              buildId: '${{ parameters.artifactBuildId }}'
+              downloadType: 'single'
+              artifactName: '${{ parameters.artifactName }}'
+              downloadPath: '${{ parameters.artifactDownloadPath }}'
+
+        - ${{ if eq(parameters.artifactBuildId, '') }}:
+          - task: DownloadBuildArtifacts@0
+            name: DownloadRequestedArtifact
+            displayName: 'Download DB build artifact (latest from branch)'
+            inputs:
+              buildType: '${{ parameters.artifactBuildType }}'
+              project: '${{ parameters.artifactProject }}'
+              pipeline: '${{ parameters.artifactDefinitionId }}'
+              buildVersionToDownload: 'latestFromBranch'
+              branchName: '${{ parameters.artifactBranch }}'
+              downloadType: 'single'
+              artifactName: '${{ parameters.artifactName }}'
+              downloadPath: '${{ parameters.artifactDownloadPath }}'
+
+        - powershell: |
+            $ErrorActionPreference = 'Stop'
+
+            $sourceBuildId = '$(DownloadRequestedArtifact.BuildNumber)'.Trim()
+
+            if ([string]::IsNullOrWhiteSpace($sourceBuildId)) {
+              throw 'Unable to resolve source build id from DownloadBuildArtifacts output.'
+            }
+
+            Write-Host "Resolved source build id: $sourceBuildId"
+            Write-Host "##vso[task.setvariable variable=SourceBuildId]$sourceBuildId"
+          displayName: 'Resolve source build id'
+
+        - powershell: |
+            $ErrorActionPreference = 'Stop'
+
+            Write-Host "Artifact root = ${{ parameters.artifactDownloadPath }}"
+            Write-Host "Artifact name = ${{ parameters.artifactName }}"
+
+            Get-ChildItem "${{ parameters.artifactDownloadPath }}" -Recurse | Select-Object FullName
+
+            $dacpac = Get-ChildItem "${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}" -Recurse -Filter database.dacpac |
+                      Select-Object -First 1
+
+            if (-not $dacpac) {
+              throw "database.dacpac not found under ${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}"
+            }
+
+            Write-Host "Using dacpac: $($dacpac.FullName)"
+            Write-Host "##vso[task.setvariable variable=DacpacPath]$($dacpac.FullName)"
+          displayName: 'Locate dacpac'
+
+        - powershell: |
+            $ErrorActionPreference = 'Stop'
+
+            $dacpac = '$(DacpacPath)'.Trim()
+            if ([string]::IsNullOrWhiteSpace($dacpac)) {
+              throw 'DacpacPath variable is empty.'
+            }
+
+            & "${{ parameters.sqlPackagePath }}" /Action:Publish `
+              /SourceFile:"$dacpac" `
+              /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
+              ${{ parameters.sqlPackageArgs }}
+
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          displayName: 'Publish database'
+
+        - powershell: |
+            $ErrorActionPreference = 'Stop'
+
+            $buildId = '$(SourceBuildId)'.Trim()
+            $tag     = '${{ parameters.successTag }}'.Trim()
+
+            if ([string]::IsNullOrWhiteSpace($buildId)) {
+              throw 'Source build id is empty before calling the Build Tag API.'
+            }
+
+            if ([string]::IsNullOrWhiteSpace($tag)) {
+              throw 'successTag is empty before calling the Build Tag API.'
+            }
+
+            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
+            $apiVersion    = '7.0'
+
+            $uri = '{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}' -f `
+              $collectionUri,
+              $projectName,
+              $buildId,
+              $tagEscaped,
+              $apiVersion
+
+            Write-Host "Resolved tag     : [$tag]"
+            Write-Host "Resolved build id: [$buildId]"
+            Write-Host "URI              : [$uri]"
+
+            $headers = @{
+              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+            }
+
+            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+            Write-Host 'Tagged DB build successfully.'
+          displayName: 'Tag source DB build as deployed'
+          condition: and(succeeded(), eq('${{ parameters.tagSuccessfulBuild }}','true'))
+          env:
+            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+
+
+Deploy-windows service:
+
 parameters:
 - name: deploymentName
   type: string
@@ -5,7 +224,7 @@ parameters:
 
 - name: deploymentDisplayName
   type: string
-  default: 'Deploy IIS'
+  default: 'Deploy Windows Service'
 
 - name: environmentName
   type: string
@@ -37,7 +256,7 @@ parameters:
 
 - name: artifactBuildType
   type: string
-  default: 'specific'   # current | specific
+  default: 'specific'
 
 - name: artifactProject
   type: string
@@ -62,13 +281,10 @@ parameters:
 - name: zipName
   type: string
 
-- name: siteName
+- name: serviceName
   type: string
 
-- name: appPoolName
-  type: string
-
-- name: iisTargetPath
+- name: serviceTargetPath
   type: string
 
 - name: cleanTargetBeforeCopy
@@ -77,7 +293,7 @@ parameters:
 
 - name: cleanExcludeCsv
   type: string
-  default: 'web.config,logs,Keys'
+  default: 'logs,Keys'
 
 - name: enableJsonTransform
   type: boolean
@@ -147,6 +363,14 @@ parameters:
   type: string
   default: ''
 
+- name: rollbackTag
+  type: string
+  default: 'LKG-SIT'
+
+- name: tagSuccessfulBuild
+  type: boolean
+  default: true
+
 jobs:
 - deployment: ${{ parameters.deploymentName }}
   displayName: ${{ parameters.deploymentDisplayName }}
@@ -199,6 +423,23 @@ jobs:
               downloadType: 'single'
               artifactName: '${{ parameters.artifactName }}'
               downloadPath: '${{ parameters.artifactDownloadPath }}'
+
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+
+            $sourceBuildId = '${{ parameters.artifactBuildId }}'.Trim()
+
+            if ([string]::IsNullOrWhiteSpace($sourceBuildId)) {
+              $sourceBuildId = '$(DownloadRequestedArtifact.BuildNumber)'.Trim()
+            }
+
+            if ([string]::IsNullOrWhiteSpace($sourceBuildId)) {
+              throw "Unable to resolve the source build ID for tagging."
+            }
+
+            Write-Host "Resolved source build ID: $sourceBuildId"
+            Write-Host "##vso[task.setvariable variable=SourceBuildId]$sourceBuildId"
+          displayName: 'Resolve source build ID'
 
         - task: ExtractFiles@1
           displayName: 'Extract requested artifact'
@@ -378,9 +619,9 @@ jobs:
               throw "componentName is required when enableLocalBackup=true."
             }
 
-            $source = '${{ parameters.iisTargetPath }}'
+            $source = '${{ parameters.serviceTargetPath }}'
             if (-not (Test-Path $source)) {
-              throw "IIS target path does not exist: $source"
+              throw "Service target path does not exist: $source"
             }
 
             $backupPath = '${{ parameters.backupPath }}'.Trim()
@@ -416,56 +657,42 @@ jobs:
           condition: succeeded()
 
         - powershell: |
-            Import-Module WebAdministration
+            $ErrorActionPreference = "Stop"
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
+            $serviceName = "${{ parameters.serviceName }}"
+            $svc = Get-Service -Name $serviceName -ErrorAction Stop
 
-            $site = Get-Website -Name $siteName
-            Write-Host "Website current state: $($site.State)"
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website: $siteName"
-              Stop-Website -Name $siteName
+            Write-Host "Service current state: $($svc.Status)"
+            if ($svc.Status -ne 'Stopped') {
+              Write-Host "Stopping service: $serviceName"
+              Stop-Service -Name $serviceName -Force -ErrorAction Stop
             } else {
-              Write-Host "Website already stopped."
-            }
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "AppPool current state: $poolState"
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool: $appPool"
-              Stop-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already stopped."
+              Write-Host "Service already stopped."
             }
 
             $maxTries = 30
             for ($i = 1; $i -le $maxTries; $i++) {
-              $siteState = (Get-Website -Name $siteName).State
-              $poolState = (Get-WebAppPoolState -Name $appPool).Value
+              $state = (Get-Service -Name $serviceName -ErrorAction Stop).Status
+              Write-Host "Service state: $state"
 
-              Write-Host "Website state: $siteState | AppPool state: $poolState"
-
-              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-                Write-Host "Website and App Pool are stopped."
+              if ($state -eq 'Stopped') {
+                Write-Host "Service is stopped."
                 break
               }
 
               Start-Sleep -Seconds 2
             }
 
-            $finalSiteState = (Get-Website -Name $siteName).State
-            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
-
-            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
+            $finalState = (Get-Service -Name $serviceName -ErrorAction Stop).Status
+            if ($finalState -ne 'Stopped') {
+              throw "Failed to stop service '$serviceName'. Final state: $finalState"
             }
 
             Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool'
+          displayName: 'Stop Windows Service'
 
         - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
+            $target = '${{ parameters.serviceTargetPath }}'
 
             if (-not (Test-Path $target)) {
               throw "Target folder does not exist: $target"
@@ -497,35 +724,40 @@ jobs:
           inputs:
             SourceFolder: '$(Pipeline.Workspace)\extracted'
             Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
+            TargetFolder: '${{ parameters.serviceTargetPath }}'
             OverWrite: true
 
         - powershell: |
-            Import-Module WebAdministration
+            $ErrorActionPreference = "Stop"
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
+            $serviceName = "${{ parameters.serviceName }}"
+            $svc = Get-Service -Name $serviceName -ErrorAction Stop
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool: $appPool"
-              Start-WebAppPool -Name $appPool
+            if ($svc.Status -ne 'Running') {
+              Write-Host "Starting service: $serviceName"
+              Start-Service -Name $serviceName -ErrorAction Stop
             } else {
-              Write-Host "AppPool already started."
+              Write-Host "Service already running."
             }
 
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website: $siteName"
-              Start-Website -Name $siteName
-            } else {
-              Write-Host "Website already started."
+            $maxTries = 30
+            for ($i = 1; $i -le $maxTries; $i++) {
+              $state = (Get-Service -Name $serviceName -ErrorAction Stop).Status
+              Write-Host "Service state: $state"
+
+              if ($state -eq 'Running') {
+                Write-Host "Service is running."
+                break
+              }
+
+              Start-Sleep -Seconds 2
             }
 
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool'
+            $finalState = (Get-Service -Name $serviceName -ErrorAction Stop).Status
+            if ($finalState -ne 'Running') {
+              throw "Failed to start service '$serviceName'. Final state: $finalState"
+            }
+          displayName: 'Start Windows Service'
 
         - powershell: |
             $ErrorActionPreference = "Stop"
@@ -612,25 +844,33 @@ jobs:
             )
 
         - powershell: |
-            Import-Module WebAdministration
+            $ErrorActionPreference = "Stop"
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
+            $serviceName = "${{ parameters.serviceName }}"
+            $svc = Get-Service -Name $serviceName -ErrorAction Stop
 
-            $site = Get-Website -Name $siteName
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website for rollback: $siteName"
-              Stop-Website -Name $siteName
+            if ($svc.Status -ne 'Stopped') {
+              Write-Host "Stopping service for rollback: $serviceName"
+              Stop-Service -Name $serviceName -Force -ErrorAction Stop
             }
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool for rollback: $appPool"
-              Stop-WebAppPool -Name $appPool
+            $maxTries = 30
+            for ($i = 1; $i -le $maxTries; $i++) {
+              $state = (Get-Service -Name $serviceName -ErrorAction Stop).Status
+              Write-Host "Service state: $state"
+
+              if ($state -eq 'Stopped') {
+                break
+              }
+
+              Start-Sleep -Seconds 2
             }
 
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool for rollback'
+            $finalState = (Get-Service -Name $serviceName -ErrorAction Stop).Status
+            if ($finalState -ne 'Stopped') {
+              throw "Failed to stop service '$serviceName' for rollback. Final state: $finalState"
+            }
+          displayName: 'Stop Windows Service for rollback'
           condition: and(
             failed(),
             eq(variables['RollbackExtractReady'], 'true'),
@@ -639,7 +879,7 @@ jobs:
             )
 
         - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
+            $target = '${{ parameters.serviceTargetPath }}'
 
             if (-not (Test-Path $target)) {
               throw "Target folder does not exist: $target"
@@ -675,7 +915,7 @@ jobs:
             $ErrorActionPreference = "Stop"
 
             $backup = '$(LocalBackupPath)'
-            $target = '${{ parameters.iisTargetPath }}'
+            $target = '${{ parameters.serviceTargetPath }}'
 
             if (-not (Test-Path $backup)) {
               throw "Local backup path not found: $backup"
@@ -700,31 +940,79 @@ jobs:
             )
 
         - powershell: |
-            Import-Module WebAdministration
+            $ErrorActionPreference = "Stop"
 
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
+            $serviceName = "${{ parameters.serviceName }}"
+            $svc = Get-Service -Name $serviceName -ErrorAction Stop
 
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Start-WebAppPool -Name $appPool
+            if ($svc.Status -ne 'Running') {
+              Start-Service -Name $serviceName -ErrorAction Stop
             }
 
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Start-Website -Name $siteName
+            $maxTries = 30
+            for ($i = 1; $i -le $maxTries; $i++) {
+              $state = (Get-Service -Name $serviceName -ErrorAction Stop).Status
+              Write-Host "Service state: $state"
+
+              if ($state -eq 'Running') {
+                break
+              }
+
+              Start-Sleep -Seconds 2
             }
 
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "After rollback => Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool after rollback'
+            $finalState = (Get-Service -Name $serviceName -ErrorAction Stop).Status
+            if ($finalState -ne 'Running') {
+              throw "Failed to start service '$serviceName' after rollback. Final state: $finalState"
+            }
+          displayName: 'Start Windows Service after rollback'
           condition: and(
             failed(),
             eq(variables['RollbackExtractReady'], 'true'),
             eq(variables['DeploymentTouched'], 'true'),
             eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
             )
+
+        - powershell: |
+            $ErrorActionPreference = "Stop"
+
+            $buildId = "$(SourceBuildId)"
+            $tag     = '${{ parameters.rollbackTag }}'.Trim()
+
+            if ([string]::IsNullOrWhiteSpace($buildId)) {
+              throw "Source build id is empty."
+            }
+
+            if ([string]::IsNullOrWhiteSpace($tag)) {
+              throw "rollbackTag is empty before calling the Build Tag API."
+            }
+
+            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
+            $apiVersion    = "7.0"
+
+            $uri = '{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}' -f `
+              $collectionUri,
+              $projectName,
+              $buildId,
+              $tagEscaped,
+              $apiVersion
+
+            Write-Host "Resolved tag     : [$tag]"
+            Write-Host "Resolved build id: [$buildId]"
+            Write-Host "URI              : [$uri]"
+
+            $headers = @{
+              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+            }
+
+            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+            Write-Host "Tagged source build successfully."
+          displayName: 'Tag source build as last known good'
+          condition: and(succeeded(), eq('${{ parameters.tagSuccessfulBuild }}','true'))
+          env:
+            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
         - powershell: |
             throw "Deployment failed after files were touched. Local rollback was executed successfully."
