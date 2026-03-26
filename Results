@@ -1,933 +1,460 @@
-Yes — here are both templates cleaned of everything related to tagging.
+name: ACM_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
-Removed from **deploy-database.yml**:
-
-* `tagSuccessfulBuild`
-* `successTag`
-* `Resolve source build id`
-* `Tag source DB build as deployed`
-
-Removed from **deploy-windows-service.yml**:
-
-* `rollbackTag`
-* `tagSuccessfulBuild`
-* `Resolve source build ID`
-* `Tag source build as last known good`
-
----
-
-## `deploy-database.yml` cleaned
-
-```yaml
 parameters:
-- name: deploymentName
-  type: string
-  default: 'DeployDatabase'
-
-- name: deploymentDisplayName
-  type: string
-  default: 'Deploy Database'
-
-- name: environmentName
-  type: string
-
-- name: deployPool
-  type: string
-
-- name: deployAgentName
-  type: string
-
-- name: jobDependsOn
-  type: object
-  default: []
-
-- name: jobCondition
-  type: string
-  default: 'succeeded()'
-
-- name: artifactName
-  type: string
-  default: 'db-drop'
-
-- name: artifactBuildType
-  type: string
-  default: 'specific'   # current | specific
-
-- name: artifactProject
-  type: string
-  default: '$(System.TeamProject)'
-
-- name: artifactDefinitionId
-  type: string
-  default: ''
-
-- name: artifactBuildId
-  type: string
-  default: ''
-
-- name: artifactBranch
-  type: string
-  default: 'refs/heads/sit'
-
-- name: artifactDownloadPath
-  type: string
-  default: '$(Pipeline.Workspace)'
-
-- name: targetConnectionString
-  type: string
-
-- name: sqlPackagePath
-  type: string
-  default: 'SqlPackage'
-
-- name: sqlPackageArgs
-  type: string
-  default: >
-    /p:IgnorePermissions=true
-    /p:IgnoreRoleMembership=true
-    /p:IgnoreUserSettingsObjects=true
-    /p:BlockOnPossibleDataLoss=false
-    /p:DropObjectsNotInSource=false
-
-jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
-  environment: ${{ parameters.environmentName }}
-  dependsOn: ${{ parameters.jobDependsOn }}
-  condition: ${{ parameters.jobCondition }}
-
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
-
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - ${{ if ne(parameters.artifactBuildId, '') }}:
-          - task: DownloadBuildArtifacts@0
-            name: DownloadRequestedArtifact
-            displayName: 'Download DB build artifact (specific build)'
-            inputs:
-              buildType: 'specific'
-              project: '${{ parameters.artifactProject }}'
-              pipeline: '${{ parameters.artifactDefinitionId }}'
-              buildVersionToDownload: 'specific'
-              buildId: '${{ parameters.artifactBuildId }}'
-              downloadType: 'single'
-              artifactName: '${{ parameters.artifactName }}'
-              downloadPath: '${{ parameters.artifactDownloadPath }}'
-
-        - ${{ if eq(parameters.artifactBuildId, '') }}:
-          - task: DownloadBuildArtifacts@0
-            name: DownloadRequestedArtifact
-            displayName: 'Download DB build artifact (latest from branch)'
-            inputs:
-              buildType: '${{ parameters.artifactBuildType }}'
-              project: '${{ parameters.artifactProject }}'
-              pipeline: '${{ parameters.artifactDefinitionId }}'
-              buildVersionToDownload: 'latestFromBranch'
-              branchName: '${{ parameters.artifactBranch }}'
-              downloadType: 'single'
-              artifactName: '${{ parameters.artifactName }}'
-              downloadPath: '${{ parameters.artifactDownloadPath }}'
-
-        - powershell: |
-            $ErrorActionPreference = 'Stop'
-
-            Write-Host "Artifact root = ${{ parameters.artifactDownloadPath }}"
-            Write-Host "Artifact name = ${{ parameters.artifactName }}"
-
-            Get-ChildItem "${{ parameters.artifactDownloadPath }}" -Recurse | Select-Object FullName
-
-            $dacpac = Get-ChildItem "${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}" -Recurse -Filter database.dacpac |
-                      Select-Object -First 1
-
-            if (-not $dacpac) {
-              throw "database.dacpac not found under ${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}"
-            }
-
-            Write-Host "Using dacpac: $($dacpac.FullName)"
-            Write-Host "##vso[task.setvariable variable=DacpacPath]$($dacpac.FullName)"
-          displayName: 'Locate dacpac'
-
-        - powershell: |
-            $ErrorActionPreference = 'Stop'
-
-            $dacpac = '$(DacpacPath)'.Trim()
-            if ([string]::IsNullOrWhiteSpace($dacpac)) {
-              throw 'DacpacPath variable is empty.'
-            }
-
-            & "${{ parameters.sqlPackagePath }}" /Action:Publish `
-              /SourceFile:"$dacpac" `
-              /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
-              ${{ parameters.sqlPackageArgs }}
-
-            if ($LASTEXITCODE -ne 0) {
-              exit $LASTEXITCODE
-            }
-          displayName: 'Publish database'
-```
-
----
-
-## `deploy-windows-service.yml` cleaned
-
-```yaml
-parameters:
-- name: deploymentName
-  type: string
-  default: 'DeployJob'
-
-- name: deploymentDisplayName
-  type: string
-  default: 'Deploy Windows Service'
-
-- name: environmentName
-  type: string
-
-- name: deployPool
-  type: string
-
-- name: deployAgentName
-  type: string
-
-- name: jobDependsOn
-  type: object
-  default: []
-
-- name: jobCondition
-  type: string
-  default: 'succeeded()'
-
-- name: variableGroup
-  type: string
-
-- name: componentName
-  type: string
-  default: ''
-
-- name: artifactName
-  type: string
-  default: 'drop'
-
-- name: artifactBuildType
-  type: string
-  default: 'specific'
-
-- name: artifactProject
-  type: string
-  default: '$(System.TeamProject)'
-
-- name: artifactDefinitionId
-  type: string
-  default: ''
-
-- name: artifactBuildId
-  type: string
-  default: ''
-
-- name: artifactBranch
-  type: string
-  default: ''
-
-- name: artifactDownloadPath
-  type: string
-  default: '$(Pipeline.Workspace)'
-
-- name: zipName
-  type: string
-
-- name: serviceName
-  type: string
-
-- name: serviceTargetPath
-  type: string
-
-- name: cleanTargetBeforeCopy
-  type: boolean
-  default: true
-
-- name: cleanExcludeCsv
-  type: string
-  default: 'logs,Keys'
-
-- name: enableJsonTransform
-  type: boolean
-  default: true
-
-- name: jsonFiles
-  type: string
-  default: '**/appsettings.json'
-
-- name: enableXmlConfigTransform
+- name: deployDatabase
   type: boolean
   default: false
+  displayName: 'Deploy Database'
 
-- name: xmlConfigFiles
-  type: object
-  default: []
-
-- name: xmlVariableValues
-  type: object
-  default: {}
-
-- name: enableCustomXmlEdits
+- name: deployMvc
   type: boolean
   default: false
+  displayName: 'Deploy MVC'
 
-- name: customXmlEdits
-  type: object
-  default: []
-
-- name: customXmlVariableValues
-  type: object
-  default: {}
-
-- name: enableHealthCheck
+- name: deployApi
   type: boolean
   default: false
+  displayName: 'Deploy API'
 
-- name: healthCheckUrl
+- name: mvcBuildNumber
   type: string
-  default: ''
+  default: '__EMPTY__'
+  displayName: 'MVC Build Number'
 
-- name: healthCheckExpectedStatusCode
+- name: apiBuildNumber
   type: string
-  default: '200'
+  default: '__EMPTY__'
+  displayName: 'API Build Number'
 
-- name: healthCheckRetries
-  type: number
-  default: 6
-
-- name: healthCheckDelaySeconds
-  type: number
-  default: 10
-
-- name: enableRollbackOnHealthCheckFailure
-  type: boolean
-  default: true
-
-- name: enableLocalBackup
-  type: boolean
-  default: true
-
-- name: backupRoot
+- name: dbBuildNumber
   type: string
-  default: 'C:\DeployBackups'
+  default: '__EMPTY__'
+  displayName: 'Database Build Number'
 
-- name: backupPath
-  type: string
-  default: ''
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
 
-jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
-  environment: ${{ parameters.environmentName }}
-  dependsOn: ${{ parameters.jobDependsOn }}
-  condition: ${{ parameters.jobCondition }}
+trigger: none
+pr: none
 
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
+variables:
+- group: SIT_API_VARIABLE_GROUP
 
+- name: mvcPipelineName
+  value: 'SIT - BUILD - MVC - AlternaCardManagement'
+
+- name: apiPipelineName
+  value: 'SIT - BUILD - API - AlternaCardManagement'
+
+- name: dbPipelineName
+  value: 'SIT - BUILD - DB - AlternaCardManagement'
+
+stages:
+
+- stage: Resolve_Selected_Builds
+  displayName: 'Resolve selected build numbers'
+  jobs:
+  - job: ResolveBuildNumbers
+    displayName: 'Resolve pipeline names and build numbers'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
+
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
+
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
+
+        $deployMvc = "${{ parameters.deployMvc }}".ToLower() -eq 'true'
+        $deployApi = "${{ parameters.deployApi }}".ToLower() -eq 'true'
+        $deployDb  = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
+
+        if (-not ($deployMvc -or $deployApi -or $deployDb)) {
+          throw 'At least one deployment target must be selected: MVC, API, or Database.'
+        }
+
+        function Resolve-DefinitionIdByName {
+          param(
+            [string]$Label,
+            [string]$PipelineName
+          )
+
+          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
+            throw "$Label pipeline name is empty."
+          }
+
+          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
+          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
+            $collectionUri,
+            $projectName,
+            $encodedName,
+            $apiVersion
+
+          Write-Host "Resolving $Label pipeline name [$PipelineName]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No pipeline definition found for $Label with name [$PipelineName]."
+          }
+
+          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
+
+          if ($exactMatches.Count -eq 0) {
+            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
+          }
+
+          if ($exactMatches.Count -gt 1) {
+            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
+          }
+
+          $definition = $exactMatches[0]
+
+          Write-Host "$Label definition resolved:"
+          Write-Host "  Definition ID   = $($definition.id)"
+          Write-Host "  Definition Name = $($definition.name)"
+
+          return $definition.id
+        }
+
+        function Resolve-Build {
+          param(
+            [string]$Label,
+            [string]$PipelineName,
+            [string]$BuildNumber
+          )
+
+          if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
+            throw "$Label build number is required because deployment of $Label was selected."
+          }
+
+          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
+          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
+
+          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $definitionId,
+            $encodedBuildNumber,
+            $apiVersion
+
+          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
+          }
+
+          $build = $response.value[0]
+
+          if ($build.sourceBranch -ne 'refs/heads/sit') {
+            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
+          }
+
+          Write-Host "$Label build resolved:"
+          Write-Host "  Build ID         = $($build.id)"
+          Write-Host "  Build Number     = $($build.buildNumber)"
+          Write-Host "  Definition ID    = $definitionId"
+          Write-Host "  Definition Name  = $PipelineName"
+          Write-Host "  Branch           = $($build.sourceBranch)"
+
+          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
+          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
+          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+        }
+
+        if ($deployMvc) {
+          if ('${{ parameters.mvcBuildNumber }}' -eq '__EMPTY__') {
+              throw 'MVC build number is required because deployment of MVC was selected.'
+            }
+
+          Resolve-Build -Label 'Mvc' -PipelineName '$(mvcPipelineName)' -BuildNumber '${{ parameters.mvcBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=MvcPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=MvcBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=MvcResolvedBuildNumber;isOutput=true]'
+        }
+
+        if ($deployApi) {
+          if ('${{ parameters.apiBuildNumber }}' -eq '__EMPTY__') {
+              throw 'API build number is required because deployment of API was selected.'
+            }
+
+          Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=ApiPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiResolvedBuildNumber;isOutput=true]'
+        }
+
+        if ($deployDb) {
+          if ('${{ parameters.dbBuildNumber }}' -eq '__EMPTY__') {
+              throw 'Database build number is required because deployment of Database was selected.'
+            }
+
+          Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
+        }
+      name: Resolve
+      displayName: 'Resolve pipeline names and build numbers'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: Deploy_Applications_SIT
+  displayName: 'Deploy applications to SIT'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: and(succeeded('Resolve_Selected_Builds'),or(${{ eq(parameters.deployApi, true) }},${{ eq(parameters.deployMvc, true) }}))
   variables:
-  - group: ${{ parameters.variableGroup }}
-
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - powershell: |
-            Write-Host "##vso[task.setvariable variable=LocalBackupReady]false"
-            Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-            Write-Host "##vso[task.setvariable variable=DeploymentTouched]false"
-          displayName: 'Initialize rollback variables'
-
-        - ${{ if ne(parameters.artifactBuildId, '') }}:
-          - task: DownloadBuildArtifacts@0
-            name: DownloadRequestedArtifact
-            displayName: 'Download requested build artifact (specific build)'
-            inputs:
-              buildType: 'specific'
-              project: '${{ parameters.artifactProject }}'
-              pipeline: '${{ parameters.artifactDefinitionId }}'
-              buildVersionToDownload: 'specific'
-              buildId: '${{ parameters.artifactBuildId }}'
-              downloadType: 'single'
-              artifactName: '${{ parameters.artifactName }}'
-              downloadPath: '${{ parameters.artifactDownloadPath }}'
-
-        - ${{ if eq(parameters.artifactBuildId, '') }}:
-          - task: DownloadBuildArtifacts@0
-            name: DownloadRequestedArtifact
-            displayName: 'Download requested build artifact (latest from branch)'
-            inputs:
-              buildType: '${{ parameters.artifactBuildType }}'
-              project: '${{ parameters.artifactProject }}'
-              pipeline: '${{ parameters.artifactDefinitionId }}'
-              buildVersionToDownload: 'latestFromBranch'
-              branchName: '${{ parameters.artifactBranch }}'
-              downloadType: 'single'
-              artifactName: '${{ parameters.artifactName }}'
-              downloadPath: '${{ parameters.artifactDownloadPath }}'
-
-        - task: ExtractFiles@1
-          displayName: 'Extract requested artifact'
-          inputs:
-            archiveFilePatterns: '${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\extracted'
-            cleanDestinationFolder: true
-
-        - task: FileTransform@2
-          displayName: 'JSON substitution (appsettings.json)'
-          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            enableXmlTransform: false
-            xmlTransformationRules: ''
-            jsonTargetFiles: ${{ parameters.jsonFiles }}
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $patternsJson = @'
-            ${{ convertToJson(parameters.xmlConfigFiles) }}
-            '@
-            $patterns = $patternsJson | ConvertFrom-Json
-
-            if (-not $patterns -or $patterns.Count -eq 0) {
-              Write-Host "No xmlConfigFiles patterns provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files([string]$base, [string]$pattern) {
-              $pattern = $pattern -replace '\\','/'
-
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            $files = @()
-            foreach ($pat in $patterns) {
-              $files += Resolve-Files $root ([string]$pat)
-            }
-            $files = $files | Where-Object { $_ } | Select-Object -Unique
-
-            if (-not $files -or $files.Count -eq 0) {
-              throw "No config files matched xmlConfigFiles patterns under: $root"
-            }
-
-            foreach ($f in $files) {
-              Write-Host "Editing: $($f.FullName)"
-              [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
-              if (-not $nodes -or $nodes.Count -eq 0) {
-                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
-                continue
-              }
-
-              $changed = 0
-
-              foreach ($n in $nodes) {
-                $key = [string]$n.GetAttribute("key")
-                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
-
-                if ([string]::IsNullOrWhiteSpace($val)) { continue }
-
-                $current = [string]$n.GetAttribute("value")
-                if ($current -ne $val) {
-                  $n.SetAttribute("value", $val)
-                  $changed++
-                }
-              }
-
-              $xml.Save($f.FullName)
-              Write-Host "Updated $changed setting(s) in $($f.Name)"
-            }
-          displayName: 'XML appSettings substitution (.config)'
-          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-          env:
-            ${{ each pair in parameters.xmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $rulesJson = @'
-            ${{ convertToJson(parameters.customXmlEdits) }}
-            '@
-            $rules = $rulesJson | ConvertFrom-Json
-
-            if (-not $rules -or $rules.Count -eq 0) {
-              Write-Host "No custom XML edits provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files($base, $pattern) {
-              $pattern = $pattern -replace '\\','/'
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            foreach ($r in $rules) {
-              $filePat = [string]$r.file
-              $xpath   = [string]$r.xpath
-              $varName = [string]$r.variable
-
-              if (-not $filePat -or -not $xpath -or -not $varName) {
-                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
-              }
-
-              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
-              if ([string]::IsNullOrWhiteSpace($value)) {
-                throw "Pipeline variable '$varName' is missing/empty."
-              }
-
-              $files = Resolve-Files $root $filePat
-              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
-
-              foreach ($f in @($files)) {
-                [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-                if ($xpath -match "/@([^/]+)$") {
-                  $attrName = $Matches[1]
-                  $nodePath = $xpath -replace "/@[^/]+$",""
-                  $node = $xml.SelectSingleNode($nodePath)
-                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
-
-                  $attr = $node.Attributes[$attrName]
-                  if (-not $attr) {
-                    $attr = $xml.CreateAttribute($attrName)
-                    [void]$node.Attributes.Append($attr)
-                  }
-                  $attr.Value = $value
-                } else {
-                  $node = $xml.SelectSingleNode($xpath)
-                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
-                  $node.InnerText = $value
-                }
-
-                $xml.Save($f.FullName)
-                Write-Host "Updated $($f.Name): $xpath (from $varName)"
-              }
-            }
-          displayName: 'Custom XML substitution (XPath)'
-          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
-          env:
-            ${{ each pair in parameters.customXmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            if ('${{ parameters.enableLocalBackup }}' -ne 'true') {
-              Write-Host "Local backup disabled."
-              exit 0
-            }
-
-            $component = '${{ parameters.componentName }}'.Trim()
-            if ([string]::IsNullOrWhiteSpace($component)) {
-              throw "componentName is required when enableLocalBackup=true."
-            }
-
-            $source = '${{ parameters.serviceTargetPath }}'
-            if (-not (Test-Path $source)) {
-              throw "Service target path does not exist: $source"
-            }
-
-            $backupPath = '${{ parameters.backupPath }}'.Trim()
-            if ([string]::IsNullOrWhiteSpace($backupPath)) {
-              $backupPath = Join-Path '${{ parameters.backupRoot }}' "${{ parameters.environmentName }}\$component\$(Build.BuildId)"
-            }
-
-            if (Test-Path $backupPath) {
-              Remove-Item -LiteralPath $backupPath -Recurse -Force
-            }
-
-            New-Item -ItemType Directory -Path $backupPath -Force | Out-Null
-
-            $items = Get-ChildItem -Path $source -Force
-            if ($items -and $items.Count -gt 0) {
-              foreach ($item in $items) {
-                Copy-Item -LiteralPath $item.FullName -Destination $backupPath -Recurse -Force
-              }
-              Write-Host "Backup created at: $backupPath"
-              Write-Host "##vso[task.setvariable variable=LocalBackupReady]true"
-            } else {
-              Write-Host "Source folder is empty. Backup folder created but contains no files."
-              Write-Host "##vso[task.setvariable variable=LocalBackupReady]false"
-            }
-
-            Write-Host "##vso[task.setvariable variable=LocalBackupPath]$backupPath"
-          displayName: 'Create local rollback backup'
-          condition: and(succeeded(), eq('${{ parameters.enableLocalBackup }}','true'))
-
-        - powershell: |
-            Write-Host "##vso[task.setvariable variable=DeploymentTouched]true"
-          displayName: 'Mark deployment as rollback-eligible'
-          condition: succeeded()
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $serviceName = "${{ parameters.serviceName }}"
-            $svc = Get-Service -Name $serviceName -ErrorAction Stop
-
-            Write-Host "Service current state: $($svc.Status)"
-            if ($svc.Status -ne 'Stopped') {
-              Write-Host "Stopping service: $serviceName"
-              Stop-Service -Name $serviceName -Force -ErrorAction Stop
-            } else {
-              Write-Host "Service already stopped."
-            }
-
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $state = (Get-Service -Name $serviceName -ErrorAction Stop).Status
-              Write-Host "Service state: $state"
-
-              if ($state -eq 'Stopped') {
-                Write-Host "Service is stopped."
-                break
-              }
-
-              Start-Sleep -Seconds 2
-            }
-
-            $finalState = (Get-Service -Name $serviceName -ErrorAction Stop).Status
-            if ($finalState -ne 'Stopped') {
-              throw "Failed to stop service '$serviceName'. Final state: $finalState"
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Windows Service'
-
-        - powershell: |
-            $target = '${{ parameters.serviceTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder (before copy)'
-          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
-
-        - task: CopyFiles@2
-          displayName: 'Copy files'
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.serviceTargetPath }}'
-            OverWrite: true
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $serviceName = "${{ parameters.serviceName }}"
-            $svc = Get-Service -Name $serviceName -ErrorAction Stop
-
-            if ($svc.Status -ne 'Running') {
-              Write-Host "Starting service: $serviceName"
-              Start-Service -Name $serviceName -ErrorAction Stop
-            } else {
-              Write-Host "Service already running."
-            }
-
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $state = (Get-Service -Name $serviceName -ErrorAction Stop).Status
-              Write-Host "Service state: $state"
-
-              if ($state -eq 'Running') {
-                Write-Host "Service is running."
-                break
-              }
-
-              Start-Sleep -Seconds 2
-            }
-
-            $finalState = (Get-Service -Name $serviceName -ErrorAction Stop).Status
-            if ($finalState -ne 'Running') {
-              throw "Failed to start service '$serviceName'. Final state: $finalState"
-            }
-          displayName: 'Start Windows Service'
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            if ('${{ parameters.enableHealthCheck }}' -ne 'true') {
-              Write-Host "Health check disabled."
-              exit 0
-            }
-
-            if ([string]::IsNullOrWhiteSpace('${{ parameters.healthCheckUrl }}')) {
-              throw "enableHealthCheck=true but healthCheckUrl is empty."
-            }
-
-            $url = '${{ parameters.healthCheckUrl }}'
-            $expected = [int]'${{ parameters.healthCheckExpectedStatusCode }}'
-            $retries = [int]'${{ parameters.healthCheckRetries }}'
-            $delay = [int]'${{ parameters.healthCheckDelaySeconds }}'
-            $passed = $false
-
-            for ($i = 1; $i -le $retries; $i++) {
-              try {
-                Write-Host "Health check attempt $i/$retries => $url"
-                $response = Invoke-WebRequest -Uri $url -Method Get -UseBasicParsing -TimeoutSec 30
-                $statusCode = [int]$response.StatusCode
-                Write-Host "Health check status code: $statusCode"
-
-                if ($statusCode -eq $expected) {
-                  $passed = $true
-                  break
-                }
-              }
-              catch {
-                Write-Host "Health check failed on attempt ${i}: $($_.Exception.Message)"
-              }
-
-              if ($i -lt $retries) {
-                Start-Sleep -Seconds $delay
-              }
-            }
-
-            if (-not $passed) {
-              throw "Health check failed after $retries attempt(s)."
-            }
-
-            Write-Host "Health check passed."
-          displayName: 'Health check'
-          condition: and(succeeded(), eq('${{ parameters.enableHealthCheck }}','true'))
-
-        - powershell: |
-            Write-Host "##vso[task.setvariable variable=DeploymentHealthy;isOutput=true]true"
-          name: publishSuccessOutcome
-          displayName: 'Publish successful deployment outcome'
-          condition: succeeded()
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            if ('${{ parameters.enableLocalBackup }}' -ne 'true') {
-              Write-Host "Local backup disabled. Nothing to validate for rollback."
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-              exit 0
-            }
-
-            $backup = '$(LocalBackupPath)'
-
-            if ([string]::IsNullOrWhiteSpace($backup)) {
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-              throw "Local backup path variable is empty."
-            }
-
-            if ((Test-Path $backup) -and (Get-ChildItem -Path $backup -Force | Measure-Object).Count -gt 0) {
-              Write-Host "Local rollback backup is valid: $backup"
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]true"
-            } else {
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-              throw "Local rollback backup is missing or empty: $backup"
-            }
-          displayName: 'Validate local rollback backup'
-          condition: and(
-            failed(),
-            eq(variables['LocalBackupReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $serviceName = "${{ parameters.serviceName }}"
-            $svc = Get-Service -Name $serviceName -ErrorAction Stop
-
-            if ($svc.Status -ne 'Stopped') {
-              Write-Host "Stopping service for rollback: $serviceName"
-              Stop-Service -Name $serviceName -Force -ErrorAction Stop
-            }
-
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $state = (Get-Service -Name $serviceName -ErrorAction Stop).Status
-              Write-Host "Service state: $state"
-
-              if ($state -eq 'Stopped') {
-                break
-              }
-
-              Start-Sleep -Seconds 2
-            }
-
-            $finalState = (Get-Service -Name $serviceName -ErrorAction Stop).Status
-            if ($finalState -ne 'Stopped') {
-              throw "Failed to stop service '$serviceName' for rollback. Final state: $finalState"
-            }
-          displayName: 'Stop Windows Service for rollback'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            $target = '${{ parameters.serviceTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder for rollback: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder for rollback'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $backup = '$(LocalBackupPath)'
-            $target = '${{ parameters.serviceTargetPath }}'
-
-            if (-not (Test-Path $backup)) {
-              throw "Local backup path not found: $backup"
-            }
-
-            $items = Get-ChildItem -Path $backup -Force
-            if (-not $items -or $items.Count -eq 0) {
-              throw "Local backup path is empty: $backup"
-            }
-
-            foreach ($item in $items) {
-              Copy-Item -LiteralPath $item.FullName -Destination $target -Recurse -Force
-            }
-
-            Write-Host "Rollback restore completed from local backup."
-          displayName: 'Restore rollback files from local backup'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $serviceName = "${{ parameters.serviceName }}"
-            $svc = Get-Service -Name $serviceName -ErrorAction Stop
-
-            if ($svc.Status -ne 'Running') {
-              Start-Service -Name $serviceName -ErrorAction Stop
-            }
-
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $state = (Get-Service -Name $serviceName -ErrorAction Stop).Status
-              Write-Host "Service state: $state"
-
-              if ($state -eq 'Running') {
-                break
-              }
-
-              Start-Sleep -Seconds 2
-            }
-
-            $finalState = (Get-Service -Name $serviceName -ErrorAction Stop).Status
-            if ($finalState -ne 'Running') {
-              throw "Failed to start service '$serviceName' after rollback. Final state: $finalState"
-            }
-          displayName: 'Start Windows Service after rollback'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            throw "Deployment failed after files were touched. Local rollback was executed successfully."
-          displayName: 'Fail deployment after rollback'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            throw "Deployment failed after files were touched, but no valid local rollback backup was available. Destructive rollback steps were skipped."
-          displayName: 'Fail safely when local rollback is unavailable'
-          condition: and(
-            failed(),
-            ne(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-```
-
-One small note: your cleaned `deploy-database.yml` no longer needs to know the source build ID, which is correct, because tagging will now happen centrally in your release pipeline/template.
-
-If you want, the next useful cleanup is to remove any `rollbackTag` / `tagSuccessfulBuild` parameters that are still being passed from release pipelines into these templates, since they no longer exist.
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+    MvcPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcPipelineDefinitionId'] ]
+    MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
+  jobs:
+  - ${{ if eq(parameters.deployApi, true) }}:
+    - template: pipelines/deploy-iis.yml@templates
+      parameters:
+        jobDependsOn: []
+        jobCondition: succeeded()
+        deploymentName: 'DeployAPI'
+        deploymentDisplayName: 'Deploy API to SIT (IIS)'
+        environmentName: 'SIT'
+        deployPool: 'Deployment Pool'
+        deployAgentName: 'SIT-ALTERNA-BN1'
+        variableGroup: 'SIT_API_VARIABLE_GROUP'
+        componentName: 'API'
+        artifactName: 'card-managemenmt-api-drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '$(ApiPipelineDefinitionId)'
+        artifactBuildId: '$(ApiBuildId)'
+        artifactBranch: 'refs/heads/sit'
+        zipName: 'AlternaCardManagementAPI.zip'
+        siteName: 'AlternaCardManagement-AzureDevOps'
+        appPoolName: 'AlternaCardManagement-AzureDevOps'
+        iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+        - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BrefBaseUrl: $(BrefBaseUrl)
+          CONN_STRING: $(CONN_STRING)
+          SMSUrl: $(SMSUrl)
+        enableCustomXmlEdits: false
+        customXmlEdits: []
+        enableHealthCheck: true
+        healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        enableLocalBackup: true
+        backupRoot: 'C:\DeployBackups'
+        backupPath: 'C:\DeployBackups\SIT\API\$(Build.BuildId)'
+
+  - ${{ if eq(parameters.deployMvc, true) }}:
+    - template: pipelines/deploy-iis.yml@templates
+      parameters:
+        ${{ if eq(parameters.deployApi, true) }}:
+          jobDependsOn:
+          - DeployAPI
+        ${{ if eq(parameters.deployApi, false) }}:
+          jobDependsOn: []
+        jobCondition: succeeded()
+        deploymentName: 'DeployMVC'
+        deploymentDisplayName: 'Deploy MVC to SIT (IIS)'
+        environmentName: 'SIT'
+        deployPool: 'Deployment Pool'
+        deployAgentName: 'SIT-ALTERNA-FN1'
+        variableGroup: 'SIT_MVC_VARIABLE_GROUP'
+        componentName: 'MVC'
+        artifactName: 'card-managemenmt-mvc-drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '$(MvcPipelineDefinitionId)'
+        artifactBuildId: '$(MvcBuildId)'
+        artifactBranch: 'refs/heads/sit'
+        zipName: 'AlternaCardManagementMVC.zip'
+        siteName: 'AlternaCardManagement-AzureDevOps'
+        appPoolName: 'AlternaCardManagement-AzureDevOps'
+        iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+        - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BaseUrlOsb: $(BaseUrlOsb)
+          CDN_IP_LINK: $(CDN_IP_LINK)
+          DASHBOARD_LINK: $(DASHBOARD_LINK)
+          GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
+          GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
+          LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
+          UploadFilesPath: $(UploadFilesPath)
+          USER_GUIDE_LINK: $(USER_GUIDE_LINK)
+        enableCustomXmlEdits: false
+        customXmlEdits: []
+        enableHealthCheck: true
+        healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        enableLocalBackup: true
+        backupRoot: 'C:\DeployBackups'
+        backupPath: 'C:\DeployBackups\SIT\MVC\$(Build.BuildId)'
+
+- stage: Rollback_API_After_MVC_Failure_SIT
+  displayName: 'Rollback API because MVC failed'
+  dependsOn:
+  - Deploy_Applications_SIT
+  condition: and(always(), eq('${{ parameters.deployApi }}', 'true'), eq('${{ parameters.deployMvc }}', 'true'), eq(dependencies.Deploy_Applications_SIT.outputs['DeployAPI.DeployAPI.publishSuccessOutcome.DeploymentHealthy'], 'true'), ne(dependencies.Deploy_Applications_SIT.outputs['DeployMVC.DeployMVC.publishSuccessOutcome.DeploymentHealthy'], 'true'))
+  jobs:
+  - template: pipelines/rollback-iis.yml@templates
+    parameters:
+      deploymentName: 'RollbackAPIAfterMVCFailure'
+      deploymentDisplayName: 'Rollback API from local backup because MVC failed'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      siteName: 'AlternaCardManagement-AzureDevOps'
+      appPoolName: 'AlternaCardManagement-AzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
+      backupPath: 'C:\DeployBackups\SIT\API\$(Build.BuildId)'
+      cleanExcludeCsv: ''
+
+- stage: Tag_APP_LKG_SIT
+  displayName: 'Tag successful application builds as LKG'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Deploy_Applications_SIT
+  condition: and(succeeded('Deploy_Applications_SIT'), or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
+  variables:
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+    MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
+  jobs:
+  - job: TagApplicationBuilds
+    displayName: 'Tag MVC / API builds'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
+
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
+
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
+
+        function Add-BuildTag {
+          param(
+            [string]$BuildId,
+            [string]$Tag
+          )
+
+          if ([string]::IsNullOrWhiteSpace($BuildId)) {
+            return
+          }
+
+          $tagEscaped = [System.Uri]::EscapeDataString($Tag)
+          $uri = "{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $BuildId,
+            $tagEscaped,
+            $apiVersion
+
+          Write-Host "Tagging build [$BuildId] with [$Tag]"
+          Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+        }
+
+        if ('${{ parameters.deployApi }}' -eq 'true') {
+          Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'LKG-SIT-API'
+          Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'DEPLOYED-SIT-API'
+        }
+
+        if ('${{ parameters.deployMvc }}' -eq 'true') {
+          Add-BuildTag -BuildId '$(MvcBuildId)' -Tag 'LKG-SIT-MVC'
+          Add-BuildTag -BuildId '$(MvcBuildId)' -Tag 'DEPLOYED-SIT-MVC'
+        }
+      displayName: 'Tag deployed application builds'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: Deploy_DB_After_Apps_SIT
+  displayName: 'Deploy DB to SIT after applications'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Tag_APP_LKG_SIT
+  condition: and( succeeded('Tag_APP_LKG_SIT'), ${{ eq(parameters.deployDatabase, true) }}, or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy database'
+      environmentName: 'SIT-DB'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'card-managemenmt-db-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      targetConnectionString: '$(CONN_STRING)'
+
+- stage: Deploy_DB_Only_SIT
+  displayName: 'Deploy DB to SIT'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: and(succeeded('Resolve_Selected_Builds'), ${{ eq(parameters.deployDatabase, true) }}, ${{ eq(parameters.deployApi, false) }}, ${{ eq(parameters.deployMvc, false) }})
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy database'
+      environmentName: 'SIT-DB'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'card-managemenmt-db-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      targetConnectionString: '$(CONN_STRING)'
