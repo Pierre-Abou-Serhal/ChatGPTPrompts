@@ -1,813 +1,255 @@
 parameters:
-- name: deploymentName
-  type: string
-  default: 'DeployJob'
-
-- name: deploymentDisplayName
-  type: string
-  default: 'Deploy IIS'
-
-- name: environmentName
-  type: string
-
-- name: deployPool
-  type: string
-
-- name: deployAgentName
-  type: string
-
-- name: jobDependsOn
+- name: tagTargets
   type: object
   default: []
 
-- name: jobCondition
+- name: apiVersion
   type: string
-  default: 'succeeded()'
+  default: '7.1'
 
-- name: variableGroup
-  type: string
+steps:
+- powershell: |
+    $ErrorActionPreference = 'Stop'
 
-- name: componentName
-  type: string
-  default: ''
+    $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+    $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+    $apiVersion    = '${{ parameters.apiVersion }}'
 
-- name: artifactName
-  type: string
-  default: 'drop'
+    $headers = @{
+      Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+    }
 
-- name: artifactBuildType
-  type: string
-  default: 'specific'   # current | specific
+    $targetsJson = @'
+    ${{ convertToJson(parameters.tagTargets) }}
+    '@
 
-- name: artifactProject
-  type: string
-  default: '$(System.TeamProject)'
+    $targets = $targetsJson | ConvertFrom-Json
 
-- name: artifactDefinitionId
-  type: string
-  default: ''
+    if (-not $targets) {
+      throw 'No tagTargets were provided to the tagging template.'
+    }
 
-- name: artifactBuildId
-  type: string
-  default: ''
+    function Add-BuildTag {
+      param(
+        [string]$BuildId,
+        [string]$Tag
+      )
 
-- name: artifactBranch
-  type: string
-  default: ''
+      if ([string]::IsNullOrWhiteSpace($BuildId) -or [string]::IsNullOrWhiteSpace($Tag)) {
+        return
+      }
 
-- name: artifactDownloadPath
-  type: string
-  default: '$(Pipeline.Workspace)'
+      $tagEscaped = [System.Uri]::EscapeDataString($Tag)
+      $uri = "{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}" -f `
+        $collectionUri,
+        $projectName,
+        $BuildId,
+        $tagEscaped,
+        $apiVersion
 
-- name: zipName
-  type: string
+      Write-Host "Adding tag [$Tag] to build [$BuildId]"
+      Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+    }
 
-- name: siteName
-  type: string
+    function Remove-BuildTag {
+      param(
+        [string]$BuildId,
+        [string]$Tag
+      )
 
-- name: appPoolName
-  type: string
+      if ([string]::IsNullOrWhiteSpace($BuildId) -or [string]::IsNullOrWhiteSpace($Tag)) {
+        return
+      }
 
-- name: iisTargetPath
-  type: string
+      $tagEscaped = [System.Uri]::EscapeDataString($Tag)
+      $uri = "{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}" -f `
+        $collectionUri,
+        $projectName,
+        $BuildId,
+        $tagEscaped,
+        $apiVersion
 
-- name: cleanTargetBeforeCopy
-  type: boolean
-  default: true
+      Write-Host "Removing tag [$Tag] from build [$BuildId]"
+      Invoke-RestMethod -Method Delete -Uri $uri -Headers $headers | Out-Null
+    }
 
-- name: cleanExcludeCsv
-  type: string
-  default: 'web.config,logs,Keys'
+    function Remove-OldLkgTags {
+      param(
+        [string]$CurrentBuildId,
+        [string]$DefinitionId,
+        [string]$LkgTag
+      )
 
-- name: enableJsonTransform
-  type: boolean
-  default: true
+      if ([string]::IsNullOrWhiteSpace($CurrentBuildId) -or [string]::IsNullOrWhiteSpace($DefinitionId) -or [string]::IsNullOrWhiteSpace($LkgTag)) {
+        return
+      }
 
-- name: jsonFiles
-  type: string
-  default: '**/appsettings.json'
+      $listUri = "{0}/{1}/_apis/build/builds?definitions={2}&tagFilters={3}&statusFilter=completed&queryOrder=finishTimeDescending&api-version={4}" -f `
+        $collectionUri,
+        $projectName,
+        $DefinitionId,
+        [System.Uri]::EscapeDataString($LkgTag),
+        $apiVersion
 
-- name: enableXmlConfigTransform
-  type: boolean
-  default: false
+      Write-Host "Looking for existing builds tagged [$LkgTag] in definition [$DefinitionId]"
+      $response = Invoke-RestMethod -Method Get -Uri $listUri -Headers $headers
 
-- name: xmlConfigFiles
-  type: object
-  default: []
+      if ($response.value) {
+        foreach ($b in $response.value) {
+          $oldBuildId = [string]$b.id
+          if ($oldBuildId -ne $CurrentBuildId) {
+            Remove-BuildTag -BuildId $oldBuildId -Tag $LkgTag
+          }
+        }
+      }
+    }
 
-- name: xmlVariableValues
-  type: object
-  default: {}
+    foreach ($target in @($targets)) {
+      $name           = [string]$target.name
+      $buildId        = [string]$target.buildId
+      $definitionId   = [string]$target.definitionId
+      $deployedTag    = [string]$target.deployedTag
+      $lkgTag         = [string]$target.lkgTag
+      $makeLkgUnique  = $false
 
-- name: enableCustomXmlEdits
-  type: boolean
-  default: false
+      if ($null -ne $target.makeLkgUnique) {
+        $makeLkgUnique = [System.Convert]::ToBoolean($target.makeLkgUnique)
+      }
 
-- name: customXmlEdits
-  type: object
-  default: []
+      if ([string]::IsNullOrWhiteSpace($name)) {
+        $name = 'UnnamedTarget'
+      }
 
-- name: customXmlVariableValues
-  type: object
-  default: {}
+      if ([string]::IsNullOrWhiteSpace($buildId)) {
+        throw "[$name] buildId is empty."
+      }
 
-- name: enableHealthCheck
-  type: boolean
-  default: false
+      Write-Host "----------------------------------------"
+      Write-Host "Processing tag target: $name"
+      Write-Host "Build ID: $buildId"
+      Write-Host "Definition ID: $definitionId"
+      Write-Host "DEPLOYED tag: $deployedTag"
+      Write-Host "LKG tag: $lkgTag"
+      Write-Host "Unique LKG: $makeLkgUnique"
 
-- name: healthCheckUrl
-  type: string
-  default: ''
+      if ($makeLkgUnique -and -not [string]::IsNullOrWhiteSpace($lkgTag)) {
+        if ([string]::IsNullOrWhiteSpace($definitionId)) {
+          throw "[$name] definitionId is required when makeLkgUnique=true."
+        }
 
-- name: healthCheckExpectedStatusCode
-  type: string
-  default: '200'
+        Remove-OldLkgTags -CurrentBuildId $buildId -DefinitionId $definitionId -LkgTag $lkgTag
+      }
 
-- name: healthCheckRetries
-  type: number
-  default: 6
+      if (-not [string]::IsNullOrWhiteSpace($lkgTag)) {
+        Add-BuildTag -BuildId $buildId -Tag $lkgTag
+      }
 
-- name: healthCheckDelaySeconds
-  type: number
-  default: 10
+      if (-not [string]::IsNullOrWhiteSpace($deployedTag)) {
+        Add-BuildTag -BuildId $buildId -Tag $deployedTag
+      }
+    }
+  displayName: 'Tag deployed builds'
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
-- name: enableRollbackOnHealthCheckFailure
-  type: boolean
-  default: true
 
-- name: enableLocalBackup
-  type: boolean
-  default: true
 
-- name: backupRoot
-  type: string
-  default: 'C:\DeployBackups'
 
-- name: backupPath
-  type: string
-  default: ''
 
-- name: rollbackTag
-  type: string
-  default: 'LKG-SIT'
 
-- name: tagSuccessfulBuild
-  type: boolean
-  default: true
 
-jobs:
-- deployment: ${{ parameters.deploymentName }}
-  displayName: ${{ parameters.deploymentDisplayName }}
-  environment: ${{ parameters.environmentName }}
-  dependsOn: ${{ parameters.jobDependsOn }}
-  condition: ${{ parameters.jobCondition }}
 
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
 
+
+- stage: Tag_API_LKG_SIT
+  displayName: 'Tag successful API build as LKG'
+  dependsOn:
+  - Resolve_Selected_Build
+  - Deploy_API_SIT
+  condition: and(succeeded('Deploy_API_SIT'), eq('${{ parameters.deployApi }}', 'true'))
   variables:
-  - group: ${{ parameters.variableGroup }}
-
-  strategy:
-    runOnce:
-      deploy:
-        steps:
-        - powershell: |
-            Write-Host "##vso[task.setvariable variable=LocalBackupReady]false"
-            Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-            Write-Host "##vso[task.setvariable variable=DeploymentTouched]false"
-          displayName: 'Initialize rollback variables'
-
-        - ${{ if ne(parameters.artifactBuildId, '') }}:
-          - task: DownloadBuildArtifacts@0
-            name: DownloadRequestedArtifact
-            displayName: 'Download requested build artifact (specific build)'
-            inputs:
-              buildType: 'specific'
-              project: '${{ parameters.artifactProject }}'
-              pipeline: '${{ parameters.artifactDefinitionId }}'
-              buildVersionToDownload: 'specific'
-              buildId: '${{ parameters.artifactBuildId }}'
-              downloadType: 'single'
-              artifactName: '${{ parameters.artifactName }}'
-              downloadPath: '${{ parameters.artifactDownloadPath }}'
-
-        - ${{ if eq(parameters.artifactBuildId, '') }}:
-          - task: DownloadBuildArtifacts@0
-            name: DownloadRequestedArtifact
-            displayName: 'Download requested build artifact (latest from branch)'
-            inputs:
-              buildType: '${{ parameters.artifactBuildType }}'
-              project: '${{ parameters.artifactProject }}'
-              pipeline: '${{ parameters.artifactDefinitionId }}'
-              buildVersionToDownload: 'latestFromBranch'
-              branchName: '${{ parameters.artifactBranch }}'
-              downloadType: 'single'
-              artifactName: '${{ parameters.artifactName }}'
-              downloadPath: '${{ parameters.artifactDownloadPath }}'
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $sourceBuildId = '${{ parameters.artifactBuildId }}'.Trim()
-
-            if ([string]::IsNullOrWhiteSpace($sourceBuildId)) {
-              $sourceBuildId = '$(DownloadRequestedArtifact.BuildNumber)'.Trim()
-            }
-
-            if ([string]::IsNullOrWhiteSpace($sourceBuildId)) {
-              throw "Unable to resolve the source build ID for tagging."
-            }
-
-            Write-Host "Resolved source build ID: $sourceBuildId"
-            Write-Host "##vso[task.setvariable variable=SourceBuildId]$sourceBuildId"
-          displayName: 'Resolve source build ID'
-
-        - task: ExtractFiles@1
-          displayName: 'Extract requested artifact'
-          inputs:
-            archiveFilePatterns: '${{ parameters.artifactDownloadPath }}\${{ parameters.artifactName }}\${{ parameters.zipName }}'
-            destinationFolder: '$(Pipeline.Workspace)\extracted'
-            cleanDestinationFolder: true
-
-        - task: FileTransform@2
-          displayName: 'JSON substitution (appsettings.json)'
-          condition: and(succeeded(), eq('${{ parameters.enableJsonTransform }}','true'))
-          inputs:
-            folderPath: '$(Pipeline.Workspace)\extracted'
-            enableXmlTransform: false
-            xmlTransformationRules: ''
-            jsonTargetFiles: ${{ parameters.jsonFiles }}
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $patternsJson = @'
-            ${{ convertToJson(parameters.xmlConfigFiles) }}
-            '@
-            $patterns = $patternsJson | ConvertFrom-Json
-
-            if (-not $patterns -or $patterns.Count -eq 0) {
-              Write-Host "No xmlConfigFiles patterns provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files([string]$base, [string]$pattern) {
-              $pattern = $pattern -replace '\\','/'
-
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            $files = @()
-            foreach ($pat in $patterns) {
-              $files += Resolve-Files $root ([string]$pat)
-            }
-            $files = $files | Where-Object { $_ } | Select-Object -Unique
-
-            if (-not $files -or $files.Count -eq 0) {
-              throw "No config files matched xmlConfigFiles patterns under: $root"
-            }
-
-            foreach ($f in $files) {
-              Write-Host "Editing: $($f.FullName)"
-              [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-              $nodes = $xml.SelectNodes("/configuration/appSettings/add[@key]")
-              if (-not $nodes -or $nodes.Count -eq 0) {
-                Write-Host "No /configuration/appSettings/add nodes found in $($f.Name). Skipping."
-                continue
-              }
-
-              $changed = 0
-
-              foreach ($n in $nodes) {
-                $key = [string]$n.GetAttribute("key")
-                $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
-
-                if ([string]::IsNullOrWhiteSpace($val)) { continue }
-
-                $current = [string]$n.GetAttribute("value")
-                if ($current -ne $val) {
-                  $n.SetAttribute("value", $val)
-                  $changed++
-                }
-              }
-
-              $xml.Save($f.FullName)
-              Write-Host "Updated $changed setting(s) in $($f.Name)"
-            }
-          displayName: 'XML appSettings substitution (.config)'
-          condition: and(succeeded(), eq('${{ parameters.enableXmlConfigTransform }}','true'))
-          env:
-            ${{ each pair in parameters.xmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-            $root = "$(Pipeline.Workspace)\extracted"
-
-            $rulesJson = @'
-            ${{ convertToJson(parameters.customXmlEdits) }}
-            '@
-            $rules = $rulesJson | ConvertFrom-Json
-
-            if (-not $rules -or $rules.Count -eq 0) {
-              Write-Host "No custom XML edits provided. Skipping."
-              exit 0
-            }
-
-            function Resolve-Files($base, $pattern) {
-              $pattern = $pattern -replace '\\','/'
-              if ($pattern.StartsWith("**/")) {
-                $name = $pattern.Substring(3)
-                return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $name }
-              }
-              if ($pattern.Contains("/") -or $pattern.Contains("\")) {
-                $p = Join-Path $base ($pattern -replace '/','\')
-                return Get-Item $p -ErrorAction SilentlyContinue
-              }
-              return Get-ChildItem $base -Recurse -File | Where-Object { $_.Name -ieq $pattern }
-            }
-
-            foreach ($r in $rules) {
-              $filePat = [string]$r.file
-              $xpath   = [string]$r.xpath
-              $varName = [string]$r.variable
-
-              if (-not $filePat -or -not $xpath -or -not $varName) {
-                throw "Rule must contain file, xpath, variable. Rule=$($r | ConvertTo-Json -Compress)"
-              }
-
-              $value = (Get-Item "Env:$varName" -ErrorAction SilentlyContinue).Value
-              if ([string]::IsNullOrWhiteSpace($value)) {
-                throw "Pipeline variable '$varName' is missing/empty."
-              }
-
-              $files = Resolve-Files $root $filePat
-              if (-not $files) { throw "No files matched '$filePat' under '$root'." }
-
-              foreach ($f in @($files)) {
-                [xml]$xml = Get-Content -Raw -Path $f.FullName
-
-                if ($xpath -match "/@([^/]+)$") {
-                  $attrName = $Matches[1]
-                  $nodePath = $xpath -replace "/@[^/]+$",""
-                  $node = $xml.SelectSingleNode($nodePath)
-                  if (-not $node) { throw "Node not found: $nodePath in $($f.FullName)" }
-
-                  $attr = $node.Attributes[$attrName]
-                  if (-not $attr) {
-                    $attr = $xml.CreateAttribute($attrName)
-                    [void]$node.Attributes.Append($attr)
-                  }
-                  $attr.Value = $value
-                } else {
-                  $node = $xml.SelectSingleNode($xpath)
-                  if (-not $node) { throw "Node not found: $xpath in $($f.FullName)" }
-                  $node.InnerText = $value
-                }
-
-                $xml.Save($f.FullName)
-                Write-Host "Updated $($f.Name): $xpath (from $varName)"
-              }
-            }
-          displayName: 'Custom XML substitution (XPath)'
-          condition: and(succeeded(), eq('${{ parameters.enableCustomXmlEdits }}','true'))
-          env:
-            ${{ each pair in parameters.customXmlVariableValues }}:
-              ${{ pair.key }}: ${{ pair.value }}
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            if ('${{ parameters.enableLocalBackup }}' -ne 'true') {
-              Write-Host "Local backup disabled."
-              exit 0
-            }
-
-            $component = '${{ parameters.componentName }}'.Trim()
-            if ([string]::IsNullOrWhiteSpace($component)) {
-              throw "componentName is required when enableLocalBackup=true."
-            }
-
-            $source = '${{ parameters.iisTargetPath }}'
-            if (-not (Test-Path $source)) {
-              throw "IIS target path does not exist: $source"
-            }
-
-            $backupPath = '${{ parameters.backupPath }}'.Trim()
-            if ([string]::IsNullOrWhiteSpace($backupPath)) {
-              $backupPath = Join-Path '${{ parameters.backupRoot }}' "${{ parameters.environmentName }}\$component\$(Build.BuildId)"
-            }
-
-            if (Test-Path $backupPath) {
-              Remove-Item -LiteralPath $backupPath -Recurse -Force
-            }
-
-            New-Item -ItemType Directory -Path $backupPath -Force | Out-Null
-
-            $items = Get-ChildItem -Path $source -Force
-            if ($items -and $items.Count -gt 0) {
-              foreach ($item in $items) {
-                Copy-Item -LiteralPath $item.FullName -Destination $backupPath -Recurse -Force
-              }
-              Write-Host "Backup created at: $backupPath"
-              Write-Host "##vso[task.setvariable variable=LocalBackupReady]true"
-            } else {
-              Write-Host "Source folder is empty. Backup folder created but contains no files."
-              Write-Host "##vso[task.setvariable variable=LocalBackupReady]false"
-            }
-
-            Write-Host "##vso[task.setvariable variable=LocalBackupPath]$backupPath"
-          displayName: 'Create local rollback backup'
-          condition: and(succeeded(), eq('${{ parameters.enableLocalBackup }}','true'))
-
-        - powershell: |
-            Write-Host "##vso[task.setvariable variable=DeploymentTouched]true"
-          displayName: 'Mark deployment as rollback-eligible'
-          condition: succeeded()
-
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $site = Get-Website -Name $siteName
-            Write-Host "Website current state: $($site.State)"
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website: $siteName"
-              Stop-Website -Name $siteName
-            } else {
-              Write-Host "Website already stopped."
-            }
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "AppPool current state: $poolState"
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool: $appPool"
-              Stop-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already stopped."
-            }
-
-            $maxTries = 30
-            for ($i = 1; $i -le $maxTries; $i++) {
-              $siteState = (Get-Website -Name $siteName).State
-              $poolState = (Get-WebAppPoolState -Name $appPool).Value
-
-              Write-Host "Website state: $siteState | AppPool state: $poolState"
-
-              if ($siteState -eq "Stopped" -and $poolState -eq "Stopped") {
-                Write-Host "Website and App Pool are stopped."
-                break
-              }
-
-              Start-Sleep -Seconds 2
-            }
-
-            $finalSiteState = (Get-Website -Name $siteName).State
-            $finalPoolState = (Get-WebAppPoolState -Name $appPool).Value
-
-            if ($finalSiteState -ne "Stopped" -or $finalPoolState -ne "Stopped") {
-              throw "Failed to stop Website/AppPool. Final states => Website: $finalSiteState | AppPool: $finalPoolState"
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool'
-
-        - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder (before copy)'
-          condition: and(succeeded(), eq('${{ parameters.cleanTargetBeforeCopy }}','true'))
-
-        - task: CopyFiles@2
-          displayName: 'Copy files'
-          inputs:
-            SourceFolder: '$(Pipeline.Workspace)\extracted'
-            Contents: '**'
-            TargetFolder: '${{ parameters.iisTargetPath }}'
-            OverWrite: true
-
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Write-Host "Starting app pool: $appPool"
-              Start-WebAppPool -Name $appPool
-            } else {
-              Write-Host "AppPool already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Write-Host "Starting website: $siteName"
-              Start-Website -Name $siteName
-            } else {
-              Write-Host "Website already started."
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool'
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            if ('${{ parameters.enableHealthCheck }}' -ne 'true') {
-              Write-Host "Health check disabled."
-              exit 0
-            }
-
-            if ([string]::IsNullOrWhiteSpace('${{ parameters.healthCheckUrl }}')) {
-              throw "enableHealthCheck=true but healthCheckUrl is empty."
-            }
-
-            $url = '${{ parameters.healthCheckUrl }}'
-            $expected = [int]'${{ parameters.healthCheckExpectedStatusCode }}'
-            $retries = [int]'${{ parameters.healthCheckRetries }}'
-            $delay = [int]'${{ parameters.healthCheckDelaySeconds }}'
-            $passed = $false
-
-            for ($i = 1; $i -le $retries; $i++) {
-              try {
-                Write-Host "Health check attempt $i/$retries => $url"
-                $response = Invoke-WebRequest -Uri $url -Method Get -UseBasicParsing -TimeoutSec 30
-                $statusCode = [int]$response.StatusCode
-                Write-Host "Health check status code: $statusCode"
-
-                if ($statusCode -eq $expected) {
-                  $passed = $true
-                  break
-                }
-              }
-              catch {
-                Write-Host "Health check failed on attempt ${i}: $($_.Exception.Message)"
-              }
-
-              if ($i -lt $retries) {
-                Start-Sleep -Seconds $delay
-              }
-            }
-
-            if (-not $passed) {
-              throw "Health check failed after $retries attempt(s)."
-            }
-
-            Write-Host "Health check passed."
-          displayName: 'Health check'
-          condition: and(succeeded(), eq('${{ parameters.enableHealthCheck }}','true'))
-
-        - powershell: |
-            Write-Host "##vso[task.setvariable variable=DeploymentHealthy;isOutput=true]true"
-          name: publishSuccessOutcome
-          displayName: 'Publish successful deployment outcome'
-          condition: succeeded()
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            if ('${{ parameters.enableLocalBackup }}' -ne 'true') {
-              Write-Host "Local backup disabled. Nothing to validate for rollback."
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-              exit 0
-            }
-
-            $backup = '$(LocalBackupPath)'
-
-            if ([string]::IsNullOrWhiteSpace($backup)) {
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-              throw "Local backup path variable is empty."
-            }
-
-            if ((Test-Path $backup) -and (Get-ChildItem -Path $backup -Force | Measure-Object).Count -gt 0) {
-              Write-Host "Local rollback backup is valid: $backup"
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]true"
-            } else {
-              Write-Host "##vso[task.setvariable variable=RollbackExtractReady]false"
-              throw "Local rollback backup is missing or empty: $backup"
-            }
-          displayName: 'Validate local rollback backup'
-          condition: and(
-            failed(),
-            eq(variables['LocalBackupReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $site = Get-Website -Name $siteName
-            if ($site.State -ne "Stopped") {
-              Write-Host "Stopping website for rollback: $siteName"
-              Stop-Website -Name $siteName
-            }
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Stopped") {
-              Write-Host "Stopping app pool for rollback: $appPool"
-              Stop-WebAppPool -Name $appPool
-            }
-
-            Start-Sleep -Seconds 2
-          displayName: 'Stop Website + App Pool for rollback'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            $target = '${{ parameters.iisTargetPath }}'
-
-            if (-not (Test-Path $target)) {
-              throw "Target folder does not exist: $target"
-            }
-
-            $excludeCsv = '${{ parameters.cleanExcludeCsv }}'.Trim()
-            $exclude = @()
-
-            if ($excludeCsv) {
-              $exclude = $excludeCsv.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            }
-
-            Write-Host "Cleaning target folder for rollback: $target"
-            Write-Host "Excluding: $($exclude -join ', ')"
-
-            Get-ChildItem -Path $target -Force | ForEach-Object {
-              if ($exclude -contains $_.Name) {
-                Write-Host "Skipping excluded item: $($_.FullName)"
-              } else {
-                Write-Host "Removing: $($_.FullName)"
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-              }
-            }
-          displayName: 'Clean target folder for rollback'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $backup = '$(LocalBackupPath)'
-            $target = '${{ parameters.iisTargetPath }}'
-
-            if (-not (Test-Path $backup)) {
-              throw "Local backup path not found: $backup"
-            }
-
-            $items = Get-ChildItem -Path $backup -Force
-            if (-not $items -or $items.Count -eq 0) {
-              throw "Local backup path is empty: $backup"
-            }
-
-            foreach ($item in $items) {
-              Copy-Item -LiteralPath $item.FullName -Destination $target -Recurse -Force
-            }
-
-            Write-Host "Rollback restore completed from local backup."
-          displayName: 'Restore rollback files from local backup'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            Import-Module WebAdministration
-
-            $siteName = "${{ parameters.siteName }}"
-            $appPool  = "${{ parameters.appPoolName }}"
-
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            if ($poolState -ne "Started") {
-              Start-WebAppPool -Name $appPool
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            if ($siteState -ne "Started") {
-              Start-Website -Name $siteName
-            }
-
-            $siteState = (Get-Website -Name $siteName).State
-            $poolState = (Get-WebAppPoolState -Name $appPool).Value
-            Write-Host "After rollback => Website state: $siteState | AppPool state: $poolState"
-          displayName: 'Start Website + App Pool after rollback'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            $ErrorActionPreference = "Stop"
-
-            $buildId = "$(SourceBuildId)"
-            $tag     = '${{ parameters.rollbackTag }}'.Trim()
-
-            if ([string]::IsNullOrWhiteSpace($buildId)) {
-              throw "Source build id is empty."
-            }
-
-            if ([string]::IsNullOrWhiteSpace($tag)) {
-              throw "rollbackTag is empty before calling the Build Tag API."
-            }
-
-            $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-            $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-            $tagEscaped    = [System.Uri]::EscapeDataString($tag)
-            $apiVersion    = "7.0"
-
-            $uri = '{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}' -f `
-              $collectionUri,
-              $projectName,
-              $buildId,
-              $tagEscaped,
-              $apiVersion
-
-            Write-Host "Resolved tag     : [$tag]"
-            Write-Host "Resolved build id: [$buildId]"
-            Write-Host "URI              : [$uri]"
-
-            $headers = @{
-              Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-            }
-
-            Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-            Write-Host "Tagged source build successfully."
-          displayName: 'Tag source build as last known good'
-          condition: and(succeeded(), eq('${{ parameters.tagSuccessfulBuild }}','true'))
-          env:
-            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-        - powershell: |
-            throw "Deployment failed after files were touched. Local rollback was executed successfully."
-          displayName: 'Fail deployment after rollback'
-          condition: and(
-            failed(),
-            eq(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
-
-        - powershell: |
-            throw "Deployment failed after files were touched, but no valid local rollback backup was available. Destructive rollback steps were skipped."
-          displayName: 'Fail safely when local rollback is unavailable'
-          condition: and(
-            failed(),
-            ne(variables['RollbackExtractReady'], 'true'),
-            eq(variables['DeploymentTouched'], 'true'),
-            eq('${{ parameters.enableRollbackOnHealthCheckFailure }}','true')
-            )
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiBuildId'] ]
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiPipelineDefinitionId'] ]
+  jobs:
+  - job: TagBuilds
+    displayName: 'Tag API build'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+    - template: pipelines/tag-builds.steps.yml@templates
+      parameters:
+        tagTargets:
+        - name: 'DataGateway API'
+          buildId: '$(ApiBuildId)'
+          definitionId: '$(ApiPipelineDefinitionId)'
+          deployedTag: 'DEPLOYED-SIT-DATAGATEWAY-API'
+          lkgTag: 'LKG-SIT-DATAGATEWAY-API'
+          makeLkgUnique: true
+
+
+
+
+
+
+
+
+
+- stage: Tag_APP_LKG_SIT
+  displayName: 'Tag successful application builds as LKG'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Deploy_Applications_SIT
+  condition: succeeded('Deploy_Applications_SIT')
+  variables:
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
+    MvcPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcPipelineDefinitionId'] ]
+  jobs:
+  - job: TagBuilds
+    displayName: 'Tag deployed builds'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+    - template: pipelines/tag-builds.steps.yml@templates
+      parameters:
+        tagTargets:
+        - name: 'CardManagement API'
+          buildId: '$(ApiBuildId)'
+          definitionId: '$(ApiPipelineDefinitionId)'
+          deployedTag: 'DEPLOYED-SIT-API'
+          lkgTag: 'LKG-SIT-API'
+          makeLkgUnique: true
+
+        - name: 'CardManagement MVC'
+          buildId: '$(MvcBuildId)'
+          definitionId: '$(MvcPipelineDefinitionId)'
+          deployedTag: 'DEPLOYED-SIT-MVC'
+          lkgTag: 'LKG-SIT-MVC'
+          makeLkgUnique: true
+
+
+
+
+
+
+
+
+
+
+
+- template: pipelines/tag-builds.steps.yml@templates
+  parameters:
+    tagTargets:
+    - name: 'DataExport DB'
+      buildId: '$(DbBuildId)'
+      definitionId: '$(DbPipelineDefinitionId)'
+      deployedTag: 'DEPLOYED-SIT-DTE-DB'
+      lkgTag: ''
+      makeLkgUnique: false
