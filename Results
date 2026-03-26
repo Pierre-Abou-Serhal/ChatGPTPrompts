@@ -1,45 +1,23 @@
-This is my Alterna-DataExport API pipeline (SIT - BUILD - API - Alterna-DataExport):
-name: DTE_API_SIT_$(Date:yyyyMMdd).$(Rev:r)
+name: DTE_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
+parameters:
+- name: deployApi
+  type: boolean
+  default: false
 
-trigger:
-  branches:
-    include:
-      - sit
-  paths:
-    include:
-      - Alterna-DataExport/**
+- name: deployDatabase
+  type: boolean
+  default: false
 
-pr: none
+# Use sentinel values so the fields appear in Run Pipeline
+# but are only validated when the related deploy flag is true.
+- name: apiBuildNumber
+  type: string
+  default: '__EMPTY__'
 
-stages:
-- stage: Build
-  displayName: 'Build & Publish Artifact'
-  jobs:
-  - template: pipelines/build-dotnet-core-webapi.yml@templates
-    parameters:
-      jobName: 'BuildJob'
-      jobDisplayName: 'Build DataExport'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      buildConfiguration: 'Release'
-      restoreProjects: '**/*.csproj'
-      runTests: false
-      testProjects: ''
-      publishProject: 'Alterna-DataExport/Alterna-DataExport/Alterna-DataExport.csproj'
-      nugetConfigPath: 'nuget.config'
-      zipName: 'Alterna-DataExport.zip'
-      artifactName: 'data-export-api-drop'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport'
-
-And this is the Altern-DataExport Database pipeline (SIT - BUILD - DB - Alterna-DataExport):
-name: DTE_DB_SIT_$(Date:yyyyMMdd).$(Rev:r)
+- name: dbBuildNumber
+  type: string
+  default: '__EMPTY__'
 
 resources:
   repositories:
@@ -48,33 +26,357 @@ resources:
     name: 'Azure Templates/Azure Templates'
     ref: refs/heads/main
 
-trigger:
-  branches:
-    include:
-    - sit
-  paths:
-    include:
-    - DatabaseProjectAlterna_DataExport/**
-
+trigger: none
 pr: none
 
 variables:
 - group: SIT_VARIABLE_GROUP
 
-stages:
-- stage: Build_DB
-  displayName: 'Build DB'
-  jobs:
-  - template: pipelines/build-database-project.yml@templates
-    parameters:
-      jobName: 'BuildDb'
-      jobDisplayName: 'Build database project'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      sqlProjectPath: 'DatabaseProjectAlterna_DataExport/DatabaseProjectAlterna_DataExport.sqlproj'
-      artifactName: 'data-export-db-drop'
-      previewConnectionString: '$(AppSettings.DataExportConnectionString)'
+- name: apiPipelineName
+  value: 'SIT - BUILD - API - Alterna-DataExport'
 
-I want to create a release pipline that similar to what we did in Card management, but in yhis project, htere are no project that depends on each other, so we either deploy API, if it fails, we rollback
-Or we deploy database and if it fails we do nothing. Or we deploy both.
-We always begin with API relase
+- name: dbPipelineName
+  value: 'SIT - BUILD - DB - Alterna-DataExport'
+
+stages:
+
+- stage: Resolve_Selected_Builds
+  displayName: 'Resolve selected build numbers'
+  jobs:
+  - job: ResolveBuildNumbers
+    displayName: 'Resolve pipeline names and build numbers'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
+
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
+
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
+
+        $deployApi = "${{ parameters.deployApi }}".ToLower() -eq 'true'
+        $deployDb  = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
+
+        if (-not ($deployApi -or $deployDb)) {
+          throw 'At least one deployment target must be selected: API or Database.'
+        }
+
+        function Normalize-BuildNumber {
+          param([string]$BuildNumber)
+
+          if ($BuildNumber -eq '__EMPTY__') {
+            return ''
+          }
+
+          return $BuildNumber
+        }
+
+        function Resolve-DefinitionIdByName {
+          param(
+            [string]$Label,
+            [string]$PipelineName
+          )
+
+          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
+            throw "$Label pipeline name is empty."
+          }
+
+          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
+          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
+            $collectionUri,
+            $projectName,
+            $encodedName,
+            $apiVersion
+
+          Write-Host "Resolving $Label pipeline name [$PipelineName]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No pipeline definition found for $Label with name [$PipelineName]."
+          }
+
+          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
+
+          if ($exactMatches.Count -eq 0) {
+            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
+          }
+
+          if ($exactMatches.Count -gt 1) {
+            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
+          }
+
+          $definition = $exactMatches[0]
+
+          Write-Host "$Label definition resolved:"
+          Write-Host "  Definition ID   = $($definition.id)"
+          Write-Host "  Definition Name = $($definition.name)"
+
+          return $definition.id
+        }
+
+        function Resolve-Build {
+          param(
+            [string]$Label,
+            [string]$PipelineName,
+            [string]$BuildNumber
+          )
+
+          $BuildNumber = Normalize-BuildNumber -BuildNumber $BuildNumber
+
+          if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
+            throw "$Label build number is required because deployment of $Label was selected."
+          }
+
+          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
+          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
+
+          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $definitionId,
+            $encodedBuildNumber,
+            $apiVersion
+
+          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
+          }
+
+          $build = $response.value[0]
+
+          if ($build.sourceBranch -ne 'refs/heads/sit') {
+            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
+          }
+
+          Write-Host "$Label build resolved:"
+          Write-Host "  Build ID         = $($build.id)"
+          Write-Host "  Build Number     = $($build.buildNumber)"
+          Write-Host "  Definition ID    = $definitionId"
+          Write-Host "  Definition Name  = $PipelineName"
+          Write-Host "  Branch           = $($build.sourceBranch)"
+
+          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
+          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
+          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+        }
+
+        if ($deployApi) {
+          Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=ApiPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiResolvedBuildNumber;isOutput=true]'
+        }
+
+        if ($deployDb) {
+          Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
+        }
+      name: Resolve
+      displayName: 'Resolve pipeline names and build numbers'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: Deploy_API_SIT
+  displayName: 'Deploy API to SIT'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployApi }}', 'true'))
+  variables:
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+  jobs:
+  - job: StageAnchor
+    displayName: 'Stage anchor'
+    pool: server
+    steps:
+    - powershell: |
+        Write-Host 'Stage anchor'
+
+  - template: pipelines/deploy-iis.yml@templates
+    parameters:
+      jobDependsOn:
+      - StageAnchor
+      jobCondition: succeeded()
+      deploymentName: 'DeployAPI'
+      deploymentDisplayName: 'Deploy DataExport API to SIT (IIS)'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      variableGroup: 'SIT_DATAEXPORT_API_VARIABLE_GROUP'
+      componentName: 'API'
+      artifactName: 'data-export-api-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(ApiPipelineDefinitionId)'
+      artifactBuildId: '$(ApiBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      zipName: 'Alterna-DataExport.zip'
+      siteName: 'REPLACE_WITH_DATAEXPORT_SITE_NAME'
+      appPoolName: 'REPLACE_WITH_DATAEXPORT_APPPOOL_NAME'
+      iisTargetPath: 'REPLACE_WITH_DATAEXPORT_API_TARGET_PATH'
+      cleanTargetBeforeCopy: true
+      cleanExcludeCsv: ''
+      enableJsonTransform: true
+      jsonFiles: '**/appsettings.json'
+      enableXmlConfigTransform: false
+      xmlConfigFiles: []
+      xmlVariableValues: {}
+      enableCustomXmlEdits: false
+      customXmlEdits: []
+      customXmlVariableValues: {}
+      enableHealthCheck: true
+      healthCheckUrl: 'REPLACE_WITH_DATAEXPORT_HEALTHCHECK_URL'
+      healthCheckExpectedStatusCode: '200'
+      healthCheckRetries: 6
+      healthCheckDelaySeconds: 10
+      enableRollbackOnHealthCheckFailure: true
+      enableLocalBackup: true
+      backupRoot: 'C:\DeployBackups'
+      backupPath: 'C:\DeployBackups\SIT\DataExport\API\$(Build.BuildId)'
+      rollbackTag: 'LKG-SIT-DTE-API'
+      tagSuccessfulBuild: false
+
+- stage: Tag_API_LKG_SIT
+  displayName: 'Tag successful API build as LKG'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Deploy_API_SIT
+  condition: and(succeeded('Deploy_API_SIT'), eq('${{ parameters.deployApi }}', 'true'))
+  variables:
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+  jobs:
+  - job: TagApiBuild
+    displayName: 'Tag API build'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
+
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
+
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
+
+        function Add-BuildTag {
+          param(
+            [string]$BuildId,
+            [string]$Tag
+          )
+
+          if ([string]::IsNullOrWhiteSpace($BuildId)) {
+            return
+          }
+
+          $tagEscaped = [System.Uri]::EscapeDataString($Tag)
+          $uri = "{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $BuildId,
+            $tagEscaped,
+            $apiVersion
+
+          Write-Host "Tagging build [$BuildId] with [$Tag]"
+          Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+        }
+
+        Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'LKG-SIT-DTE-API'
+        Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'DEPLOYED-SIT-DTE-API'
+      displayName: 'Tag deployed API build'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: Deploy_DB_After_API_SIT
+  displayName: 'Deploy DB to SIT after API'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Tag_API_LKG_SIT
+  condition: and(succeeded('Tag_API_LKG_SIT'), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'true'))
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  jobs:
+  - job: StageAnchor
+    displayName: 'Stage anchor'
+    pool: server
+    steps:
+    - powershell: |
+        Write-Host 'Stage anchor'
+
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      jobDependsOn:
+      - StageAnchor
+      jobCondition: succeeded()
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy DataExport database'
+      environmentName: 'SIT-DB'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'data-export-db-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+      tagSuccessfulBuild: true
+      successTag: 'DEPLOYED-SIT-DTE-DB'
+
+- stage: Deploy_DB_Only_SIT
+  displayName: 'Deploy DB to SIT'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'false'))
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  jobs:
+  - job: StageAnchor
+    displayName: 'Stage anchor'
+    pool: server
+    steps:
+    - powershell: |
+        Write-Host 'Stage anchor'
+
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      jobDependsOn:
+      - StageAnchor
+      jobCondition: succeeded()
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy DataExport database'
+      environmentName: 'SIT-DB'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'data-export-db-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+      tagSuccessfulBuild: true
+      successTag: 'DEPLOYED-SIT-DTE-DB'
