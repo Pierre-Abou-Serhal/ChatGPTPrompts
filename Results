@@ -1,108 +1,58 @@
-That’s the issue.
+I am getting this error:
 
-In Azure DevOps, **a variable that is set in the YAML file cannot be changed at queue time**. Microsoft says this explicitly: if you need a variable to be settable at queue time, **don’t set it in the YAML file**. ([Microsoft Learn][1])
+Resolve pipeline names and build numbers
 
-So these lines are preventing the UI prompt behavior:
+View raw log
+Starting: Resolve pipeline names and build numbers
+==============================================================================
+Task         : PowerShell
+Description  : Run a PowerShell script on Linux, macOS, or Windows
+Version      : 2.232.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\40d81a6b-fe3a-4c6b-af93-21346579a811.ps1'"
+Mvc build number is required because deployment of Mvc was selected.
+At C:\agent\_work\_temp\40d81a6b-fe3a-4c6b-af93-21346579a811.ps1:73 char:5
++     throw "$Label build number is required because deployment of $Lab ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Mvc build numbe...c was selec 
+   ted.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Mvc build number is required because deployment  
+   of Mvc was selected.
+ 
+##[error]PowerShell exited with code '1'.
+Finishing: Resolve pipeline names and build numbers
 
-```yaml
-- name: mvcBuildNumber
-  value: ''
+An no variable prompt was shown
 
-- name: apiBuildNumber
-  value: ''
+name: ACM_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
-- name: dbBuildNumber
-  value: ''
-```
+parameters:
+- name: deployDatabase
+  type: boolean
+  default: false
 
-Also, queue-time variables for YAML pipelines are defined in the **pipeline Variables UI**, where you mark **“Let users override this value when running this pipeline.”** They are not meant to be duplicated in YAML. ([Microsoft Learn][2])
+- name: deployMvc
+  type: boolean
+  default: false
 
-You also have **2 variable reference mistakes** in the resolver:
+- name: deployApi
+  type: boolean
+  default: false
 
-```powershell
-'$(parameters.apiBuildNumber)'
-'$(parameters.dbBuildNumber)'
-```
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
 
-Those are wrong. Since these are variables, they must be:
+trigger: none
+pr: none
 
-```powershell
-'$(apiBuildNumber)'
-'$(dbBuildNumber)'
-```
-
-## What to correct
-
-### 1) Remove these 3 variables from YAML
-
-Delete this block entirely:
-
-```yaml
-- name: mvcBuildNumber
-  value: ''
-
-- name: apiBuildNumber
-  value: ''
-
-- name: dbBuildNumber
-  value: ''
-```
-
-### 2) Keep them only in the pipeline UI
-
-In Azure DevOps pipeline settings, create these three variables and mark each one as:
-
-* **Let users override this value when running this pipeline**
-
-Use these exact names:
-
-* `mvcBuildNumber`
-* `apiBuildNumber`
-* `dbBuildNumber`
-
-### 3) Fix the resolver step
-
-Replace this part:
-
-```powershell
-if ($deployApi) {
-  Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '$(parameters.apiBuildNumber)'
-}
-
-if ($deployDb) {
-  Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '$(parameters.dbBuildNumber)'
-}
-```
-
-with:
-
-```powershell
-if ($deployApi) {
-  Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '$(apiBuildNumber)'
-} else {
-  Write-Host '##vso[task.setvariable variable=ApiPipelineDefinitionId;isOutput=true]'
-  Write-Host '##vso[task.setvariable variable=ApiBuildId;isOutput=true]'
-  Write-Host '##vso[task.setvariable variable=ApiResolvedBuildNumber;isOutput=true]'
-}
-
-if ($deployDb) {
-  Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '$(dbBuildNumber)'
-} else {
-  Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
-  Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
-  Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
-}
-```
-
-## After that, behavior will be:
-
-* if you run the pipeline and choose only `deployApi = true`, the run form can show `apiBuildNumber` as an overridable variable
-* `mvcBuildNumber` and `dbBuildNumber` can stay blank
-* your resolver already validates only the selected components, so blank values for unselected ones are fine
-
-## Final structure at the top should be
-
-```yaml
 variables:
 - group: SIT_API_VARIABLE_GROUP
 
@@ -114,14 +64,405 @@ variables:
 
 - name: dbPipelineName
   value: 'SIT - BUILD - DB - AlternaCardManagement'
-```
 
-and **not** the three build-number variables in YAML. ([Microsoft Learn][1])
+stages:
 
-So the direct answer is:
+- stage: Resolve_Selected_Builds
+  displayName: 'Resolve selected build numbers'
+  jobs:
+  - job: ResolveBuildNumbers
+    displayName: 'Resolve pipeline names and build numbers'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
 
-**the pipeline is not asking for the build number because you defined those variables in YAML.**
-For queue-time prompting, remove them from YAML and keep them only in the pipeline Variables UI.
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
 
-[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/variables?view=azure-devops "Define variables - Azure Pipelines | Microsoft Learn"
-[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/security/inputs?view=azure-devops "Securely use variables and parameters - Azure Pipelines | Microsoft Learn"
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
+
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
+
+        $deployMvc = "${{ parameters.deployMvc }}".ToLower() -eq 'true'
+        $deployApi = "${{ parameters.deployApi }}".ToLower() -eq 'true'
+        $deployDb  = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
+
+        if (-not ($deployMvc -or $deployApi -or $deployDb)) {
+          throw 'At least one deployment target must be selected: MVC, API, or Database.'
+        }
+
+        function Resolve-DefinitionIdByName {
+          param(
+            [string]$Label,
+            [string]$PipelineName
+          )
+
+          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
+            throw "$Label pipeline name is empty."
+          }
+
+          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
+          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
+            $collectionUri,
+            $projectName,
+            $encodedName,
+            $apiVersion
+
+          Write-Host "Resolving $Label pipeline name [$PipelineName]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No pipeline definition found for $Label with name [$PipelineName]."
+          }
+
+          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
+
+          if ($exactMatches.Count -eq 0) {
+            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
+          }
+
+          if ($exactMatches.Count -gt 1) {
+            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
+          }
+
+          $definition = $exactMatches[0]
+
+          Write-Host "$Label definition resolved:"
+          Write-Host "  Definition ID   = $($definition.id)"
+          Write-Host "  Definition Name = $($definition.name)"
+
+          return $definition.id
+        }
+
+        function Resolve-Build {
+          param(
+            [string]$Label,
+            [string]$PipelineName,
+            [string]$BuildNumber
+          )
+
+          if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
+            throw "$Label build number is required because deployment of $Label was selected."
+          }
+
+          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
+          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
+
+          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $definitionId,
+            $encodedBuildNumber,
+            $apiVersion
+
+          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
+          }
+
+          $build = $response.value[0]
+
+          if ($build.sourceBranch -ne 'refs/heads/sit') {
+            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
+          }
+
+          Write-Host "$Label build resolved:"
+          Write-Host "  Build ID         = $($build.id)"
+          Write-Host "  Build Number     = $($build.buildNumber)"
+          Write-Host "  Definition ID    = $definitionId"
+          Write-Host "  Definition Name  = $PipelineName"
+          Write-Host "  Branch           = $($build.sourceBranch)"
+
+          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
+          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
+          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+        }
+
+        if ($deployMvc) {
+          Resolve-Build -Label 'Mvc' -PipelineName '$(mvcPipelineName)' -BuildNumber '$(mvcBuildNumber)'
+        } else {
+          Write-Host '##vso[task.setvariable variable=MvcPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=MvcBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=MvcResolvedBuildNumber;isOutput=true]'
+        }
+
+        if ($deployApi) {
+          Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '$(apiBuildNumber)'
+        } else {
+          Write-Host '##vso[task.setvariable variable=ApiPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiResolvedBuildNumber;isOutput=true]'
+        }
+
+        if ($deployDb) {
+          Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '$(dbBuildNumber)'
+        } else {
+          Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
+        }
+      name: Resolve
+      displayName: 'Resolve pipeline names and build numbers'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: Deploy_Applications_SIT
+  displayName: 'Deploy applications to SIT'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: and(succeeded('Resolve_Selected_Builds'),or(${{ eq(parameters.deployApi, true) }},${{ eq(parameters.deployMvc, true) }}))
+  variables:
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+    MvcPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcPipelineDefinitionId'] ]
+    MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
+  jobs:
+  - ${{ if eq(parameters.deployApi, true) }}:
+    - template: pipelines/deploy-iis.yml@templates
+      parameters:
+        jobDependsOn: []
+        jobCondition: succeeded()
+        deploymentName: 'DeployAPI'
+        deploymentDisplayName: 'Deploy API to SIT (IIS)'
+        environmentName: 'SIT'
+        deployPool: 'Deployment Pool'
+        deployAgentName: 'SIT-ALTERNA-BN1'
+        variableGroup: 'SIT_API_VARIABLE_GROUP'
+        componentName: 'API'
+        artifactName: 'api-drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '$(ApiPipelineDefinitionId)'
+        artifactBuildId: '$(ApiBuildId)'
+        artifactBranch: 'refs/heads/sit'
+        zipName: 'AlternaCardManagementAPI.zip'
+        siteName: 'AlternaCardManagement-AzureDevOps'
+        appPoolName: 'AlternaCardManagement-AzureDevOps'
+        iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+        - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BrefBaseUrl: $(BrefBaseUrl)
+          CONN_STRING: $(CONN_STRING)
+          SMSUrl: $(SMSUrl)
+        enableCustomXmlEdits: false
+        customXmlEdits: []
+        enableHealthCheck: true
+        healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        enableLocalBackup: true
+        backupRoot: 'C:\DeployBackups'
+        backupPath: 'C:\DeployBackups\SIT\API\$(Build.BuildId)'
+        rollbackTag: 'LKG-SIT-API'
+        tagSuccessfulBuild: false
+
+  - ${{ if eq(parameters.deployMvc, true) }}:
+    - template: pipelines/deploy-iis.yml@templates
+      parameters:
+        ${{ if eq(parameters.deployApi, true) }}:
+          jobDependsOn:
+          - DeployAPI
+        ${{ if eq(parameters.deployApi, false) }}:
+          jobDependsOn: []
+        jobCondition: succeeded()
+        deploymentName: 'DeployMVC'
+        deploymentDisplayName: 'Deploy MVC to SIT (IIS)'
+        environmentName: 'SIT'
+        deployPool: 'Deployment Pool'
+        deployAgentName: 'SIT-ALTERNA-FN1'
+        variableGroup: 'SIT_MVC_VARIABLE_GROUP'
+        componentName: 'MVC'
+        artifactName: 'mvc-drop'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '$(MvcPipelineDefinitionId)'
+        artifactBuildId: '$(MvcBuildId)'
+        artifactBranch: 'refs/heads/sit'
+        zipName: 'AlternaCardManagementMVC.zip'
+        siteName: 'AlternaCardManagement-AzureDevOps'
+        appPoolName: 'AlternaCardManagement-AzureDevOps'
+        iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-FN1'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+        - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BaseUrlOsb: $(BaseUrlOsb)
+          CDN_IP_LINK: $(CDN_IP_LINK)
+          DASHBOARD_LINK: $(DASHBOARD_LINK)
+          GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
+          GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
+          LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
+          UploadFilesPath: $(UploadFilesPath)
+          USER_GUIDE_LINK: $(USER_GUIDE_LINK)
+        enableCustomXmlEdits: false
+        customXmlEdits: []
+        enableHealthCheck: true
+        healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        enableLocalBackup: true
+        backupRoot: 'C:\DeployBackups'
+        backupPath: 'C:\DeployBackups\SIT\MVC\$(Build.BuildId)'
+        rollbackTag: 'LKG-SIT-MVC'
+        tagSuccessfulBuild: false
+
+- stage: Rollback_API_After_MVC_Failure_SIT
+  displayName: 'Rollback API because MVC failed'
+  dependsOn:
+  - Deploy_Applications_SIT
+  condition: and(always(), eq('${{ parameters.deployApi }}', 'true'), eq('${{ parameters.deployMvc }}', 'true'), eq(dependencies.Deploy_Applications_SIT.outputs['DeployAPI.DeployAPI.publishSuccessOutcome.DeploymentHealthy'], 'true'), ne(dependencies.Deploy_Applications_SIT.outputs['DeployMVC.DeployMVC.publishSuccessOutcome.DeploymentHealthy'], 'true'))
+  jobs:
+  - template: pipelines/rollback-iis.yml@templates
+    parameters:
+      deploymentName: 'RollbackAPIAfterMVCFailure'
+      deploymentDisplayName: 'Rollback API from local backup because MVC failed'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      siteName: 'AlternaCardManagement-AzureDevOps'
+      appPoolName: 'AlternaCardManagement-AzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaCardManagement-AzureDevOps-BN1'
+      backupPath: 'C:\DeployBackups\SIT\API\$(Build.BuildId)'
+      cleanExcludeCsv: ''
+
+- stage: Tag_APP_LKG_SIT
+  displayName: 'Tag successful application builds as LKG'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Deploy_Applications_SIT
+  condition: and(succeeded('Deploy_Applications_SIT'), or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
+  variables:
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+    MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
+  jobs:
+  - job: TagApplicationBuilds
+    displayName: 'Tag MVC / API builds'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
+
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
+
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
+
+        function Add-BuildTag {
+          param(
+            [string]$BuildId,
+            [string]$Tag
+          )
+
+          if ([string]::IsNullOrWhiteSpace($BuildId)) {
+            return
+          }
+
+          $tagEscaped = [System.Uri]::EscapeDataString($Tag)
+          $uri = "{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $BuildId,
+            $tagEscaped,
+            $apiVersion
+
+          Write-Host "Tagging build [$BuildId] with [$Tag]"
+          Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+        }
+
+        if ('${{ parameters.deployApi }}' -eq 'true') {
+          Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'LKG-SIT-API'
+          Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'DEPLOYED-SIT-API'
+        }
+
+        if ('${{ parameters.deployMvc }}' -eq 'true') {
+          Add-BuildTag -BuildId '$(MvcBuildId)' -Tag 'LKG-SIT-MVC'
+          Add-BuildTag -BuildId '$(MvcBuildId)' -Tag 'DEPLOYED-SIT-MVC'
+        }
+      displayName: 'Tag deployed application builds'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: Deploy_DB_After_Apps_SIT
+  displayName: 'Deploy DB to SIT after applications'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Tag_APP_LKG_SIT
+  condition: and( succeeded('Tag_APP_LKG_SIT'), ${{ eq(parameters.deployDatabase, true) }}, or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy database'
+      environmentName: 'SIT-DB'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'db-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      targetConnectionString: '$(CONN_STRING)'
+      tagSuccessfulBuild: true
+      successTag: 'DEPLOYED-SIT-DB'
+
+- stage: Deploy_DB_Only_SIT
+  displayName: 'Deploy DB to SIT'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: and(succeeded('Resolve_Selected_Builds'), ${{ eq(parameters.deployDatabase, true) }}, ${{ eq(parameters.deployApi, false) }}, ${{ eq(parameters.deployMvc, false) }})
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy database'
+      environmentName: 'SIT-DB'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'db-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      targetConnectionString: '$(CONN_STRING)'
+      tagSuccessfulBuild: true
+      successTag: 'DEPLOYED-SIT-DB'
