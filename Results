@@ -1,3 +1,19 @@
+Yes. Your pattern is valid.
+
+`ManualValidation@1` runs only in an agentless `pool: server` job, and multiple jobs in the same stage run in parallel by default unless you add `dependsOn`. ([Microsoft Learn][1])
+
+Also, when you set a custom `condition`, you overwrite the default success behavior, so your deploy stages should use `succeeded()` to ensure they only run after the approval stage succeeds. ([Microsoft Learn][2])
+
+For groups: `approvers` can be a comma-separated list of users, groups, or project teams that are allowed to act on the manual validation. In practice, this is a single approval gate, so listing a group means members of that group can act on that gate; it is not an “every member must approve” workflow. ([Microsoft Learn][1])
+
+Here is the rewritten pipeline with:
+
+* app approval always required
+* DBA approval added only when `deployDatabase = true`
+* corrected deploy-stage conditions
+* your tag template usage preserved
+
+```yaml
 name: ACM_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
@@ -177,8 +193,8 @@ stages:
 
         if ($deployMvc) {
           if ('${{ parameters.mvcBuildNumber }}' -eq '__EMPTY__') {
-              throw 'MVC build number is required because deployment of MVC was selected.'
-            }
+            throw 'MVC build number is required because deployment of MVC was selected.'
+          }
 
           Resolve-Build -Label 'Mvc' -PipelineName '$(mvcPipelineName)' -BuildNumber '${{ parameters.mvcBuildNumber }}'
         } else {
@@ -189,8 +205,8 @@ stages:
 
         if ($deployApi) {
           if ('${{ parameters.apiBuildNumber }}' -eq '__EMPTY__') {
-              throw 'API build number is required because deployment of API was selected.'
-            }
+            throw 'API build number is required because deployment of API was selected.'
+          }
 
           Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
         } else {
@@ -201,8 +217,8 @@ stages:
 
         if ($deployDb) {
           if ('${{ parameters.dbBuildNumber }}' -eq '__EMPTY__') {
-              throw 'Database build number is required because deployment of Database was selected.'
-            }
+            throw 'Database build number is required because deployment of Database was selected.'
+          }
 
           Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
         } else {
@@ -221,8 +237,6 @@ stages:
   - Resolve_Selected_Builds
   condition: succeeded('Resolve_Selected_Builds')
   jobs:
-
-  # Apps only (API or MVC approvals)
   - job: WaitForAppsApproval
     displayName: 'Wait for Security / Management approval'
     pool: server
@@ -237,10 +251,9 @@ stages:
         instructions: 'Approve SIT application deployment.'
         onTimeout: 'reject'
 
-  # DB deployment (DB approvals)
   - ${{ if eq(parameters.deployDatabase, true) }}:
-    - job: WaitForAppsAndDbApproval
-      displayName: 'Wait for Security / Management / DBA approval'
+    - job: WaitForDbaApproval
+      displayName: 'Wait for DBA approval'
       pool: server
       timeoutInMinutes: 1500
       steps:
@@ -250,7 +263,7 @@ stages:
           notifyUsers: 'SGBL\kabbas'
           approvers: 'SGBL\kabbas'
           allowApproversToApproveTheirOwnRuns: false
-          instructions: 'Approve SIT Database deployment.'
+          instructions: 'Approve SIT database deployment.'
           onTimeout: 'reject'
 
 - stage: Deploy_Applications_SIT
@@ -258,7 +271,7 @@ stages:
   dependsOn:
   - Resolve_Selected_Builds
   - Approval_SIT_Release
-  condition: and(succeeded('Resolve_Selected_Builds'),or(${{ eq(parameters.deployApi, true) }},${{ eq(parameters.deployMvc, true) }}))
+  condition: and(succeeded(), or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
   variables:
     ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
     ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
@@ -394,7 +407,6 @@ stages:
   variables:
     ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
     ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
-
     MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
     MvcPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcPipelineDefinitionId'] ]
   jobs:
@@ -434,7 +446,7 @@ stages:
   dependsOn:
   - Resolve_Selected_Builds
   - Tag_APP_LKG_SIT
-  condition: and( succeeded('Tag_APP_LKG_SIT'), ${{ eq(parameters.deployDatabase, true) }}, or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
+  condition: and(succeeded('Tag_APP_LKG_SIT'), ${{ eq(parameters.deployDatabase, true) }}, or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
   variables:
     DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
     DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
@@ -459,7 +471,7 @@ stages:
   dependsOn:
   - Resolve_Selected_Builds
   - Approval_SIT_Release
-  condition: and(succeeded('Resolve_Selected_Builds'), ${{ eq(parameters.deployDatabase, true) }}, ${{ eq(parameters.deployApi, false) }}, ${{ eq(parameters.deployMvc, false) }})
+  condition: and(succeeded(), ${{ eq(parameters.deployDatabase, true) }}, ${{ eq(parameters.deployApi, false) }}, ${{ eq(parameters.deployMvc, false) }})
   variables:
     DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
     DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
@@ -508,3 +520,29 @@ stages:
           deployedTag: 'DEPLOYED-SIT-DB'
           lkgTag: 'LKG-SIT-DB'
           makeLkgUnique: true
+```
+
+For **sequenced approvals**, yes, that also works. Jobs in the same stage run in parallel by default, and `dependsOn` makes them sequential. ([Microsoft Learn][3])
+
+So if you want DBA approval to happen only **after** Security/Management approval, change this:
+
+```yaml
+- ${{ if eq(parameters.deployDatabase, true) }}:
+  - job: WaitForDbaApproval
+```
+
+to this:
+
+```yaml
+- ${{ if eq(parameters.deployDatabase, true) }}:
+  - job: WaitForDbaApproval
+    dependsOn: WaitForAppsApproval
+```
+
+For **groups**, yes — that is a good fit here. `approvers` accepts users, groups, and project teams. If you put a security group there, the manual validation is still a single gate, so one authorized member of that group can act on it. ([Microsoft Learn][1])
+
+If you want, I can also rewrite the `notifyUsers` / `approvers` lines using group names instead of individual users.
+
+[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/manual-validation-v1?view=azure-pipelines "ManualValidation@1 - Manual validation v1 task | Microsoft Learn"
+[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/conditions?view=azure-devops "Pipeline conditions - Azure Pipelines | Microsoft Learn"
+[3]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/phases?view=azure-devops "Jobs in Azure Pipelines - Azure Pipelines | Microsoft Learn"
