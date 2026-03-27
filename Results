@@ -1,19 +1,3 @@
-Yes. Your pattern is valid.
-
-`ManualValidation@1` runs only in an agentless `pool: server` job, and multiple jobs in the same stage run in parallel by default unless you add `dependsOn`. ([Microsoft Learn][1])
-
-Also, when you set a custom `condition`, you overwrite the default success behavior, so your deploy stages should use `succeeded()` to ensure they only run after the approval stage succeeds. ([Microsoft Learn][2])
-
-For groups: `approvers` can be a comma-separated list of users, groups, or project teams that are allowed to act on the manual validation. In practice, this is a single approval gate, so listing a group means members of that group can act on that gate; it is not an “every member must approve” workflow. ([Microsoft Learn][1])
-
-Here is the rewritten pipeline with:
-
-* app approval always required
-* DBA approval added only when `deployDatabase = true`
-* corrected deploy-stage conditions
-* your tag template usage preserved
-
-```yaml
 name: ACM_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
@@ -237,16 +221,30 @@ stages:
   - Resolve_Selected_Builds
   condition: succeeded('Resolve_Selected_Builds')
   jobs:
-  - job: WaitForAppsApproval
-    displayName: 'Wait for Security / Management approval'
+  - job: WaitForBusinessApproval
+    displayName: 'Wait for Business Approval'
     pool: server
     timeoutInMinutes: 1500
     steps:
     - task: ManualValidation@1
       timeoutInMinutes: 1440
       inputs:
-        notifyUsers: 'SGBL\pabouserhal,SGBL\hkassab'
-        approvers: 'SGBL\pabouserhal,SGBL\hkassab'
+        notifyUsers: 'SGBL\pabouserhal'
+        approvers: 'SGBL\pabouserhal'
+        allowApproversToApproveTheirOwnRuns: false
+        instructions: 'Approve SIT application deployment.'
+        onTimeout: 'reject'
+
+  - job: WaitForManagementApproval
+    displayName: 'Wait for Management Approval'
+    pool: server
+    timeoutInMinutes: 1500
+    steps:
+    - task: ManualValidation@1
+      timeoutInMinutes: 1440
+      inputs:
+        notifyUsers: 'SGBL\kabbas'
+        approvers: 'SGBL\kabbas'
         allowApproversToApproveTheirOwnRuns: false
         instructions: 'Approve SIT application deployment.'
         onTimeout: 'reject'
@@ -260,8 +258,8 @@ stages:
       - task: ManualValidation@1
         timeoutInMinutes: 1440
         inputs:
-          notifyUsers: 'SGBL\kabbas'
-          approvers: 'SGBL\kabbas'
+          notifyUsers: 'SGBL\hkassab'
+          approvers: 'SGBL\hkassab'
           allowApproversToApproveTheirOwnRuns: false
           instructions: 'Approve SIT database deployment.'
           onTimeout: 'reject'
@@ -520,29 +518,9 @@ stages:
           deployedTag: 'DEPLOYED-SIT-DB'
           lkgTag: 'LKG-SIT-DB'
           makeLkgUnique: true
-```
 
-For **sequenced approvals**, yes, that also works. Jobs in the same stage run in parallel by default, and `dependsOn` makes them sequential. ([Microsoft Learn][3])
+I have hese errors:
 
-So if you want DBA approval to happen only **after** Security/Management approval, change this:
+A task is missing. The pipeline references a task called 'ManualValidation' with version '1'. This indicates that the specific task version can not be found. (job 'WaitForBusinessApproval', step ''.)
 
-```yaml
-- ${{ if eq(parameters.deployDatabase, true) }}:
-  - job: WaitForDbaApproval
-```
-
-to this:
-
-```yaml
-- ${{ if eq(parameters.deployDatabase, true) }}:
-  - job: WaitForDbaApproval
-    dependsOn: WaitForAppsApproval
-```
-
-For **groups**, yes — that is a good fit here. `approvers` accepts users, groups, and project teams. If you put a security group there, the manual validation is still a single gate, so one authorized member of that group can act on it. ([Microsoft Learn][1])
-
-If you want, I can also rewrite the `notifyUsers` / `approvers` lines using group names instead of individual users.
-
-[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/manual-validation-v1?view=azure-pipelines "ManualValidation@1 - Manual validation v1 task | Microsoft Learn"
-[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/conditions?view=azure-devops "Pipeline conditions - Azure Pipelines | Microsoft Learn"
-[3]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/phases?view=azure-devops "Jobs in Azure Pipelines - Azure Pipelines | Microsoft Learn"
+A task is missing. The pipeline references a task called 'ManualValidation' with version '1'. This indicates that the specific task version can not be found. (job 'WaitForManagementApproval', step ''.)
