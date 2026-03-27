@@ -1,18 +1,19 @@
-Yes. For **DataGateway**, you only need to add the same **approval stage** pattern and then make `Deploy_API_SIT` depend on it.
-
-Use `ManualValidation@0` in `pool: server` jobs, and sequence the approval jobs with `dependsOn`. Also keep `condition: succeeded()` on the deploy stage, because a custom condition overrides the default dependency-success behavior. ([Microsoft Learn][1])
-
-## Replace your pipeline with this
-
-```yaml
-name: DATAGATEWAY_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
+name: DTE_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
 - name: deployApi
   type: boolean
   default: false
 
+- name: deployDatabase
+  type: boolean
+  default: false
+
 - name: apiBuildNumber
+  type: string
+  default: '__EMPTY__'
+
+- name: dbBuildNumber
   type: string
   default: '__EMPTY__'
 
@@ -30,15 +31,18 @@ variables:
 - group: SIT_VARIABLE_GROUP
 
 - name: apiPipelineName
-  value: 'SIT - BUILD - API - DataGateway'
+  value: 'SIT - BUILD - API - Alterna-DataExport'
+
+- name: dbPipelineName
+  value: 'SIT - BUILD - DB - Alterna-DataExport'
 
 stages:
 
-- stage: Resolve_Selected_Build
-  displayName: 'Resolve selected build number'
+- stage: Resolve_Selected_Builds
+  displayName: 'Resolve selected build numbers'
   jobs:
-  - job: ResolveBuildNumber
-    displayName: 'Resolve pipeline name and build number'
+  - job: ResolveBuildNumbers
+    displayName: 'Resolve pipeline names and build numbers'
     pool:
       name: 'Deployment Pool'
       demands:
@@ -58,9 +62,10 @@ stages:
         }
 
         $deployApi = "${{ parameters.deployApi }}".ToLower() -eq 'true'
+        $deployDb  = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
 
-        if (-not $deployApi) {
-          throw 'At least one deployment target must be selected: API.'
+        if (-not ($deployApi -or $deployDb)) {
+          throw 'At least one deployment target must be selected: API or Database.'
         }
 
         function Normalize-BuildNumber {
@@ -164,121 +169,66 @@ stages:
           Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
         }
 
-        Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
+        if ($deployApi) {
+          Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=ApiPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiResolvedBuildNumber;isOutput=true]'
+        }
+
+        if ($deployDb) {
+          Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
+        }
       name: Resolve
-      displayName: 'Resolve pipeline name and build number'
+      displayName: 'Resolve pipeline names and build numbers'
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-- stage: Approval_SIT_Release
-  displayName: 'Approval for SIT release'
-  dependsOn:
-  - Resolve_Selected_Build
-  condition: succeeded('Resolve_Selected_Build')
-  jobs:
-  - job: WaitForBusinessApproval
-    displayName: 'Wait for Business Approval'
-    pool: server
-    timeoutInMinutes: 1500
-    steps:
-    - task: ManualValidation@0
-      timeoutInMinutes: 1440
-      inputs:
-        notifyUsers: 'SGBL\pabouserhal'
-        instructions: 'Approve SIT DataGateway deployment.'
-        onTimeout: 'reject'
-
-  - job: WaitForManagementApproval
-    displayName: 'Wait for Management Approval'
-    dependsOn: WaitForBusinessApproval
-    pool: server
-    timeoutInMinutes: 1500
-    steps:
-    - task: ManualValidation@0
-      timeoutInMinutes: 1440
-      inputs:
-        notifyUsers: 'SGBL\kabbas'
-        instructions: 'Approve SIT DataGateway deployment.'
-        onTimeout: 'reject'
 
 - stage: Deploy_API_SIT
   displayName: 'Deploy API to SIT'
   dependsOn:
-  - Resolve_Selected_Build
-  - Approval_SIT_Release
-  condition: and(succeeded(), eq('${{ parameters.deployApi }}', 'true'))
+  - Resolve_Selected_Builds
+  condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployApi }}', 'true'))
   variables:
-    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiPipelineDefinitionId'] ]
-    ApiBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiBuildId'] ]
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
   jobs:
   - template: pipelines/deploy-iis.yml@templates
     parameters:
       jobDependsOn: []
       jobCondition: succeeded()
       deploymentName: 'DeployAPI'
-      deploymentDisplayName: 'Deploy DataGateway API to SIT (IIS)'
+      deploymentDisplayName: 'Deploy DataExport API to SIT (IIS)'
       environmentName: 'SIT'
       deployPool: 'Deployment Pool'
       deployAgentName: 'SIT-ALTERNA-BN1'
       variableGroup: 'SIT_VARIABLE_GROUP'
       componentName: 'API'
-      artifactName: 'datagateway-api-drop'
+      artifactName: 'data-export-api-drop'
       artifactBuildType: 'specific'
       artifactProject: '$(System.TeamProject)'
       artifactDefinitionId: '$(ApiPipelineDefinitionId)'
       artifactBuildId: '$(ApiBuildId)'
       artifactBranch: 'refs/heads/sit'
-      zipName: 'DataGatewayService.zip'
-      siteName: 'AlternaDataGatewayServiceAzureDevOps'
-      appPoolName: 'AlternaDataGatewayServiceAzureDevOps'
-      iisTargetPath: 'C:\inetpub\wwwroot\AlternaDataGatewayService-AzureDevOps-BN1'
+      zipName: 'Alterna-DataExport.zip'
+      siteName: 'AlternaDataExportServiceAzureDevOps'
+      appPoolName: 'AlternaDataExportServiceAzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1'
       cleanTargetBeforeCopy: true
       cleanExcludeCsv: ''
-      enableJsonTransform: false
-      jsonFiles: ''
-      enableXmlConfigTransform: true
-      xmlConfigFiles:
-      - '**/App.config'
-      - '**/API.dll.config'
-      xmlVariableValues:
-        API_TOKEN_CHECK: $(API_TOKEN_CHECK)
-        CONN_STRING_User: $(CONN_STRING_User)
-        NLog_MaxArchiveDays: $(NLog_MaxArchiveDays)
-      enableCustomXmlEdits: true
-      customXmlVariableValues:
-        TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE: $(TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE)
-        TOKEN_GET_CUSTOMER_AMS: $(TOKEN_GET_CUSTOMER_AMS)
-        TOKEN_GET_CUSTOMER_FRESH_ACCOUNT: $(TOKEN_GET_CUSTOMER_FRESH_ACCOUNT)
-        TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE_HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES: $(TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE_HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES)
-        TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE: $(TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE)
-        TOKEN_GET_T24USER_AMS: $(TOKEN_GET_T24USER_AMS)
-        TOKEN_LDAP_PSS: $(TOKEN_LDAP_PSS)
-        TOKEN_GET_PRODUCT_FRESH_ACCOUNT: $(TOKEN_GET_PRODUCT_FRESH_ACCOUNT)
-      customXmlEdits:
-      - file: '**/APITOKENS.xml'
-        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@VALUE'
-        variable: 'TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE'
-      - file: '**/APITOKENS.xml'
-        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="AMS"]/@VALUE'
-        variable: 'TOKEN_GET_CUSTOMER_AMS'
-      - file: '**/APITOKENS.xml'
-        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@VALUE'
-        variable: 'TOKEN_GET_CUSTOMER_FRESH_ACCOUNT'
-      - file: '**/APITOKENS.xml'
-        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES'
-        variable: 'TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE_HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES'
-      - file: '**/APITOKENS.xml'
-        xpath: '/APITOKEN/GET_COMPANY/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@VALUE'
-        variable: 'TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE'
-      - file: '**/APITOKENS.xml'
-        xpath: '/APITOKEN/GET_T24USER/TOKEN[@APPLICATION_NAME="AMS"]/@VALUE'
-        variable: 'TOKEN_GET_T24USER_AMS'
-      - file: '**/APITOKENS.xml'
-        xpath: '/APITOKEN/LDAP/TOKEN[@APPLICATION_NAME="PSS"]/@VALUE'
-        variable: 'TOKEN_LDAP_PSS'
-      - file: '**/APITOKENS.xml'
-        xpath: '/APITOKEN/GET_PRODUCT/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@VALUE'
-        variable: 'TOKEN_GET_PRODUCT_FRESH_ACCOUNT'
+      enableJsonTransform: true
+      jsonFiles: '**/appsettings.json'
+      enableXmlConfigTransform: false
+      xmlConfigFiles: []
+      xmlVariableValues: {}
+      enableCustomXmlEdits: false
+      customXmlEdits: []
+      customXmlVariableValues: {}
       enableHealthCheck: true
       healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
       healthCheckExpectedStatusCode: '200'
@@ -287,17 +237,16 @@ stages:
       enableRollbackOnHealthCheckFailure: true
       enableLocalBackup: true
       backupRoot: 'C:\DeployBackups'
-      backupPath: 'C:\DeployBackups\SIT\DataGateway\API\$(Build.BuildId)'
+      backupPath: 'C:\DeployBackups\SIT\DataExport\API\$(Build.BuildId)'
 
 - stage: Tag_API_LKG_SIT
   displayName: 'Tag successful API build as LKG'
   dependsOn:
-  - Resolve_Selected_Build
+  - Resolve_Selected_Builds
   - Deploy_API_SIT
   condition: and(succeeded('Deploy_API_SIT'), eq('${{ parameters.deployApi }}', 'true'))
   variables:
-    ApiBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiBuildId'] ]
-    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
   jobs:
   - job: TagApiBuild
     displayName: 'Tag API build'
@@ -308,26 +257,94 @@ stages:
     steps:
     - checkout: none
 
-    - template: pipelines/tag-builds.yml@templates
-      parameters:
-        tagTargets:
-        - name: 'DataGateway API'
-          buildId: '$(ApiBuildId)'
-          definitionId: '$(ApiPipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-SIT-DATAGATEWAY-API'
-          lkgTag: 'LKG-SIT-DATAGATEWAY-API'
-          makeLkgUnique: true
-```
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
 
-### What changed
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
 
-I added:
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
 
-* `Approval_SIT_Release`
-* `WaitForBusinessApproval`
-* `WaitForManagementApproval` with `dependsOn` so it is sequential
-* `Deploy_API_SIT` now depends on the approval stage and uses `condition: and(succeeded(), ...)`
+        function Add-BuildTag {
+          param(
+            [string]$BuildId,
+            [string]$Tag
+          )
 
-That sequencing works because jobs run in parallel by default unless you chain them with `dependsOn`. And `ManualValidation@0` must run in an agentless `server` job. ([Microsoft Learn][1])
+          if ([string]::IsNullOrWhiteSpace($BuildId)) {
+            return
+          }
 
-[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/manual-validation-v0?view=azure-pipelines "ManualValidation@0 - Manual validation v0 task | Microsoft Learn"
+          $tagEscaped = [System.Uri]::EscapeDataString($Tag)
+          $uri = "{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $BuildId,
+            $tagEscaped,
+            $apiVersion
+
+          Write-Host "Tagging build [$BuildId] with [$Tag]"
+          Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+        }
+
+        Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'LKG-SIT-DTE-API'
+        Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'DEPLOYED-SIT-DTE-API'
+      displayName: 'Tag deployed API build'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: Deploy_DB_After_API_SIT
+  displayName: 'Deploy DB to SIT after API'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Tag_API_LKG_SIT
+  condition: and(succeeded('Tag_API_LKG_SIT'), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'true'))
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      jobDependsOn: []
+      jobCondition: succeeded()
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy DataExport database'
+      environmentName: 'SIT-DB'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'data-export-db-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+
+- stage: Deploy_DB_Only_SIT
+  displayName: 'Deploy DB to SIT'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'false'))
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      jobDependsOn: []
+      jobCondition: succeeded()
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy DataExport database'
+      environmentName: 'SIT-DB'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      artifactName: 'data-export-db-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
