@@ -1,27 +1,39 @@
-Yes — the clean way is:
+SIT - RELEASE - DataFateway pipeline
 
-* remove the inline PowerShell tag code from `Tag_APP_LKG_SIT`
-* call your shared tag template instead
-* add a separate DB tag stage, since `deploy-database.yml` no longer tags anything
+name: DATAGATEWAY_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
-## 1) Replace `Tag_APP_LKG_SIT` with this
+parameters:
+- name: deployApi
+  type: boolean
+  default: false
 
-```yaml
-- stage: Tag_APP_LKG_SIT
-  displayName: 'Tag successful application builds as LKG'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Deploy_Applications_SIT
-  condition: and(succeeded('Deploy_Applications_SIT'), or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
-  variables:
-    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
-    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+- name: apiBuildNumber
+  type: string
+  default: '__EMPTY__'
 
-    MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
-    MvcPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcPipelineDefinitionId'] ]
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger: none
+pr: none
+
+variables:
+- group: SIT_VARIABLE_GROUP
+
+- name: apiPipelineName
+  value: 'SIT - BUILD - API - DataGateway'
+
+stages:
+
+- stage: Resolve_Selected_Build
+  displayName: 'Resolve selected build number'
   jobs:
-  - job: TagApplicationBuilds
-    displayName: 'Tag MVC / API builds'
+  - job: ResolveBuildNumber
+    displayName: 'Resolve pipeline name and build number'
     pool:
       name: 'Deployment Pool'
       demands:
@@ -29,57 +41,228 @@ Yes — the clean way is:
     steps:
     - checkout: none
 
-    - ${{ if eq(parameters.deployApi, true) }}:
-      - template: pipelines/tag-builds.steps.yml@templates
-        parameters:
-          tagTargets:
-          - name: 'AlternaCardManagement API'
-            buildId: '$(ApiBuildId)'
-            definitionId: '$(ApiPipelineDefinitionId)'
-            deployedTag: 'DEPLOYED-SIT-API'
-            lkgTag: 'LKG-SIT-API'
-            makeLkgUnique: true
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
 
-    - ${{ if eq(parameters.deployMvc, true) }}:
-      - template: pipelines/tag-builds.steps.yml@templates
-        parameters:
-          tagTargets:
-          - name: 'AlternaCardManagement MVC'
-            buildId: '$(MvcBuildId)'
-            definitionId: '$(MvcPipelineDefinitionId)'
-            deployedTag: 'DEPLOYED-SIT-MVC'
-            lkgTag: 'LKG-SIT-MVC'
-            makeLkgUnique: true
-```
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
 
----
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
 
-## 2) Add a DB tagging stage
+        $deployApi = "${{ parameters.deployApi }}".ToLower() -eq 'true'
 
-Since DB is no longer tagged inside `deploy-database.yml`, add this stage **after** your two DB deployment stages.
+        if (-not $deployApi) {
+          throw 'At least one deployment target must be selected: API.'
+        }
 
-This version tags DB as **DEPLOYED only**, which matches your earlier logic better.
+        function Normalize-BuildNumber {
+          param([string]$BuildNumber)
 
-```yaml
-- stage: Tag_DB_DEPLOYED_SIT
-  displayName: 'Tag deployed database build'
+          if ($BuildNumber -eq '__EMPTY__') {
+            return ''
+          }
+
+          return $BuildNumber
+        }
+
+        function Resolve-DefinitionIdByName {
+          param(
+            [string]$Label,
+            [string]$PipelineName
+          )
+
+          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
+            throw "$Label pipeline name is empty."
+          }
+
+          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
+          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
+            $collectionUri,
+            $projectName,
+            $encodedName,
+            $apiVersion
+
+          Write-Host "Resolving $Label pipeline name [$PipelineName]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No pipeline definition found for $Label with name [$PipelineName]."
+          }
+
+          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
+
+          if ($exactMatches.Count -eq 0) {
+            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
+          }
+
+          if ($exactMatches.Count -gt 1) {
+            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
+          }
+
+          $definition = $exactMatches[0]
+
+          Write-Host "$Label definition resolved:"
+          Write-Host "  Definition ID   = $($definition.id)"
+          Write-Host "  Definition Name = $($definition.name)"
+
+          return $definition.id
+        }
+
+        function Resolve-Build {
+          param(
+            [string]$Label,
+            [string]$PipelineName,
+            [string]$BuildNumber
+          )
+
+          $BuildNumber = Normalize-BuildNumber -BuildNumber $BuildNumber
+
+          if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
+            throw "$Label build number is required because deployment of $Label was selected."
+          }
+
+          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
+          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
+
+          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $definitionId,
+            $encodedBuildNumber,
+            $apiVersion
+
+          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
+          }
+
+          $build = $response.value[0]
+
+          if ($build.sourceBranch -ne 'refs/heads/sit') {
+            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
+          }
+
+          Write-Host "$Label build resolved:"
+          Write-Host "  Build ID         = $($build.id)"
+          Write-Host "  Build Number     = $($build.buildNumber)"
+          Write-Host "  Definition ID    = $definitionId"
+          Write-Host "  Definition Name  = $PipelineName"
+          Write-Host "  Branch           = $($build.sourceBranch)"
+
+          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
+          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
+          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+        }
+
+        Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
+      name: Resolve
+      displayName: 'Resolve pipeline name and build number'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: Deploy_API_SIT
+  displayName: 'Deploy API to SIT'
   dependsOn:
-  - Resolve_Selected_Builds
-  - Deploy_DB_After_Apps_SIT
-  - Deploy_DB_Only_SIT
-  condition: and(
-    eq('${{ parameters.deployDatabase }}', 'true'),
-    or(
-      eq(dependencies.Deploy_DB_After_Apps_SIT.result, 'Succeeded'),
-      eq(dependencies.Deploy_DB_Only_SIT.result, 'Succeeded')
-    )
-  )
+  - Resolve_Selected_Build
+  condition: and(succeeded('Resolve_Selected_Build'), eq('${{ parameters.deployApi }}', 'true'))
   variables:
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiBuildId'] ]
   jobs:
-  - job: TagDatabaseBuild
-    displayName: 'Tag DB build'
+  - template: pipelines/deploy-iis.yml@templates
+    parameters:
+      jobDependsOn: []
+      jobCondition: succeeded()
+      deploymentName: 'DeployAPI'
+      deploymentDisplayName: 'Deploy DataGateway API to SIT (IIS)'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      variableGroup: 'SIT_VARIABLE_GROUP'
+      componentName: 'API'
+      artifactName: 'datagateway-api-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(ApiPipelineDefinitionId)'
+      artifactBuildId: '$(ApiBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      zipName: 'DataGatewayService.zip'
+      siteName: 'AlternaDataGatewayServiceAzureDevOps'
+      appPoolName: 'AlternaDataGatewayServiceAzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaDataGatewayService-AzureDevOps-BN1'
+      cleanTargetBeforeCopy: true
+      cleanExcludeCsv: ''
+      enableJsonTransform: false
+      jsonFiles: ''
+      enableXmlConfigTransform: true
+      xmlConfigFiles:
+      - '**/App.config'
+      - '**/API.dll.config'
+      xmlVariableValues:
+        API_TOKEN_CHECK: $(API_TOKEN_CHECK)
+        CONN_STRING_User: $(CONN_STRING_User)
+        NLog_MaxArchiveDays: $(NLog_MaxArchiveDays)
+      enableCustomXmlEdits: true
+      customXmlVariableValues:
+        TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE: $(TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE)
+        TOKEN_GET_CUSTOMER_AMS: $(TOKEN_GET_CUSTOMER_AMS)
+        TOKEN_GET_CUSTOMER_FRESH_ACCOUNT: $(TOKEN_GET_CUSTOMER_FRESH_ACCOUNT)
+        TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE_HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES: $(TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE_HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES)
+        TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE: $(TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE)
+        TOKEN_GET_T24USER_AMS: $(TOKEN_GET_T24USER_AMS)
+        TOKEN_LDAP_PSS: $(TOKEN_LDAP_PSS)
+        TOKEN_GET_PRODUCT_FRESH_ACCOUNT: $(TOKEN_GET_PRODUCT_FRESH_ACCOUNT)
+      customXmlEdits:
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@VALUE'
+        variable: 'TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="AMS"]/@VALUE'
+        variable: 'TOKEN_GET_CUSTOMER_AMS'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@VALUE'
+        variable: 'TOKEN_GET_CUSTOMER_FRESH_ACCOUNT'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES'
+        variable: 'TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE_HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_COMPANY/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@VALUE'
+        variable: 'TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_T24USER/TOKEN[@APPLICATION_NAME="AMS"]/@VALUE'
+        variable: 'TOKEN_GET_T24USER_AMS'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/LDAP/TOKEN[@APPLICATION_NAME="PSS"]/@VALUE'
+        variable: 'TOKEN_LDAP_PSS'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_PRODUCT/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@VALUE'
+        variable: 'TOKEN_GET_PRODUCT_FRESH_ACCOUNT'
+      enableHealthCheck: true
+      healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+      healthCheckExpectedStatusCode: '200'
+      healthCheckRetries: 6
+      healthCheckDelaySeconds: 10
+      enableRollbackOnHealthCheckFailure: true
+      enableLocalBackup: true
+      backupRoot: 'C:\DeployBackups'
+      backupPath: 'C:\DeployBackups\SIT\DataGateway\API\$(Build.BuildId)'
+
+- stage: Tag_API_LKG_SIT
+  displayName: 'Tag successful API build as LKG'
+  dependsOn:
+  - Resolve_Selected_Build
+  - Deploy_API_SIT
+  condition: and(succeeded('Deploy_API_SIT'), eq('${{ parameters.deployApi }}', 'true'))
+  variables:
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiBuildId'] ]
+  jobs:
+  - job: TagApiBuild
+    displayName: 'Tag API build'
     pool:
       name: 'Deployment Pool'
       demands:
@@ -87,76 +270,41 @@ This version tags DB as **DEPLOYED only**, which matches your earlier logic bett
     steps:
     - checkout: none
 
-    - template: pipelines/tag-builds.steps.yml@templates
-      parameters:
-        tagTargets:
-        - name: 'AlternaCardManagement DB'
-          buildId: '$(DbBuildId)'
-          definitionId: '$(DbPipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-SIT-DB'
-          lkgTag: ''
-          makeLkgUnique: false
-```
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
 
----
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
 
-## 3) Nothing else needs to change in deploy stages
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
 
-Your deploy stages can stay as they are now, since:
+        function Add-BuildTag {
+          param(
+            [string]$BuildId,
+            [string]$Tag
+          )
 
-* `deploy-iis.yml` no longer tags
-* `deploy-database.yml` no longer tags
+          if ([string]::IsNullOrWhiteSpace($BuildId)) {
+            return
+          }
 
-So the release pipeline becomes the single place where all tag logic happens.
+          $tagEscaped = [System.Uri]::EscapeDataString($Tag)
+          $uri = "{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $BuildId,
+            $tagEscaped,
+            $apiVersion
 
----
+          Write-Host "Tagging build [$BuildId] with [$Tag]"
+          Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
+        }
 
-## 4) Final stage flow after this change
-
-Your flow becomes:
-
-* `Resolve_Selected_Builds`
-* `Deploy_Applications_SIT`
-* `Rollback_API_After_MVC_Failure_SIT`
-* `Tag_APP_LKG_SIT`
-* `Deploy_DB_After_Apps_SIT` or `Deploy_DB_Only_SIT`
-* `Tag_DB_DEPLOYED_SIT`
-
-That is clean and centralized.
-
----
-
-## 5) If you also want DB to have a true LKG tag
-
-Change the DB tag target to:
-
-```yaml
-- name: 'AlternaCardManagement DB'
-  buildId: '$(DbBuildId)'
-  definitionId: '$(DbPipelineDefinitionId)'
-  deployedTag: 'DEPLOYED-SIT-DB'
-  lkgTag: 'LKG-SIT-DB'
-  makeLkgUnique: true
-```
-
-But if your DB strategy is only deployment history, keep the deployed-only version.
-
----
-
-## 6) One small correction I noticed
-
-You still have this typo in artifact names:
-
-* `card-managemenmt-api-drop`
-* `card-managemenmt-mvc-drop`
-* `card-managemenmt-db-drop`
-
-You probably want:
-
-* `card-management-api-drop`
-* `card-management-mvc-drop`
-* `card-management-db-drop`
-
-Not required for tagging, but worth fixing before it spreads further.
-
-If you want, I can now rewrite the **full Card Management release pipeline** with these tag-template changes already merged in.
+        Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'LKG-SIT-DATAGATEWAY-API'
+        Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'DEPLOYED-SIT-DATAGATEWAY-API'
+      displayName: 'Tag deployed API build'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
