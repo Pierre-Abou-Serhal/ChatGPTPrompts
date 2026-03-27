@@ -189,11 +189,57 @@ stages:
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
+- stage: Approval_SIT_Release
+  displayName: 'Approval for SIT release'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: succeeded('Resolve_Selected_Builds')
+  jobs:
+  - job: WaitForBusinessApproval
+    displayName: 'Wait for Business Approval'
+    pool: server
+    timeoutInMinutes: 1500
+    steps:
+    - task: ManualValidation@0
+      timeoutInMinutes: 1440
+      inputs:
+        notifyUsers: 'SGBL\pabouserhal'
+        instructions: 'Approve SIT DataExport deployment.'
+        onTimeout: 'reject'
+
+  - job: WaitForManagementApproval
+    displayName: 'Wait for Management Approval'
+    dependsOn: WaitForBusinessApproval
+    pool: server
+    timeoutInMinutes: 1500
+    steps:
+    - task: ManualValidation@0
+      timeoutInMinutes: 1440
+      inputs:
+        notifyUsers: 'SGBL\kabbas'
+        instructions: 'Approve SIT DataExport deployment.'
+        onTimeout: 'reject'
+
+  - ${{ if eq(parameters.deployDatabase, true) }}:
+    - job: WaitForDbaApproval
+      displayName: 'Wait for DBA approval'
+      dependsOn: WaitForManagementApproval
+      pool: server
+      timeoutInMinutes: 1500
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: 'SGBL\hkassab'
+          instructions: 'Approve SIT DataExport database deployment.'
+          onTimeout: 'reject'
+
 - stage: Deploy_API_SIT
   displayName: 'Deploy API to SIT'
   dependsOn:
   - Resolve_Selected_Builds
-  condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployApi }}', 'true'))
+  - Approval_SIT_Release
+  condition: and(succeeded(), eq('${{ parameters.deployApi }}', 'true'))
   variables:
     ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
     ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
@@ -247,6 +293,7 @@ stages:
   condition: and(succeeded('Deploy_API_SIT'), eq('${{ parameters.deployApi }}', 'true'))
   variables:
     ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
   jobs:
   - job: TagApiBuild
     displayName: 'Tag API build'
@@ -257,44 +304,15 @@ stages:
     steps:
     - checkout: none
 
-    - powershell: |
-        $ErrorActionPreference = 'Stop'
-
-        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-        $apiVersion    = '7.1'
-
-        $headers = @{
-          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-        }
-
-        function Add-BuildTag {
-          param(
-            [string]$BuildId,
-            [string]$Tag
-          )
-
-          if ([string]::IsNullOrWhiteSpace($BuildId)) {
-            return
-          }
-
-          $tagEscaped = [System.Uri]::EscapeDataString($Tag)
-          $uri = "{0}/{1}/_apis/build/builds/{2}/tags/{3}?api-version={4}" -f `
-            $collectionUri,
-            $projectName,
-            $BuildId,
-            $tagEscaped,
-            $apiVersion
-
-          Write-Host "Tagging build [$BuildId] with [$Tag]"
-          Invoke-RestMethod -Method Put -Uri $uri -Headers $headers | Out-Null
-        }
-
-        Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'LKG-SIT-DTE-API'
-        Add-BuildTag -BuildId '$(ApiBuildId)' -Tag 'DEPLOYED-SIT-DTE-API'
-      displayName: 'Tag deployed API build'
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    - template: pipelines/tag-builds.yml@templates
+      parameters:
+        tagTargets:
+        - name: 'Alterna-DataExport API'
+          buildId: '$(ApiBuildId)'
+          definitionId: '$(ApiPipelineDefinitionId)'
+          deployedTag: 'DEPLOYED-SIT-DTE-API'
+          lkgTag: 'LKG-SIT-DTE-API'
+          makeLkgUnique: true
 
 - stage: Deploy_DB_After_API_SIT
   displayName: 'Deploy DB to SIT after API'
@@ -327,7 +345,8 @@ stages:
   displayName: 'Deploy DB to SIT'
   dependsOn:
   - Resolve_Selected_Builds
-  condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'false'))
+  - Approval_SIT_Release
+  condition: and(succeeded(), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'false'))
   variables:
     DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
     DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
@@ -348,3 +367,33 @@ stages:
       artifactBuildId: '$(DbBuildId)'
       artifactBranch: 'refs/heads/sit'
       targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+
+- stage: Tag_DB_DEPLOYED_SIT
+  displayName: 'Tag deployed database build'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Deploy_DB_After_API_SIT
+  - Deploy_DB_Only_SIT
+  condition: and(eq('${{ parameters.deployDatabase }}', 'true'), or(eq(dependencies.Deploy_DB_After_API_SIT.result, 'Succeeded'), eq(dependencies.Deploy_DB_Only_SIT.result, 'Succeeded')))
+  variables:
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+  jobs:
+  - job: TagDatabaseBuild
+    displayName: 'Tag DB build'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+
+    - template: pipelines/tag-builds.yml@templates
+      parameters:
+        tagTargets:
+        - name: 'Alterna-DataExport DB'
+          buildId: '$(DbBuildId)'
+          definitionId: '$(DbPipelineDefinitionId)'
+          deployedTag: 'DEPLOYED-SIT-DTE-DB'
+          lkgTag: 'LKG-SIT-DTE-DB'
+          makeLkgUnique: true
