@@ -1,15 +1,4 @@
-Yes — here are the two Logger pipelines in the same style as your other projects.
-
-I mirrored the same approval model using `ManualValidation@0` in agentless `server` jobs, sequenced with `dependsOn`, and used `and(succeeded(), ...)` on the deploy stage so approval success is preserved. ([Microsoft Learn][1])
-
-I also kept `sit-temp` because that is what your old Logger pipeline was using. If this project now builds from `sit`, change the branch in the few places I noted below.
-
-## 1) Build pipeline — Alterna Logger
-
-Use this as your new build pipeline.
-
-```yaml
-name: LOGGER_SVC_SIT_$(Date:yyyyMMdd).$(Rev:r)
+This is my Alterna Telecom API BUild and Deploy pipeline:
 
 resources:
   repositories:
@@ -21,53 +10,62 @@ resources:
 trigger:
   branches:
     include:
-    - sit-temp
-
-pr: none
+    - sit
+    - uat
+    - master
 
 stages:
-- stage: Build_Service
+# =========================
+# BUILD
+# =========================
+- stage: Build
   displayName: 'Build & Publish Artifact'
   jobs:
   - template: pipelines/build-dotnet-core-webapi.yml@templates
     parameters:
-      jobName: 'BuildLoggerService'
-      jobDisplayName: 'Build Alterna Logger Service'
+      jobName: 'BuildJob'
+      jobDisplayName: 'Build Alterna Telecom Backend'
       buildPool: 'Build Pool'
       buildAgentName: 'UAT-ALTERNA-DK1'
       buildConfiguration: 'Release'
       restoreProjects: '**/*.csproj'
       runTests: false
       testProjects: ''
-      publishProject: 'Logger/Logger.csproj'
+      publishProject: 'Alterna-Telecom-Backend/Alterna-Telecom-Backend.csproj'
       nugetConfigPath: 'nuget.config'
-      zipName: 'Alterna-Logger-drop.zip'
-      artifactName: 'logger-service-drop'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-Logger'
-      deploymentMode: 'self-contained'
-      targetRuntime: 'win-x64'
-      produceSingleFile: true
-      readyToRun: false
-      trim: false
-```
+      zipName: 'Alterna-Telecom-Backend.zip'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-Telecom-Backend'
 
-## 2) Release pipeline — Alterna Logger
+# =========================
+# DEPLOY SIT
+# =========================
+- stage: Deploy_SIT
+  displayName: 'Deploy to SIT'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
+  jobs:
+  - template: pipelines/deploy-iis.yml@templates
+    parameters:
+      deploymentName: 'DeploySIT'
+      deploymentDisplayName: 'Deploy SIT (IIS)'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      variableGroup: 'SIT_BACK_END_VARIABLE_GROUP'
+      zipName: 'Alterna-Telecom-Backend.zip'
+      siteName: 'Alterna.TelecomAzureDevOps'
+      appPoolName: 'Alterna.TelecomAzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\Alterna.TelecomAzureDevOps'
+      cleanTargetBeforeCopy: true
+      cleanExcludeCsv: ''
+      enableJsonTransform: true
+      jsonFiles: '**/appsettings.json'
+      enableXmlConfigTransform: false
+      xmlConfigFiles: []
+      enableCustomXmlEdits: false
+      customXmlEdits: []
 
-Use this as your new release pipeline.
-
-```yaml
-name: LOGGER_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
-
-parameters:
-- name: deployService
-  type: boolean
-  default: false
-  displayName: 'Deploy Logger Service'
-
-- name: serviceBuildNumber
-  type: string
-  default: '__EMPTY__'
-  displayName: 'Service Build Number'
+And this is my Alterna Telecom Front end  BUild and Deploy pipeline:
 
 resources:
   repositories:
@@ -76,279 +74,101 @@ resources:
     name: 'Azure Templates/Azure Templates'
     ref: refs/heads/main
 
-trigger: none
-pr: none
-
-variables:
-- group: SIT_VARIABLE_GROUP
-
-- name: servicePipelineName
-  value: 'SIT - BUILD - SERVICE - Alterna Logger'
+trigger:
+  branches:
+    include:
+    - sit
+    - uat
+    - master
 
 stages:
-
-- stage: Resolve_Selected_Build
-  displayName: 'Resolve selected build number'
+# =========================
+# BUILD
+# =========================
+- stage: Build
+  displayName: 'Build Angular & Publish Artifact'
   jobs:
-  - job: ResolveBuildNumber
-    displayName: 'Resolve pipeline name and build number'
-    pool:
-      name: 'Deployment Pool'
-      demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
-    steps:
-    - checkout: none
-
-    - powershell: |
-        $ErrorActionPreference = 'Stop'
-
-        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-        $apiVersion    = '7.1'
-
-        $headers = @{
-          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-        }
-
-        $deployService = "${{ parameters.deployService }}".ToLower() -eq 'true'
-
-        if (-not $deployService) {
-          throw 'At least one deployment target must be selected: Logger Service.'
-        }
-
-        function Normalize-BuildNumber {
-          param([string]$BuildNumber)
-
-          if ($BuildNumber -eq '__EMPTY__') {
-            return ''
-          }
-
-          return $BuildNumber
-        }
-
-        function Resolve-DefinitionIdByName {
-          param(
-            [string]$Label,
-            [string]$PipelineName
-          )
-
-          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
-            throw "$Label pipeline name is empty."
-          }
-
-          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
-          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
-            $collectionUri,
-            $projectName,
-            $encodedName,
-            $apiVersion
-
-          Write-Host "Resolving $Label pipeline name [$PipelineName]"
-          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-          if (-not $response.value -or $response.count -lt 1) {
-            throw "No pipeline definition found for $Label with name [$PipelineName]."
-          }
-
-          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
-
-          if ($exactMatches.Count -eq 0) {
-            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
-          }
-
-          if ($exactMatches.Count -gt 1) {
-            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
-          }
-
-          $definition = $exactMatches[0]
-
-          Write-Host "$Label definition resolved:"
-          Write-Host "  Definition ID   = $($definition.id)"
-          Write-Host "  Definition Name = $($definition.name)"
-
-          return $definition.id
-        }
-
-        function Resolve-Build {
-          param(
-            [string]$Label,
-            [string]$PipelineName,
-            [string]$BuildNumber
-          )
-
-          $BuildNumber = Normalize-BuildNumber -BuildNumber $BuildNumber
-
-          if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
-            throw "$Label build number is required because deployment of $Label was selected."
-          }
-
-          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
-          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
-
-          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-            $collectionUri,
-            $projectName,
-            $definitionId,
-            $encodedBuildNumber,
-            $apiVersion
-
-          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
-          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-          if (-not $response.value -or $response.count -lt 1) {
-            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
-          }
-
-          $build = $response.value[0]
-
-          if ($build.sourceBranch -ne 'refs/heads/sit-temp') {
-            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit-temp]."
-          }
-
-          Write-Host "$Label build resolved:"
-          Write-Host "  Build ID         = $($build.id)"
-          Write-Host "  Build Number     = $($build.buildNumber)"
-          Write-Host "  Definition ID    = $definitionId"
-          Write-Host "  Definition Name  = $PipelineName"
-          Write-Host "  Branch           = $($build.sourceBranch)"
-
-          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
-          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
-          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-        }
-
-        Resolve-Build -Label 'Service' -PipelineName '$(servicePipelineName)' -BuildNumber '${{ parameters.serviceBuildNumber }}'
-      name: Resolve
-      displayName: 'Resolve pipeline name and build number'
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-- stage: Approval_SIT_Release
-  displayName: 'Approval for SIT release'
-  dependsOn:
-  - Resolve_Selected_Build
-  condition: succeeded('Resolve_Selected_Build')
-  jobs:
-  - job: WaitForBusinessApproval
-    displayName: 'Wait for Business Approval'
-    pool: server
-    timeoutInMinutes: 1500
-    steps:
-    - task: ManualValidation@0
-      timeoutInMinutes: 1440
-      inputs:
-        notifyUsers: 'SGBL\pabouserhal'
-        instructions: 'Approve SIT Alterna Logger deployment.'
-        onTimeout: 'reject'
-
-  - job: WaitForManagementApproval
-    displayName: 'Wait for Management Approval'
-    dependsOn: WaitForBusinessApproval
-    pool: server
-    timeoutInMinutes: 1500
-    steps:
-    - task: ManualValidation@0
-      timeoutInMinutes: 1440
-      inputs:
-        notifyUsers: 'SGBL\kabbas'
-        instructions: 'Approve SIT Alterna Logger deployment.'
-        onTimeout: 'reject'
-
-- stage: Deploy_Service_SIT
-  displayName: 'Deploy Logger Service to SIT'
-  dependsOn:
-  - Resolve_Selected_Build
-  - Approval_SIT_Release
-  condition: and(succeeded(), eq('${{ parameters.deployService }}', 'true'))
-  variables:
-    ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServicePipelineDefinitionId'] ]
-    ServiceBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceBuildId'] ]
-  jobs:
-  - template: pipelines/deploy-windows-service.yml@templates
+  - template: pipelines/build-angular-webapp.yml@templates
     parameters:
-      jobDependsOn: []
-      jobCondition: succeeded()
-      deploymentName: 'DeployLoggerService'
-      deploymentDisplayName: 'Deploy Alterna Logger Windows Service - SIT'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      workingDirectory: '.'              # folder containing package.json
+      nodeVersion: '22.x'
+      installCommand: 'ci'
+      runTests: false
+      buildCommand: 'npx ng build'
+      distFolder: 'dist/Telecom/browser'
+      zipName: 'Alterna-Telecom-Frontend.zip'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish'
+
+# =========================
+# DEPLOY SIT
+# =========================
+- stage: Deploy_SIT
+  displayName: 'Deploy to SIT'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/sit'))
+  jobs:
+  - template: pipelines/deploy-iis.yml@templates
+    parameters:
+      deploymentName: 'DeploySIT'
+      deploymentDisplayName: 'Deploy SIT (IIS)'
       environmentName: 'SIT'
       deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-BN1'
-      variableGroup: 'SIT_VARIABLE_GROUP'
-      componentName: 'LOGGER'
-      artifactName: 'logger-service-drop'
-      artifactBuildType: 'specific'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(ServicePipelineDefinitionId)'
-      artifactBuildId: '$(ServiceBuildId)'
-      artifactBranch: 'refs/heads/sit-temp'
-      zipName: 'Alterna-Logger-drop.zip'
-      serviceName: 'LoggerServiceAzureDevOps'
-      serviceTargetPath: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps'
+      deployAgentName: 'SIT-ALTERNA-FN1'
+      variableGroup: 'SIT_FRONT_END_VARIABLE_GROUP'
+      zipName: 'Alterna-Telecom-Frontend.zip'
+      siteName: 'AlternaTelecomAzureDevOps'
+      appPoolName: 'AlternaTelecomAzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaTelecomAzureDevOps'
       cleanTargetBeforeCopy: true
-      cleanExcludeCsv: 'logs,Keys'
+      cleanExcludeCsv: ''
       enableJsonTransform: true
       jsonFiles: '**/appsettings.json'
       enableXmlConfigTransform: false
       xmlConfigFiles: []
-      xmlVariableValues: {}
       enableCustomXmlEdits: false
       customXmlEdits: []
-      customXmlVariableValues: {}
-      enableHealthCheck: false
-      enableRollbackOnHealthCheckFailure: true
-      enableLocalBackup: true
-      backupRoot: 'C:\DeployBackups'
-      backupPath: 'C:\DeployBackups\SIT\LOGGER\$(Build.BuildId)'
 
-- stage: Tag_SERVICE_LKG_SIT
-  displayName: 'Tag successful service build as LKG'
-  dependsOn:
-  - Resolve_Selected_Build
-  - Deploy_Service_SIT
-  condition: and(succeeded('Deploy_Service_SIT'), eq('${{ parameters.deployService }}', 'true'))
-  variables:
-    ServiceBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceBuildId'] ]
-    ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServicePipelineDefinitionId'] ]
+
+I also added now a build pipilein form the Alterna Database pipeline:
+
+name: ATC_DB_SIT_$(Date:yyyyMMdd).$(Rev:r)
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - sit
+  paths:
+    include:
+    - DatabaseProjectAlterna_Telecom/**
+
+pr: none
+
+variables:
+- group: SIT_BACK_END_VARIABLE_GROUP
+
+stages:
+- stage: Build_DB
+  displayName: 'Build DB'
   jobs:
-  - job: TagServiceBuild
-    displayName: 'Tag service build'
-    pool:
-      name: 'Deployment Pool'
-      demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
-    steps:
-    - checkout: none
+  - template: pipelines/build-database-project.yml@templates
+    parameters:
+      jobName: 'BuildDb'
+      jobDisplayName: 'Build database project'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      sqlProjectPath: 'DatabaseProjectAlterna_Telecom/DatabaseProjectAlterna_Telecom.sqlproj'
+      artifactName: 'alterna-telecom-db-drop'
+      previewConnectionString: '$(GlobalSettings.ConnString)'
 
-    - template: pipelines/tag-builds.yml@templates
-      parameters:
-        tagTargets:
-        - name: 'Alterna Logger Service'
-          buildId: '$(ServiceBuildId)'
-          definitionId: '$(ServicePipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-SIT-LOGGER-SVC'
-          lkgTag: 'LKG-SIT-LOGGER-SVC'
-          makeLkgUnique: true
-```
+I want to create a build pipeline for the frontend, a build pipeline for the backend and a release pipeline that can release: front, back and DB
 
-Two important notes.
-
-I used the **current** `deploy-windows-service.yml` shape you standardized later in the chat. That means I did **not** include the old parameters like:
-
-* `serviceDisplayName`
-* `serviceDescription`
-* `serviceExeName`
-* `serviceStartType`
-* `createServiceIfMissing`
-* `updateBinPathIfExists`
-
-So this release pipeline assumes the Windows service already exists and only needs stop/copy/start deployment.
-
-Also, I set `enableHealthCheck: false` because your old Logger service pipeline did not show an HTTP health endpoint. If Logger exposes one, we can turn it on and wire rollback to it too.
-
-If your Logger repo now uses `sit` instead of `sit-temp`, change these 3 places:
-
-* build pipeline trigger branch
-* release pipeline branch validation in `Resolve-Build`
-* release pipeline `artifactBranch` value
-
-[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/manual-validation-v0?view=azure-pipelines&utm_source=chatgpt.com "ManualValidation@0 - Manual validation v0 task"
+I want th logic of the release pipeline to be like the on of the Alterna Card Management pipeline
