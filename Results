@@ -1,3 +1,5 @@
+This is my Alterna Telecom Build Pipeline
+
 name: ATC_API_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
 resources:
@@ -13,10 +15,10 @@ trigger:
     - sit
   paths:
     exclude:
-      - '**/*.yml'
+      - '*.yml'
       - global.json
       - nuget.config
- 
+
 pr: none
 
 stages:
@@ -38,3 +40,46 @@ stages:
       zipName: 'Alterna-Telecom-Backend.zip'
       artifactName: 'alterna-telecom-api-drop'
       publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-Telecom-Backend'
+
+And this is my Alterna Telecom Front end build pipeline:
+
+name: ATC_FE_SIT_$(Date:yyyyMMdd).$(Rev:r)
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - sit
+  paths:
+    exclude:
+      - '*.yml'
+
+pr: none
+
+stages:
+- stage: Build_Frontend
+  displayName: 'Build Angular & Publish Artifact'
+  jobs:
+  - template: pipelines/build-angular-webapp.yml@templates
+    parameters:
+      jobName: 'BuildFrontend'
+      jobDisplayName: 'Build Alterna Telecom Frontend'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      workingDirectory: '.'
+      nodeVersion: '22.x'
+      installCommand: 'ci'
+      runTests: false
+      buildCommand: 'npx ng build'
+      distFolder: 'dist/Telecom/browser'
+      zipName: 'Alterna-Telecom-Frontend.zip'
+      artifactName: 'alterna-telecom-front-drop'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish'
+
+Where can I add Microsoft SAecurity Devops ?
