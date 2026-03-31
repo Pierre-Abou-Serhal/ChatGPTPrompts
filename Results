@@ -1,35 +1,127 @@
-name: ATC_DB_$(SourceBranchName)_rc$(Rev:r)
+This is my build-database-project.yml
 
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildDatabase'
 
-trigger:
-  branches:
-    include:
-    - release/*
-  paths:
-    include:
-    - DatabaseProjectAlterna_Telecom/**
+- name: jobDisplayName
+  type: string
+  default: 'Build Database Project'
 
-pr: none
+- name: buildPool
+  type: string
 
-variables:
-- group: SIT_BACK_END_VARIABLE_GROUP
+- name: buildAgentName
+  type: string
 
-stages:
-- stage: Build_DB
-  displayName: 'Build DB'
-  jobs:
-  - template: pipelines/build-database-project.yml@templates
-    parameters:
-      jobName: 'BuildDb'
-      jobDisplayName: 'Build database project'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      sqlProjectPath: 'DatabaseProjectAlterna_Telecom/DatabaseProjectAlterna_Telecom.sqlproj'
-      artifactName: 'alterna-telecom-db-drop'
-      previewConnectionString: '$(GlobalSettings.ConnString)'
+- name: sqlProjectPath
+  type: string
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: artifactName
+  type: string
+  default: 'db-drop'
+
+- name: outputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\db'
+
+- name: dacpacFileName
+  type: string
+  default: 'database.dacpac'
+
+- name: generatePreview
+  type: boolean
+  default: true
+
+- name: sqlPackagePath
+  type: string
+  default: 'SqlPackage'
+
+- name: previewConnectionString
+  type: string
+  default: ''
+
+- name: sqlPackageArgs
+  type: string
+  default: >
+    /p:IgnorePermissions=true
+    /p:IgnoreRoleMembership=true
+    /p:IgnoreUserSettingsObjects=true
+    /p:BlockOnPossibleDataLoss=true
+    /p:DropObjectsNotInSource=false
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - powershell: |
+      dotnet build "${{ parameters.sqlProjectPath }}" -c "${{ parameters.buildConfiguration }}"
+    displayName: 'Build SQL project'
+
+  - powershell: |
+      $dacpac = Get-ChildItem "$(Build.SourcesDirectory)" -Recurse -Filter *.dacpac |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -First 1
+
+      if (-not $dacpac) {
+        throw "No .dacpac found after build."
+      }
+
+      New-Item -Path "${{ parameters.outputFolder }}" -ItemType Directory -Force | Out-Null
+      Copy-Item $dacpac.FullName "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}" -Force
+
+      Write-Host "DACPAC copied to ${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
+    displayName: 'Collect dacpac'
+
+  - powershell: |
+      if ('${{ parameters.generatePreview }}' -ne 'true') {
+        Write-Host "Preview generation disabled."
+        exit 0
+      }
+
+      if ([string]::IsNullOrWhiteSpace("${{ parameters.previewConnectionString }}")) {
+        Write-Host "No previewConnectionString provided. Skipping preview generation."
+        exit 0
+      }
+
+      $dacpac = "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
+      $script = "${{ parameters.outputFolder }}\preview-deploy.sql"
+      $report = "${{ parameters.outputFolder }}\deploy-report.xml"
+
+      & "${{ parameters.sqlPackagePath }}" /Action:Script `
+        /SourceFile:"$dacpac" `
+        /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
+        /OutputPath:"$script" `
+        ${{ parameters.sqlPackageArgs }}
+
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      & "${{ parameters.sqlPackagePath }}" /Action:DeployReport `
+        /SourceFile:"$dacpac" `
+        /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
+        /OutputPath:"$report" `
+        ${{ parameters.sqlPackageArgs }}
+
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    displayName: 'Generate DBA preview files'
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish DB pipeline artifact'
+    inputs:
+      PathtoPublish: '${{ parameters.outputFolder }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
