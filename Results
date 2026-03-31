@@ -1,5 +1,32 @@
-This is my build-database-project.yml
+Yes — this template is exactly where the architecture is getting mixed.
 
+Microsoft’s current SQL project guidance separates the flow into two tasks: **build the SQL project to produce a `.dacpac`**, then **deploy or script it against a target database** later. The `Script` action is specifically what generates the incremental SQL for a **target database**, and it needs target connection information. ([Microsoft Learn][1])
+
+So your current template is doing **two different jobs**:
+
+* CI job: build the DACPAC
+* CD/pre-approval job: generate preview SQL for an environment
+
+That is why it feels environment-dependent.
+
+## What to change
+
+Make this template **build-only**.
+
+Then create a second template for:
+
+* downloading the chosen DACPAC
+* generating `preview-deploy.sql`
+* generating `deploy-report.xml`
+* using the selected environment’s connection string
+
+That second template belongs in the **release pipeline before approval**. Microsoft explicitly describes that build/deploy split and notes that `Script`/`DeployReport` can be used for review before sensitive deployments. ([Microsoft Learn][1])
+
+---
+
+## Rewritten `build-database-project.yml`
+
+```yaml
 parameters:
 - name: jobName
   type: string
@@ -34,27 +61,6 @@ parameters:
   type: string
   default: 'database.dacpac'
 
-- name: generatePreview
-  type: boolean
-  default: true
-
-- name: sqlPackagePath
-  type: string
-  default: 'SqlPackage'
-
-- name: previewConnectionString
-  type: string
-  default: ''
-
-- name: sqlPackageArgs
-  type: string
-  default: >
-    /p:IgnorePermissions=true
-    /p:IgnoreRoleMembership=true
-    /p:IgnoreUserSettingsObjects=true
-    /p:BlockOnPossibleDataLoss=true
-    /p:DropObjectsNotInSource=false
-
 jobs:
 - job: ${{ parameters.jobName }}
   displayName: ${{ parameters.jobDisplayName }}
@@ -69,10 +75,13 @@ jobs:
     clean: true
 
   - powershell: |
+      $ErrorActionPreference = 'Stop'
       dotnet build "${{ parameters.sqlProjectPath }}" -c "${{ parameters.buildConfiguration }}"
     displayName: 'Build SQL project'
 
   - powershell: |
+      $ErrorActionPreference = 'Stop'
+
       $dacpac = Get-ChildItem "$(Build.SourcesDirectory)" -Recurse -Filter *.dacpac |
                 Sort-Object LastWriteTime -Descending |
                 Select-Object -First 1
@@ -87,41 +96,221 @@ jobs:
       Write-Host "DACPAC copied to ${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
     displayName: 'Collect dacpac'
 
-  - powershell: |
-      if ('${{ parameters.generatePreview }}' -ne 'true') {
-        Write-Host "Preview generation disabled."
-        exit 0
-      }
-
-      if ([string]::IsNullOrWhiteSpace("${{ parameters.previewConnectionString }}")) {
-        Write-Host "No previewConnectionString provided. Skipping preview generation."
-        exit 0
-      }
-
-      $dacpac = "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
-      $script = "${{ parameters.outputFolder }}\preview-deploy.sql"
-      $report = "${{ parameters.outputFolder }}\deploy-report.xml"
-
-      & "${{ parameters.sqlPackagePath }}" /Action:Script `
-        /SourceFile:"$dacpac" `
-        /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
-        /OutputPath:"$script" `
-        ${{ parameters.sqlPackageArgs }}
-
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      & "${{ parameters.sqlPackagePath }}" /Action:DeployReport `
-        /SourceFile:"$dacpac" `
-        /TargetConnectionString:"${{ parameters.previewConnectionString }}" `
-        /OutputPath:"$report" `
-        ${{ parameters.sqlPackageArgs }}
-
-      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    displayName: 'Generate DBA preview files'
-
   - task: PublishBuildArtifacts@1
-    displayName: 'Publish DB pipeline artifact'
+    displayName: 'Publish DB artifact'
     inputs:
       PathtoPublish: '${{ parameters.outputFolder }}'
       ArtifactName: '${{ parameters.artifactName }}'
       publishLocation: 'Container'
+```
+
+## Your DB build pipeline should become
+
+```yaml
+name: ATC_DB_$(SourceBranchName)_rc$(Rev:r)
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - release/*
+    - hotfix/*
+  paths:
+    include:
+    - DatabaseProjectAlterna_Telecom/**
+
+pr: none
+
+stages:
+- stage: Build_DB
+  displayName: 'Build DB'
+  jobs:
+  - template: pipelines/build-database-project.yml@templates
+    parameters:
+      jobName: 'BuildDb'
+      jobDisplayName: 'Build database project'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      sqlProjectPath: 'DatabaseProjectAlterna_Telecom/DatabaseProjectAlterna_Telecom.sqlproj'
+      artifactName: 'alterna-telecom-db-drop'
+      dacpacFileName: 'DatabaseProjectAlterna_Telecom.dacpac'
+```
+
+No variable group. No environment connection string.
+
+---
+
+## New template: `generate-db-preview.yml`
+
+This is the part that should run in the **release pipeline**, because `SqlPackage /Action:Script` creates a script for a specific target database. Microsoft documents `DeployScriptPath` and `DeployReportPath` for that action. ([Microsoft Learn][2])
+
+```yaml
+parameters:
+- name: jobName
+  type: string
+  default: 'GenerateDbPreview'
+
+- name: jobDisplayName
+  type: string
+  default: 'Generate DB preview'
+
+- name: deployPool
+  type: string
+
+- name: deployAgentName
+  type: string
+
+- name: artifactProject
+  type: string
+
+- name: artifactDefinitionId
+  type: string
+
+- name: artifactBuildId
+  type: string
+
+- name: artifactName
+  type: string
+  default: 'db-drop'
+
+- name: targetConnectionString
+  type: string
+
+- name: sqlPackagePath
+  type: string
+  default: 'SqlPackage'
+
+- name: sqlPackageArgs
+  type: string
+  default: >
+    /p:IgnorePermissions=true
+    /p:IgnoreRoleMembership=true
+    /p:IgnoreUserSettingsObjects=true
+    /p:BlockOnPossibleDataLoss=true
+    /p:DropObjectsNotInSource=false
+
+- name: previewArtifactName
+  type: string
+  default: 'db-preview'
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.deployPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
+
+  steps:
+  - checkout: none
+
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download DB DACPAC artifact'
+    inputs:
+      project: '${{ parameters.artifactProject }}'
+      buildType: 'specific'
+      definition: '${{ parameters.artifactDefinitionId }}'
+      buildVersionToDownload: 'specific'
+      pipelineId: '${{ parameters.artifactBuildId }}'
+      artifactName: '${{ parameters.artifactName }}'
+      targetPath: '$(Pipeline.Workspace)\dbdrop'
+
+  - powershell: |
+      $ErrorActionPreference = 'Stop'
+
+      $dacpac = Get-ChildItem "$(Pipeline.Workspace)\dbdrop" -Recurse -Filter *.dacpac |
+                Select-Object -First 1
+
+      if (-not $dacpac) {
+        throw "No .dacpac found in downloaded artifact."
+      }
+
+      $outDir = "$(Pipeline.Workspace)\db-preview"
+      New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+      $scriptPath = Join-Path $outDir 'preview-deploy.sql'
+      $reportPath = Join-Path $outDir 'deploy-report.xml'
+
+      & "${{ parameters.sqlPackagePath }}" `
+        /Action:Script `
+        /SourceFile:"$($dacpac.FullName)" `
+        /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
+        /DeployScriptPath:"$scriptPath" `
+        /DeployReportPath:"$reportPath" `
+        ${{ parameters.sqlPackageArgs }}
+
+      if ($LASTEXITCODE -ne 0) {
+        throw "SqlPackage Script action failed with exit code $LASTEXITCODE"
+      }
+
+      Write-Host "Preview script generated at: $scriptPath"
+      Write-Host "Deploy report generated at: $reportPath"
+    displayName: 'Generate preview SQL and deploy report'
+
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish DB preview artifact'
+    inputs:
+      targetPath: '$(Pipeline.Workspace)\db-preview'
+      artifact: '${{ parameters.previewArtifactName }}'
+```
+
+---
+
+## Where this goes in your release pipeline
+
+Use it:
+
+* after resolving the DB build number
+* before your manual approval stage
+* with the selected environment’s connection string
+
+Example:
+
+```yaml
+- stage: Generate_DB_Preview
+  displayName: 'Generate DB preview for ${{ parameters.targetEnvironment }}'
+  dependsOn:
+  - Resolve_Selected_Builds
+  condition: eq('${{ parameters.deployDatabase }}', 'true')
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  jobs:
+  - template: pipelines/generate-db-preview.yml@templates
+    parameters:
+      jobName: 'GeneratePreview'
+      jobDisplayName: 'Generate DB preview'
+      deployPool: '$(deploymentPool)'
+      deployAgentName: '$(dbAgentName)'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactName: 'alterna-telecom-db-drop'
+      previewArtifactName: 'db-preview-${{ parameters.targetEnvironment }}'
+      targetConnectionString: '$(GlobalSettings.ConnString)'
+```
+
+Then make `Approval_Release` depend on `Generate_DB_Preview` when DB deployment is selected.
+
+---
+
+## Final rule for your team
+
+Use this split:
+
+* **DB build pipeline** → builds DACPAC only
+* **Release pipeline** → generates environment-specific preview SQL from that DACPAC, then waits for approval, then deploys
+
+That keeps your architecture clean and still gives DBAs the preview script they want. The docs support exactly this “build once, then script/deploy later” model. ([Microsoft Learn][1])
+
+If you want, I’ll now rewrite your **DB stages inside the release pipeline** so the preview generation is inserted in the right place before approval.
+
+[1]: https://learn.microsoft.com/en-us/sql/tools/sql-database-projects/sql-projects-automation?view=sql-server-ver17 "SQL Projects Automation - SQL Server | Microsoft Learn"
+[2]: https://learn.microsoft.com/en-us/sql/tools/sqlpackage/sqlpackage-script?view=sql-server-ver17 "SqlPackage Script - SQL Server | Microsoft Learn"
