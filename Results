@@ -1,6 +1,27 @@
-name: ATC_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
+Yes — this is the right refactor.
+
+In the YAML you shared, `SIT` is hardcoded in the pipeline name, variable group, build-pipeline names, branch validation, stage names, deploy template inputs, backup paths, and build tags. So the clean fix is not just “add one parameter”, but “centralize all environment-specific values and read them from one environment parameter.” 
+
+Also, for this kind of selection, use a **parameter**, not a normal variable. Azure Pipelines parameters are expanded during template parsing, which is exactly what you need for choosing environment-specific structure and template inputs. Normal variables render later and are just strings. ([Microsoft Learn][1])
+
+## What I would change
+
+### 1) Add one environment parameter and one environment config object
+
+Start the file like this:
+
+```yaml
+name: ATC_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
+- name: targetEnvironment
+  type: string
+  default: SIT
+  values:
+  - SIT
+  - UAT
+  - PROD
+
 - name: deployBackend
   type: boolean
   default: false
@@ -31,6 +52,51 @@ parameters:
   default: '__EMPTY__'
   displayName: 'Database Build Number'
 
+- name: envConfig
+  type: object
+  default:
+    SIT:
+      backendVariableGroup: 'SIT_BACK_END_VARIABLE_GROUP'
+      frontendVariableGroup: 'SIT_FRONT_END_VARIABLE_GROUP'
+      sharedVariableGroup: 'SIT_BACK_END_VARIABLE_GROUP'
+      backendPipelineName: 'BUILD - API - Alterna Telecom'
+      frontendPipelineName: 'BUILD - FRONT - Alterna Telecom'
+      dbPipelineName: 'BUILD - DB - Alterna Telecom'
+      backendAgentName: 'SIT-ALTERNA-BN1'
+      frontendAgentName: 'SIT-ALTERNA-FN1'
+      dbAgentName: 'SIT-ALTERNA-BN1'
+      approvalNotifyUsers: 'SGBL\pabouserhal'
+      approvalInstructions: 'Approve SIT Alterna Telecom deployment.'
+      backupRoot: 'C:\DeployBackups\SIT\AlternaTelecom'
+
+    UAT:
+      backendVariableGroup: 'UAT_BACK_END_VARIABLE_GROUP'
+      frontendVariableGroup: 'UAT_FRONT_END_VARIABLE_GROUP'
+      sharedVariableGroup: 'UAT_BACK_END_VARIABLE_GROUP'
+      backendPipelineName: 'BUILD - API - Alterna Telecom'
+      frontendPipelineName: 'BUILD - FRONT - Alterna Telecom'
+      dbPipelineName: 'BUILD - DB - Alterna Telecom'
+      backendAgentName: 'UAT-ALTERNA-BN1'
+      frontendAgentName: 'UAT-ALTERNA-FN1'
+      dbAgentName: 'UAT-ALTERNA-BN1'
+      approvalNotifyUsers: 'SGBL\pabouserhal'
+      approvalInstructions: 'Approve UAT Alterna Telecom deployment.'
+      backupRoot: 'C:\DeployBackups\UAT\AlternaTelecom'
+
+    PROD:
+      backendVariableGroup: 'PROD_BACK_END_VARIABLE_GROUP'
+      frontendVariableGroup: 'PROD_FRONT_END_VARIABLE_GROUP'
+      sharedVariableGroup: 'PROD_BACK_END_VARIABLE_GROUP'
+      backendPipelineName: 'BUILD - API - Alterna Telecom'
+      frontendPipelineName: 'BUILD - FRONT - Alterna Telecom'
+      dbPipelineName: 'BUILD - DB - Alterna Telecom'
+      backendAgentName: 'PROD-ALTERNA-BN1'
+      frontendAgentName: 'PROD-ALTERNA-FN1'
+      dbAgentName: 'PROD-ALTERNA-BN1'
+      approvalNotifyUsers: 'SGBL\pabouserhal'
+      approvalInstructions: 'Approve PROD Alterna Telecom deployment.'
+      backupRoot: 'C:\DeployBackups\PROD\AlternaTelecom'
+
 resources:
   repositories:
   - repository: templates
@@ -42,235 +108,125 @@ trigger: none
 pr: none
 
 variables:
-- group: SIT_BACK_END_VARIABLE_GROUP
+- ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+  - group: SIT_BACK_END_VARIABLE_GROUP
+- ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+  - group: UAT_BACK_END_VARIABLE_GROUP
+- ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+  - group: PROD_BACK_END_VARIABLE_GROUP
+
+- name: envName
+  value: ${{ parameters.targetEnvironment }}
 
 - name: backendPipelineName
-  value: 'SIT - BUILD - API - Alterna Telecom'
+  value: ${{ parameters.envConfig[parameters.targetEnvironment].backendPipelineName }}
 
 - name: frontendPipelineName
-  value: 'SIT - BUILD - FRONT - Alterna Telecom'
+  value: ${{ parameters.envConfig[parameters.targetEnvironment].frontendPipelineName }}
 
 - name: dbPipelineName
-  value: 'SIT - BUILD - DB - Alterna Telecom'
+  value: ${{ parameters.envConfig[parameters.targetEnvironment].dbPipelineName }}
 
-stages:
+- name: backendAgentName
+  value: ${{ parameters.envConfig[parameters.targetEnvironment].backendAgentName }}
 
-- stage: Resolve_Selected_Builds
-  displayName: 'Resolve selected build numbers'
-  jobs:
-  - job: ResolveBuildNumbers
-    displayName: 'Resolve pipeline names and build numbers'
-    pool:
-      name: 'Deployment Pool'
-      demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
-    steps:
-    - checkout: none
+- name: frontendAgentName
+  value: ${{ parameters.envConfig[parameters.targetEnvironment].frontendAgentName }}
 
-    - powershell: |
-        $ErrorActionPreference = 'Stop'
+- name: dbAgentName
+  value: ${{ parameters.envConfig[parameters.targetEnvironment].dbAgentName }}
 
-        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-        $apiVersion    = '7.1'
+- name: approvalNotifyUsers
+  value: ${{ parameters.envConfig[parameters.targetEnvironment].approvalNotifyUsers }}
 
-        $headers = @{
-          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-        }
+- name: approvalInstructions
+  value: ${{ parameters.envConfig[parameters.targetEnvironment].approvalInstructions }}
 
-        $deployBackend = "${{ parameters.deployBackend }}".ToLower() -eq 'true'
-        $deployFrontend = "${{ parameters.deployFrontend }}".ToLower() -eq 'true'
-        $deployDb = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
+- name: backupRoot
+  value: ${{ parameters.envConfig[parameters.targetEnvironment].backupRoot }}
 
-        if (-not ($deployBackend -or $deployFrontend -or $deployDb)) {
-          throw 'At least one deployment target must be selected: Backend, Frontend, or Database.'
-        }
+- name: buildSourceBranchRegex
+  value: '^refs/heads/(release|hotfix)/'
+```
 
-        function Normalize-BuildNumber {
-          param([string]$BuildNumber)
+This works because parameters are designed for compile-time selection, and conditional/template expressions are the mechanism Azure gives you for this kind of YAML shaping. ([Microsoft Learn][1])
 
-          if ($BuildNumber -eq '__EMPTY__') {
-            return ''
-          }
+## 2) Change the resolve step
 
-          return $BuildNumber
-        }
+Right now your script rejects anything that isn’t `refs/heads/sit`. That must change, because in the model we discussed the build artifacts should come from `release/*` or `hotfix/*`, then get promoted to SIT/UAT/PROD. Your current check is one of the SIT hardcodings that must go. 
 
-        function Resolve-DefinitionIdByName {
-          param(
-            [string]$Label,
-            [string]$PipelineName
-          )
+Change this part:
 
-          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
-            throw "$Label pipeline name is empty."
-          }
+```powershell
+if ($build.sourceBranch -ne 'refs/heads/sit') {
+  throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
+}
+```
 
-          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
-          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
-            $collectionUri,
-            $projectName,
-            $encodedName,
-            $apiVersion
+to this:
 
-          Write-Host "Resolving $Label pipeline name [$PipelineName]"
-          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+```powershell
+$allowedBranchPattern = '$(buildSourceBranchRegex)'
 
-          if (-not $response.value -or $response.count -lt 1) {
-            throw "No pipeline definition found for $Label with name [$PipelineName]."
-          }
+if ($build.sourceBranch -notmatch $allowedBranchPattern) {
+  throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)]. Only release/* or hotfix/* builds can be deployed."
+}
 
-          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
+Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
+```
 
-          if ($exactMatches.Count -eq 0) {
-            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
-          }
+Then expose the source branch as an output variable for backend/frontend/db.
 
-          if ($exactMatches.Count -gt 1) {
-            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
-          }
+## 3) Make the approval stage generic
 
-          $definition = $exactMatches[0]
+Your current stage is named `Approval_SIT_Release` and the instructions are SIT-specific. 
 
-          Write-Host "$Label definition resolved:"
-          Write-Host "  Definition ID   = $($definition.id)"
-          Write-Host "  Definition Name = $($definition.name)"
+I would rename it to something generic and make it conditional:
 
-          return $definition.id
-        }
+```yaml
+- ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
+  - stage: Approval_Release
+    displayName: 'Approval for ${{ parameters.targetEnvironment }} release'
+    dependsOn:
+    - Resolve_Selected_Builds
+    condition: succeeded('Resolve_Selected_Builds')
+    jobs:
+    - job: WaitForBusinessApproval
+      displayName: 'Wait for Business Approval'
+      pool: server
+      timeoutInMinutes: 1500
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(approvalNotifyUsers)'
+          instructions: '$(approvalInstructions)'
+          onTimeout: 'reject'
+```
 
-        function Resolve-Build {
-          param(
-            [string]$Label,
-            [string]$PipelineName,
-            [string]$BuildNumber
-          )
+If you keep `ManualValidation`, this is valid because that task is meant for agentless jobs. Longer term, I’d move approvals to **Azure Environments** for UAT/PROD, because approvals/checks are managed on environments/resources and not inside the YAML itself. ([Microsoft Learn][2])
 
-          $BuildNumber = Normalize-BuildNumber -BuildNumber $BuildNumber
+## 4) Make your deploy stages generic
 
-          if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
-            throw "$Label build number is required because deployment of $Label was selected."
-          }
+Do not keep stage ids like `Deploy_Applications_SIT`, `Deploy_DB_Only_SIT`, `Tag_DB_DEPLOYED_SIT`. Keep stage ids generic and only make the `displayName` dynamic. Your current file hardcodes SIT in all of those. 
 
-          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
-          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
+Example for applications:
 
-          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-            $collectionUri,
-            $projectName,
-            $definitionId,
-            $encodedBuildNumber,
-            $apiVersion
-
-          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
-          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-          if (-not $response.value -or $response.count -lt 1) {
-            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
-          }
-
-          $build = $response.value[0]
-
-          if ($build.sourceBranch -ne 'refs/heads/sit') {
-            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
-          }
-
-          Write-Host "$Label build resolved:"
-          Write-Host "  Build ID         = $($build.id)"
-          Write-Host "  Build Number     = $($build.buildNumber)"
-          Write-Host "  Definition ID    = $definitionId"
-          Write-Host "  Definition Name  = $PipelineName"
-          Write-Host "  Branch           = $($build.sourceBranch)"
-
-          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
-          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
-          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-        }
-
-        if ($deployBackend) {
-          Resolve-Build -Label 'Backend' -PipelineName '$(backendPipelineName)' -BuildNumber '${{ parameters.backendBuildNumber }}'
-        } else {
-          Write-Host '##vso[task.setvariable variable=BackendPipelineDefinitionId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=BackendBuildId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=BackendResolvedBuildNumber;isOutput=true]'
-        }
-
-        if ($deployFrontend) {
-          Resolve-Build -Label 'Frontend' -PipelineName '$(frontendPipelineName)' -BuildNumber '${{ parameters.frontendBuildNumber }}'
-        } else {
-          Write-Host '##vso[task.setvariable variable=FrontendPipelineDefinitionId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=FrontendBuildId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=FrontendResolvedBuildNumber;isOutput=true]'
-        }
-
-        if ($deployDb) {
-          Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
-        } else {
-          Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
-        }
-      name: Resolve
-      displayName: 'Resolve pipeline names and build numbers'
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-- stage: Approval_SIT_Release
-  displayName: 'Approval for SIT release'
+```yaml
+- stage: Deploy_Applications
+  displayName: 'Deploy applications to ${{ parameters.targetEnvironment }}'
   dependsOn:
   - Resolve_Selected_Builds
-  condition: succeeded('Resolve_Selected_Builds')
-  jobs:
-  - job: WaitForBusinessApproval
-    displayName: 'Wait for Business Approval'
-    pool: server
-    timeoutInMinutes: 1500
-    steps:
-    - task: ManualValidation@0
-      timeoutInMinutes: 1440
-      inputs:
-        notifyUsers: 'SGBL\pabouserhal'
-        instructions: 'Approve SIT Alterna Telecom deployment.'
-        onTimeout: 'reject'
-
-#   - job: WaitForManagementApproval
-#     displayName: 'Wait for Management Approval'
-#     dependsOn: WaitForBusinessApproval
-#     pool: server
-#     timeoutInMinutes: 1500
-#     steps:
-#     - task: ManualValidation@0
-#       timeoutInMinutes: 1440
-#       inputs:
-#         notifyUsers: 'SGBL\kabbas'
-#         instructions: 'Approve SIT Alterna Telecom deployment.'
-#         onTimeout: 'reject'
-
-#   - ${{ if eq(parameters.deployDatabase, true) }}:
-#     - job: WaitForDbaApproval
-#       displayName: 'Wait for DBA approval'
-#       dependsOn: WaitForManagementApproval
-#       pool: server
-#       timeoutInMinutes: 1500
-#       steps:
-#       - task: ManualValidation@0
-#         timeoutInMinutes: 1440
-#         inputs:
-#           notifyUsers: 'SGBL\hkassab'
-#           instructions: 'Approve SIT Alterna Telecom database deployment.'
-#           onTimeout: 'reject'
-
-- stage: Deploy_Applications_SIT
-  displayName: 'Deploy applications to SIT'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Approval_SIT_Release
+  - ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
+    - Approval_Release
   condition: and(succeeded(), or(${{ eq(parameters.deployBackend, true) }}, ${{ eq(parameters.deployFrontend, true) }}))
   variables:
     BackendPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendPipelineDefinitionId'] ]
     BackendBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendBuildId'] ]
+    BackendSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendSourceBranch'] ]
     FrontendPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendPipelineDefinitionId'] ]
     FrontendBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendBuildId'] ]
+    FrontendSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendSourceBranch'] ]
   jobs:
   - ${{ if eq(parameters.deployBackend, true) }}:
     - template: pipelines/deploy-iis.yml@templates
@@ -278,18 +234,18 @@ stages:
         jobDependsOn: []
         jobCondition: succeeded()
         deploymentName: 'DeployBackend'
-        deploymentDisplayName: 'Deploy Backend to SIT (IIS)'
-        environmentName: 'SIT'
+        deploymentDisplayName: 'Deploy Backend to ${{ parameters.targetEnvironment }} (IIS)'
+        environmentName: '${{ parameters.targetEnvironment }}'
         deployPool: 'Deployment Pool'
-        deployAgentName: 'SIT-ALTERNA-BN1'
-        variableGroup: 'SIT_BACK_END_VARIABLE_GROUP'
+        deployAgentName: '$(backendAgentName)'
+        variableGroup: ${{ parameters.envConfig[parameters.targetEnvironment].backendVariableGroup }}
         componentName: 'BACKEND'
         artifactName: 'alterna-telecom-api-drop'
         artifactBuildType: 'specific'
         artifactProject: '$(System.TeamProject)'
         artifactDefinitionId: '$(BackendPipelineDefinitionId)'
         artifactBuildId: '$(BackendBuildId)'
-        artifactBranch: 'refs/heads/sit'
+        artifactBranch: '$(BackendSourceBranch)'
         zipName: 'Alterna-Telecom-Backend.zip'
         siteName: 'Alterna.TelecomAzureDevOps'
         appPoolName: 'Alterna.TelecomAzureDevOps'
@@ -312,7 +268,7 @@ stages:
         enableRollbackOnHealthCheckFailure: true
         enableLocalBackup: true
         backupRoot: 'C:\DeployBackups'
-        backupPath: 'C:\DeployBackups\SIT\AlternaTelecom\BACKEND\$(Build.BuildId)'
+        backupPath: '$(backupRoot)\BACKEND\$(Build.BuildId)'
 
   - ${{ if eq(parameters.deployFrontend, true) }}:
     - template: pipelines/deploy-iis.yml@templates
@@ -324,18 +280,18 @@ stages:
           jobDependsOn: []
         jobCondition: succeeded()
         deploymentName: 'DeployFrontend'
-        deploymentDisplayName: 'Deploy Frontend to SIT (IIS)'
-        environmentName: 'SIT'
+        deploymentDisplayName: 'Deploy Frontend to ${{ parameters.targetEnvironment }} (IIS)'
+        environmentName: '${{ parameters.targetEnvironment }}'
         deployPool: 'Deployment Pool'
-        deployAgentName: 'SIT-ALTERNA-FN1'
-        variableGroup: 'SIT_FRONT_END_VARIABLE_GROUP'
+        deployAgentName: '$(frontendAgentName)'
+        variableGroup: ${{ parameters.envConfig[parameters.targetEnvironment].frontendVariableGroup }}
         componentName: 'FRONTEND'
         artifactName: 'alterna-telecom-front-drop'
         artifactBuildType: 'specific'
         artifactProject: '$(System.TeamProject)'
         artifactDefinitionId: '$(FrontendPipelineDefinitionId)'
         artifactBuildId: '$(FrontendBuildId)'
-        artifactBranch: 'refs/heads/sit'
+        artifactBranch: '$(FrontendSourceBranch)'
         zipName: 'Alterna-Telecom-Frontend.zip'
         siteName: 'AlternaTelecomAzureDevOps'
         appPoolName: 'AlternaTelecomAzureDevOps'
@@ -358,146 +314,65 @@ stages:
         enableRollbackOnHealthCheckFailure: true
         enableLocalBackup: true
         backupRoot: 'C:\DeployBackups'
-        backupPath: 'C:\DeployBackups\SIT\AlternaTelecom\FRONTEND\$(Build.BuildId)'
+        backupPath: '$(backupRoot)\FRONTEND\$(Build.BuildId)'
+```
 
-- stage: Rollback_Backend_After_Frontend_Failure_SIT
-  displayName: 'Rollback Backend because Frontend failed'
-  dependsOn:
-  - Deploy_Applications_SIT
-  condition: and(always(), eq('${{ parameters.deployBackend }}', 'true'), eq('${{ parameters.deployFrontend }}', 'true'), eq(dependencies.Deploy_Applications_SIT.outputs['DeployBackend.DeployBackend.publishSuccessOutcome.DeploymentHealthy'], 'true'), ne(dependencies.Deploy_Applications_SIT.outputs['DeployFrontend.DeployFrontend.publishSuccessOutcome.DeploymentHealthy'], 'true'))
-  jobs:
-  - template: pipelines/rollback-iis.yml@templates
-    parameters:
-      deploymentName: 'RollbackBackendAfterFrontendFailure'
-      deploymentDisplayName: 'Rollback Backend from local backup because Frontend failed'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-BN1'
-      siteName: 'Alterna.TelecomAzureDevOps'
-      appPoolName: 'Alterna.TelecomAzureDevOps'
-      iisTargetPath: 'C:\inetpub\wwwroot\Alterna.TelecomAzureDevOps'
-      backupPath: 'C:\DeployBackups\SIT\AlternaTelecom\BACKEND\$(Build.BuildId)'
-      cleanExcludeCsv: ''
+## 5) Make tags and DB deployment generic too
 
-- stage: Tag_APP_LKG_SIT
-  displayName: 'Tag successful application builds as LKG'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Deploy_Applications_SIT
-  condition: and(succeeded('Deploy_Applications_SIT'), or(${{ eq(parameters.deployBackend, true) }}, ${{ eq(parameters.deployFrontend, true) }}))
-  variables:
-    BackendBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendBuildId'] ]
-    BackendPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendPipelineDefinitionId'] ]
-    FrontendBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendBuildId'] ]
-    FrontendPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendPipelineDefinitionId'] ]
-  jobs:
-  - job: TagApplicationBuilds
-    displayName: 'Tag Frontend / Backend builds'
-    pool:
-      name: 'Deployment Pool'
-      demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
-    steps:
-    - checkout: none
+Right now your build tags and DB deployment are SIT-specific too. 
 
-    - ${{ if eq(parameters.deployBackend, true) }}:
-      - template: pipelines/tag-builds.yml@templates
-        parameters:
-          tagTargets:
-          - name: 'Alterna Telecom Backend'
-            buildId: '$(BackendBuildId)'
-            definitionId: '$(BackendPipelineDefinitionId)'
-            deployedTag: 'DEPLOYED-SIT-ATC-BACKEND'
-            lkgTag: 'LKG-SIT-ATC-BACKEND'
-            makeLkgUnique: true
+Replace things like:
 
-    - ${{ if eq(parameters.deployFrontend, true) }}:
-      - template: pipelines/tag-builds.yml@templates
-        parameters:
-          tagTargets:
-          - name: 'Alterna Telecom Frontend'
-            buildId: '$(FrontendBuildId)'
-            definitionId: '$(FrontendPipelineDefinitionId)'
-            deployedTag: 'DEPLOYED-SIT-ATC-FRONTEND'
-            lkgTag: 'LKG-SIT-ATC-FRONTEND'
-            makeLkgUnique: true
+```yaml
+deployedTag: 'DEPLOYED-SIT-ATC-BACKEND'
+lkgTag: 'LKG-SIT-ATC-BACKEND'
+```
 
-- stage: Deploy_DB_After_Apps_SIT
-  displayName: 'Deploy DB to SIT after applications'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Tag_APP_LKG_SIT
-  condition: and(succeeded('Tag_APP_LKG_SIT'), ${{ eq(parameters.deployDatabase, true) }}, or(${{ eq(parameters.deployBackend, true) }}, ${{ eq(parameters.deployFrontend, true) }}))
-  variables:
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-  jobs:
-  - template: pipelines/deploy-database.yml@templates
-    parameters:
-      deploymentName: 'DeployDb'
-      deploymentDisplayName: 'Deploy Alterna Telecom database'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-BN1'
-      artifactName: 'alterna-telecom-db-drop'
-      artifactBuildType: 'specific'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactBranch: 'refs/heads/sit'
-      targetConnectionString: '$(GlobalSettings.ConnString)'
+with:
 
-- stage: Deploy_DB_Only_SIT
-  displayName: 'Deploy DB to SIT'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Approval_SIT_Release
-  condition: and(succeeded(), ${{ eq(parameters.deployDatabase, true) }}, ${{ eq(parameters.deployBackend, false) }}, ${{ eq(parameters.deployFrontend, false) }})
-  variables:
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-  jobs:
-  - template: pipelines/deploy-database.yml@templates
-    parameters:
-      deploymentName: 'DeployDb'
-      deploymentDisplayName: 'Deploy Alterna Telecom database'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-BN1'
-      artifactName: 'alterna-telecom-db-drop'
-      artifactBuildType: 'specific'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactBranch: 'refs/heads/sit'
-      targetConnectionString: '$(GlobalSettings.ConnString)'
+```yaml
+deployedTag: 'DEPLOYED-$(envName)-ATC-BACKEND'
+lkgTag: 'LKG-$(envName)-ATC-BACKEND'
+```
 
-- stage: Tag_DB_DEPLOYED_SIT
-  displayName: 'Tag deployed database build'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Deploy_DB_After_Apps_SIT
-  - Deploy_DB_Only_SIT
-  condition: and(eq('${{ parameters.deployDatabase }}', 'true'), or(eq(dependencies.Deploy_DB_After_Apps_SIT.result, 'Succeeded'), eq(dependencies.Deploy_DB_Only_SIT.result, 'Succeeded')))
-  variables:
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-  jobs:
-  - job: TagDatabaseBuild
-    displayName: 'Tag DB build'
-    pool:
-      name: 'Deployment Pool'
-      demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
-    steps:
-    - checkout: none
+and similarly:
 
-    - template: pipelines/tag-builds.yml@templates
-      parameters:
-        tagTargets:
-        - name: 'Alterna Telecom DB'
-          buildId: '$(DbBuildId)'
-          definitionId: '$(DbPipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-SIT-ATC-DB'
-          lkgTag: 'LKG-SIT-ATC-DB'
-          makeLkgUnique: true
+```yaml
+environmentName: '${{ parameters.targetEnvironment }}'
+deployAgentName: '$(dbAgentName)'
+artifactBranch: '$(DbSourceBranch)'
+```
+
+for DB stages.
+
+## 6) One important cleanup
+
+Your current release pipeline still assumes environment-specific build pipelines like `SIT - BUILD - API - Alterna Telecom`. That works for the refactor, but it is not the end-state we discussed. The cleaner target is that build pipelines become generic and the release pipeline only chooses:
+
+* the artifact build number
+* the environment to deploy to
+
+So for the transition, either:
+
+* keep the env-specific build-pipeline names in `envConfig`, or
+* switch them now to generic names like `BUILD - API - Alterna Telecom` and keep promotion truly artifact-based.
+
+## My recommendation
+
+Do this in two steps:
+
+First, make **this exact release pipeline** environment-parameterized with:
+
+* `targetEnvironment`
+* env config block
+* generic stage names
+* dynamic approval text
+* dynamic deploy agents / variable groups / tags / backup paths
+* release/hotfix branch validation instead of `refs/heads/sit`
+
+Then, in the next step, remove the environment-specific build-pipeline names too.
+
+If you want, I’ll rewrite your full release pipeline in one cleaned-up version with `SIT/UAT/PROD` parameter support.
+
+[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/runtime-parameters?view=azure-devops&utm_source=chatgpt.com "Use runtime and type-safe parameters - Azure Pipelines"
+[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/release/deploy-using-approvals?view=azure-devops&utm_source=chatgpt.com "Control deployments with gates and approvals - Azure ..."
