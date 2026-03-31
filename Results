@@ -1,316 +1,321 @@
-Yes — this template is exactly where the architecture is getting mixed.
+Yes — here is the clean rewrite for the **DB part inside your release pipeline**.
 
-Microsoft’s current SQL project guidance separates the flow into two tasks: **build the SQL project to produce a `.dacpac`**, then **deploy or script it against a target database** later. The `Script` action is specifically what generates the incremental SQL for a **target database**, and it needs target connection information. ([Microsoft Learn][1])
+First, one important change outside the release pipeline:
 
-So your current template is doing **two different jobs**:
+In your **DB build pipeline**, stop generating the preview there.
+Either remove those preview parameters entirely, or set:
 
-* CI job: build the DACPAC
-* CD/pre-approval job: generate preview SQL for an environment
+```yaml
+generatePreview: false
+```
 
-That is why it feels environment-dependent.
-
-## What to change
-
-Make this template **build-only**.
-
-Then create a second template for:
-
-* downloading the chosen DACPAC
-* generating `preview-deploy.sql`
-* generating `deploy-report.xml`
-* using the selected environment’s connection string
-
-That second template belongs in the **release pipeline before approval**. Microsoft explicitly describes that build/deploy split and notes that `Script`/`DeployReport` can be used for review before sensitive deployments. ([Microsoft Learn][1])
+because the preview is environment-specific and now belongs in the release pipeline.
 
 ---
 
-## Rewritten `build-database-project.yml`
+# 1) Replace your `Approval_Release` stage with this version
+
+This makes approval wait for the DB preview first when `deployDatabase = true`.
 
 ```yaml
-parameters:
-- name: jobName
-  type: string
-  default: 'BuildDatabase'
-
-- name: jobDisplayName
-  type: string
-  default: 'Build Database Project'
-
-- name: buildPool
-  type: string
-
-- name: buildAgentName
-  type: string
-
-- name: sqlProjectPath
-  type: string
-
-- name: buildConfiguration
-  type: string
-  default: 'Release'
-
-- name: artifactName
-  type: string
-  default: 'db-drop'
-
-- name: outputFolder
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\db'
-
-- name: dacpacFileName
-  type: string
-  default: 'database.dacpac'
-
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
-
-  pool:
-    name: ${{ parameters.buildPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.buildAgentName }}
-
-  steps:
-  - checkout: self
-    clean: true
-
-  - powershell: |
-      $ErrorActionPreference = 'Stop'
-      dotnet build "${{ parameters.sqlProjectPath }}" -c "${{ parameters.buildConfiguration }}"
-    displayName: 'Build SQL project'
-
-  - powershell: |
-      $ErrorActionPreference = 'Stop'
-
-      $dacpac = Get-ChildItem "$(Build.SourcesDirectory)" -Recurse -Filter *.dacpac |
-                Sort-Object LastWriteTime -Descending |
-                Select-Object -First 1
-
-      if (-not $dacpac) {
-        throw "No .dacpac found after build."
-      }
-
-      New-Item -Path "${{ parameters.outputFolder }}" -ItemType Directory -Force | Out-Null
-      Copy-Item $dacpac.FullName "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}" -Force
-
-      Write-Host "DACPAC copied to ${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
-    displayName: 'Collect dacpac'
-
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish DB artifact'
-    inputs:
-      PathtoPublish: '${{ parameters.outputFolder }}'
-      ArtifactName: '${{ parameters.artifactName }}'
-      publishLocation: 'Container'
-```
-
-## Your DB build pipeline should become
-
-```yaml
-name: ATC_DB_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-    - release/*
-    - hotfix/*
-  paths:
-    include:
-    - DatabaseProjectAlterna_Telecom/**
-
-pr: none
-
-stages:
-- stage: Build_DB
-  displayName: 'Build DB'
+- stage: Approval_Release
+  displayName: 'Approval for $(environmentName) release'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - ${{ if eq(parameters.deployDatabase, true) }}:
+    - Generate_DB_Preview
+  condition: succeeded()
   jobs:
-  - template: pipelines/build-database-project.yml@templates
-    parameters:
-      jobName: 'BuildDb'
-      jobDisplayName: 'Build database project'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      sqlProjectPath: 'DatabaseProjectAlterna_Telecom/DatabaseProjectAlterna_Telecom.sqlproj'
-      artifactName: 'alterna-telecom-db-drop'
-      dacpacFileName: 'DatabaseProjectAlterna_Telecom.dacpac'
-```
+  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+    - job: NoApprovalRequired
+      displayName: 'No approval required for SIT'
+      pool:
+        name: '$(deploymentPool)'
+        demands:
+        - Agent.Name -equals $(resolveAgentName)
+      steps:
+      - checkout: none
+      - powershell: |
+          Write-Host 'SIT selected. No manual approval is required.'
+        displayName: 'Skip manual approval'
 
-No variable group. No environment connection string.
-
----
-
-## New template: `generate-db-preview.yml`
-
-This is the part that should run in the **release pipeline**, because `SqlPackage /Action:Script` creates a script for a specific target database. Microsoft documents `DeployScriptPath` and `DeployReportPath` for that action. ([Microsoft Learn][2])
-
-```yaml
-parameters:
-- name: jobName
-  type: string
-  default: 'GenerateDbPreview'
-
-- name: jobDisplayName
-  type: string
-  default: 'Generate DB preview'
-
-- name: deployPool
-  type: string
-
-- name: deployAgentName
-  type: string
-
-- name: artifactProject
-  type: string
-
-- name: artifactDefinitionId
-  type: string
-
-- name: artifactBuildId
-  type: string
-
-- name: artifactName
-  type: string
-  default: 'db-drop'
-
-- name: targetConnectionString
-  type: string
-
-- name: sqlPackagePath
-  type: string
-  default: 'SqlPackage'
-
-- name: sqlPackageArgs
-  type: string
-  default: >
-    /p:IgnorePermissions=true
-    /p:IgnoreRoleMembership=true
-    /p:IgnoreUserSettingsObjects=true
-    /p:BlockOnPossibleDataLoss=true
-    /p:DropObjectsNotInSource=false
-
-- name: previewArtifactName
-  type: string
-  default: 'db-preview'
-
-jobs:
-- job: ${{ parameters.jobName }}
-  displayName: ${{ parameters.jobDisplayName }}
-
-  pool:
-    name: ${{ parameters.deployPool }}
-    demands:
-    - Agent.Name -equals ${{ parameters.deployAgentName }}
-
-  steps:
-  - checkout: none
-
-  - task: DownloadPipelineArtifact@2
-    displayName: 'Download DB DACPAC artifact'
-    inputs:
-      project: '${{ parameters.artifactProject }}'
-      buildType: 'specific'
-      definition: '${{ parameters.artifactDefinitionId }}'
-      buildVersionToDownload: 'specific'
-      pipelineId: '${{ parameters.artifactBuildId }}'
-      artifactName: '${{ parameters.artifactName }}'
-      targetPath: '$(Pipeline.Workspace)\dbdrop'
-
-  - powershell: |
-      $ErrorActionPreference = 'Stop'
-
-      $dacpac = Get-ChildItem "$(Pipeline.Workspace)\dbdrop" -Recurse -Filter *.dacpac |
-                Select-Object -First 1
-
-      if (-not $dacpac) {
-        throw "No .dacpac found in downloaded artifact."
-      }
-
-      $outDir = "$(Pipeline.Workspace)\db-preview"
-      New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-
-      $scriptPath = Join-Path $outDir 'preview-deploy.sql'
-      $reportPath = Join-Path $outDir 'deploy-report.xml'
-
-      & "${{ parameters.sqlPackagePath }}" `
-        /Action:Script `
-        /SourceFile:"$($dacpac.FullName)" `
-        /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
-        /DeployScriptPath:"$scriptPath" `
-        /DeployReportPath:"$reportPath" `
-        ${{ parameters.sqlPackageArgs }}
-
-      if ($LASTEXITCODE -ne 0) {
-        throw "SqlPackage Script action failed with exit code $LASTEXITCODE"
-      }
-
-      Write-Host "Preview script generated at: $scriptPath"
-      Write-Host "Deploy report generated at: $reportPath"
-    displayName: 'Generate preview SQL and deploy report'
-
-  - task: PublishPipelineArtifact@1
-    displayName: 'Publish DB preview artifact'
-    inputs:
-      targetPath: '$(Pipeline.Workspace)\db-preview'
-      artifact: '${{ parameters.previewArtifactName }}'
+  - ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
+    - job: WaitForBusinessApproval
+      displayName: 'Wait for Business Approval'
+      pool: server
+      timeoutInMinutes: 1500
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(approvalNotifyUsers)'
+          instructions: '$(approvalInstructions)'
+          onTimeout: 'reject'
 ```
 
 ---
 
-## Where this goes in your release pipeline
+# 2) Add this new stage before approval
 
-Use it:
+This downloads the chosen DACPAC and generates:
 
-* after resolving the DB build number
-* before your manual approval stage
-* with the selected environment’s connection string
+* `preview-deploy.sql`
+* `deploy-report.xml`
 
-Example:
+for the selected environment.
 
 ```yaml
 - stage: Generate_DB_Preview
-  displayName: 'Generate DB preview for ${{ parameters.targetEnvironment }}'
+  displayName: 'Generate DB preview for $(environmentName)'
   dependsOn:
   - Resolve_Selected_Builds
-  condition: eq('${{ parameters.deployDatabase }}', 'true')
+  condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployDatabase }}', 'true'))
   variables:
     DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
     DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
   jobs:
-  - template: pipelines/generate-db-preview.yml@templates
-    parameters:
-      jobName: 'GeneratePreview'
-      jobDisplayName: 'Generate DB preview'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(dbAgentName)'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactName: 'alterna-telecom-db-drop'
-      previewArtifactName: 'db-preview-${{ parameters.targetEnvironment }}'
-      targetConnectionString: '$(GlobalSettings.ConnString)'
-```
+  - job: GenerateDbPreview
+    displayName: 'Generate preview SQL and deploy report'
+    pool:
+      name: '$(deploymentPool)'
+      demands:
+      - Agent.Name -equals $(dbAgentName)
+    steps:
+    - checkout: none
 
-Then make `Approval_Release` depend on `Generate_DB_Preview` when DB deployment is selected.
+    - task: DownloadPipelineArtifact@2
+      displayName: 'Download DB DACPAC artifact'
+      inputs:
+        project: '$(System.TeamProject)'
+        buildType: 'specific'
+        definition: '$(DbPipelineDefinitionId)'
+        buildVersionToDownload: 'specific'
+        pipelineId: '$(DbBuildId)'
+        artifactName: '$(dbArtifactName)'
+        targetPath: '$(Pipeline.Workspace)\dbdrop'
+
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
+
+        $dacpac = Get-ChildItem "$(Pipeline.Workspace)\dbdrop" -Recurse -Filter *.dacpac |
+                  Select-Object -First 1
+
+        if (-not $dacpac) {
+          throw "No .dacpac found in downloaded DB artifact."
+        }
+
+        $outDir = "$(Pipeline.Workspace)\db-preview"
+        New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+        $scriptPath = Join-Path $outDir 'preview-deploy.sql'
+        $reportPath = Join-Path $outDir 'deploy-report.xml'
+
+        & "SqlPackage" `
+          /Action:Script `
+          /SourceFile:"$($dacpac.FullName)" `
+          /TargetConnectionString:"$(GlobalSettings.ConnString)" `
+          /DeployScriptPath:"$scriptPath" `
+          /DeployReportPath:"$reportPath" `
+          /p:IgnorePermissions=true `
+          /p:IgnoreRoleMembership=true `
+          /p:IgnoreUserSettingsObjects=true `
+          /p:BlockOnPossibleDataLoss=true `
+          /p:DropObjectsNotInSource=false
+
+        if ($LASTEXITCODE -ne 0) {
+          throw "SqlPackage Script failed with exit code $LASTEXITCODE"
+        }
+
+        Write-Host "Preview SQL generated at: $scriptPath"
+        Write-Host "Deploy report generated at: $reportPath"
+      displayName: 'Generate DB preview files'
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish DB preview artifact'
+      inputs:
+        targetPath: '$(Pipeline.Workspace)\db-preview'
+        artifact: 'db-preview-$(environmentName)'
+```
 
 ---
 
-## Final rule for your team
+# 3) Replace `Deploy_DB_After_Apps` with this
 
-Use this split:
+This is for the case:
 
-* **DB build pipeline** → builds DACPAC only
-* **Release pipeline** → generates environment-specific preview SQL from that DACPAC, then waits for approval, then deploys
+* app deploy selected
+* DB deploy selected
 
-That keeps your architecture clean and still gives DBAs the preview script they want. The docs support exactly this “build once, then script/deploy later” model. ([Microsoft Learn][1])
+```yaml
+- stage: Deploy_DB_After_Apps
+  displayName: 'Deploy DB to $(environmentName) after applications'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Approval_Release
+  - Tag_APP_LKG
+  condition: and(
+              succeeded('Approval_Release'),
+              succeeded('Tag_APP_LKG'),
+              eq('${{ parameters.deployDatabase }}', 'true'),
+              or(eq('${{ parameters.deployBackend }}', 'true'), eq('${{ parameters.deployFrontend }}', 'true'))
+            )
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy Alterna Telecom database'
+      environmentName: '${{ parameters.targetEnvironment }}'
+      deployPool: '$(deploymentPool)'
+      deployAgentName: '$(dbAgentName)'
+      artifactName: '$(dbArtifactName)'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: '$(DbSourceBranch)'
+      targetConnectionString: '$(GlobalSettings.ConnString)'
+```
 
-If you want, I’ll now rewrite your **DB stages inside the release pipeline** so the preview generation is inserted in the right place before approval.
+---
 
-[1]: https://learn.microsoft.com/en-us/sql/tools/sql-database-projects/sql-projects-automation?view=sql-server-ver17 "SQL Projects Automation - SQL Server | Microsoft Learn"
-[2]: https://learn.microsoft.com/en-us/sql/tools/sqlpackage/sqlpackage-script?view=sql-server-ver17 "SqlPackage Script - SQL Server | Microsoft Learn"
+# 4) Replace `Deploy_DB_Only` with this
+
+This is for the case:
+
+* only DB deploy selected
+* no app deploy selected
+
+```yaml
+- stage: Deploy_DB_Only
+  displayName: 'Deploy DB to $(environmentName)'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Approval_Release
+  condition: and(
+              succeeded('Approval_Release'),
+              eq('${{ parameters.deployDatabase }}', 'true'),
+              eq('${{ parameters.deployBackend }}', 'false'),
+              eq('${{ parameters.deployFrontend }}', 'false')
+            )
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy Alterna Telecom database'
+      environmentName: '${{ parameters.targetEnvironment }}'
+      deployPool: '$(deploymentPool)'
+      deployAgentName: '$(dbAgentName)'
+      artifactName: '$(dbArtifactName)'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: '$(DbSourceBranch)'
+      targetConnectionString: '$(GlobalSettings.ConnString)'
+```
+
+---
+
+# 5) Replace `Tag_DB_DEPLOYED` with this
+
+This keeps your DB tagging behavior.
+
+```yaml
+- stage: Tag_DB_DEPLOYED
+  displayName: 'Tag deployed database build'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Deploy_DB_After_Apps
+  - Deploy_DB_Only
+  condition: and(
+              eq('${{ parameters.deployDatabase }}', 'true'),
+              or(
+                eq(dependencies.Deploy_DB_After_Apps.result, 'Succeeded'),
+                eq(dependencies.Deploy_DB_Only.result, 'Succeeded')
+              )
+            )
+  variables:
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+  jobs:
+  - job: TagDatabaseBuild
+    displayName: 'Tag DB build'
+    pool:
+      name: '$(deploymentPool)'
+      demands:
+      - Agent.Name -equals $(resolveAgentName)
+    steps:
+    - checkout: none
+
+    - template: pipelines/tag-builds.yml@templates
+      parameters:
+        tagTargets:
+        - name: 'Alterna Telecom DB'
+          buildId: '$(DbBuildId)'
+          definitionId: '$(DbPipelineDefinitionId)'
+          deployedTag: 'DEPLOYED-$(environmentName)-ATC-DB'
+          lkgTag: 'LKG-$(environmentName)-ATC-DB'
+          makeLkgUnique: true
+```
+
+---
+
+# What this gives you
+
+Now the flow becomes:
+
+### If DB is selected
+
+1. Resolve chosen DB build
+2. Download DACPAC
+3. Generate preview SQL + deploy report for the selected environment
+4. Publish preview artifact
+5. Wait for approval
+6. Deploy DB
+7. Tag deployed DB build
+
+### If DB is not selected
+
+* `Generate_DB_Preview`
+* `Deploy_DB_After_Apps`
+* `Deploy_DB_Only`
+* `Tag_DB_DEPLOYED`
+
+will all skip naturally
+
+---
+
+# Very important note
+
+Because the DB preview is now generated in the release pipeline, your **DB build pipeline must stop doing preview generation**.
+
+So in your DB build pipeline template call, either:
+
+* remove `generatePreview` and `previewConnectionString`
+* or explicitly set:
+
+```yaml
+generatePreview: false
+```
+
+---
+
+# My recommendation
+
+Paste these four DB stages plus the updated `Approval_Release` stage, then test in this order:
+
+1. `SIT + DB only`
+2. `SIT + backend + frontend + DB`
+3. `UAT + DB only`
+4. check that the `db-preview-<environment>` artifact is published before approval
+
+If you want, I can also rewrite your **DB build pipeline YAML** so it matches this final flow exactly.
