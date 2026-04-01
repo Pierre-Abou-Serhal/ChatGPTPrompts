@@ -58,28 +58,29 @@ jobs:
   steps:
   - checkout: none
 
-  - task: DownloadPipelineArtifact@2
+  - task: DownloadBuildArtifacts@1
     displayName: 'Download DB DACPAC artifact'
     inputs:
-      project: '${{ parameters.artifactProject }}'
       buildType: 'specific'
-      definition: '${{ parameters.artifactDefinitionId }}'
+      project: '${{ parameters.artifactProject }}'
+      pipeline: '${{ parameters.artifactDefinitionId }}'
       buildVersionToDownload: 'specific'
-      pipelineId: '${{ parameters.artifactBuildId }}'
+      buildId: '${{ parameters.artifactBuildId }}'
+      downloadType: 'single'
       artifactName: '${{ parameters.artifactName }}'
-      targetPath: '$(Pipeline.Workspace)\dbdrop'
+      downloadPath: '$(System.ArtifactsDirectory)\dbdrop'
 
   - powershell: |
       $ErrorActionPreference = 'Stop'
 
-      $dacpac = Get-ChildItem "$(Pipeline.Workspace)\dbdrop" -Recurse -Filter *.dacpac |
+      $dacpac = Get-ChildItem "$(System.ArtifactsDirectory)\dbdrop" -Recurse -Filter *.dacpac |
                 Select-Object -First 1
 
       if (-not $dacpac) {
         throw "No .dacpac found in downloaded artifact."
       }
 
-      $outDir = "$(Pipeline.Workspace)\db-preview"
+      $outDir = "$(Build.ArtifactStagingDirectory)\db-preview"
       New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
       $scriptPath = Join-Path $outDir 'preview-deploy.sql'
@@ -101,8 +102,9 @@ jobs:
       Write-Host "Deploy report generated at: $reportPath"
     displayName: 'Generate preview SQL and deploy report'
 
-  - task: PublishPipelineArtifact@1
+  - task: PublishBuildArtifacts@1
     displayName: 'Publish DB preview artifact'
     inputs:
-      targetPath: '$(Pipeline.Workspace)\db-preview'
-      artifact: '${{ parameters.previewArtifactName }}'
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\db-preview'
+      ArtifactName: '${{ parameters.previewArtifactName }}'
+      publishLocation: 'Container'
