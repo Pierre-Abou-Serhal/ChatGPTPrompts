@@ -1,163 +1,39 @@
-16d47f4a-18eb-4804-a3fa-72c6af029e3f
 
-Your **Angular build template** stays the place where the OWASP scan logic lives.
-
-Your **Alterna-Telecom-Frontend build pipeline** stays the place that:
-
-* links the secret variable group
-* passes the OWASP parameters
-* decides whether the scan is on or off for that run
-
-That is the clean separation. Azure DevOps variable groups are linked in YAML with `variables: - group: ...`, runtime parameters are the right way to toggle behavior at queue time, and self-hosted agents are the right place to preinstall tools and keep local caches. ([Microsoft Learn][1])
-
-## What changes in `build-angular-webapp.yml`
-
-You remove the **OWASP extension task** and replace it with a **local CLI script step**.
-
-Add these parameters near the top:
-
-```yaml
-- name: runDependencyCheck
-  type: boolean
-  default: true
-
-- name: dependencyCheckCliPath
-  type: string
-  default: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-
-- name: dependencyCheckDataPath
-  type: string
-  default: 'C:\Tools\dependency-check-data'
-
-- name: dependencyCheckProjectName
-  type: string
-  default: '$(Build.Repository.Name)'
-
-- name: dependencyCheckAdditionalArguments
-  type: string
-  default: ''
-```
-
-Then, in the steps, keep your existing Angular flow, and insert this **after `Install dependencies (npm)`**:
-
-```yaml
-  - powershell: |
-      $dc = '${{ parameters.dependencyCheckCliPath }}'
-      $reportDir = '$(Build.ArtifactStagingDirectory)\dependency-check'
-
-      if (-not (Test-Path $dc)) {
-        throw "Dependency-Check CLI not found at: $dc"
-      }
-
-      New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
-
-      & $dc `
-        --project "${{ parameters.dependencyCheckProjectName }}" `
-        --scan "$(Build.SourcesDirectory)" `
-        --format "HTML" `
-        --format "JSON" `
-        --format "JUNIT" `
-        --out $reportDir `
-        --data "${{ parameters.dependencyCheckDataPath }}" `
-        --nvdApiKey "$(NVD_API_KEY)" `
-        --disableYarnAudit `
-        --disablePnpmAudit `
-        --disableNodeAudit `
-        --disableRetireJS `
-        ${{ parameters.dependencyCheckAdditionalArguments }}
-
-      if ($LASTEXITCODE -ne 0) {
-        exit $LASTEXITCODE
-      }
-    displayName: 'OWASP Dependency Check (local CLI)'
-    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-
-  - task: PublishTestResults@2
-    displayName: 'Publish Dependency Check JUnit'
-    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-    inputs:
-      testResultsFormat: 'JUnit'
-      testResultsFiles: '**\*junit.xml'
-      searchFolder: '$(Build.ArtifactStagingDirectory)\dependency-check'
-      failTaskOnFailedTests: false
-```
-
-This works because the Dependency-Check CLI officially supports `--project`, `--scan`, `--format`, `--out`, `--data`, and `--nvdApiKey`. The self-hosted agent model is designed for preinstalled tools and persistent machine-level caches. ([dependency-check.github.io][2])
-
-## What changes in `Alterna-Telecom-Frontend` build pipeline
-
-Very little.
-
-You mainly:
-
-1. link the variable group that contains `NVD_API_KEY`
-2. call the Angular template with the OWASP parameters
-
-Example:
-
-```yaml
-variables:
-- group: SECURITY_SECRETS
-```
-
-And in the template call:
-
-```yaml
-- template: build-angular-webapp.yml@templates
-  parameters:
-    jobName: 'BuildAngular'
-    jobDisplayName: 'Build (Angular)'
-    buildPool: 'Build Pool'
-    buildAgentName: 'YOUR-AGENT'
-    workingDirectory: 'Alterna-Telecom-Frontend'
-    distFolder: 'dist/Alterna-Telecom-Frontend'
-    zipName: 'AlternaTelecomFrontend.zip'
-    artifactName: 'alterna-telecom-frontend-drop'
-
-    runDependencyCheck: true
-    dependencyCheckProjectName: 'Alterna-Telecom-Frontend'
-    dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-    dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-    dependencyCheckAdditionalArguments: ''
-```
-
-Variable groups are not picked up automatically; the pipeline has to reference them explicitly. ([Microsoft Learn][1])
-
-## So, practically
-
-For your setup:
-
-* **Template** = contains the reusable OWASP logic
-* **Alterna-Telecom-Frontend pipeline** = passes values and secrets to that template
-* **Agent machine** = has Java + Dependency-Check CLI already installed locally
-
-## What does not happen anymore
-
-* no download from GitHub during the build
-* no OWASP extension bootstrap call to `api.github.com`
-* no dependency on that extension step succeeding first
-
-## Can you disable it anytime?
-
-Yes. Just queue the pipeline with:
-
-```yaml
-runDependencyCheck: false
-```
-
-or change the value in the calling pipeline. Azure DevOps conditions and runtime parameters are built for this kind of toggle. ([Microsoft Learn][3])
-
-## My recommendation
-
-For **Alterna-Telecom-Frontend**:
-
-* keep the template reusable
-* switch the template from extension-task to local CLI
-* keep `runDependencyCheck` as a boolean parameter
-* link `SECURITY_SECRETS` only in the calling pipeline
-
-If you want, I’ll rewrite your `build-angular-webapp.yml` exactly as a ready-to-paste final version.
-
-[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/library/variable-groups?view=azure-devops&utm_source=chatgpt.com "Manage variable groups - Azure Pipelines"
-[2]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html?utm_source=chatgpt.com "Command Line Arguments – dependency-check-cli"
-[3]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/runtime-parameters?view=azure-devops&utm_source=chatgpt.com "Use runtime and type-safe parameters - Azure Pipelines"
+	at java.base/java.net.Inet6AddressImpl.lookupAllHostAddr(Native Method)
+	at java.base/java.net.Inet6AddressImpl.lookupAllHostAddr(Inet6AddressImpl.java:52)
+	at java.base/java.net.InetAddress$PlatformResolver.lookupByName(InetAddress.java:1211)
+	at java.base/java.net.InetAddress.getAddressesFromNameService(InetAddress.java:1828)
+	at java.base/java.net.InetAddress$NameServiceAddresses.get(InetAddress.java:1139)
+	at java.base/java.net.InetAddress.getAllByName0(InetAddress.java:1818)
+	at java.base/java.net.InetAddress.getAllByName(InetAddress.java:1688)
+	at org.apache.hc.client5.http.SystemDefaultDnsResolver.resolve(SystemDefaultDnsResolver.java:61)
+	at org.apache.hc.client5.http.DnsResolver.resolve(DnsResolver.java:77)
+	at org.apache.hc.client5.http.impl.io.DefaultHttpClientConnectionOperator.connect(DefaultHttpClientConnectionOperator.java:173)
+	at org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager.connect(PoolingHttpClientConnectionManager.java:497)
+	at org.apache.hc.client5.http.impl.classic.InternalExecRuntime.connectEndpoint(InternalExecRuntime.java:164)
+	at org.apache.hc.client5.http.impl.classic.InternalExecRuntime.connectEndpoint(InternalExecRuntime.java:174)
+	at org.apache.hc.client5.http.impl.classic.ConnectExec.execute(ConnectExec.java:144)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.ProtocolExec.execute(ProtocolExec.java:195)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.ContentCompressionExec.execute(ContentCompressionExec.java:151)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.HttpRequestRetryExec.execute(HttpRequestRetryExec.java:112)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.RedirectExec.execute(RedirectExec.java:110)
+	at org.apache.hc.client5.http.impl.classic.ExecChainElement.execute(ExecChainElement.java:51)
+	at org.apache.hc.client5.http.impl.classic.InternalHttpClient.doExecute(InternalHttpClient.java:185)
+	at org.apache.hc.client5.http.impl.classic.CloseableHttpClient.execute(CloseableHttpClient.java:245)
+	at org.apache.hc.client5.http.impl.classic.CloseableHttpClient.execute(CloseableHttpClient.java:188)
+	at org.owasp.dependencycheck.utils.Downloader.fetchAndHandle(Downloader.java:732)
+	at org.owasp.dependencycheck.utils.Downloader.fetchAndHandle(Downloader.java:701)
+	at org.owasp.dependencycheck.utils.Downloader.fetchAndHandle(Downloader.java:653)
+	at org.owasp.dependencycheck.data.update.KnownExploitedDataSource.update(KnownExploitedDataSource.java:96)
+	... 6 common frames omitted
+[WARN] Unable to update 1 or more Cached Web DataSource, using local data instead. Results may not include recent vulnerabilities.
+[ERROR] Unable to continue dependency-check analysis.
+[ERROR] One or more fatal errors occurred
+[ERROR] java.net.UnknownHostException: This is usually a temporary error during hostname resolution and means that the local server did not receive a response from an authoritative server (www.cisa.gov)
+[ERROR] No documents exist
+##[error]PowerShell exited with code '1'.
+Finishing: OWASP Dependency Check (local CLI)
