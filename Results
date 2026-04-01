@@ -1,1 +1,311 @@
- 16d47f4a-18eb-4804-a3fa-72c6af029e3f
+Yes. Here is the clean way to implement it.
+
+## One-time prerequisite
+
+Create a **secret variable** named `NVD_API_KEY` in a variable group, then link that variable group in the **pipeline that calls the template**. The OWASP task can pass the key through `additionalArguments` using `--nvdApiKey`, which is a supported Dependency-Check CLI argument. Dependency-Check strongly recommends an NVD API key because updates are much slower without one. ([dependency-check.github.io][1])
+
+Example in the **calling pipeline**:
+
+```yaml
+variables:
+- group: SECURITY_SECRETS
+```
+
+And inside the task:
+
+```yaml
+additionalArguments: '--nvdApiKey $(NVD_API_KEY)'
+```
+
+## Common parameters to add to each build template
+
+Add these parameters near the top of **each** template:
+
+```yaml
+- name: runDependencyCheck
+  type: boolean
+  default: true
+
+- name: dependencyCheckProjectName
+  type: string
+  default: ''
+
+- name: dependencyCheckScanPath
+  type: string
+  default: '$(Build.SourcesDirectory)'
+
+- name: dependencyCheckFormats
+  type: string
+  default: 'HTML,JSON,JUNIT'
+
+- name: dependencyCheckReportsDirectory
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\dependency-check'
+
+- name: dependencyCheckFailOnCVSS
+  type: string
+  default: '7'
+
+- name: dependencyCheckAdditionalArguments
+  type: string
+  default: ''
+```
+
+The Azure DevOps OWASP task shape commonly uses `projectName`, `scanPath`, `format`, `reportsDirectory`, `failOnCVSS`, `warnOnCVSSViolation`, and `additionalArguments`. ([GitHub][2])
+
+## Common OWASP block to add
+
+Use this block in all four templates, with the right placement for each:
+
+```yaml
+- task: dependency-check-build-task@6
+  displayName: 'OWASP Dependency Check'
+  condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+  continueOnError: true
+  inputs:
+    projectName: '${{ parameters.dependencyCheckProjectName }}'
+    scanPath: '${{ parameters.dependencyCheckScanPath }}'
+    format: '${{ parameters.dependencyCheckFormats }}'
+    reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
+    failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
+    warnOnCVSSViolation: true
+    additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
+
+- task: PublishTestResults@2
+  displayName: 'Publish Dependency Check JUnit'
+  condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+  inputs:
+    testResultsFormat: 'JUnit'
+    testResultsFiles: '**\*junit.xml'
+    searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
+    testRunTitle: 'OWASP Dependency Check'
+    failTaskOnFailedTests: false
+```
+
+Dependency-Check supports JUNIT as an output format, and the CLI supports `--project`, `--scan`, `--out`, `--format`, and `--nvdApiKey`. ([dependency-check.github.io][1])
+
+---
+
+# 1) `build-angular-webapp.yml`
+
+## Where to add it
+
+Add the OWASP block **after** this step:
+
+```yaml
+  - script: |
+      npm ${{ parameters.installCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Install dependencies (npm)'
+```
+
+That is the best place because dependencies are already restored, so the scan sees the packages actually used by the app.
+
+## What to add
+
+Use this exact block:
+
+```yaml
+  - task: dependency-check-build-task@6
+    displayName: 'OWASP Dependency Check'
+    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    continueOnError: true
+    inputs:
+      projectName: '${{ parameters.dependencyCheckProjectName }}'
+      scanPath: '${{ parameters.dependencyCheckScanPath }}'
+      format: '${{ parameters.dependencyCheckFormats }}'
+      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
+      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
+      warnOnCVSSViolation: true
+      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Dependency Check JUnit'
+    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**\*junit.xml'
+      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
+      testRunTitle: 'OWASP Dependency Check'
+      failTaskOnFailedTests: false
+```
+
+## How to call it from parent pipeline
+
+```yaml
+- template: build-angular-webapp.yml@templates
+  parameters:
+    ...
+    runDependencyCheck: true
+    dependencyCheckProjectName: 'AlternaCardManagement-Angular'
+    dependencyCheckScanPath: '${{ parameters.workingDirectory }}'
+    dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY) --exclude "**/node_modules/**" --exclude "**/dist/**"'
+```
+
+---
+
+# 2) `build-dotnet-core-webapi.yml`
+
+## Where to add it
+
+Add the OWASP block **after** the `Restore` task and **before** the `Build` task.
+
+## What to add
+
+```yaml
+  - task: dependency-check-build-task@6
+    displayName: 'OWASP Dependency Check'
+    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    continueOnError: true
+    inputs:
+      projectName: '${{ parameters.dependencyCheckProjectName }}'
+      scanPath: '${{ parameters.dependencyCheckScanPath }}'
+      format: '${{ parameters.dependencyCheckFormats }}'
+      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
+      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
+      warnOnCVSSViolation: true
+      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Dependency Check JUnit'
+    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**\*junit.xml'
+      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
+      testRunTitle: 'OWASP Dependency Check'
+      failTaskOnFailedTests: false
+```
+
+## How to call it from parent pipeline
+
+```yaml
+- template: build-dotnet-core-webapi.yml@templates
+  parameters:
+    ...
+    runDependencyCheck: true
+    dependencyCheckProjectName: 'AlternaCardManagement-API'
+    dependencyCheckScanPath: '$(Build.SourcesDirectory)'
+    dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY) --exclude "**/bin/**" --exclude "**/obj/**"'
+```
+
+---
+
+# 3) `build-dotnet-framework-webapi.yml`
+
+## Where to add it
+
+Add the OWASP block **after** the `NuGetCommand@2 Restore` task and **before** `VSBuild@1 Build Project`.
+
+## What to add
+
+```yaml
+  - task: dependency-check-build-task@6
+    displayName: 'OWASP Dependency Check'
+    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    continueOnError: true
+    inputs:
+      projectName: '${{ parameters.dependencyCheckProjectName }}'
+      scanPath: '${{ parameters.dependencyCheckScanPath }}'
+      format: '${{ parameters.dependencyCheckFormats }}'
+      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
+      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
+      warnOnCVSSViolation: true
+      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Dependency Check JUnit'
+    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**\*junit.xml'
+      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
+      testRunTitle: 'OWASP Dependency Check'
+      failTaskOnFailedTests: false
+```
+
+## How to call it from parent pipeline
+
+```yaml
+- template: build-dotnet-framework-webapi.yml@templates
+  parameters:
+    ...
+    runDependencyCheck: true
+    dependencyCheckProjectName: 'AlternaCardManagement-MVC'
+    dependencyCheckScanPath: '$(Build.SourcesDirectory)'
+    dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY) --exclude "**/bin/**" --exclude "**/obj/**"'
+```
+
+---
+
+# 4) `build-database-project.yml`
+
+## Where to add it
+
+Add the OWASP block **after checkout** and before `Build SQL project`.
+
+This is the least valuable of the four unless that repo has dependency manifests or NuGet packages you care about, but you can still add it.
+
+## What to add
+
+```yaml
+  - task: dependency-check-build-task@6
+    displayName: 'OWASP Dependency Check'
+    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    continueOnError: true
+    inputs:
+      projectName: '${{ parameters.dependencyCheckProjectName }}'
+      scanPath: '${{ parameters.dependencyCheckScanPath }}'
+      format: '${{ parameters.dependencyCheckFormats }}'
+      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
+      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
+      warnOnCVSSViolation: true
+      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Dependency Check JUnit'
+    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**\*junit.xml'
+      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
+      testRunTitle: 'OWASP Dependency Check'
+      failTaskOnFailedTests: false
+```
+
+## How to call it from parent pipeline
+
+```yaml
+- template: build-database-project.yml@templates
+  parameters:
+    ...
+    runDependencyCheck: true
+    dependencyCheckProjectName: 'AlternaCardManagement-DB'
+    dependencyCheckScanPath: '$(Build.SourcesDirectory)'
+    dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY) --exclude "**/bin/**" --exclude "**/obj/**"'
+```
+
+---
+
+# One important note about the API key
+
+Do **not** put the actual key directly in YAML. Keep it in the variable group as a secret and only reference `$(NVD_API_KEY)`. Dependency-Check’s docs support `--nvdApiKey`, and the project warns that CI setups sharing one key across many builds can hit NVD rate limits, so caching may be worth adding later. ([dependency-check.github.io][1])
+
+# My recommendation for your exact templates
+
+Use these defaults everywhere:
+
+```yaml
+runDependencyCheck: true
+dependencyCheckFormats: 'HTML,JSON,JUNIT'
+dependencyCheckReportsDirectory: '$(Build.ArtifactStagingDirectory)\dependency-check'
+dependencyCheckFailOnCVSS: '7'
+dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY)'
+```
+
+Then add excludes per template as needed.
+
+If you want, next I can give you the **full modified version of each of the 4 YAML templates**, ready to paste.
+
+[1]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html?utm_source=chatgpt.com "Command Line Arguments – dependency-check-cli"
+[2]: https://github.com/dependency-check/azuredevops/issues/142?utm_source=chatgpt.com "Question regarding easy caching approach · Issue #142"
