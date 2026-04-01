@@ -1,787 +1,586 @@
-xquery version "1.0" encoding "utf-8";
+build-angular-webapp.yml:
 
-(:: OracleAnnotationVersion "1.0" ::)
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildAngular'
 
-declare namespace ns2="http://temenos.com/SOGE-KYC-WS";
-(:: import schema at
-"../../../../../Alterna.Backend.svc/Alterna.Services/AlternaKYC/T24WS/XMLSchema_-43786998.xsd" ::)
-declare namespace ns1="http://www.sgbl.com.lb.com/cvs.KYC_updateT24CustomerKyc_request";
-(:: import schema at "../../xsd/cvs.updateT24CustomerKycReq.xsd" ::)
+- name: jobDisplayName
+  type: string
+  default: 'Build (Angular)'
 
-declare namespace cus = "http://temenos.com/CUSTOMERSGBSOGEAMDKYC";
+- name: buildPool
+  type: string
 
-declare variable $request as element() (:: schema-element(ns1:cvs.updateT24CustomerKycReq) ::)
-external;
+- name: buildAgentName
+  type: string
 
-declare function local:func($request as element() (::
-schema-element(ns1:cvs.updateT24CustomerKycReq) ::)) as element() (::
-schema-element(ns2:WSSOGEAMDKYC) ::) {
-<ns2:WSSOGEAMDKYC>
-   <WebRequestCommon>
-      <company>{dvmtr:lookup('Alterna.core/dvm/Dictionary','key','KYC_COMPANY','value','')}</company>
-      <password>{dvmtr:lookup('Alterna.core/dvm/Dictionary','key','KYC_PASSWORD','value','')}</password>
-      <userName>{dvmtr:lookup('Alterna.core/dvm/Dictionary','key','KYC_USERNAME','value','')}</userName>
-   </WebRequestCommon>
-   <OfsFunction>
-      <messageId>{fn:concat(dvmtr:lookup('Alterna.core/dvm/Dictionary','key','KYC_MESSAGEID','value',''),fn:data($request/ns1:Id))}</messageId>
-   </OfsFunction>
-   <CUSTOMERSGBSOGEAMDKYCType id="{fn:data($request/ns1:Id)}">
-       <cus:gSTREET>
-           <cus:Street>{fn:data($request/ns1:Street)}</cus:Street>
-       </cus:gSTREET>
-       <cus:CountryofResidence>{fn:data($request/ns1:Residence)}</cus:CountryofResidence>
-       <cus:MaritalStatus>{fn:data($request/ns1:MaritalStatus)}</cus:MaritalStatus>
-       <cus:gEMPLOYMENTSTATUS g="1">
-           {
-               for $EmploymentList at $pos in $request/ns1:EmploymentList
-               return 
-               <cus:mEMPLOYMENTSTATUS m="{$pos}">
-                   <cus:EmploymentStatus>{fn:data($EmploymentList/ns1:EmploymentStatus)}</cus:EmploymentStatus>
-                   <cus:Occupation>{fn:data($EmploymentList/ns1:Occupation)}</cus:Occupation>
-                   <cus:JobTitle>{fn:data($EmploymentList/ns1:JobTitle)}</cus:JobTitle>
-                   <cus:EmployersName>{fn:data($EmploymentList/ns1:EmployersName)}</cus:EmployersName>
-                   <cus:EmployersBusiness>{fn:data($EmploymentList/ns1:EmployersBuss)}</cus:EmployersBusiness>
-                   <cus:EmploymentStartDt>{fn:data($EmploymentList/ns1:EmploymentStart)}</cus:EmploymentStartDt>
-                   <cus:CustomerCurrency>{fn:data($EmploymentList/ns1:CustomerCurrency)}</cus:CustomerCurrency>
-                   <cus:CustomerSalaryUSD>{fn:data($EmploymentList/ns1:Salary)}</cus:CustomerSalaryUSD>
-                    {
-                      if (fn:data($EmploymentList/ns1:SalaryDateFreq)) then
-                          <cus:SalaryDateFreq>{fn:data($EmploymentList/ns1:SalaryDateFreq)}</cus:SalaryDateFreq>
-                      else ()
-                    }
-                   
-                   
-                   </cus:mEMPLOYMENTSTATUS>
-           }
-       </cus:gEMPLOYMENTSTATUS>
-       <cus:gRESIDENCESTATUS g="1">
-           {
-               for $ResidenceInfoList at $pos in $request/ns1:ResidenceInfoList
-               return 
-               <cus:mRESIDENCESTATUS m="{$pos}">
-                   <cus:Residencestatus>{fn:data($ResidenceInfoList/ns1:ResidenceStatus)}</cus:Residencestatus>
-                   <cus:Residencetype>{fn:data($ResidenceInfoList/ns1:ResidenceType)}</cus:Residencetype>
-                   <cus:Residencesince>{fn:data($ResidenceInfoList/ns1:ResidenceSince)}</cus:Residencesince></cus:mRESIDENCESTATUS>
-           }
-       </cus:gRESIDENCESTATUS>
-       <cus:LastKYCReviewDate>{fn:data($request/ns1:LastKycReviewDate)}</cus:LastKYCReviewDate>
-      
-       <cus:City>{fn:data($request/ns1:CusCity)}</cus:City>
-       <cus:SpFirstName>{fn:data($request/ns1:SpFirstName)}</cus:SpFirstName>
-       <cus:SpLastName>{fn:data($request/ns1:SpLastName)}</cus:SpLastName>
-       <cus:OtherIncome>{fn:data($request/ns1:EstWealth)}</cus:OtherIncome>
-       <cus:AnnualVolInUSD>{fn:data($request/ns1:AnnualVolIn)}</cus:AnnualVolInUSD>
-       <cus:AnnualVolOutUSD>{fn:data($request/ns1:AnnualVolOut)}</cus:AnnualVolOutUSD>
-       <cus:SpouseProf>{fn:data($request/ns1:SpouseProf)}</cus:SpouseProf>
-       <cus:Region>{fn:data($request/ns1:CusRegion)}</cus:Region>
-       <cus:CustDistrict>{fn:data($request/ns1:CustDistrict)}</cus:CustDistrict>
-       <cus:CusBuilding>{fn:data($request/ns1:CusBuilding)}</cus:CusBuilding>
-       <cus:ApartmentNo>{fn:data($request/ns1:ApartmentNo)}</cus:ApartmentNo>
-       <cus:FloorNo>{fn:data($request/ns1:FloorNo)}</cus:FloorNo>
-       <cus:POBox>{fn:data($request/ns1:PoBox)}</cus:POBox>
-       <cus:Province>{fn:data($request/ns1:Province)}</cus:Province>
-       <cus:Department>{fn:data($request/ns1:Department)}</cus:Department>
-       <cus:ForeignCity>{fn:data($request/ns1:City)}</cus:ForeignCity>
-       <cus:gP.CNTRY.CODE g="1">
-           {
-               for $PhoneNumbersList at $pos in $request/ns1:PhoneNumbersList
-               return 
-               <cus:mP.CNTRY.CODE m="{$pos}">
-                   <cus:PhoneCountryCode>{fn:data($PhoneNumbersList/ns1:PCntryCode)}</cus:PhoneCountryCode>
-                   <cus:PAreaCode>{fn:data($PhoneNumbersList/ns1:PhoneAreaCode)}</cus:PAreaCode>
-                   <cus:PhoneNb>{fn:data($PhoneNumbersList/ns1:PhoneNo)}</cus:PhoneNb>
-                   <cus:FaxCountrycode1>{fn:data($PhoneNumbersList/ns1:FCntryCode)}</cus:FaxCountrycode1>
-                   <cus:FAreaCode>{fn:data($PhoneNumbersList/ns1:FAreaCode)}</cus:FAreaCode>
-                   <cus:FAXNB>{fn:data($PhoneNumbersList/ns1:Faxnb)}</cus:FAXNB></cus:mP.CNTRY.CODE>
-           }
-       </cus:gP.CNTRY.CODE>
-       <cus:ProfessionDetails>{fn:data($request/ns1:ProfDetails)}</cus:ProfessionDetails>
-       <cus:Children>{fn:data($request/ns1:SgbChildren)}</cus:Children>
-       <cus:SpouseAnnualSalaryUSD>{fn:data($request/ns1:SgbSpAnlSal)}</cus:SpouseAnnualSalaryUSD>
-       <cus:Realestateproperty>{fn:data($request/ns1:SgbReaEsProp)}</cus:Realestateproperty>
-       <cus:Realestateregion>{fn:data($request/ns1:SgbReaEsRegn)}</cus:Realestateregion>
-       <cus:PEP>{fn:data($request/ns1:SgbPep)}</cus:PEP>
-       <cus:TitleofPEP>{fn:data($request/ns1:SgbPepTitle)}</cus:TitleofPEP>
-       <cus:gSGB.CHILD.NAME g="1">
-           {
-               for $ChildList at $pos in $request/ns1:ChildList
-               return 
-               <cus:mSGB.CHILD.NAME m="{$pos}">
-                   <cus:ChildName>{fn:data($ChildList/ns1:SgbChildName)}</cus:ChildName>
-                   <cus:ChildDateofBirth>{fn:data($ChildList/ns1:SgbDtOfBirth)}</cus:ChildDateofBirth>
-                   <cus:ChildEducation>{fn:data($ChildList/ns1:SgbEducation)}</cus:ChildEducation>
-                   <cus:ChildOccupation>{fn:data($ChildList/ns1:SgbOccupation)}</cus:ChildOccupation>
-                   <cus:ChildEmployer>{fn:data($ChildList/ns1:SgbEmployer)}</cus:ChildEmployer></cus:mSGB.CHILD.NAME>
-           }
-       </cus:gSGB.CHILD.NAME>
-       <cus:Source>{fn:data($request/ns1:SglProsCoGrp)}</cus:Source>
-       
-       <cus:Spouseemployername>{fn:data($request/ns1:SgbSpouseName)}</cus:Spouseemployername>
-       <cus:gSGB.SRC.FUNDS g="1">
-           {
-               for $FundsList at $pos in $request/ns1:FundsList
-               return 
-               <cus:mSGB.SRC.FUNDS m="{$pos}">
-                   <cus:SourceofFunds>{fn:data($FundsList/ns1:SgbSrcFunds)}</cus:SourceofFunds>
-                   <cus:SpecifySource>{fn:data($FundsList/ns1:SgbFinDets)}</cus:SpecifySource></cus:mSGB.SRC.FUNDS>
-           }
-       </cus:gSGB.SRC.FUNDS>
-       <cus:gSGB.SRC.WEALTH>
-           <cus:SourceofWealth>{fn:data($request/ns1:SgbSrcWealth)}</cus:SourceofWealth>
-       </cus:gSGB.SRC.WEALTH>
-       <cus:NumberofSources>{fn:data($request/ns1:SgbNoOfSrcs)}</cus:NumberofSources>
-       <cus:EstWealth>{fn:data($request/ns1:SgbEstWealth)}</cus:EstWealth>
-       <cus:SpouseProfDetails>{fn:data($request/ns1:SpofDetails)}</cus:SpouseProfDetails>
-       <cus:gSGB.OTHR.NAT g="1">
-           {
-               for $OtherNatList at $pos in $request/ns1:OtherNatList
-               return 
-               <cus:mSGB.OTHR.NAT m="{$pos}">
-                   <cus:OtherNationality1>{fn:data($OtherNatList/ns1:SgbOthrNat)}</cus:OtherNationality1>
-                   <cus:OtherDocName1>{fn:data($OtherNatList/ns1:SgbOthrDocNm)}</cus:OtherDocName1>
-                   <cus:OtherDocNr1>{fn:data($OtherNatList/ns1:SgbOthrDocNr)}</cus:OtherDocNr1></cus:mSGB.OTHR.NAT>
-           }
-       </cus:gSGB.OTHR.NAT>
-       <cus:gSGB.FIN.LOC g="1">
-          {
-               for $EmploymentAddressList at $pos in $request/ns1:EmploymentAddressList
-               return 
-                <cus:mSGB.FIN.LOC m="{$pos}">
-                     <cus:EmploymentForeignCountry>{fn:data($EmploymentAddressList/ns1:SgbFinTwnCty)}</cus:EmploymentForeignCountry>
-                 </cus:mSGB.FIN.LOC>
-          }
-       </cus:gSGB.FIN.LOC>
-       <cus:gSGB.CRS.TAX.RES g="1">
-           {
-               for $TaxList at $pos in $request/ns1:TaxList
-               return 
-               <cus:mSGB.CRS.TAX.RES m="{$pos}">
-                   <cus:CRSCountryofTaxResidence>{fn:data($TaxList/ns1:SgbCrsTaxRes)}</cus:CRSCountryofTaxResidence>
-                   <cus:CRSTaxIdentificationNumber>{fn:data($TaxList/ns1:SgbCrsTaxId)}</cus:CRSTaxIdentificationNumber>
-                   <cus:DateofUpdofCRSCntryTaxResidence>{fn:data($TaxList/ns1:SgbCrsTaxDt)}</cus:DateofUpdofCRSCntryTaxResidence>
-                   <cus:SgbCrsCancel>{fn:data($TaxList/ns1:SgbCrsCancel)}</cus:SgbCrsCancel>
-                   <cus:SgbCrsCancelDt>{fn:data($TaxList/ns1:SgbCrsCancDt)}</cus:SgbCrsCancelDt></cus:mSGB.CRS.TAX.RES>
-           }
-       </cus:gSGB.CRS.TAX.RES>
-       <cus:SourceofCRSCntryTaxResidence>{fn:data($request/ns1:SgbCrsSource)}</cus:SourceofCRSCntryTaxResidence>
-       
-       {
-          if(fn:data($request/ns1:SgbHldOthNat) != 'Yes') then
-            <cus:Holderofanothernationality>No</cus:Holderofanothernationality>
-          else
-            <cus:Holderofanothernationality>Yes</cus:Holderofanothernationality>
-       }
-       
-       <cus:MeansofKYCrenewal>{fn:data($request/ns1:SgbKycNewewal)}</cus:MeansofKYCrenewal>
-       <cus:ClientFunction>{fn:data($request/ns1:SgbClientFunc)}</cus:ClientFunction>
-       <cus:SalaryDomiciliation>{fn:data($request/ns1:SgbSalaryDom)}</cus:SalaryDomiciliation>
+# Where your Angular project lives relative to repo root
+- name: workingDirectory
+  type: string
+  default: '.'
 
-   </CUSTOMERSGBSOGEAMDKYCType>
-</ns2:WSSOGEAMDKYC>
-};
+# Node version to use (must exist on server or be installed)
+- name: nodeVersion
+  type: string
+  default: '22.x'
 
-local:func($request)
+# install command
+- name: installCommand
+  type: string
+  default: 'ci'   # npm install
 
+# whether to run tests
+- name: runTests
+  type: boolean
+  default: false
 
-<!-- Published by JAX-WS RI at http://jax-ws.dev.java.net. RI's version is JAX-WS RI 2.2.8 svn-revision#13980. --><xs:schema version="1.0" targetNamespace="http://temenos.com/SOGE-KYC-WS" xmlns:tns="http://temenos.com/SOGE-KYC-WS" xmlns:ns3="http://temenos.com/CUSTOMERSGBSOGEAMDKYC" xmlns:ns2="http://temenos.com/CUSTOMER" xmlns:ns1="http://temenos.com/CUSTOMERSGBINPUTLBMBONBOARDNEW" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+# test command (customizable)
+- name: testCommand
+  type: string
+  default: 'test -- --watch=false --browsers=ChromeHeadless'
 
-<xs:import namespace="http://temenos.com/CUSTOMERSGBINPUTLBMBONBOARDNEW" schemaLocation="XMLSchema_657277580.xsd"/>
+# build configuration / command
+- name: buildCommand
+  type: string
+  default: 'npx ng build'
 
-<xs:import namespace="http://temenos.com/CUSTOMER" schemaLocation="XMLSchema_-1139673779.xsd"/>
+# Angular dist folder (relative to workingDirectory)
+# Example: 'dist/my-app'
+- name: distFolder
+  type: string
 
-<xs:import namespace="http://temenos.com/CUSTOMERSGBSOGEAMDKYC" schemaLocation="XMLSchema_-1840738357.xsd"/>
+# Zip file name produced as artifact
+- name: zipName
+  type: string
+  default: 'AngularApp.zip'
 
-<xs:element name="WSSOGEAMDKYC" type="tns:WSSOGEAMDKYC"/>
+- name: artifactName
+  type: string
+  default: 'drop'
 
-<xs:element name="WSSOGEAMDKYCResponse" type="tns:WSSOGEAMDKYCResponse"/>
+# Where to stage files before zipping
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
 
-<xs:element name="WSSOGEAMDKYC_Validate" type="tns:WSSOGEAMDKYC_Validate"/>
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
 
-<xs:element name="WSSOGEAMDKYC_ValidateResponse" type="tns:WSSOGEAMDKYC_ValidateResponse"/>
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
 
-<xs:element name="WSSOGETWSCUSONBREL" type="tns:WSSOGETWSCUSONBREL"/>
+  steps:
+  - checkout: self
+    clean: true
 
-<xs:element name="WSSOGETWSCUSONBRELResponse" type="tns:WSSOGETWSCUSONBRELResponse"/>
+  - powershell: |
+      Write-Host "Working directory: ${{ parameters.workingDirectory }}"
+      if (-not (Test-Path "${{ parameters.workingDirectory }}")) {
+        throw "Working directory not found: ${{ parameters.workingDirectory }}"
+      }
+    displayName: 'Validate working directory'
 
-<xs:element name="WSSOGETWSCUSONBREL_Validate" type="tns:WSSOGETWSCUSONBREL_Validate"/>
+  - script: |
+      whoami
+      npm config list -l
+      node -p "process.env.HTTP_PROXY"
+      node -p "process.env.HTTPS_PROXY"
+      nslookup registry.npmjs.org
+      npm ping --registry=https://registry.npmjs.org/
+    displayName: 'Diagnose npm network'
 
-<xs:element name="WSSOGETWSCUSONBREL_ValidateResponse" type="tns:WSSOGETWSCUSONBREL_ValidateResponse"/>
+  # Install dependencies
+  - script: |
+      npm ${{ parameters.installCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Install dependencies (npm)'
 
-<xs:complexType name="WSSOGETWSCUSONBREL">
-<xs:sequence>
-<xs:element name="WebRequestCommon" type="tns:webRequestCommon" minOccurs="0"/>
-<xs:element name="OfsFunction" type="tns:ofsFunction" minOccurs="0"/>
-<xs:element name="CUSTOMERSGBINPUTLBMBONBOARDNEWType" type="ns1:CUSTOMERSGBINPUTLBMBONBOARDNEWType" minOccurs="0"/>
-</xs:sequence>
-</xs:complexType>
+  # Optional tests
+  - script: |
+      npm ${{ parameters.testCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Run tests'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    # If you use yarn/pnpm tests, switch this command accordingly.
 
-<xs:complexType name="webRequestCommon">
-<xs:sequence>
-<xs:element name="company" type="xs:string" minOccurs="0"/>
-<xs:element name="password" type="xs:string"/>
-<xs:element name="userName" type="xs:string"/>
-</xs:sequence>
-</xs:complexType>
+  # Build
+  - script: |
+      ${{ parameters.buildCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Build Angular'
 
-<xs:complexType name="ofsFunction">
-<xs:sequence>
-<xs:element name="activityName" type="xs:string" minOccurs="0"/>
-<xs:element name="assignReason" type="xs:string" minOccurs="0"/>
-<xs:element name="dueDate" type="xs:string" minOccurs="0"/>
-<xs:element name="extProcess" type="xs:string" minOccurs="0"/>
-<xs:element name="extProcessID" type="xs:string" minOccurs="0"/>
-<xs:element name="gtsControl" type="xs:string" minOccurs="0"/>
-<xs:element name="messageId" type="xs:string" minOccurs="0"/>
-<xs:element name="noOfAuth" type="xs:string" minOccurs="0"/>
-<xs:element name="owner" type="xs:string" minOccurs="0"/>
-<xs:element name="replace" type="xs:string" minOccurs="0"/>
-<xs:element name="startDate" type="xs:string" minOccurs="0"/>
-<xs:element name="user" type="xs:string" minOccurs="0"/>
-</xs:sequence>
-</xs:complexType>
+  # Copy dist output to staging folder (clean staging first)
+  - task: CopyFiles@2
+    displayName: 'Copy dist to staging folder'
+    inputs:
+      SourceFolder: '${{ parameters.workingDirectory }}\${{ parameters.distFolder }}'
+      Contents: '**'
+      TargetFolder: '${{ parameters.publishOutputFolder }}'
+      OverWrite: true
 
-<xs:complexType name="WSSOGETWSCUSONBRELResponse">
-<xs:sequence>
-<xs:element name="Status" type="tns:Status" minOccurs="0"/>
-<xs:element name="CUSTOMERType" type="ns2:CUSTOMERType" minOccurs="0"/>
-</xs:sequence>
-</xs:complexType>
+  # Zip staged files (no nested dist folder in zip)
+  - task: ArchiveFiles@2
+    displayName: 'Zip dist output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
 
-<xs:complexType name="Status">
-<xs:sequence>
-<xs:element name="transactionId" type="xs:string" minOccurs="0"/>
-<xs:element name="messageId" type="xs:string" minOccurs="0"/>
-<xs:element name="successIndicator" type="tns:successIndicator" minOccurs="0"/>
-<xs:element name="application" type="xs:string" minOccurs="0"/>
-<xs:element name="messages" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
-</xs:sequence>
-</xs:complexType>
+  # Publish artifact (on-prem compatible)
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
 
-<xs:complexType name="WSSOGEAMDKYC">
-<xs:sequence>
-<xs:element name="WebRequestCommon" type="tns:webRequestCommon" minOccurs="0"/>
-<xs:element name="OfsFunction" type="tns:ofsFunction" minOccurs="0"/>
-<xs:element name="CUSTOMERSGBSOGEAMDKYCType" type="ns3:CUSTOMERSGBSOGEAMDKYCType" minOccurs="0"/>
-</xs:sequence>
-</xs:complexType>
+build-database-project.yml:
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildDatabase'
 
-<xs:complexType name="WSSOGEAMDKYCResponse">
-<xs:sequence>
-<xs:element name="Status" type="tns:Status" minOccurs="0"/>
-<xs:element name="CUSTOMERType" type="ns2:CUSTOMERType" minOccurs="0"/>
-</xs:sequence>
-</xs:complexType>
+- name: jobDisplayName
+  type: string
+  default: 'Build Database Project'
 
-<xs:complexType name="WSSOGETWSCUSONBREL_Validate">
-<xs:sequence>
-<xs:element name="WebRequestCommon" type="tns:webRequestCommon" minOccurs="0"/>
-<xs:element name="OfsFunction" type="tns:ofsFunction" minOccurs="0"/>
-<xs:element name="CUSTOMERSGBINPUTLBMBONBOARDNEWType" type="ns1:CUSTOMERSGBINPUTLBMBONBOARDNEWType" minOccurs="0"/>
-</xs:sequence>
-</xs:complexType>
+- name: buildPool
+  type: string
 
-<xs:complexType name="WSSOGETWSCUSONBREL_ValidateResponse">
-<xs:sequence>
-<xs:element name="Status" type="tns:Status" minOccurs="0"/>
-<xs:element name="CUSTOMERType" type="ns2:CUSTOMERType" minOccurs="0"/>
-</xs:sequence>
-</xs:complexType>
+- name: buildAgentName
+  type: string
 
-<xs:complexType name="WSSOGEAMDKYC_Validate">
-<xs:sequence>
-<xs:element name="WebRequestCommon" type="tns:webRequestCommon" minOccurs="0"/>
-<xs:element name="OfsFunction" type="tns:ofsFunction" minOccurs="0"/>
-<xs:element name="CUSTOMERSGBSOGEAMDKYCType" type="ns3:CUSTOMERSGBSOGEAMDKYCType" minOccurs="0"/>
-</xs:sequence>
-</xs:complexType>
+- name: sqlProjectPath
+  type: string
 
-<xs:complexType name="WSSOGEAMDKYC_ValidateResponse">
-<xs:sequence>
-<xs:element name="Status" type="tns:Status" minOccurs="0"/>
-<xs:element name="CUSTOMERType" type="ns2:CUSTOMERType" minOccurs="0"/>
-</xs:sequence>
-</xs:complexType>
+- name: buildConfiguration
+  type: string
+  default: 'Release'
 
-<xs:simpleType name="successIndicator">
-<xs:restriction base="xs:string">
-<xs:enumeration value="Success"/>
-<xs:enumeration value="TWSError"/>
-<xs:enumeration value="T24Error"/>
-<xs:enumeration value="T24Override"/>
-<xs:enumeration value="T24Offline"/>
-</xs:restriction>
-</xs:simpleType>
-</xs:schema>
+- name: artifactName
+  type: string
+  default: 'db-drop'
 
-<?xml version="1.0" encoding="UTF-8"?><!-- Published by JAX-WS RI at http://jax-ws.dev.java.net. RI's version is JAX-WS RI 2.2.8 svn-revision#13980. --><xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" version="1.0" targetNamespace="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
+- name: outputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\db'
 
-<xs:complexType name="CUSTOMERSGBSOGEAMDKYCType">
-<xs:sequence>
-<xs:element name="gSTREET" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="Street" type="xs:string" minOccurs="0" maxOccurs="unbounded"></xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="gRELATIONCODE" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mRELATIONCODE" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="RelationCode" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="RelationCustomer" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ReverseRelation" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Role" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="MoreRoleInfo" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="RoleNotes" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="NATIONALITY" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="CountryofResidence" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="gLEGALID" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mLEGALID" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="LegalID" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="DocumentName" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="NameonID" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="IssueAuthority" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="IssueDate" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ExpirationDate" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="FirstName" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="LastName" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="MaritalStatus" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Email11" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="gEMPLOYMENTSTATUS" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mEMPLOYMENTSTATUS" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="EmploymentStatus" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Occupation" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="JobTitle" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="EmployersName" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="EmployersBusiness" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="EmploymentStartDt" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="CustomerCurrency" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="CustomerSalaryUSD" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="AnnualBonus" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SalaryDateFreq" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="gRESIDENCESTATUS" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mRESIDENCESTATUS" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="Residencestatus" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Residencetype" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Residencesince" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ResidenceValue" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="MortgageAmount" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="LastKYCReviewDate" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="AutoNextKYCRev" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="City" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="gM.CNTRY.CODE" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mM.CNTRY.CODE" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="MobileCountryCode" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="AreaCode" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="MOBILENB" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="Fathername" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SpFirstName" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SpLastName" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="AnnualAmount" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="OtherIncome" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="AnnualVolInUSD" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="AnnualVolOutUSD" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SpouseProf" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Mohafaza" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Caza" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Region" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="CustDistrict" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="CusBuilding" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ApartmentNo" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FloorNo" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="NextTo" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="POBox" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Province" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Department" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ForeignCity" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="gP.CNTRY.CODE" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mP.CNTRY.CODE" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="PhoneCountryCode" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="PAreaCode" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="PhoneNb" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FaxCountrycode1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FAreaCode" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FAXNB" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="ProfessionDetails" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="gSGB.OP.FR.CNTRY" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mSGB.OP.FR.CNTRY" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="Operationwithforeigncountries1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Currency1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Importorigin1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Exportdestination1" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="Children" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="PreviousJob" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SpouseAnnualSalaryUSD" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Realestateproperty" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Realestateregion" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="PEP" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="TitleofPEP" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Placeofdelivery" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="gSGB.CHILD.NAME" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mSGB.CHILD.NAME" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="ChildName" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ChildDateofBirth" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ChildEducation" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ChildOccupation" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ChildEmployer" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="Source" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="NoofChildren" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Spouseemployername" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="gSGB.SRC.FUNDS" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mSGB.SRC.FUNDS" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="SourceofFunds" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SpecifySource" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="gSGB.SRC.WEALTH" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="SourceofWealth" type="xs:string" minOccurs="0" maxOccurs="unbounded"></xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="NumberofSources" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="EstWealth" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SpouseProfDetails" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="gSGB.OTHR.NAT" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mSGB.OTHR.NAT" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="OtherNationality1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="OtherDocName1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="OtherDocNr1" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="gSGB.FIN.LOC" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mSGB.FIN.LOC" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="FinLocality" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="CAZA" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FinMohafaza" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ForForeignResidence1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FinCity" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ArEmploymentForeignCity" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Province1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ArEmploymentForeignProvince" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FinDepartment" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ArEmploymentForeignDept" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="EmployerAddressTag" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FinRegion" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="District" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FinStreet" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ArEmploymentForeignStreet" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Building" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ArEmploymentForeignBuilding" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="BuildingNo" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="AppartmentNo" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="BlocNo1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FinFloorNo" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FinNextTo" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="EmailId" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="FinPOBox" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="PostOffice" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="PostalCode1" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="EmploymentForeignCountry" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ArEmploymentForeignCountry" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SgbFinDeAdd" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="gSGB.CRS.TAX.RES" minOccurs="0">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="mSGB.CRS.TAX.RES" minOccurs="0" maxOccurs="unbounded">
-<xs:complexType>
-<xs:sequence>
-<xs:element name="CRSCountryofTaxResidence" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="CRSTaxIdentificationNumber" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="DateofUpdofCRSCntryTaxResidence" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SgbCrsCancel" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SgbCrsCancelDt" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="m" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-</xs:sequence>
-<xs:attribute name="g" type="xs:positiveInteger"></xs:attribute>
-</xs:complexType>
-</xs:element>
-<xs:element name="SourceofCRSCntryTaxResidence" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="Holderofanothernationality" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="MeansofKYCRenewal" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="ClientFunction" type="xs:string" minOccurs="0"></xs:element>
-<xs:element name="SalaryDomiciliation" type="xs:string" minOccurs="0"></xs:element>
-</xs:sequence>
-<xs:attribute name="id" type="xs:string"></xs:attribute>
-</xs:complexType>
-</xs:schema>
+- name: dacpacFileName
+  type: string
+  default: 'database.dacpac'
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - powershell: |
+      $ErrorActionPreference = 'Stop'
+      dotnet build "${{ parameters.sqlProjectPath }}" -c "${{ parameters.buildConfiguration }}"
+    displayName: 'Build SQL project'
+
+  - powershell: |
+      $ErrorActionPreference = 'Stop'
+
+      $dacpac = Get-ChildItem "$(Build.SourcesDirectory)" -Recurse -Filter *.dacpac |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -First 1
+
+      if (-not $dacpac) {
+        throw "No .dacpac found after build."
+      }
+
+      New-Item -Path "${{ parameters.outputFolder }}" -ItemType Directory -Force | Out-Null
+      Copy-Item $dacpac.FullName "${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}" -Force
+
+      Write-Host "DACPAC copied to ${{ parameters.outputFolder }}\${{ parameters.dacpacFileName }}"
+    displayName: 'Collect dacpac'
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish DB artifact'
+    inputs:
+      PathtoPublish: '${{ parameters.outputFolder }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
+
+build-dotnet-core-webapi.yml:
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
+
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: restoreProjects
+  type: string
+  default: '**/*.csproj'
+
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testProjects
+  type: string
+  default: '**/*Tests/*.csproj'
+
+- name: publishProject
+  type: string
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: artifactName
+  type: string
+  default: 'drop'
 
 
-The xml is:
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+- name: deploymentMode
+  type: string
+  default: 'framework-dependent'
+  values:
+  - framework-dependent
+  - self-contained
+
+- name: targetRuntime
+  type: string
+  default: ''
+
+- name: produceSingleFile
+  type: boolean
+  default: false
+
+- name: readyToRun
+  type: boolean
+  default: false
+
+- name: trim
+  type: boolean
+  default: false
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  variables:
+
+  - name: publishArgsNoRestore
+    value: '--no-restore'
+
+  - name: publishArgsBase
+    value: >-
+      --configuration ${{ parameters.buildConfiguration }}
+      --output "${{ parameters.publishOutputFolder }}"
+
+  - name: publishArgsRuntime
+    value: ''
+
+  - name: publishArgsSelfContained
+    value: ''
+
+  - name: publishArgsSingleFile
+    value: ''
+
+  - name: publishArgsReadyToRun
+    value: ''
+
+  - name: publishArgsTrim
+    value: ''
+  
+  - name: restoreArgs
+    value: ''
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: publishArgsRuntime
+      value: '-r ${{ parameters.targetRuntime }}'
+
+  - ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained true'
+
+  - ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained false'
+
+  - ${{ if eq(parameters.produceSingleFile, true) }}:
+    - name: publishArgsSingleFile
+      value: '/p:PublishSingleFile=true'
+
+  - ${{ if eq(parameters.readyToRun, true) }}:
+    - name: publishArgsReadyToRun
+      value: '/p:PublishReadyToRun=true'
+
+  - ${{ if eq(parameters.trim, true) }}:
+    - name: publishArgsTrim
+      value: '/p:PublishTrimmed=true'
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: restoreArgs
+      value: '-r ${{ parameters.targetRuntime }}'
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: publishArgsNoRestore
+      value: ''
+
+  steps:
+  - checkout: self
+    clean: true
+
+  # Restore using nuget.config
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      projects: ${{ parameters.restoreProjects }}
+      feedsToUse: 'config'
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}
+      arguments: >-
+        $(restoreArgs)
+
+  # Building project: dotnet build
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: ${{ parameters.restoreProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
+
+  # Running tests if available: dotnet test
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    inputs:
+      command: 'test'
+      projects: ${{ parameters.testProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
+      publishTestResults: true
+
+  # Publish the API project (with deployment-mode / runtime / single-file options)
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish'
+    inputs:
+      command: 'publish'
+      projects: ${{ parameters.publishProject }}
+      publishWebProjects: false
+      zipAfterPublish: false
+      modifyOutputPath: false
+      arguments: >-
+        $(publishArgsBase)
+        $(publishArgsNoRestore)
+        $(publishArgsRuntime)
+        $(publishArgsSelfContained)
+        $(publishArgsSingleFile)
+        $(publishArgsReadyToRun)
+        $(publishArgsTrim)
+
+  # Zipping published files
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  # Uploading zipped files to Azure
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
+
+build-dotnet-framework-webapi.yml:
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
+
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET Framework)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+- name: vsVersion
+  type: string
+  default: '17.0'
+
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: solution
+  type: string
+  default: '**/*.sln'
+
+- name: buildProject
+  type: string
+  default: ''
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
+
+- name: publishProject
+  type: string
+  default: ''
+
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - task: NuGetCommand@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      restoreSolution: '${{ parameters.solution }}'
+      feedsToUse: 'config'
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+
+  - task: VSBuild@1
+    displayName: 'Build Project'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+
+  # Tests (optional)
+  # - task: VSTest@2
+  #   displayName: 'Test'
+  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+  #   inputs:
+  #     testSelector: 'testAssemblies'
+  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
+  #     searchFolder: '$(System.DefaultWorkingDirectory)'
+  #     platform: '${{ parameters.buildPlatform }}'
+  #     configuration: '${{ parameters.buildConfiguration }}'
+  #     diagnosticsEnabled: true
 
 
-<Body 	xmlns="http://schemas.xmlsoap.org/soap/envelope/">
-<ns2:WSSOGEAMDKYC 	xmlns="" xmlns:ns2="http://temenos.com/SOGE-KYC-WS">
-<WebRequestCommon>
-<company>LB0010001</company>
-<password/>
-<userName>TWSUSER</userName>
-</WebRequestCommon>
-<OfsFunction>
-<messageId>TCIB.REG-1278935</messageId>
-</OfsFunction>
-<CUSTOMERSGBSOGEAMDKYCType 	id="1278935">
-<cus:gSTREET 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:Street>LIBAN CABLES</cus:Street>
-</cus:gSTREET>
-<cus:CountryofResidence 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">LB</cus:CountryofResidence>
-<cus:MaritalStatus 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">MARRIED</cus:MaritalStatus>
-<cus:gEMPLOYMENTSTATUS 	g="1" xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:mEMPLOYMENTSTATUS 	m="1">
-<cus:EmploymentStatus>ACTIVE</cus:EmploymentStatus>
-<cus:Occupation>189</cus:Occupation>
-<cus:JobTitle>EMPLOYEE</cus:JobTitle>
-<cus:EmployersName>JOELLE</cus:EmployersName>
-<cus:EmployersBusiness>NA</cus:EmployersBusiness>
-<cus:EmploymentStartDt>19000101</cus:EmploymentStartDt>
-<cus:CustomerCurrency>USD</cus:CustomerCurrency>
-<cus:CustomerSalaryUSD>12000</cus:CustomerSalaryUSD>
-<cus:SalaryDateFreq>LYEAR</cus:SalaryDateFreq>
-</cus:mEMPLOYMENTSTATUS>
-</cus:gEMPLOYMENTSTATUS>
-<cus:gRESIDENCESTATUS 	g="1" xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:mRESIDENCESTATUS 	m="1">
-<cus:Residencestatus>HOME.OWNER</cus:Residencestatus>
-<cus:Residencetype>INDEPEDENT.HOUSE</cus:Residencetype>
-<cus:Residencesince>20190706</cus:Residencesince>
-</cus:mRESIDENCESTATUS>
-</cus:gRESIDENCESTATUS>
-<cus:LastKYCReviewDate 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">20240926</cus:LastKYCReviewDate>
-<cus:City 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">12213</cus:City>
-<cus:SpFirstName 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">Anthony</cus:SpFirstName>
-<cus:SpLastName 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">Rizkallah</cus:SpLastName>
-<cus:OtherIncome 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">1</cus:OtherIncome>
-<cus:AnnualVolInUSD 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">14000</cus:AnnualVolInUSD>
-<cus:AnnualVolOutUSD 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">13000</cus:AnnualVolOutUSD>
-<cus:SpouseProf 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">131</cus:SpouseProf>
-<cus:Region 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:CustDistrict 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:CusBuilding 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">BLOC A</cus:CusBuilding>
-<cus:ApartmentNo 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:FloorNo 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">1ST FLOOR</cus:FloorNo>
-<cus:POBox 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:Province 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:Department 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:ForeignCity 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:gP.CNTRY.CODE 	g="1" xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:mP.CNTRY.CODE 	m="1">
-<cus:PhoneCountryCode>00961</cus:PhoneCountryCode>
-<cus:PAreaCode>01</cus:PAreaCode>
-<cus:PhoneNb>123456</cus:PhoneNb>
-<cus:FaxCountrycode1/>
-<cus:FAreaCode/>
-<cus:FAXNB/>
-</cus:mP.CNTRY.CODE>
-</cus:gP.CNTRY.CODE>
-<cus:ProfessionDetails 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">pROFESSION DETAILS</cus:ProfessionDetails>
-<cus:Children 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:SpouseAnnualSalaryUSD 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">10000</cus:SpouseAnnualSalaryUSD>
-<cus:Realestateproperty 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">2</cus:Realestateproperty>
-<cus:Realestateregion 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">DBAYEH</cus:Realestateregion>
-<cus:PEP 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">No</cus:PEP>
-<cus:TitleofPEP 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:gSGB.CHILD.NAME 	g="1" xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:mSGB.CHILD.NAME 	m="1">
-<cus:ChildName>CHARBEL</cus:ChildName>
-<cus:ChildDateofBirth>20200625</cus:ChildDateofBirth>
-<cus:ChildEducation>OTHER</cus:ChildEducation>
-<cus:ChildOccupation>999</cus:ChildOccupation>
-<cus:ChildEmployer>Other</cus:ChildEmployer>
-</cus:mSGB.CHILD.NAME>
-<cus:mSGB.CHILD.NAME 	m="2">
-<cus:ChildName>TIANA</cus:ChildName>
-<cus:ChildDateofBirth>20220129</cus:ChildDateofBirth>
-<cus:ChildEducation>OTHER</cus:ChildEducation>
-<cus:ChildOccupation>999</cus:ChildOccupation>
-<cus:ChildEmployer>Other</cus:ChildEmployer>
-</cus:mSGB.CHILD.NAME>
-</cus:gSGB.CHILD.NAME>
-<cus:Source 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">FAMILY</cus:Source>
-<cus:Spouseemployername 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC"/>
-<cus:gSGB.SRC.FUNDS 	g="1" xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:mSGB.SRC.FUNDS 	m="1">
-<cus:SourceofFunds>10</cus:SourceofFunds>
-<cus:SpecifySource>NA</cus:SpecifySource>
-</cus:mSGB.SRC.FUNDS>
-<cus:mSGB.SRC.FUNDS 	m="2">
-<cus:SourceofFunds>08</cus:SourceofFunds>
-<cus:SpecifySource>ASSETS</cus:SpecifySource>
-</cus:mSGB.SRC.FUNDS>
-</cus:gSGB.SRC.FUNDS>
-<cus:gSGB.SRC.WEALTH 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:SourceofWealth/>
-</cus:gSGB.SRC.WEALTH>
-<cus:NumberofSources 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">02</cus:NumberofSources>
-<cus:EstWealth 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">06</cus:EstWealth>
-<cus:SpouseProfDetails 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">SPOUSE PROFESSION</cus:SpouseProfDetails>
-<cus:gSGB.OTHR.NAT 	g="1" xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:mSGB.OTHR.NAT 	m="1">
-<cus:OtherNationality1>AR</cus:OtherNationality1>
-<cus:OtherDocName1>ID</cus:OtherDocName1>
-<cus:OtherDocNr1>0001245786892</cus:OtherDocNr1>
-</cus:mSGB.OTHR.NAT>
-</cus:gSGB.OTHR.NAT>
-<cus:gSGB.FIN.LOC 	g="1" xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:mSGB.FIN.LOC 	m="1">
-<cus:EmploymentForeignCountry>LB</cus:EmploymentForeignCountry>
-</cus:mSGB.FIN.LOC>
-</cus:gSGB.FIN.LOC>
-<cus:gSGB.CRS.TAX.RES 	g="1" xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">
-<cus:mSGB.CRS.TAX.RES 	m="1">
-<cus:CRSCountryofTaxResidence>LB</cus:CRSCountryofTaxResidence>
-<cus:CRSTaxIdentificationNumber>0123457863</cus:CRSTaxIdentificationNumber>
-<cus:DateofUpdofCRSCntryTaxResidence>20241127</cus:DateofUpdofCRSCntryTaxResidence>
-<cus:SgbCrsCancel>NO</cus:SgbCrsCancel>
-<cus:SgbCrsCancelDt/>
-</cus:mSGB.CRS.TAX.RES>
-</cus:gSGB.CRS.TAX.RES>
-<cus:SourceofCRSCntryTaxResidence 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">SELF.CERTIFICATION</cus:SourceofCRSCntryTaxResidence>
-<cus:Holderofanothernationality 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">Yes</cus:Holderofanothernationality>
-<cus:MeansofKYCrenewal 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">ESGBL</cus:MeansofKYCrenewal>
-<cus:ClientFunction 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">THIRDCLASS</cus:ClientFunction>
-<cus:SalaryDomiciliation 	xmlns:cus="http://temenos.com/CUSTOMERSGBSOGEAMDKYC">Public Sec.-Salary Domiciliated</cus:SalaryDomiciliation>
-</CUSTOMERSGBSOGEAMDKYCType>
-</ns2:WSSOGEAMDKYC>
-</Body>
+  - task: VSBuild@1
+    displayName: 'Publish to folder'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: false
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+        /p:DeployOnBuild=true
+        /p:DeployDefaultTarget=WebPublish
+        /p:WebPublishMethod=FileSystem
+        /p:PublishUrl="${{ parameters.packageLocation }}"
+        /p:DeleteExistingFiles=true
+        /p:AutoParameterizationWebConfigConnectionStrings=false
 
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
 
-And the error in OSB is:
-<S:Body 	xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
-<S:Fault 	xmlns:ns4="http://www.w3.org/2003/05/soap-envelope">
-<faultcode>S:Client</faultcode>
-<faultstring>org.xml.sax.SAXParseException: cvc-complex-type.2.4.a: Invalid content was found starting with element 'cus:MeansofKYCrenewal'. One of '{"http://temenos.com/CUSTOMERSGBSOGEAMDKYC":MeansofKYCRenewal, "http://temenos.com/CUSTOMERSGBSOGEAMDKYC":ClientFunction, "http://temenos.com/CUSTOMERSGBSOGEAMDKYC":SalaryDomiciliation}' is expected.</faultstring>
-</S:Fault>
-</S:Body>
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
+
+In these build tmeplates, I want to add the "OWASP Dependency Check".
+I read that it is best to also use an API key with the extention. Can you tell me how can I acquire one ?
