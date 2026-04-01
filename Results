@@ -1,145 +1,108 @@
-name: ATC_DB_PREVIEW_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
-
 parameters:
-- name: targetEnvironment
+- name: jobName
   type: string
-  default: SIT
-  values:
-  - SIT
-  - UAT
-  - PROD
-  displayName: 'Target Environment'
+  default: 'GenerateDbPreview'
 
-- name: dbBuildNumber
+- name: jobDisplayName
   type: string
-  default: ''
-  displayName: 'DB Build Number'
+  default: 'Generate DB preview'
 
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
+- name: deployPool
+  type: string
 
-trigger: none
-pr: none
+- name: deployAgentName
+  type: string
 
-variables:
-- name: deploymentPool
-  value: 'Deployment Pool'
+- name: artifactProject
+  type: string
 
-- name: dbPipelineName
-  value: 'BUILD - DB - Alterna Telecom'
+- name: artifactDefinitionId
+  type: string
 
-- name: dbArtifactName
-  value: 'alterna-telecom-db-drop'
+- name: artifactBuildId
+  type: string
 
-- ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-  - group: SIT_BACK_END_VARIABLE_GROUP
-  - name: environmentName
-    value: 'SIT'
-  - name: dbAgentName
-    value: 'SIT-ALTERNA-BN1'
+- name: artifactName
+  type: string
+  default: 'db-drop'
 
-- ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-  - group: UAT_BACK_END_VARIABLE_GROUP
-  - name: environmentName
-    value: 'UAT'
-  - name: dbAgentName
-    value: 'UAT-ALTERNA-BN1'   # adjust if needed
+- name: targetConnectionString
+  type: string
 
-- ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-  - group: PROD_BACK_END_VARIABLE_GROUP
-  - name: environmentName
-    value: 'PROD'
-  - name: dbAgentName
-    value: 'PROD-ALTERNA-BN1'  # adjust if needed
+- name: sqlPackagePath
+  type: string
+  default: 'SqlPackage'
 
-stages:
-- stage: Resolve_DB_Build
-  displayName: 'Resolve DB build'
-  jobs:
-  - job: ResolveDbBuild
-    displayName: 'Resolve DB build number'
-    pool:
-      name: '$(deploymentPool)'
-      demands:
-      - Agent.Name -equals $(dbAgentName)
-    steps:
-    - checkout: none
+- name: sqlPackageArgs
+  type: string
+  default: >
+    /p:IgnorePermissions=true
+    /p:IgnoreRoleMembership=true
+    /p:IgnoreUserSettingsObjects=true
+    /p:BlockOnPossibleDataLoss=true
+    /p:DropObjectsNotInSource=false
 
-    - powershell: |
-        $ErrorActionPreference = 'Stop'
+- name: previewArtifactName
+  type: string
+  default: 'db-preview'
 
-        if ([string]::IsNullOrWhiteSpace('${{ parameters.dbBuildNumber }}')) {
-          throw 'dbBuildNumber is required.'
-        }
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
 
-        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-        $apiVersion    = '7.1'
+  pool:
+    name: ${{ parameters.deployPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.deployAgentName }}
 
-        $headers = @{
-          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-        }
+  steps:
+  - checkout: none
 
-        $pipelineName = '$(dbPipelineName)'
-        $encodedName = [System.Uri]::EscapeDataString($pipelineName)
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download DB DACPAC artifact'
+    inputs:
+      project: '${{ parameters.artifactProject }}'
+      buildType: 'specific'
+      definition: '${{ parameters.artifactDefinitionId }}'
+      buildVersionToDownload: 'specific'
+      pipelineId: '${{ parameters.artifactBuildId }}'
+      artifactName: '${{ parameters.artifactName }}'
+      targetPath: '$(Pipeline.Workspace)\dbdrop'
 
-        $definitionsUri = "{0}/{1}/_apis/build/definitions?name={2}&api-version={3}" -f `
-          $collectionUri, $projectName, $encodedName, $apiVersion
+  - powershell: |
+      $ErrorActionPreference = 'Stop'
 
-        $definitions = Invoke-RestMethod -Method Get -Uri $definitionsUri -Headers $headers
-        $definition = @($definitions.value | Where-Object { $_.name -eq $pipelineName }) | Select-Object -First 1
+      $dacpac = Get-ChildItem "$(Pipeline.Workspace)\dbdrop" -Recurse -Filter *.dacpac |
+                Select-Object -First 1
 
-        if (-not $definition) {
-          throw "Could not resolve pipeline definition for [$pipelineName]."
-        }
+      if (-not $dacpac) {
+        throw "No .dacpac found in downloaded artifact."
+      }
 
-        $buildNumber = [System.Uri]::EscapeDataString('${{ parameters.dbBuildNumber }}')
+      $outDir = "$(Pipeline.Workspace)\db-preview"
+      New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-        $buildsUri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-          $collectionUri, $projectName, $definition.id, $buildNumber, $apiVersion
+      $scriptPath = Join-Path $outDir 'preview-deploy.sql'
+      $reportPath = Join-Path $outDir 'deploy-report.xml'
 
-        $builds = Invoke-RestMethod -Method Get -Uri $buildsUri -Headers $headers
-        $build = @($builds.value) | Select-Object -First 1
+      & "${{ parameters.sqlPackagePath }}" `
+        /Action:Script `
+        /SourceFile:"$($dacpac.FullName)" `
+        /TargetConnectionString:"${{ parameters.targetConnectionString }}" `
+        /DeployScriptPath:"$scriptPath" `
+        /DeployReportPath:"$reportPath" `
+        ${{ parameters.sqlPackageArgs }}
 
-        if (-not $build) {
-          throw "No successful DB build found for build number [${{ parameters.dbBuildNumber }}]."
-        }
+      if ($LASTEXITCODE -ne 0) {
+        throw "SqlPackage Script action failed with exit code $LASTEXITCODE"
+      }
 
-        Write-Host "Resolved build:"
-        Write-Host "  Definition ID = $($definition.id)"
-        Write-Host "  Build ID      = $($build.id)"
-        Write-Host "  Build Number  = $($build.buildNumber)"
-        Write-Host "  Source Branch = $($build.sourceBranch)"
+      Write-Host "Preview script generated at: $scriptPath"
+      Write-Host "Deploy report generated at: $reportPath"
+    displayName: 'Generate preview SQL and deploy report'
 
-        Write-Host "##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]$($definition.id)"
-        Write-Host "##vso[task.setvariable variable=DbBuildId;isOutput=true]$($build.id)"
-        Write-Host "##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-      name: Resolve
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-- stage: Generate_DB_Preview
-  displayName: 'Generate DB preview for $(environmentName)'
-  dependsOn:
-  - Resolve_DB_Build
-  condition: succeeded('Resolve_DB_Build')
-  variables:
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbPipelineDefinitionId'] ]
-    DbBuildId: $[ stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbBuildId'] ]
-  jobs:
-  - template: pipelines/generate-db-preview.yml@templates
-    parameters:
-      jobName: 'GeneratePreview'
-      jobDisplayName: 'Generate DB preview for $(environmentName)'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(dbAgentName)'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactName: '$(dbArtifactName)'
-      previewArtifactName: 'db-preview-$(environmentName)'
-      targetConnectionString: '$(GlobalSettings.ConnString)'
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish DB preview artifact'
+    inputs:
+      targetPath: '$(Pipeline.Workspace)\db-preview'
+      artifact: '${{ parameters.previewArtifactName }}'
