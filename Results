@@ -1,311 +1,195 @@
-Yes. Here is the clean way to implement it.
+Yes. For Azure DevOps Server on a **self-hosted Windows agent**, the cleanest setup is:
 
-## One-time prerequisite
+1. **download the Dependency-Check CLI ZIP once**
+2. **extract it to a fixed folder on the agent**
+3. **run `dependency-check.bat` from a script step**
+4. **store the NVD data in a persistent folder**
+5. **pass your NVD API key from a secret variable**
+6. **optionally disable analyzers that still need internet** for Angular projects. Dependency-Check’s official CLI docs say to download the ZIP from the GitHub Release, optionally verify the GPG signature, extract it, and run `dependency-check.bat`. They also document `--nvdApiKey`, `--data`, and `--updateonly`. Azure DevOps self-hosted agents are intended for exactly this kind of “install tools once, reuse them, keep caches between runs” setup. ([dependency-check.github.io][1])
 
-Create a **secret variable** named `NVD_API_KEY` in a variable group, then link that variable group in the **pipeline that calls the template**. The OWASP task can pass the key through `additionalArguments` using `--nvdApiKey`, which is a supported Dependency-Check CLI argument. Dependency-Check strongly recommends an NVD API key because updates are much slower without one. ([dependency-check.github.io][1])
+## 1) Install the CLI once on the build agent
 
-Example in the **calling pipeline**:
+On a machine that has internet access:
 
-```yaml
-variables:
-- group: SECURITY_SECRETS
+* download the current **Dependency-Check CLI ZIP** from the official GitHub Release
+* optionally download the `.asc` signature too and verify it
+* copy the ZIP to your build agent server
+* extract it to a stable folder such as:
+
+```text
+C:\Tools\dependency-check\dependency-check-12.2.0
 ```
 
-And inside the task:
+The official docs show the CLI distribution is a ZIP, and after extraction you run `dependency-check.bat` from the `bin` folder. ([dependency-check.github.io][1])
 
-```yaml
-additionalArguments: '--nvdApiKey $(NVD_API_KEY)'
+I recommend also creating a persistent data/cache folder:
+
+```text
+C:\Tools\dependency-check-data
 ```
 
-## Common parameters to add to each build template
+That is because the CLI supports `--data <path>`, and the docs say the data directory holds persistent data. On a self-hosted agent, that cache survives between runs. ([dependency-check.github.io][2])
 
-Add these parameters near the top of **each** template:
+## 2) Put your API key in Azure DevOps
 
-```yaml
-- name: runDependencyCheck
-  type: boolean
-  default: true
+Create a **secret variable** named:
 
-- name: dependencyCheckProjectName
-  type: string
-  default: ''
-
-- name: dependencyCheckScanPath
-  type: string
-  default: '$(Build.SourcesDirectory)'
-
-- name: dependencyCheckFormats
-  type: string
-  default: 'HTML,JSON,JUNIT'
-
-- name: dependencyCheckReportsDirectory
-  type: string
-  default: '$(Build.ArtifactStagingDirectory)\dependency-check'
-
-- name: dependencyCheckFailOnCVSS
-  type: string
-  default: '7'
-
-- name: dependencyCheckAdditionalArguments
-  type: string
-  default: ''
+```text
+NVD_API_KEY
 ```
 
-The Azure DevOps OWASP task shape commonly uses `projectName`, `scanPath`, `format`, `reportsDirectory`, `failOnCVSS`, `warnOnCVSSViolation`, and `additionalArguments`. ([GitHub][2])
+in a variable group, then link that group in the pipeline that calls your templates.
 
-## Common OWASP block to add
+In the CLI, the official argument is:
 
-Use this block in all four templates, with the right placement for each:
+```text
+--nvdApiKey
+```
+
+and Dependency-Check’s docs say that with an API key the default NVD delay is **3500 ms**, versus **8000 ms** without one. ([dependency-check.github.io][2])
+
+## 3) Use a script step instead of the extension task
+
+This is the safest on-prem pattern because it avoids the extension’s GitHub bootstrap step.
+
+### Example PowerShell step
 
 ```yaml
-- task: dependency-check-build-task@6
-  displayName: 'OWASP Dependency Check'
+- powershell: |
+    $dc = 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+    $reportDir = '$(Build.ArtifactStagingDirectory)\dependency-check'
+
+    New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
+
+    & $dc `
+      --project "$(Build.Repository.Name)" `
+      --scan "$(Build.SourcesDirectory)" `
+      --format "HTML" `
+      --format "JSON" `
+      --format "JUNIT" `
+      --out $reportDir `
+      --data "C:\Tools\dependency-check-data" `
+      --nvdApiKey "$(NVD_API_KEY)"
+
+    if ($LASTEXITCODE -ne 0) {
+      exit $LASTEXITCODE
+    }
+  displayName: 'OWASP Dependency Check (local CLI)'
   condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-  continueOnError: true
-  inputs:
-    projectName: '${{ parameters.dependencyCheckProjectName }}'
-    scanPath: '${{ parameters.dependencyCheckScanPath }}'
-    format: '${{ parameters.dependencyCheckFormats }}'
-    reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
-    failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
-    warnOnCVSSViolation: true
-    additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
+```
 
+The arguments above are all documented by the official CLI docs: `--project`, `--scan`, `--format`, `--out`, `--data`, and `--nvdApiKey`. ([dependency-check.github.io][3])
+
+Then publish the JUnit report:
+
+```yaml
 - task: PublishTestResults@2
   displayName: 'Publish Dependency Check JUnit'
   condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
   inputs:
     testResultsFormat: 'JUnit'
     testResultsFiles: '**\*junit.xml'
-    searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
-    testRunTitle: 'OWASP Dependency Check'
+    searchFolder: '$(Build.ArtifactStagingDirectory)\dependency-check'
     failTaskOnFailedTests: false
 ```
 
-Dependency-Check supports JUNIT as an output format, and the CLI supports `--project`, `--scan`, `--out`, `--format`, and `--nvdApiKey`. ([dependency-check.github.io][1])
+## 4) Where to place it in your templates
 
----
+Use the same placement I suggested earlier:
 
-# 1) `build-angular-webapp.yml`
+* **Angular**: after `npm install`
+* **.NET Core**: after `Restore`
+* **.NET Framework**: after `NuGet Restore`
+* **Database**: after checkout or before build
 
-## Where to add it
+That keeps the scan after dependency resolution, which is the most useful point.
 
-Add the OWASP block **after** this step:
+## 5) Angular-specific note
 
-```yaml
-  - script: |
-      npm ${{ parameters.installCommand }}
-    workingDirectory: ${{ parameters.workingDirectory }}
-    displayName: 'Install dependencies (npm)'
-```
+Even after you stop the extension from calling GitHub, some analyzers can still need internet.
 
-That is the best place because dependencies are already restored, so the scan sees the packages actually used by the app.
+The CLI docs explicitly say these analyzers require internet:
 
-## What to add
+* `--disableYarnAudit`
+* `--disablePnpmAudit`
+* `--disableNodeAudit`
 
-Use this exact block:
+and the docs also show `--disableRetireJS`, with RetireJS using its own remote URL by default. ([dependency-check.github.io][2])
 
-```yaml
-  - task: dependency-check-build-task@6
-    displayName: 'OWASP Dependency Check'
-    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-    continueOnError: true
-    inputs:
-      projectName: '${{ parameters.dependencyCheckProjectName }}'
-      scanPath: '${{ parameters.dependencyCheckScanPath }}'
-      format: '${{ parameters.dependencyCheckFormats }}'
-      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
-      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
-      warnOnCVSSViolation: true
-      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
-
-  - task: PublishTestResults@2
-    displayName: 'Publish Dependency Check JUnit'
-    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-    inputs:
-      testResultsFormat: 'JUnit'
-      testResultsFiles: '**\*junit.xml'
-      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
-      testRunTitle: 'OWASP Dependency Check'
-      failTaskOnFailedTests: false
-```
-
-## How to call it from parent pipeline
+So for your Angular build on-prem, a more stable command is often:
 
 ```yaml
-- template: build-angular-webapp.yml@templates
-  parameters:
-    ...
-    runDependencyCheck: true
-    dependencyCheckProjectName: 'AlternaCardManagement-Angular'
-    dependencyCheckScanPath: '${{ parameters.workingDirectory }}'
-    dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY) --exclude "**/node_modules/**" --exclude "**/dist/**"'
+- powershell: |
+    $dc = 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+    $reportDir = '$(Build.ArtifactStagingDirectory)\dependency-check'
+
+    New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
+
+    & $dc `
+      --project "AlternaCardManagement-Angular" `
+      --scan "$(Build.SourcesDirectory)" `
+      --format "HTML" `
+      --format "JSON" `
+      --format "JUNIT" `
+      --out $reportDir `
+      --data "C:\Tools\dependency-check-data" `
+      --nvdApiKey "$(NVD_API_KEY)" `
+      --disableYarnAudit `
+      --disablePnpmAudit `
+      --disableNodeAudit `
+      --disableRetireJS
+
+    if ($LASTEXITCODE -ne 0) {
+      exit $LASTEXITCODE
+    }
+  displayName: 'OWASP Dependency Check (Angular, local CLI)'
+  condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
 ```
 
----
+That reduces external calls a lot. The tradeoff is that you lose those specific analyzers. ([dependency-check.github.io][2])
 
-# 2) `build-dotnet-core-webapi.yml`
+## 6) Optional but useful: pre-warm the cache
 
-## Where to add it
+Dependency-Check supports:
 
-Add the OWASP block **after** the `Restore` task and **before** the `Build` task.
+```text
+--updateonly
+```
 
-## What to add
+which updates the local vulnerability data without running a scan. ([dependency-check.github.io][2])
+
+That means you can create a small scheduled pipeline or nightly job like this:
 
 ```yaml
-  - task: dependency-check-build-task@6
-    displayName: 'OWASP Dependency Check'
-    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-    continueOnError: true
-    inputs:
-      projectName: '${{ parameters.dependencyCheckProjectName }}'
-      scanPath: '${{ parameters.dependencyCheckScanPath }}'
-      format: '${{ parameters.dependencyCheckFormats }}'
-      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
-      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
-      warnOnCVSSViolation: true
-      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
+- powershell: |
+    $dc = 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
 
-  - task: PublishTestResults@2
-    displayName: 'Publish Dependency Check JUnit'
-    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-    inputs:
-      testResultsFormat: 'JUnit'
-      testResultsFiles: '**\*junit.xml'
-      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
-      testRunTitle: 'OWASP Dependency Check'
-      failTaskOnFailedTests: false
+    & $dc `
+      --updateonly `
+      --data "C:\Tools\dependency-check-data" `
+      --nvdApiKey "$(NVD_API_KEY)"
+
+    if ($LASTEXITCODE -ne 0) {
+      exit $LASTEXITCODE
+    }
+  displayName: 'Update OWASP Dependency Check cache'
 ```
 
-## How to call it from parent pipeline
+This makes later build scans much faster and more reliable on your self-hosted agent. The project’s docs also strongly recommend mirroring the NVD feed for operational integrations if you want maximum reliability. ([dependency-check.github.io][2])
 
-```yaml
-- template: build-dotnet-core-webapi.yml@templates
-  parameters:
-    ...
-    runDependencyCheck: true
-    dependencyCheckProjectName: 'AlternaCardManagement-API'
-    dependencyCheckScanPath: '$(Build.SourcesDirectory)'
-    dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY) --exclude "**/bin/**" --exclude "**/obj/**"'
-```
+## 7) My recommendation for you
 
----
+For your on-prem setup, I would do this:
 
-# 3) `build-dotnet-framework-webapi.yml`
+* install **Dependency-Check CLI** once on each relevant build agent
+* store the data cache in `C:\Tools\dependency-check-data`
+* keep `NVD_API_KEY` in a secret variable group
+* use **PowerShell script steps**, not the extension task
+* for Angular, start with `--disableNodeAudit --disableYarnAudit --disablePnpmAudit --disableRetireJS`
+* later, if your network allows it, re-enable the analyzers one by one
 
-## Where to add it
+If you want, I’ll rewrite your **Angular build template** first to use the local CLI, then we can apply the same pattern to the .NET templates.
 
-Add the OWASP block **after** the `NuGetCommand@2 Restore` task and **before** `VSBuild@1 Build Project`.
-
-## What to add
-
-```yaml
-  - task: dependency-check-build-task@6
-    displayName: 'OWASP Dependency Check'
-    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-    continueOnError: true
-    inputs:
-      projectName: '${{ parameters.dependencyCheckProjectName }}'
-      scanPath: '${{ parameters.dependencyCheckScanPath }}'
-      format: '${{ parameters.dependencyCheckFormats }}'
-      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
-      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
-      warnOnCVSSViolation: true
-      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
-
-  - task: PublishTestResults@2
-    displayName: 'Publish Dependency Check JUnit'
-    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-    inputs:
-      testResultsFormat: 'JUnit'
-      testResultsFiles: '**\*junit.xml'
-      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
-      testRunTitle: 'OWASP Dependency Check'
-      failTaskOnFailedTests: false
-```
-
-## How to call it from parent pipeline
-
-```yaml
-- template: build-dotnet-framework-webapi.yml@templates
-  parameters:
-    ...
-    runDependencyCheck: true
-    dependencyCheckProjectName: 'AlternaCardManagement-MVC'
-    dependencyCheckScanPath: '$(Build.SourcesDirectory)'
-    dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY) --exclude "**/bin/**" --exclude "**/obj/**"'
-```
-
----
-
-# 4) `build-database-project.yml`
-
-## Where to add it
-
-Add the OWASP block **after checkout** and before `Build SQL project`.
-
-This is the least valuable of the four unless that repo has dependency manifests or NuGet packages you care about, but you can still add it.
-
-## What to add
-
-```yaml
-  - task: dependency-check-build-task@6
-    displayName: 'OWASP Dependency Check'
-    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-    continueOnError: true
-    inputs:
-      projectName: '${{ parameters.dependencyCheckProjectName }}'
-      scanPath: '${{ parameters.dependencyCheckScanPath }}'
-      format: '${{ parameters.dependencyCheckFormats }}'
-      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
-      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
-      warnOnCVSSViolation: true
-      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
-
-  - task: PublishTestResults@2
-    displayName: 'Publish Dependency Check JUnit'
-    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-    inputs:
-      testResultsFormat: 'JUnit'
-      testResultsFiles: '**\*junit.xml'
-      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
-      testRunTitle: 'OWASP Dependency Check'
-      failTaskOnFailedTests: false
-```
-
-## How to call it from parent pipeline
-
-```yaml
-- template: build-database-project.yml@templates
-  parameters:
-    ...
-    runDependencyCheck: true
-    dependencyCheckProjectName: 'AlternaCardManagement-DB'
-    dependencyCheckScanPath: '$(Build.SourcesDirectory)'
-    dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY) --exclude "**/bin/**" --exclude "**/obj/**"'
-```
-
----
-
-# One important note about the API key
-
-Do **not** put the actual key directly in YAML. Keep it in the variable group as a secret and only reference `$(NVD_API_KEY)`. Dependency-Check’s docs support `--nvdApiKey`, and the project warns that CI setups sharing one key across many builds can hit NVD rate limits, so caching may be worth adding later. ([dependency-check.github.io][1])
-
-# My recommendation for your exact templates
-
-Use these defaults everywhere:
-
-```yaml
-runDependencyCheck: true
-dependencyCheckFormats: 'HTML,JSON,JUNIT'
-dependencyCheckReportsDirectory: '$(Build.ArtifactStagingDirectory)\dependency-check'
-dependencyCheckFailOnCVSS: '7'
-dependencyCheckAdditionalArguments: '--nvdApiKey $(NVD_API_KEY)'
-```
-
-Then add excludes per template as needed.
-
-If you want, next I can give you the **full modified version of each of the 4 YAML templates**, ready to paste.
-
-[1]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html?utm_source=chatgpt.com "Command Line Arguments – dependency-check-cli"
-[2]: https://github.com/dependency-check/azuredevops/issues/142?utm_source=chatgpt.com "Question regarding easy caching approach · Issue #142"
+[1]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/index.html "About – dependency-check-cli"
+[2]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html "Command Line Arguments – dependency-check-cli"
+[3]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html?utm_source=chatgpt.com "Command Line Arguments – dependency-check-cli"
