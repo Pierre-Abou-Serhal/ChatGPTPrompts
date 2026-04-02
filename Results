@@ -1,128 +1,22 @@
-Yes — you can debug it, and right now the most likely reason is **still the local Dependency-Check database**, not the variable group.
+Yes — your understanding is correct.
 
-Your current Angular template runs Dependency-Check with `--noupdate` . OWASP’s CLI docs say `--noupdate` disables automatic updates of NVD, hosted suppressions, and RetireJS, and their cache guidance explains that reader nodes using `--noupdate` depend on an already-populated `data` directory. ([dependency-check.github.io][1])
+With the **local CLI + `--noupdate`**, Dependency-Check only reads its **local `data` directory**. If that directory has not been populated yet, the scan fails with errors like **“No documents exist”** and **“Unable to continue dependency-check analysis.”** OWASP’s docs say the `data` directory holds the local H2 vulnerability database, and `--noupdate` disables automatic updates of NVD, hosted suppressions, and RetireJS. ([dependency-check.github.io][1])
 
-Your latest error is generic because Dependency-Check is exiting before it has usable vulnerability data. The clue is the earlier `No documents exist` output in your run, which is the exact failure OWASP users hit when `--noupdate` is used and the database is empty or invalid.  ([GitHub][2])
+## How to populate it locally
 
-There is also one concrete issue in your current template: you map `NVD_API_KEY` into the task environment, but your actual command does **not** pass `--nvdApiKey` anywhere, so the key is currently unused.  ([dependency-check.github.io][1])
+You have 2 valid ways.
 
-## What to do first
+### Option 1: Populate it on the build agent itself
 
-Add verbose logging to the command so you can see the real cause.
+This works only if that machine can reach the required feeds directly or through a proxy. OWASP documents `--updateonly`, `--data`, and `--nvdApiKey` for this purpose. ([dependency-check.github.io][1])
 
-Use this step instead of the current one:
-
-```yaml
-- powershell: |
-    $dc = '${{ parameters.dependencyCheckCliPath }}'
-    $reportDir = '$(Build.ArtifactStagingDirectory)\dependency-check'
-    $scanPath = Join-Path '$(Build.SourcesDirectory)' '${{ parameters.workingDirectory }}'
-    $logFile = '$(Build.ArtifactStagingDirectory)\dependency-check\odc.log'
-
-    if (-not (Test-Path $dc)) {
-      throw "Dependency-Check CLI not found at: $dc"
-    }
-
-    New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
-
-    Write-Host "Dependency-Check CLI: $dc"
-    Write-Host "Scan path: $scanPath"
-    Write-Host "Data path: ${{ parameters.dependencyCheckDataPath }}"
-    Write-Host "Log file: $logFile"
-
-    if (Test-Path '${{ parameters.dependencyCheckDataPath }}') {
-      Write-Host "Data directory exists."
-      Get-ChildItem '${{ parameters.dependencyCheckDataPath }}' -Force | Select-Object Name,Length,LastWriteTime
-    } else {
-      Write-Host "Data directory does NOT exist."
-    }
-
-    & $dc `
-      --project "${{ parameters.dependencyCheckProjectName }}" `
-      --scan "$scanPath" `
-      --format "HTML" `
-      --format "JSON" `
-      --format "JUNIT" `
-      --out "$reportDir" `
-      --data "${{ parameters.dependencyCheckDataPath }}" `
-      --log "$logFile" `
-      --noupdate `
-      --disableKnownExploited `
-      --disableHostedSuppressions `
-      --disableYarnAudit `
-      --disablePnpmAudit `
-      --disableNodeAudit `
-      --disableRetireJS `
-      --disableVersionCheck `
-      ${{ parameters.dependencyCheckAdditionalArguments }}
-
-    if ($LASTEXITCODE -ne 0) {
-      Write-Host "Dependency-Check failed. Showing last 200 log lines:"
-      if (Test-Path $logFile) {
-        Get-Content $logFile -Tail 200
-      }
-      exit $LASTEXITCODE
-    }
-  displayName: 'OWASP Dependency Check (local CLI)'
-  condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-  env:
-    NVD_API_KEY: $(NVD_API_KEY)
-
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish Dependency-Check debug log'
-  condition: always()
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)\dependency-check'
-    ArtifactName: 'dependency-check-debug'
-    publishLocation: 'Container'
-```
-
-OWASP documents `--log <file>` for verbose logging. ([dependency-check.github.io][1])
-
-## What I expect you’ll find
-
-Most likely one of these:
-
-1. **`C:\Tools\dependency-check-data` is empty or incomplete**.
-   That fits your earlier `No documents exist` error and your current use of `--noupdate`.  ([dependency-check.github.io][3])
-
-2. **The cache was created by a failed update** and contains a tiny or broken DB instead of a fully populated one. That also matches the “No documents exist” family of failures. ([GitHub][4])
-
-3. **The agent still cannot reach some remote source**, but the generic message is hiding it because you are not writing a detailed log file yet. OWASP’s docs support mirrors, proxies, and cache seeding for this reason. ([dependency-check.github.io][1])
-
-## Fastest way to prove it
-
-Run this manually on the build agent in PowerShell:
-
-```powershell
-C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat `
-  --project "debug-test" `
-  --scan "C:\agent\_work\1\s" `
-  --data "C:\Tools\dependency-check-data" `
-  --noupdate `
-  --disableKnownExploited `
-  --disableHostedSuppressions `
-  --disableYarnAudit `
-  --disablePnpmAudit `
-  --disableNodeAudit `
-  --disableRetireJS `
-  --disableVersionCheck `
-  --log "C:\temp\odc.log"
-```
-
-If that fails with the same message, open `C:\temp\odc.log`. That will tell you the actual failing class or missing DB state. OWASP’s own guidance is to use the log file for verbose details. ([dependency-check.github.io][1])
-
-## The likely real fix
-
-If the log confirms empty data, do a **one-time update** on a machine that can reach the needed feeds, then copy the populated data folder to the agent. OWASP’s cache guidance explicitly describes this shared-cache pattern. ([dependency-check.github.io][3])
-
-And when you do the update, actually use the NVD key:
+Run this once on the agent:
 
 ```powershell
 C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat `
   --updateonly `
   --data "C:\Tools\dependency-check-data" `
-  --nvdApiKey "<real key>" `
+  --nvdApiKey "<your real NVD key>" `
   --disableKnownExploited `
   --disableHostedSuppressions `
   --disableRetireJS `
@@ -130,11 +24,70 @@ C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat `
   --log "C:\temp\odc-update.log"
 ```
 
-Your current pipeline does not pass `--nvdApiKey`, so even though the secret is available, it is not helping yet.  ([dependency-check.github.io][1])
+Then your pipeline scan can keep using:
 
-The shortest answer is: **yes, you can debug it with `--log`, and the most likely cause is that `--noupdate` is being used with an empty or bad `data` folder.**
+```powershell
+--data "C:\Tools\dependency-check-data" --noupdate
+```
+
+### Option 2: Populate it on another machine, then copy it
+
+This is the best option for your on-prem setup if the build agent cannot reach external hosts.
+
+Use a different Windows machine that **can** reach NVD, run the same `--updateonly` command there, then copy the whole folder:
+
+```text
+C:\Tools\dependency-check-data
+```
+
+to the build agent at the exact same path. OWASP’s cache guidance explicitly describes reusing the whole `data` directory, including the H2 DB, across reader nodes. ([dependency-check.github.io][2])
+
+## What I recommend for you
+
+Because your agent has already failed on several external hosts, use this model:
+
+1. Pick one machine with internet/proxy access.
+2. Run `--updateonly` there to build `C:\Tools\dependency-check-data`.
+3. Copy that folder to the build agent.
+4. In your pipelines, keep:
+
+   * `--data "C:\Tools\dependency-check-data"`
+   * `--noupdate`
+
+That is the cleanest offline/on-prem pattern and matches OWASP’s shared-cache guidance. ([dependency-check.github.io][2])
+
+## Important note
+
+Because you are disabling:
+
+* `--disableKnownExploited`
+* `--disableHostedSuppressions`
+* `--disableRetireJS`
+
+your results may be less complete than a fully internet-connected setup. OWASP’s CLI docs document all of those switches. ([dependency-check.github.io][1])
+
+## How to verify the cache was populated
+
+After `--updateonly`, the `data` folder should no longer be empty. OWASP notes that the cached H2 DB file is part of that directory. ([dependency-check.github.io][2])
+
+Then test manually on the agent with:
+
+```powershell
+C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat `
+  --project "debug-test" `
+  --scan "C:\path\to\some\repo" `
+  --data "C:\Tools\dependency-check-data" `
+  --noupdate `
+  --disableKnownExploited `
+  --disableHostedSuppressions `
+  --disableRetireJS `
+  --disableVersionCheck `
+  --log "C:\temp\odc-scan.log"
+```
+
+If that works, your pipeline should work too.
+
+If you want, I’ll give you the exact **update script** and the exact **final scan script** to paste into your Azure DevOps templates.
 
 [1]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html?utm_source=chatgpt.com "Command Line Arguments – dependency-check-cli"
-[2]: https://github.com/dependency-check/DependencyCheck/issues/2200?utm_source=chatgpt.com "[DependencyCheck] [ERROR] No documents exist when ..."
-[3]: https://dependency-check.github.io/DependencyCheck/data/cacheh2.html?utm_source=chatgpt.com "Caching ODC's H2 Database – dependency-check-maven"
-[4]: https://github.com/dependency-check/DependencyCheck/issues/7227?utm_source=chatgpt.com "No documents exist\" when local database does not ..."
+[2]: https://dependency-check.github.io/DependencyCheck/data/cacheh2.html?utm_source=chatgpt.com "Caching ODC's H2 Database – dependency-check-maven"
