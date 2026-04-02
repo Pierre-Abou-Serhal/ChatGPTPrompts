@@ -101,88 +101,93 @@ If you want, I’ll give you the exact **update script** and the exact **final s
 
 
 
+Yes. Use a PowerShell script that does three things:
 
+1. overrides Java to JDK 21 for that session
+2. runs Dependency-Check in `--updateonly` mode
+3. writes to the same `data` folder you will later copy to the build agent
 
+Dependency-Check 12.2.0 supports `--updateonly`, `--data`, `--nvdApiKey`, `--log`, and `--noupdate`. Its docs also say `--noupdate` disables automatic updates, so a local cache must already exist for offline scan nodes. ([Dependency Check][1])
 
-Yes. In a PowerShell script, override **only for that session/process** by setting `$env:JAVA_HOME` and prepending the JDK 21 `bin` folder to `$env:PATH`, then run Dependency-Check **in the same script**. PowerShell environment variables are process-scoped by default in the session, and child processes inherit them. Also, `Start-Process` inherits the current process environment unless you override it. ([Microsoft Learn][1])
-
-Use this:
+Use this script on your local PC:
 
 ```powershell
+# ===== SETTINGS =====
 $jdkHome = 'D:\Java\jdk-21.0.10'
 $dcBat   = 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+$dataDir = 'C:\Tools\dependency-check-data'
+$logFile = 'C:\Tools\dependency-check-data\odc-update.log'
 
-# Override only for this PowerShell session
+# Put your real NVD API key here for local use,
+# or replace this with a safer method if you prefer.
+$nvdApiKey = 'PASTE_YOUR_NVD_API_KEY_HERE'
+
+# ===== JAVA OVERRIDE FOR THIS POWERSHELL SESSION ONLY =====
 $env:JAVA_HOME = $jdkHome
 $env:PATH = "$jdkHome\bin;$env:PATH"
 
-# Verify what this session will use
+# ===== BASIC CHECKS =====
+if (-not (Test-Path $dcBat)) {
+    throw "Dependency-Check CLI not found at: $dcBat"
+}
+
+if (-not (Test-Path $dataDir)) {
+    New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+}
+
 Write-Host "JAVA_HOME = $env:JAVA_HOME"
+Write-Host "Using java:"
 Get-Command java | Select-Object Source
 java -version
 
-# Run Dependency-Check in the same session
+# ===== UPDATE LOCAL DATABASE =====
 & $dcBat `
-  --version
-```
-
-If you want the full scan:
-
-```powershell
-$jdkHome   = 'D:\Java\jdk-21.0.10'
-$dcBat     = 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-$dataDir   = 'C:\Tools\dependency-check-data'
-$reportDir = 'C:\temp\odc-report'
-$scanPath  = 'D:\YourRepo'
-
-$env:JAVA_HOME = $jdkHome
-$env:PATH = "$jdkHome\bin;$env:PATH"
-
-New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
-
-Write-Host "Using java from:"
-Get-Command java | Select-Object Source
-java -version
-
-& $dcBat `
-  --project "debug-test" `
-  --scan $scanPath `
-  --out $reportDir `
-  --data $dataDir `
-  --noupdate `
+  --updateonly `
+  --data "$dataDir" `
+  --nvdApiKey "$nvdApiKey" `
   --disableKnownExploited `
   --disableHostedSuppressions `
   --disableRetireJS `
   --disableVersionCheck `
-  --log "$reportDir\odc.log"
+  --log "$logFile"
 
 if ($LASTEXITCODE -ne 0) {
-  Get-Content "$reportDir\odc.log" -Tail 200
-  exit $LASTEXITCODE
+    Write-Host "Dependency-Check update failed. Last log lines:"
+    if (Test-Path $logFile) {
+        Get-Content $logFile -Tail 200
+    }
+    exit $LASTEXITCODE
 }
+
+Write-Host "Dependency-Check data update completed."
+Write-Host "Data folder: $dataDir"
 ```
 
-If you want to force it even harder, call Java by full path for verification:
+Why those flags:
 
-```powershell
-& 'D:\Java\jdk-21.0.10\bin\java.exe' -version
+* `--updateonly` updates the local DB without scanning. ([Dependency Check][1])
+* `--data` tells Dependency-Check where to store the local persistent data. ([Dependency Check][1])
+* `--nvdApiKey` uses your NVD key for the NVD API. ([Dependency Check][1])
+* `--disableKnownExploited`, `--disableHostedSuppressions`, and `--disableRetireJS` avoid the same extra internet endpoints that already failed for you earlier. Those are supported CLI switches. ([Dependency Check][1])
+* `--disableVersionCheck` avoids the version check network call. ([Dependency Check][1])
+
+After it succeeds, copy the whole folder:
+
+```text
+C:\Tools\dependency-check-data
 ```
 
-That works because specifying a full path bypasses normal command lookup precedence. ([Microsoft Learn][2])
+to your build agent at the same path, then keep your pipeline scan on:
 
-If you want this every time you open PowerShell, put the two lines below in your PowerShell profile:
-
-```powershell
-$env:JAVA_HOME = 'D:\Java\jdk-21.0.10'
-$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+```text
+--data "C:\Tools\dependency-check-data" --noupdate
 ```
 
-PowerShell profiles are the standard place to apply session startup customizations. ([Microsoft Learn][3])
+That offline/shared-cache pattern is the documented approach for reader nodes using the cached H2 database. ([Dependency Check][2])
 
-The one thing to remember is: changing `JAVA_HOME` alone is often not enough for `java -version`; the active `java.exe` comes from the current `PATH`, so you should set both. Microsoft’s Java-on-Windows guidance also shows `JAVA_HOME` plus `%JAVA_HOME%\bin` in `Path`. ([Microsoft Learn][4])
+To verify it worked, you should see files created/updated in `C:\Tools\dependency-check-data`, and your pipeline scan should stop failing with “No documents exist.”
 
-[1]: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-7.5&utm_source=chatgpt.com "about_Environment_Variables - PowerShell"
-[2]: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_command_precedence?view=powershell-7.6&utm_source=chatgpt.com "about_Command_Precedence - PowerShell"
-[3]: https://learn.microsoft.com/en-us/powershell/scripting/learn/shell/creating-profiles?view=powershell-7.6&utm_source=chatgpt.com "Customizing your shell environment - PowerShell"
-[4]: https://learn.microsoft.com/en-us/windows/dev-environment/java?utm_source=chatgpt.com "Get started with Java on Windows"
+If your local PC still fails during update, run the same script and send me the last lines of `C:\Tools\dependency-check-data\odc-update.log`.
 
+[1]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html "Command Line Arguments – dependency-check-cli"
+[2]: https://dependency-check.github.io/DependencyCheck/data/cacheh2.html "Caching ODC's H2 Database – dependency-check-maven"
