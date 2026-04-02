@@ -93,3 +93,96 @@ If you want, I’ll give you the exact **update script** and the exact **final s
 
 [1]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html?utm_source=chatgpt.com "Command Line Arguments – dependency-check-cli"
 [2]: https://dependency-check.github.io/DependencyCheck/data/cacheh2.html?utm_source=chatgpt.com "Caching ODC's H2 Database – dependency-check-maven"
+
+
+
+
+
+
+
+
+
+
+
+Yes. In a PowerShell script, override **only for that session/process** by setting `$env:JAVA_HOME` and prepending the JDK 21 `bin` folder to `$env:PATH`, then run Dependency-Check **in the same script**. PowerShell environment variables are process-scoped by default in the session, and child processes inherit them. Also, `Start-Process` inherits the current process environment unless you override it. ([Microsoft Learn][1])
+
+Use this:
+
+```powershell
+$jdkHome = 'D:\Java\jdk-21.0.10'
+$dcBat   = 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+
+# Override only for this PowerShell session
+$env:JAVA_HOME = $jdkHome
+$env:PATH = "$jdkHome\bin;$env:PATH"
+
+# Verify what this session will use
+Write-Host "JAVA_HOME = $env:JAVA_HOME"
+Get-Command java | Select-Object Source
+java -version
+
+# Run Dependency-Check in the same session
+& $dcBat `
+  --version
+```
+
+If you want the full scan:
+
+```powershell
+$jdkHome   = 'D:\Java\jdk-21.0.10'
+$dcBat     = 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+$dataDir   = 'C:\Tools\dependency-check-data'
+$reportDir = 'C:\temp\odc-report'
+$scanPath  = 'D:\YourRepo'
+
+$env:JAVA_HOME = $jdkHome
+$env:PATH = "$jdkHome\bin;$env:PATH"
+
+New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
+
+Write-Host "Using java from:"
+Get-Command java | Select-Object Source
+java -version
+
+& $dcBat `
+  --project "debug-test" `
+  --scan $scanPath `
+  --out $reportDir `
+  --data $dataDir `
+  --noupdate `
+  --disableKnownExploited `
+  --disableHostedSuppressions `
+  --disableRetireJS `
+  --disableVersionCheck `
+  --log "$reportDir\odc.log"
+
+if ($LASTEXITCODE -ne 0) {
+  Get-Content "$reportDir\odc.log" -Tail 200
+  exit $LASTEXITCODE
+}
+```
+
+If you want to force it even harder, call Java by full path for verification:
+
+```powershell
+& 'D:\Java\jdk-21.0.10\bin\java.exe' -version
+```
+
+That works because specifying a full path bypasses normal command lookup precedence. ([Microsoft Learn][2])
+
+If you want this every time you open PowerShell, put the two lines below in your PowerShell profile:
+
+```powershell
+$env:JAVA_HOME = 'D:\Java\jdk-21.0.10'
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+```
+
+PowerShell profiles are the standard place to apply session startup customizations. ([Microsoft Learn][3])
+
+The one thing to remember is: changing `JAVA_HOME` alone is often not enough for `java -version`; the active `java.exe` comes from the current `PATH`, so you should set both. Microsoft’s Java-on-Windows guidance also shows `JAVA_HOME` plus `%JAVA_HOME%\bin` in `Path`. ([Microsoft Learn][4])
+
+[1]: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables?view=powershell-7.5&utm_source=chatgpt.com "about_Environment_Variables - PowerShell"
+[2]: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_command_precedence?view=powershell-7.6&utm_source=chatgpt.com "about_Command_Precedence - PowerShell"
+[3]: https://learn.microsoft.com/en-us/powershell/scripting/learn/shell/creating-profiles?view=powershell-7.6&utm_source=chatgpt.com "Customizing your shell environment - PowerShell"
+[4]: https://learn.microsoft.com/en-us/windows/dev-environment/java?utm_source=chatgpt.com "Get started with Java on Windows"
+
