@@ -1,7 +1,24 @@
-I want to fix these:
+Yes — here’s the clean way to fix those three parent pipelines so they follow the same pattern as your working Angular parent pipeline.
 
-BUILD - API - AlternaCardManagement:
+Your Angular parent pipeline already uses the right model:
+
+* link `OWASP_SECRETS` at the **parent** level
+* pass `runDependencyCheck`, `dependencyCheckCliPath`, `dependencyCheckDataPath`, and `dependencyCheckProjectName` down to the template 
+
+Also, your current `build-database-project.yml` still does **not** expose any OWASP parameters yet, so the DB parent pipeline cannot be fixed only from the parent side until that template is updated too. 
+
+## 1) BUILD - API - AlternaCardManagement
+
+Use this:
+
+```yaml
 name: ACM_API_SIT_$(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+- name: runDependencyCheck
+  type: boolean
+  default: true
+  displayName: 'Run OWASP Dependency Check'
 
 resources:
   repositories:
@@ -19,6 +36,9 @@ trigger:
       - CardManagement/**
 
 pr: none
+
+variables:
+- group: OWASP_SECRETS
 
 stages:
   - stage: Build_API
@@ -41,9 +61,27 @@ stages:
           zipName: 'AlternaCardManagementAPI.zip'
           artifactName: 'card-management-api-drop'
 
+          runDependencyCheck: ${{ parameters.runDependencyCheck }}
+          dependencyCheckProjectName: 'AlternaCardManagement-API'
+          dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+          dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
+          dependencyCheckAdditionalArguments: ''
+```
 
-BUILD - MVC - AlternaCardManagement:
+---
+
+## 2) BUILD - MVC - AlternaCardManagement
+
+Use this:
+
+```yaml
 name: ACM_MVC_SIT_$(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+- name: runDependencyCheck
+  type: boolean
+  default: true
+  displayName: 'Run OWASP Dependency Check'
 
 resources:
   repositories:
@@ -61,6 +99,9 @@ trigger:
       - CardManagement/**
 
 pr: none
+
+variables:
+- group: OWASP_SECRETS
 
 stages:
   - stage: Build_MVC
@@ -83,8 +124,36 @@ stages:
           zipName: 'AlternaCardManagementMVC.zip'
           artifactName: 'card-management-mvc-drop'
 
-BUILD - DB - AlternaCardManagement:
+          runDependencyCheck: ${{ parameters.runDependencyCheck }}
+          dependencyCheckProjectName: 'AlternaCardManagement-MVC'
+          dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+          dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
+          dependencyCheckAdditionalArguments: ''
+```
+
+---
+
+## 3) BUILD - DB - AlternaCardManagement
+
+This one depends on whether you also update `build-database-project.yml`.
+
+### If you do **not** update the DB template yet
+
+Keep the parent pipeline as-is.
+Right now the DB template only supports SQL build/publish parameters and has no `runDependencyCheck`, `dependencyCheckCliPath`, or `dependencyCheckDataPath` inputs. 
+
+### If you **do** update the DB template to support OWASP
+
+Then use this parent pipeline:
+
+```yaml
 name: ACM_DB_SIT_$(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+- name: runDependencyCheck
+  type: boolean
+  default: true
+  displayName: 'Run OWASP Dependency Check'
 
 resources:
   repositories:
@@ -105,6 +174,7 @@ pr: none
 
 variables:
 - group: SIT_API_VARIABLE_GROUP
+- group: OWASP_SECRETS
 
 stages:
 - stage: Build_DB
@@ -119,3 +189,35 @@ stages:
       sqlProjectPath: 'DatabaseProjectAlterna.CardManagement/DatabaseProjectAlterna.CardManagement.sqlproj'
       artifactName: 'card-management-db-drop'
       previewConnectionString: '$(CONN_STRING)'
+
+      runDependencyCheck: ${{ parameters.runDependencyCheck }}
+      dependencyCheckProjectName: 'AlternaCardManagement-DB'
+      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
+      dependencyCheckAdditionalArguments: ''
+```
+
+---
+
+## Important note about the templates
+
+For the **API** and **MVC** parent pipelines above to work, your `build-dotnet-framework-webapi.yml` must already support these parameters:
+
+* `runDependencyCheck`
+* `dependencyCheckCliPath`
+* `dependencyCheckDataPath`
+* `dependencyCheckProjectName`
+* `dependencyCheckAdditionalArguments`
+
+If your real template still uses the old OWASP extension-task parameters instead, that template has to be updated first. Your pasted working direction shows you are already moving templates to the local-CLI model, which is the right pattern.
+
+## My recommendation
+
+Do these in this order:
+
+1. Fix **BUILD - API - AlternaCardManagement**
+2. Fix **BUILD - MVC - AlternaCardManagement**
+3. Update **build-database-project.yml** to support the same OWASP local-CLI pattern
+4. Then fix **BUILD - DB - AlternaCardManagement**
+
+If you want, next I’ll give you the exact **`build-database-project.yml` OWASP version** so the DB parent pipeline becomes usable too.
