@@ -1,5 +1,4 @@
-build-angular-webapp.yml
-
+This is my build-angular-webapp.yml template:
 parameters:
 - name: jobName
   type: string
@@ -140,7 +139,6 @@ jobs:
         --format "JUNIT" `
         --out "$reportDir" `
         --data "${{ parameters.dependencyCheckDataPath }}" `
-        --noupdate `
         --disableKnownExploited `
         --disableHostedSuppressions `
         --disableYarnAudit `
@@ -208,50 +206,470 @@ jobs:
       ArtifactName: '${{ parameters.artifactName }}'
       publishLocation: 'Container'
 
-BUILD - FRONT - Alterna Telecom:
-name: ATC_FRONT_$(SourceBranchName)_rc$(Rev:r)
+I want to add the same OWASP checks to my other build templates.
 
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
+build-dotnet-core-webapi.yml:
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
 
-trigger:
-  branches:
-    include:
-    - release/*
-  paths:
-    exclude:
-      - '*.yml'
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET)'
 
-pr: none
+- name: buildPool
+  type: string
 
-variables:
-- group: OWASP_SECRETS
+- name: buildAgentName
+  type: string
 
-stages:
-- stage: Build_Frontend
-  displayName: 'Build Angular & Publish Artifact'
-  jobs:
-  - template: pipelines/build-angular-webapp.yml@templates
-    parameters:
-      jobName: 'BuildFrontend'
-      jobDisplayName: 'Build Alterna Telecom Frontend'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      workingDirectory: '.'
-      nodeVersion: '22.x'
-      installCommand: 'ci'
-      runTests: false
-      buildCommand: 'npx ng build'
-      distFolder: 'dist/Telecom/browser'
-      zipName: 'Alterna-Telecom-Frontend.zip'
-      artifactName: 'alterna-telecom-front-drop'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish'
-      runDependencyCheck: true
-      dependencyCheckProjectName: 'Alterna-Telecom-Frontend'
-      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-      dependencyCheckAdditionalArguments: ''
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: restoreProjects
+  type: string
+  default: '**/*.csproj'
+
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testProjects
+  type: string
+  default: '**/*Tests/*.csproj'
+
+- name: publishProject
+  type: string
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+- name: deploymentMode
+  type: string
+  default: 'framework-dependent'
+  values:
+  - framework-dependent
+  - self-contained
+
+- name: targetRuntime
+  type: string
+  default: ''
+
+- name: produceSingleFile
+  type: boolean
+  default: false
+
+- name: readyToRun
+  type: boolean
+  default: false
+
+- name: trim
+  type: boolean
+  default: false
+
+- name: runDependencyCheck
+  type: boolean
+  default: false
+
+- name: dependencyCheckProjectName
+  type: string
+  default: ''
+
+- name: dependencyCheckScanPath
+  type: string
+  default: '$(Build.SourcesDirectory)'
+
+- name: dependencyCheckFormats
+  type: string
+  default: 'HTML,JSON,JUNIT'
+
+- name: dependencyCheckReportsDirectory
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\dependency-check'
+
+- name: dependencyCheckFailOnCVSS
+  type: string
+  default: '7'
+
+- name: dependencyCheckAdditionalArguments
+  type: string
+  default: ''
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  variables:
+
+  - name: publishArgsNoRestore
+    value: '--no-restore'
+
+  - name: publishArgsBase
+    value: >-
+      --configuration ${{ parameters.buildConfiguration }}
+      --output "${{ parameters.publishOutputFolder }}"
+
+  - name: publishArgsRuntime
+    value: ''
+
+  - name: publishArgsSelfContained
+    value: ''
+
+  - name: publishArgsSingleFile
+    value: ''
+
+  - name: publishArgsReadyToRun
+    value: ''
+
+  - name: publishArgsTrim
+    value: ''
+  
+  - name: restoreArgs
+    value: ''
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: publishArgsRuntime
+      value: '-r ${{ parameters.targetRuntime }}'
+
+  - ${{ if eq(parameters.deploymentMode, 'self-contained') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained true'
+
+  - ${{ if eq(parameters.deploymentMode, 'framework-dependent') }}:
+    - name: publishArgsSelfContained
+      value: '--self-contained false'
+
+  - ${{ if eq(parameters.produceSingleFile, true) }}:
+    - name: publishArgsSingleFile
+      value: '/p:PublishSingleFile=true'
+
+  - ${{ if eq(parameters.readyToRun, true) }}:
+    - name: publishArgsReadyToRun
+      value: '/p:PublishReadyToRun=true'
+
+  - ${{ if eq(parameters.trim, true) }}:
+    - name: publishArgsTrim
+      value: '/p:PublishTrimmed=true'
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: restoreArgs
+      value: '-r ${{ parameters.targetRuntime }}'
+
+  - ${{ if ne(parameters.targetRuntime, '') }}:
+    - name: publishArgsNoRestore
+      value: ''
+
+  steps:
+  - checkout: self
+    clean: true
+
+  # Restore using nuget.config
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      projects: ${{ parameters.restoreProjects }}
+      feedsToUse: 'config'
+      nugetConfigPath: ${{ parameters.nugetConfigPath }}
+      arguments: >-
+        $(restoreArgs)
+
+  - task: dependency-check-build-task@6
+    displayName: 'OWASP Dependency Check'
+    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    continueOnError: true
+    inputs:
+      projectName: '${{ parameters.dependencyCheckProjectName }}'
+      scanPath: '${{ parameters.dependencyCheckScanPath }}'
+      format: '${{ parameters.dependencyCheckFormats }}'
+      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
+      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
+      warnOnCVSSViolation: true
+      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Dependency Check JUnit'
+    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**\*junit.xml'
+      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
+      testRunTitle: 'OWASP Dependency Check'
+      failTaskOnFailedTests: false
+
+  # Building project: dotnet build
+  - task: DotNetCoreCLI@2
+    displayName: 'Build'
+    inputs:
+      command: 'build'
+      projects: ${{ parameters.restoreProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-restore'
+
+  # Running tests if available: dotnet test
+  - task: DotNetCoreCLI@2
+    displayName: 'Test'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    inputs:
+      command: 'test'
+      projects: ${{ parameters.testProjects }}
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --no-build --no-restore'
+      publishTestResults: true
+
+  # Publish the API project (with deployment-mode / runtime / single-file options)
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish'
+    inputs:
+      command: 'publish'
+      projects: ${{ parameters.publishProject }}
+      publishWebProjects: false
+      zipAfterPublish: false
+      modifyOutputPath: false
+      arguments: >-
+        $(publishArgsBase)
+        $(publishArgsNoRestore)
+        $(publishArgsRuntime)
+        $(publishArgsSelfContained)
+        $(publishArgsSingleFile)
+        $(publishArgsReadyToRun)
+        $(publishArgsTrim)
+
+  # Zipping published files
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  # Uploading zipped files to Azure
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
+
+build-dotnet-framework-webapi.yml:
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildJob'
+
+- name: jobDisplayName
+  type: string
+  default: 'Build (.NET Framework)'
+
+- name: buildPool
+  type: string
+
+- name: buildAgentName
+  type: string
+
+- name: vsVersion
+  type: string
+  default: '17.0'
+
+- name: buildPlatform
+  type: string
+  default: 'Any CPU'
+
+- name: buildConfiguration
+  type: string
+  default: 'Release'
+
+- name: solution
+  type: string
+  default: '**/*.sln'
+
+- name: buildProject
+  type: string
+  default: ''
+
+- name: nugetConfigPath
+  type: string
+  default: 'nuget.config'
+
+- name: runTests
+  type: boolean
+  default: false
+
+- name: testAssemblies
+  type: string
+  default: |
+    **\*test*.dll
+    **\*tests*.dll
+    !**\obj\**
+    !**\bin\ref\**
+    !**\*TestAdapter.dll
+    !**\*vstest*.dll
+
+- name: publishProject
+  type: string
+  default: ''
+
+- name: packageLocation
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
+
+- name: zipName
+  type: string
+  default: 'WebApp.zip'
+
+- name: artifactName
+  type: string
+  default: 'drop'
+
+- name: runDependencyCheck
+  type: boolean
+  default: false
+
+- name: dependencyCheckProjectName
+  type: string
+  default: ''
+
+- name: dependencyCheckScanPath
+  type: string
+  default: '$(Build.SourcesDirectory)'
+
+- name: dependencyCheckFormats
+  type: string
+  default: 'HTML,JSON,JUNIT'
+
+- name: dependencyCheckReportsDirectory
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\dependency-check'
+
+- name: dependencyCheckFailOnCVSS
+  type: string
+  default: '7'
+
+- name: dependencyCheckAdditionalArguments
+  type: string
+  default: ''
+
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
+
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
+
+  steps:
+  - checkout: self
+    clean: true
+
+  - task: NuGetCommand@2
+    displayName: 'Restore'
+    inputs:
+      command: 'restore'
+      restoreSolution: '${{ parameters.solution }}'
+      feedsToUse: 'config'
+      nugetConfigPath: '${{ parameters.nugetConfigPath }}'
+
+  - task: VSBuild@1
+    displayName: 'Build Project'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: true
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+
+  # Tests (optional)
+  # - task: VSTest@2
+  #   displayName: 'Test'
+  #   condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+  #   inputs:
+  #     testSelector: 'testAssemblies'
+  #     testAssemblyVer2: '${{ parameters.testAssemblies }}'
+  #     searchFolder: '$(System.DefaultWorkingDirectory)'
+  #     platform: '${{ parameters.buildPlatform }}'
+  #     configuration: '${{ parameters.buildConfiguration }}'
+  #     diagnosticsEnabled: true
+
+  - task: dependency-check-build-task@6
+    displayName: 'OWASP Dependency Check'
+    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    continueOnError: true
+    inputs:
+      projectName: '${{ parameters.dependencyCheckProjectName }}'
+      scanPath: '${{ parameters.dependencyCheckScanPath }}'
+      format: '${{ parameters.dependencyCheckFormats }}'
+      reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
+      failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
+      warnOnCVSSViolation: true
+      additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Dependency Check JUnit'
+    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**\*junit.xml'
+      searchFolder: '${{ parameters.dependencyCheckReportsDirectory }}'
+      testRunTitle: 'OWASP Dependency Check'
+      failTaskOnFailedTests: false
+
+  - task: VSBuild@1
+    displayName: 'Publish to folder'
+    condition: and(succeeded(), ne('${{ parameters.buildProject }}', ''))
+    inputs:
+      solution: '${{ parameters.buildProject }}'
+      vsVersion: '${{ parameters.vsVersion }}'
+      platform: '${{ parameters.buildPlatform }}'
+      configuration: '${{ parameters.buildConfiguration }}'
+      clean: false
+      msbuildArgs: >
+        /p:SkipInvalidConfigurations=true
+        /p:VisualStudioVersion=${{ parameters.vsVersion }}
+        /p:DeployOnBuild=true
+        /p:DeployDefaultTarget=WebPublish
+        /p:WebPublishMethod=FileSystem
+        /p:PublishUrl="${{ parameters.packageLocation }}"
+        /p:DeleteExistingFiles=true
+        /p:AutoParameterizationWebConfigConnectionStrings=false
+
+  - task: ArchiveFiles@2
+    displayName: 'Zip publish output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.packageLocation }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
