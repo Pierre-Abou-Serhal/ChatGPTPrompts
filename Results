@@ -1,490 +1,75 @@
-PS C:\Windows\System32\WindowsPowerShell\v1.0> # ===== SETTINGS =====
+The update is failing because your PC cannot resolve the NVD host **`services.nvd.nist.gov`** from the Java process running Dependency-Check. Your log shows repeated `UnknownHostException: services.nvd.nist.gov`, followed by `NVD Update Failed` and `Error updating the NVD Data`  . That means the local database is **not** being populated at all.
+
+Also, the NVD API Dependency-Check uses is indeed the NVD CVE API hosted under the `services.nvd.nist.gov` base URL, and Dependency-Check supports either direct NVD access, proxy settings, or an alternate mirrored feed via `--nvdDatafeed`. It also supports proxy flags like `--proxyserver` and `--proxyport`. ([NVD][1])
+
+So the issue is now:
+
+* **not Java version**
+* **not the local CLI itself**
+* **not the variable group**
+* **DNS / network / proxy access from Java to NVD**
+
+Run these on your PC first:
+
+```powershell
+Resolve-DnsName services.nvd.nist.gov
+nslookup services.nvd.nist.gov
+Test-NetConnection services.nvd.nist.gov -Port 443
+```
+
+If `Resolve-DnsName` or `nslookup` fails, it is a machine/network DNS issue.
+If DNS works but Dependency-Check still fails, it is usually a **proxy** issue for Java.
+
+Use one of these paths.
+
+### Path 1: your company requires a proxy
+
+Add proxy settings to the update command, because Dependency-Check supports them directly. ([dependency-check.github.io][2])
+
+Example:
+
+```powershell
 $jdkHome = 'D:\Java\jdk-21.0.10'
 $dcBat   = 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
 $dataDir = 'C:\Tools\dependency-check-data'
 $logFile = 'C:\Tools\dependency-check-data\odc-update.log'
+$nvdApiKey = 'YOUR_REAL_NVD_API_KEY'
 
-# Put your real NVD API key here for local use,
-# or replace this with a safer method if you prefer.
-$nvdApiKey = 'PASTE_YOUR_NVD_API_KEY_HERE'
-
-# ===== JAVA OVERRIDE FOR THIS POWERSHELL SESSION ONLY =====
 $env:JAVA_HOME = $jdkHome
 $env:PATH = "$jdkHome\bin;$env:PATH"
 
-# ===== BASIC CHECKS =====
-if (-not (Test-Path $dcBat)) {
-    throw "Dependency-Check CLI not found at: $dcBat"
-}
-
-if (-not (Test-Path $dataDir)) {
-    New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
-}
-
-Write-Host "JAVA_HOME = $env:JAVA_HOME"
-Write-Host "Using java:"
-Get-Command java | Select-Object Source
-java -version
-
-# ===== UPDATE LOCAL DATABASE =====
 & $dcBat `
   --updateonly `
   --data "$dataDir" `
   --nvdApiKey "$nvdApiKey" `
+  --proxyserver "YOUR_PROXY_HOST" `
+  --proxyport 8080 `
   --disableKnownExploited `
   --disableHostedSuppressions `
   --disableRetireJS `
   --disableVersionCheck `
   --log "$logFile"
+```
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Dependency-Check update failed. Last log lines:"
-    if (Test-Path $logFile) {
-        Get-Content $logFile -Tail 200
-    }
-    exit $LASTEXITCODE
-}
+If your proxy needs auth, Dependency-Check also supports proxy user/password options. ([dependency-check.github.io][2])
 
-Write-Host "Dependency-Check data update completed."
-Write-Host "Data folder: $dataDir"
-JAVA_HOME = D:\Java\jdk-21.0.10
-Using java:
+### Path 2: direct internet is blocked but you can use a mirror
 
-Source                          
-------                          
-D:\Java\jdk-21.0.10\bin\java.exe
-java : java version "21.0.10" 2026-01-20 LTS
-At line:27 char:1
-+ java -version
-+ ~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (java version "21.0.10" 2026-01-20 LTS:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-Java(TM) SE Runtime Environment (build 21.0.10+8-LTS-217)
-Java HotSpot(TM) 64-Bit Server VM (build 21.0.10+8-LTS-217, mixed mode, sharing)
-[INFO] Checking for updates
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[ERROR] Error updating the NVD Data
-org.owasp.dependencycheck.data.update.exception.UpdateException: Error updating the NVD Data
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:387)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.update(NvdApiDataSource.java:128)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:902)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:874)
-	at org.owasp.dependencycheck.App.runUpdateOnly(App.java:449)
-	at org.owasp.dependencycheck.App.run(App.java:178)
-	at org.owasp.dependencycheck.App.main(App.java:93)
-Caused by: io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryExceededException: NVD Update Failed: attempted to retrieve data from the NVD unsuccessfully five 
-times.
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:361)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient.next(NvdCveClient.java:356)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:343)
-	... 6 common frames omitted
-[ERROR] Error updating the NVD Data
-org.owasp.dependencycheck.data.update.exception.UpdateException: Error updating the NVD Data
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:387)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.update(NvdApiDataSource.java:128)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:902)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:874)
-	at org.owasp.dependencycheck.App.runUpdateOnly(App.java:449)
-	at org.owasp.dependencycheck.App.run(App.java:178)
-	at org.owasp.dependencycheck.App.main(App.java:93)
-Caused by: io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryExceededException: NVD Update Failed: attempted to retrieve data from the NVD unsuccessfully five 
-times.
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:361)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient.next(NvdCveClient.java:356)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:343)
-	... 6 common frames omitted
-Dependency-Check update failed. Last log lines:
-2026-04-02 11:25:44,660 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:91
-WARN  - NVD API request failures are occurring; retrying request for the 26th time
-2026-04-02 11:25:44,660 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:93
-DEBUG - NVD API request failures with exception : java.net.UnknownHostException. Message: services.nvd.nist.gov
-2026-04-02 11:25:44,660 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:91
-WARN  - NVD API request failures are occurring; retrying request for the 27th time
-2026-04-02 11:25:44,660 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:93
-DEBUG - NVD API request failures with exception : java.net.UnknownHostException. Message: services.nvd.nist.gov
-2026-04-02 11:25:44,660 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:91
-WARN  - NVD API request failures are occurring; retrying request for the 28th time
-2026-04-02 11:25:44,661 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:93
-DEBUG - NVD API request failures with exception : java.net.UnknownHostException. Message: services.nvd.nist.gov
-2026-04-02 11:25:44,661 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:91
-WARN  - NVD API request failures are occurring; retrying request for the 29th time
-2026-04-02 11:25:44,661 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:93
-DEBUG - NVD API request failures with exception : java.net.UnknownHostException. Message: services.nvd.nist.gov
-2026-04-02 11:25:44,661 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:91
-WARN  - NVD API request failures are occurring; retrying request for the 30th time
-2026-04-02 11:25:44,661 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:93
-DEBUG - NVD API request failures with exception : java.net.UnknownHostException. Message: services.nvd.nist.gov
-2026-04-02 11:25:44,661 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:91
-WARN  - NVD API request failures are occurring; retrying request for the 31st time
-2026-04-02 11:25:44,661 io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryStrategy:93
-DEBUG - NVD API request failures with exception : java.net.UnknownHostException. Message: services.nvd.nist.gov
-2026-04-02 11:25:44,661 io.github.jeremylong.openvulnerability.client.nvd.RateLimitedClient$SimpleFutureResponse:353
-DEBUG - request failed
-java.net.UnknownHostException: services.nvd.nist.gov
-	at java.base/java.net.InetAddress$CachedLookup.get(InetAddress.java:988)
-	at java.base/java.net.InetAddress.getAllByName0(InetAddress.java:1818)
-	at java.base/java.net.InetAddress.getAllByName(InetAddress.java:1688)
-	at org.apache.hc.client5.http.SystemDefaultDnsResolver.resolve(SystemDefaultDnsResolver.java:61)
-	at org.apache.hc.client5.http.DnsResolver.resolve(DnsResolver.java:77)
-	at org.apache.hc.client5.http.impl.nio.MultihomeIOSessionRequester.connect(MultihomeIOSessionRequester.java:113)
-	at org.apache.hc.client5.http.impl.nio.DefaultAsyncClientConnectionOperator.connect(DefaultAsyncClientConnectionOperator.java:123)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager.connect(PoolingAsyncClientConnectionManager.java:459)
-	at org.apache.hc.client5.http.impl.async.InternalHttpAsyncExecRuntime.connectEndpoint(InternalHttpAsyncExecRuntime.java:226)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec.doProceedToNextHop(AsyncConnectExec.java:222)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec.proceedToNextHop(AsyncConnectExec.java:197)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec.access$000(AsyncConnectExec.java:92)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec$1.completed(AsyncConnectExec.java:164)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec$1.completed(AsyncConnectExec.java:153)
-	at org.apache.hc.client5.http.impl.async.InternalHttpAsyncExecRuntime$1.completed(InternalHttpAsyncExecRuntime.java:128)
-	at org.apache.hc.client5.http.impl.async.InternalHttpAsyncExecRuntime$1.completed(InternalHttpAsyncExecRuntime.java:120)
-	at org.apache.hc.core5.concurrent.BasicFuture.completed(BasicFuture.java:148)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager$3$1.leaseCompleted(PoolingAsyncClientConnectionManager.java:342)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager$3$1.completed(PoolingAsyncClientConnectionManager.java:324)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager$3$1.completed(PoolingAsyncClientConnectionManager.java:289)
-	at org.apache.hc.core5.concurrent.BasicFuture.completed(BasicFuture.java:148)
-	at org.apache.hc.core5.pool.StrictConnPool.fireCallbacks(StrictConnPool.java:401)
-	at org.apache.hc.core5.pool.StrictConnPool.lease(StrictConnPool.java:219)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager$3.<init>(PoolingAsyncClientConnectionManager.java:286)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager.lease(PoolingAsyncClientConnectionManager.java:281)
-	at org.apache.hc.client5.http.impl.async.InternalHttpAsyncExecRuntime.acquireEndpoint(InternalHttpAsyncExecRuntime.java:115)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec.execute(AsyncConnectExec.java:152)
-	at org.apache.hc.client5.http.impl.async.AsyncExecChainElement.execute(AsyncExecChainElement.java:54)
-	at org.apache.hc.client5.http.impl.async.AsyncProtocolExec.internalExecute(AsyncProtocolExec.java:209)
-	at org.apache.hc.client5.http.impl.async.AsyncProtocolExec.execute(AsyncProtocolExec.java:174)
-	at org.apache.hc.client5.http.impl.async.AsyncExecChainElement.execute(AsyncExecChainElement.java:54)
-	at org.apache.hc.client5.http.impl.async.AsyncHttpRequestRetryExec.internalExecute(AsyncHttpRequestRetryExec.java:114)
-	at org.apache.hc.client5.http.impl.async.AsyncHttpRequestRetryExec.execute(AsyncHttpRequestRetryExec.java:219)
-	at org.apache.hc.client5.http.impl.async.AsyncHttpRequestRetryExec$1.lambda$failed$1(AsyncHttpRequestRetryExec.java:197)
-	at org.apache.hc.client5.http.impl.async.InternalAbstractHttpAsyncClient$ScheduledRequestExecution.run(InternalAbstractHttpAsyncClient.java:434)
-	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
-	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
-	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304)
-	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
-	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
-	at java.base/java.lang.Thread.run(Thread.java:1583)
-2026-04-02 11:25:45,153 io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient:454
-DEBUG - Error retrieving the NVD data
-java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.net.UnknownHostException: services.nvd.nist.gov
-	at java.base/java.util.concurrent.FutureTask.report(FutureTask.java:122)
-	at java.base/java.util.concurrent.FutureTask.get(FutureTask.java:191)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient.getCompletedFuture(NvdCveClient.java:519)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:370)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient.next(NvdCveClient.java:356)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:343)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.update(NvdApiDataSource.java:128)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:902)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:874)
-	at org.owasp.dependencycheck.App.runUpdateOnly(App.java:449)
-	at org.owasp.dependencycheck.App.run(App.java:178)
-	at org.owasp.dependencycheck.App.main(App.java:93)
-Caused by: java.util.concurrent.ExecutionException: java.net.UnknownHostException: services.nvd.nist.gov
-	at org.apache.hc.core5.concurrent.BasicFuture.getResult(BasicFuture.java:84)
-	at org.apache.hc.core5.concurrent.BasicFuture.get(BasicFuture.java:99)
-	at io.github.jeremylong.openvulnerability.client.nvd.RateLimitedClient.delayedExecute(RateLimitedClient.java:327)
-	at io.github.jeremylong.openvulnerability.client.nvd.RateLimitedClient.lambda$execute$1(RateLimitedClient.java:278)
-	at io.github.jeremylong.openvulnerability.client.nvd.RateLimitedClient$PrioritizedCallable.call(RateLimitedClient.java:404)
-	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
-	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
-	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
-	at java.base/java.lang.Thread.run(Thread.java:1583)
-Caused by: java.net.UnknownHostException: services.nvd.nist.gov
-	at java.base/java.net.InetAddress$CachedLookup.get(InetAddress.java:988)
-	at java.base/java.net.InetAddress.getAllByName0(InetAddress.java:1818)
-	at java.base/java.net.InetAddress.getAllByName(InetAddress.java:1688)
-	at org.apache.hc.client5.http.SystemDefaultDnsResolver.resolve(SystemDefaultDnsResolver.java:61)
-	at org.apache.hc.client5.http.DnsResolver.resolve(DnsResolver.java:77)
-	at org.apache.hc.client5.http.impl.nio.MultihomeIOSessionRequester.connect(MultihomeIOSessionRequester.java:113)
-	at org.apache.hc.client5.http.impl.nio.DefaultAsyncClientConnectionOperator.connect(DefaultAsyncClientConnectionOperator.java:123)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager.connect(PoolingAsyncClientConnectionManager.java:459)
-	at org.apache.hc.client5.http.impl.async.InternalHttpAsyncExecRuntime.connectEndpoint(InternalHttpAsyncExecRuntime.java:226)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec.doProceedToNextHop(AsyncConnectExec.java:222)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec.proceedToNextHop(AsyncConnectExec.java:197)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec.access$000(AsyncConnectExec.java:92)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec$1.completed(AsyncConnectExec.java:164)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec$1.completed(AsyncConnectExec.java:153)
-	at org.apache.hc.client5.http.impl.async.InternalHttpAsyncExecRuntime$1.completed(InternalHttpAsyncExecRuntime.java:128)
-	at org.apache.hc.client5.http.impl.async.InternalHttpAsyncExecRuntime$1.completed(InternalHttpAsyncExecRuntime.java:120)
-	at org.apache.hc.core5.concurrent.BasicFuture.completed(BasicFuture.java:148)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager$3$1.leaseCompleted(PoolingAsyncClientConnectionManager.java:342)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager$3$1.completed(PoolingAsyncClientConnectionManager.java:324)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager$3$1.completed(PoolingAsyncClientConnectionManager.java:289)
-	at org.apache.hc.core5.concurrent.BasicFuture.completed(BasicFuture.java:148)
-	at org.apache.hc.core5.pool.StrictConnPool.fireCallbacks(StrictConnPool.java:401)
-	at org.apache.hc.core5.pool.StrictConnPool.lease(StrictConnPool.java:219)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager$3.<init>(PoolingAsyncClientConnectionManager.java:286)
-	at org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager.lease(PoolingAsyncClientConnectionManager.java:281)
-	at org.apache.hc.client5.http.impl.async.InternalHttpAsyncExecRuntime.acquireEndpoint(InternalHttpAsyncExecRuntime.java:115)
-	at org.apache.hc.client5.http.impl.async.AsyncConnectExec.execute(AsyncConnectExec.java:152)
-	at org.apache.hc.client5.http.impl.async.AsyncExecChainElement.execute(AsyncExecChainElement.java:54)
-	at org.apache.hc.client5.http.impl.async.AsyncProtocolExec.internalExecute(AsyncProtocolExec.java:209)
-	at org.apache.hc.client5.http.impl.async.AsyncProtocolExec.execute(AsyncProtocolExec.java:174)
-	at org.apache.hc.client5.http.impl.async.AsyncExecChainElement.execute(AsyncExecChainElement.java:54)
-	at org.apache.hc.client5.http.impl.async.AsyncHttpRequestRetryExec.internalExecute(AsyncHttpRequestRetryExec.java:114)
-	at org.apache.hc.client5.http.impl.async.AsyncHttpRequestRetryExec.execute(AsyncHttpRequestRetryExec.java:219)
-	at org.apache.hc.client5.http.impl.async.AsyncHttpRequestRetryExec$1.lambda$failed$1(AsyncHttpRequestRetryExec.java:197)
-	at org.apache.hc.client5.http.impl.async.InternalAbstractHttpAsyncClient$ScheduledRequestExecution.run(InternalAbstractHttpAsyncClient.java:434)
-	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572)
-	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
-	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304)
-	... 3 common frames omitted
-2026-04-02 11:25:45,155 org.owasp.dependencycheck.Engine:905
-ERROR - Error updating the NVD Data
-org.owasp.dependencycheck.data.update.exception.UpdateException: Error updating the NVD Data
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:387)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.update(NvdApiDataSource.java:128)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:902)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:874)
-	at org.owasp.dependencycheck.App.runUpdateOnly(App.java:449)
-	at org.owasp.dependencycheck.App.run(App.java:178)
-	at org.owasp.dependencycheck.App.main(App.java:93)
-Caused by: io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryExceededException: NVD Update Failed: attempted to retrieve data from the NVD unsuccessfully five 
-times.
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:361)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient.next(NvdCveClient.java:356)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:343)
-	... 6 common frames omitted
-2026-04-02 11:25:45,157 org.owasp.dependencycheck.utils.Settings:1288
-DEBUG - Settings.getDataFile() - file: 'C:\Tools\dependency-check-data'
-2026-04-02 11:25:45,157 org.owasp.dependencycheck.utils.Settings:1288
-DEBUG - Settings.getDataFile() - file: 'C:\Tools\dependency-check-data'
-2026-04-02 11:25:45,158 org.owasp.dependencycheck.data.nvdcve.CveDB:312
-DEBUG - Closing database
-2026-04-02 11:25:45,158 org.owasp.dependencycheck.data.nvdcve.CveDB:314
-DEBUG - Cache cleared
-2026-04-02 11:25:45,172 org.owasp.dependencycheck.data.nvdcve.CveDB:317
-DEBUG - Connection closed
-2026-04-02 11:25:45,173 org.owasp.dependencycheck.data.nvdcve.CveDB:323
-DEBUG - Resources released
-2026-04-02 11:25:45,173 org.owasp.dependencycheck.data.nvdcve.DriverLoader:57
-DEBUG - Begin deregister driver
-2026-04-02 11:25:45,173 org.owasp.dependencycheck.data.nvdcve.DriverLoader:59
-DEBUG - End deregister driver
-2026-04-02 11:25:45,175 org.owasp.dependencycheck.utils.WriteLock:240
-DEBUG - Lock released (main) 7940fd1d396aab44a19edb88f05ff957 @ 2026-04-02 11:25:45.175
-2026-04-02 11:25:45,179 org.owasp.dependencycheck.App:180
-ERROR - Error updating the NVD Data
-org.owasp.dependencycheck.data.update.exception.UpdateException: Error updating the NVD Data
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:387)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.update(NvdApiDataSource.java:128)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:902)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:874)
-	at org.owasp.dependencycheck.App.runUpdateOnly(App.java:449)
-	at org.owasp.dependencycheck.App.run(App.java:178)
-	at org.owasp.dependencycheck.App.main(App.java:93)
-Caused by: io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryExceededException: NVD Update Failed: attempted to retrieve data from the NVD unsuccessfully five 
-times.
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:361)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient.next(NvdCveClient.java:356)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:343)
-	... 6 common frames omitted
-2026-04-02 11:25:45,180 org.owasp.dependencycheck.App:94
-DEBUG - Exit code: 8
+Use an internal mirrored NVD feed with `--nvdDatafeed`, which Dependency-Check explicitly supports. ([dependency-check.github.io][2])
+
+### Path 3: easiest operational workaround
+
+Populate the cache on **another machine that can resolve and reach** `services.nvd.nist.gov`, then copy the whole populated `data` folder to the build agent and keep your pipeline on `--noupdate`.
+
+One more thing: in the script you ran, the example still shows:
+
+```powershell
+$nvdApiKey = 'PASTE_YOUR_NVD_API_KEY_HERE'
+```
+
+in the pasted output . That should be replaced with a real key, but that is **not** the main error here. An invalid or missing key would usually lead to API/auth/rate-limit problems, while your current failure is clearly hostname resolution for `services.nvd.nist.gov` .
+
+The next best step is to run those three DNS/network commands and tell me which one fails.
+
+[1]: https://nvd.nist.gov/developers/vulnerabilities?utm_source=chatgpt.com "Vulnerability APIs - NVD"
+[2]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html?utm_source=chatgpt.com "Command Line Arguments – dependency-check-cli"
