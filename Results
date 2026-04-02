@@ -1,75 +1,257 @@
-The update is failing because your PC cannot resolve the NVD host **`services.nvd.nist.gov`** from the Java process running Dependency-Check. Your log shows repeated `UnknownHostException: services.nvd.nist.gov`, followed by `NVD Update Failed` and `Error updating the NVD Data`  . That means the local database is **not** being populated at all.
+build-angular-webapp.yml
 
-Also, the NVD API Dependency-Check uses is indeed the NVD CVE API hosted under the `services.nvd.nist.gov` base URL, and Dependency-Check supports either direct NVD access, proxy settings, or an alternate mirrored feed via `--nvdDatafeed`. It also supports proxy flags like `--proxyserver` and `--proxyport`. ([NVD][1])
+parameters:
+- name: jobName
+  type: string
+  default: 'BuildAngular'
 
-So the issue is now:
+- name: jobDisplayName
+  type: string
+  default: 'Build (Angular)'
 
-* **not Java version**
-* **not the local CLI itself**
-* **not the variable group**
-* **DNS / network / proxy access from Java to NVD**
+- name: buildPool
+  type: string
 
-Run these on your PC first:
+- name: buildAgentName
+  type: string
 
-```powershell
-Resolve-DnsName services.nvd.nist.gov
-nslookup services.nvd.nist.gov
-Test-NetConnection services.nvd.nist.gov -Port 443
-```
+# Where your Angular project lives relative to repo root
+- name: workingDirectory
+  type: string
+  default: '.'
 
-If `Resolve-DnsName` or `nslookup` fails, it is a machine/network DNS issue.
-If DNS works but Dependency-Check still fails, it is usually a **proxy** issue for Java.
+# Node version to use (must exist on server or be installed)
+- name: nodeVersion
+  type: string
+  default: '22.x'
 
-Use one of these paths.
+# install command
+- name: installCommand
+  type: string
+  default: 'ci'   # npm install
 
-### Path 1: your company requires a proxy
+# whether to run tests
+- name: runTests
+  type: boolean
+  default: false
 
-Add proxy settings to the update command, because Dependency-Check supports them directly. ([dependency-check.github.io][2])
+# test command (customizable)
+- name: testCommand
+  type: string
+  default: 'test -- --watch=false --browsers=ChromeHeadless'
 
-Example:
+# build configuration / command
+- name: buildCommand
+  type: string
+  default: 'npx ng build'
 
-```powershell
-$jdkHome = 'D:\Java\jdk-21.0.10'
-$dcBat   = 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-$dataDir = 'C:\Tools\dependency-check-data'
-$logFile = 'C:\Tools\dependency-check-data\odc-update.log'
-$nvdApiKey = 'YOUR_REAL_NVD_API_KEY'
+# Angular dist folder (relative to workingDirectory)
+# Example: 'dist/my-app'
+- name: distFolder
+  type: string
 
-$env:JAVA_HOME = $jdkHome
-$env:PATH = "$jdkHome\bin;$env:PATH"
+# Zip file name produced as artifact
+- name: zipName
+  type: string
+  default: 'AngularApp.zip'
 
-& $dcBat `
-  --updateonly `
-  --data "$dataDir" `
-  --nvdApiKey "$nvdApiKey" `
-  --proxyserver "YOUR_PROXY_HOST" `
-  --proxyport 8080 `
-  --disableKnownExploited `
-  --disableHostedSuppressions `
-  --disableRetireJS `
-  --disableVersionCheck `
-  --log "$logFile"
-```
+- name: artifactName
+  type: string
+  default: 'drop'
 
-If your proxy needs auth, Dependency-Check also supports proxy user/password options. ([dependency-check.github.io][2])
+# Where to stage files before zipping
+- name: publishOutputFolder
+  type: string
+  default: '$(Build.ArtifactStagingDirectory)\publish'
 
-### Path 2: direct internet is blocked but you can use a mirror
+# OWASP Security Check
+- name: runDependencyCheck
+  type: boolean
+  default: false
 
-Use an internal mirrored NVD feed with `--nvdDatafeed`, which Dependency-Check explicitly supports. ([dependency-check.github.io][2])
+- name: dependencyCheckCliPath
+  type: string
+  default: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
 
-### Path 3: easiest operational workaround
+- name: dependencyCheckDataPath
+  type: string
+  default: 'C:\Tools\dependency-check-data'
 
-Populate the cache on **another machine that can resolve and reach** `services.nvd.nist.gov`, then copy the whole populated `data` folder to the build agent and keep your pipeline on `--noupdate`.
+- name: dependencyCheckProjectName
+  type: string
+  default: '$(Build.Repository.Name)'
 
-One more thing: in the script you ran, the example still shows:
+- name: dependencyCheckAdditionalArguments
+  type: string
+  default: ''
 
-```powershell
-$nvdApiKey = 'PASTE_YOUR_NVD_API_KEY_HERE'
-```
+jobs:
+- job: ${{ parameters.jobName }}
+  displayName: ${{ parameters.jobDisplayName }}
 
-in the pasted output . That should be replaced with a real key, but that is **not** the main error here. An invalid or missing key would usually lead to API/auth/rate-limit problems, while your current failure is clearly hostname resolution for `services.nvd.nist.gov` .
+  pool:
+    name: ${{ parameters.buildPool }}
+    demands:
+    - Agent.Name -equals ${{ parameters.buildAgentName }}
 
-The next best step is to run those three DNS/network commands and tell me which one fails.
+  steps:
+  - checkout: self
+    clean: true
 
-[1]: https://nvd.nist.gov/developers/vulnerabilities?utm_source=chatgpt.com "Vulnerability APIs - NVD"
-[2]: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html?utm_source=chatgpt.com "Command Line Arguments – dependency-check-cli"
+  - powershell: |
+      Write-Host "Working directory: ${{ parameters.workingDirectory }}"
+      if (-not (Test-Path "${{ parameters.workingDirectory }}")) {
+        throw "Working directory not found: ${{ parameters.workingDirectory }}"
+      }
+    displayName: 'Validate working directory'
+
+  - script: |
+      whoami
+      npm config list -l
+      node -p "process.env.HTTP_PROXY"
+      node -p "process.env.HTTPS_PROXY"
+      nslookup registry.npmjs.org
+      npm ping --registry=https://registry.npmjs.org/
+    displayName: 'Diagnose npm network'
+
+  # Install dependencies
+  - script: |
+      npm ${{ parameters.installCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Install dependencies (npm)'
+  
+  # OWASP dependency check
+  - powershell: |
+      $dc = '${{ parameters.dependencyCheckCliPath }}'
+      $reportDir = '$(Build.ArtifactStagingDirectory)\dependency-check'
+      $scanPath = Join-Path '$(Build.SourcesDirectory)' '${{ parameters.workingDirectory }}'
+
+      if (-not (Test-Path $dc)) {
+        throw "Dependency-Check CLI not found at: $dc"
+      }
+
+      New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
+
+      & $dc `
+        --project "${{ parameters.dependencyCheckProjectName }}" `
+        --scan "$scanPath" `
+        --format "HTML" `
+        --format "JSON" `
+        --format "JUNIT" `
+        --out "$reportDir" `
+        --data "${{ parameters.dependencyCheckDataPath }}" `
+        --noupdate `
+        --disableKnownExploited `
+        --disableHostedSuppressions `
+        --disableYarnAudit `
+        --disablePnpmAudit `
+        --disableNodeAudit `
+        --disableRetireJS `
+        --disableVersionCheck `
+        ${{ parameters.dependencyCheckAdditionalArguments }}
+
+      if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+      }
+    displayName: 'OWASP Dependency Check (local CLI)'
+    condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    env:
+      NVD_API_KEY: $(NVD_API_KEY)
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Dependency Check JUnit'
+    condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**\*junit.xml'
+      searchFolder: '$(Build.ArtifactStagingDirectory)\dependency-check'
+      failTaskOnFailedTests: false
+
+  # Optional tests
+  - script: |
+      npm ${{ parameters.testCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Run tests'
+    condition: and(succeeded(), eq('${{ parameters.runTests }}', 'true'))
+    # If you use yarn/pnpm tests, switch this command accordingly.
+
+  # Build
+  - script: |
+      ${{ parameters.buildCommand }}
+    workingDirectory: ${{ parameters.workingDirectory }}
+    displayName: 'Build Angular'
+
+  # Copy dist output to staging folder (clean staging first)
+  - task: CopyFiles@2
+    displayName: 'Copy dist to staging folder'
+    inputs:
+      SourceFolder: '${{ parameters.workingDirectory }}\${{ parameters.distFolder }}'
+      Contents: '**'
+      TargetFolder: '${{ parameters.publishOutputFolder }}'
+      OverWrite: true
+
+  # Zip staged files (no nested dist folder in zip)
+  - task: ArchiveFiles@2
+    displayName: 'Zip dist output'
+    inputs:
+      rootFolderOrFile: '${{ parameters.publishOutputFolder }}'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      replaceExistingArchive: true
+
+  # Publish artifact (on-prem compatible)
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Build Artifact'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)\${{ parameters.zipName }}'
+      ArtifactName: '${{ parameters.artifactName }}'
+      publishLocation: 'Container'
+
+BUILD - FRONT - Alterna Telecom:
+name: ATC_FRONT_$(SourceBranchName)_rc$(Rev:r)
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - release/*
+  paths:
+    exclude:
+      - '*.yml'
+
+pr: none
+
+variables:
+- group: OWASP_SECRETS
+
+stages:
+- stage: Build_Frontend
+  displayName: 'Build Angular & Publish Artifact'
+  jobs:
+  - template: pipelines/build-angular-webapp.yml@templates
+    parameters:
+      jobName: 'BuildFrontend'
+      jobDisplayName: 'Build Alterna Telecom Frontend'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      workingDirectory: '.'
+      nodeVersion: '22.x'
+      installCommand: 'ci'
+      runTests: false
+      buildCommand: 'npx ng build'
+      distFolder: 'dist/Telecom/browser'
+      zipName: 'Alterna-Telecom-Frontend.zip'
+      artifactName: 'alterna-telecom-front-drop'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish'
+      runDependencyCheck: true
+      dependencyCheckProjectName: 'Alterna-Telecom-Frontend'
+      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
+      dependencyCheckAdditionalArguments: ''
