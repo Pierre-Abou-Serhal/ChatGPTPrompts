@@ -1,2 +1,192 @@
+The problem is **not the group itself** first. It is **how you reference it**.
 
-There was a resource authorization issue: "The pipeline is not valid. Job DeployAPI: Variable group $(apiVariableGroup) could not be found. The variable group does not exist or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz Job DeployMVC: Variable group $(mvcVariableGroup) could not be found. The variable group does not exist or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz"
+Azure DevOps is seeing this:
+
+```yaml
+variableGroup: '$(apiVariableGroup)'
+```
+
+as a **runtime macro**, but variable groups are a **resource** that must be resolved and authorized **before runtime**. Parameters are available during **template parsing**, while macro variables like `$(...)` are processed later at runtime. That is why Azure DevOps tries to find a group literally named `$(apiVariableGroup)` and fails. ([Microsoft Learn][1])
+
+## Why this fails
+
+You used runtime variables like:
+
+```yaml
+variableGroup: '$(apiVariableGroup)'
+variableGroup: '$(mvcVariableGroup)'
+```
+
+But resource authorization for variable groups happens before the job runs, so Azure DevOps needs the **actual group name** at compile time, not a runtime macro. Parameters and template expressions (`${{ }}`) are resolved during template parsing; `$(...)` is not. ([Microsoft Learn][1])
+
+## Fix
+
+Use **compile-time conditionals** where you call `deploy-iis.yml`.
+
+Replace this:
+
+```yaml
+variableGroup: '$(apiVariableGroup)'
+```
+
+with this:
+
+```yaml
+${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+  variableGroup: 'SIT_API_VARIABLE_GROUP'
+${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+  variableGroup: 'UAT_API_VARIABLE_GROUP'
+${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+  variableGroup: 'PROD_API_VARIABLE_GROUP'
+```
+
+And replace this:
+
+```yaml
+variableGroup: '$(mvcVariableGroup)'
+```
+
+with this:
+
+```yaml
+${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+  variableGroup: 'SIT_MVC_VARIABLE_GROUP'
+${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+  variableGroup: 'UAT_MVC_VARIABLE_GROUP'
+${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+  variableGroup: 'PROD_MVC_VARIABLE_GROUP'
+```
+
+## Your corrected API deploy block
+
+Use this shape:
+
+```yaml
+- template: pipelines/deploy-iis.yml@templates
+  parameters:
+    jobDependsOn: []
+    jobCondition: succeeded()
+    deploymentName: 'DeployAPI'
+    deploymentDisplayName: 'Deploy API to ${{ parameters.targetEnvironment }} (IIS)'
+    environmentName: '${{ parameters.targetEnvironment }}'
+    deployPool: '$(deploymentPool)'
+    deployAgentName: '$(apiAgentName)'
+    ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+      variableGroup: 'SIT_API_VARIABLE_GROUP'
+    ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+      variableGroup: 'UAT_API_VARIABLE_GROUP'
+    ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+      variableGroup: 'PROD_API_VARIABLE_GROUP'
+    componentName: 'API'
+    artifactName: '$(apiArtifactName)'
+    artifactBuildType: 'specific'
+    artifactProject: '$(System.TeamProject)'
+    artifactDefinitionId: '$(ApiPipelineDefinitionId)'
+    artifactBuildId: '$(ApiBuildId)'
+    artifactBranch: '$(ApiSourceBranch)'
+    zipName: '$(apiZipName)'
+    siteName: '$(apiSiteName)'
+    appPoolName: '$(apiAppPoolName)'
+    iisTargetPath: '$(apiTargetPath)'
+    cleanTargetBeforeCopy: true
+    cleanExcludeCsv: ''
+    enableJsonTransform: false
+    jsonFiles: ''
+    enableXmlConfigTransform: true
+    xmlConfigFiles:
+    - '**/Web.config'
+    xmlVariableValues:
+      BaseUrl: $(BaseUrl)
+      BrefBaseUrl: $(BrefBaseUrl)
+      CONN_STRING: $(CONN_STRING)
+      SMSUrl: $(SMSUrl)
+    enableCustomXmlEdits: false
+    customXmlEdits: []
+    enableHealthCheck: true
+    healthCheckUrl: '$(apiHealthCheckUrl)'
+    healthCheckExpectedStatusCode: '200'
+    healthCheckRetries: 6
+    healthCheckDelaySeconds: 10
+    enableRollbackOnHealthCheckFailure: true
+    enableLocalBackup: true
+    backupRoot: '$(backupRoot)'
+    backupPath: '$(backupRoot)\API\$(Build.BuildId)'
+```
+
+## Your corrected MVC deploy block
+
+```yaml
+- template: pipelines/deploy-iis.yml@templates
+  parameters:
+    ${{ if eq(parameters.deployApi, true) }}:
+      jobDependsOn:
+      - DeployAPI
+    ${{ if eq(parameters.deployApi, false) }}:
+      jobDependsOn: []
+    jobCondition: succeeded()
+    deploymentName: 'DeployMVC'
+    deploymentDisplayName: 'Deploy MVC to ${{ parameters.targetEnvironment }} (IIS)'
+    environmentName: '${{ parameters.targetEnvironment }}'
+    deployPool: '$(deploymentPool)'
+    deployAgentName: '$(mvcAgentName)'
+    ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+      variableGroup: 'SIT_MVC_VARIABLE_GROUP'
+    ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+      variableGroup: 'UAT_MVC_VARIABLE_GROUP'
+    ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+      variableGroup: 'PROD_MVC_VARIABLE_GROUP'
+    componentName: 'MVC'
+    artifactName: '$(mvcArtifactName)'
+    artifactBuildType: 'specific'
+    artifactProject: '$(System.TeamProject)'
+    artifactDefinitionId: '$(MvcPipelineDefinitionId)'
+    artifactBuildId: '$(MvcBuildId)'
+    artifactBranch: '$(MvcSourceBranch)'
+    zipName: '$(mvcZipName)'
+    siteName: '$(mvcSiteName)'
+    appPoolName: '$(mvcAppPoolName)'
+    iisTargetPath: '$(mvcTargetPath)'
+    cleanTargetBeforeCopy: true
+    cleanExcludeCsv: ''
+    enableJsonTransform: false
+    jsonFiles: ''
+    enableXmlConfigTransform: true
+    xmlConfigFiles:
+    - '**/Web.config'
+    xmlVariableValues:
+      BaseUrl: $(BaseUrl)
+      BaseUrlOsb: $(BaseUrlOsb)
+      CDN_IP_LINK: $(CDN_IP_LINK)
+      DASHBOARD_LINK: $(DASHBOARD_LINK)
+      GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
+      GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
+      LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
+      UploadFilesPath: $(UploadFilesPath)
+      USER_GUIDE_LINK: $(USER_GUIDE_LINK)
+    enableCustomXmlEdits: false
+    customXmlEdits: []
+    enableHealthCheck: true
+    healthCheckUrl: '$(mvcHealthCheckUrl)'
+    healthCheckExpectedStatusCode: '200'
+    healthCheckRetries: 6
+    healthCheckDelaySeconds: 10
+    enableRollbackOnHealthCheckFailure: true
+    enableLocalBackup: true
+    backupRoot: '$(backupRoot)'
+    backupPath: '$(backupRoot)\MVC\$(Build.BuildId)'
+```
+
+## After that
+
+If the groups really exist, you may still need to **authorize** them for this pipeline in Library. Azure DevOps variable groups are protected resources and may need explicit pipeline authorization. ([Microsoft Learn][2])
+
+So the real fix is:
+
+1. stop using `$(apiVariableGroup)` / `$(mvcVariableGroup)` for template parameter `variableGroup`
+2. pass the group name with **`${{ if ... }}`**
+3. authorize those groups once in Azure DevOps Library if prompted
+
+If you want, I can rewrite your **full ACM release pipeline** with this fix already applied.
+
+[1]: https://learn.microsoft.com/en-us/azure/devops/pipelines/process/runtime-parameters?view=azure-devops&utm_source=chatgpt.com "Use runtime and type-safe parameters - Azure Pipelines"
+[2]: https://learn.microsoft.com/en-us/azure/devops/pipelines/library/variable-groups?view=azure-devops&utm_source=chatgpt.com "Manage variable groups - Azure Pipelines"
