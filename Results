@@ -1,3 +1,5 @@
+ 16d47f4a-18eb-4804-a3fa-72c6af029e3f
+
 Yes — your understanding is correct.
 
 With the **local CLI + `--noupdate`**, Dependency-Check only reads its **local `data` directory**. If that directory has not been populated yet, the scan fails with errors like **“No documents exist”** and **“Unable to continue dependency-check analysis.”** OWASP’s docs say the `data` directory holds the local H2 vulnerability database, and `--noupdate` disables automatic updates of NVD, hosted suppressions, and RetireJS. ([dependency-check.github.io][1])
