@@ -1,236 +1,44 @@
-Yes — for the other templates, I’d make them match your **Angular local-CLI pattern** and **remove the extension task**. Right now your Angular template already uses the local `dependency-check.bat` with `dependencyCheckCliPath`, `dependencyCheckDataPath`, `dependencyCheckProjectName`, and `dependencyCheckAdditionalArguments`, while your .NET Core and .NET Framework templates still use `dependency-check-build-task@6` and the old parameter set (`dependencyCheckScanPath`, `dependencyCheckFormats`, `dependencyCheckReportsDirectory`, `dependencyCheckFailOnCVSS`). 
+This is my BUILD - API - Alterna Telecom pipeline:
 
-Also, with the Angular template **as uploaded now**, opening only `services.nvd.nist.gov` is **not enough by itself** to change behavior, because the script currently maps `NVD_API_KEY` into `env` but never actually passes `--nvdApiKey "$env:NVD_API_KEY"` to Dependency-Check. So if you want **online updates**, add that flag. If you want **offline/cache-only mode**, keep a pre-populated `dependencyCheckDataPath` and add `--noupdate`. 
+name: ATC_API_$(SourceBranchName)_rc$(Rev:r)
 
-## What to change in `build-dotnet-core-webapi.yml`
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
 
-### 1) Replace the OWASP parameters
+trigger:
+  branches:
+    include:
+    - release/*
+  paths:
+    exclude:
+      - '*.yml'
+      - global.json
+      - nuget.config
 
-Remove these old ones:
+pr: none
 
-```yaml
-- name: dependencyCheckScanPath
-- name: dependencyCheckFormats
-- name: dependencyCheckReportsDirectory
-- name: dependencyCheckFailOnCVSS
-```
+stages:
+- stage: Build_API
+  displayName: 'Build API & Publish Artifact'
+  jobs:
+  - template: pipelines/build-dotnet-core-webapi.yml@templates
+    parameters:
+      jobName: 'BuildBackend'
+      jobDisplayName: 'Build Alterna Telecom Backend'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      buildConfiguration: 'Release'
+      restoreProjects: '**/*.csproj'
+      runTests: false
+      testProjects: ''
+      publishProject: 'Alterna-Telecom-Backend/Alterna-Telecom-Backend.csproj'
+      nugetConfigPath: 'nuget.config'
+      zipName: 'Alterna-Telecom-Backend.zip'
+      artifactName: 'alterna-telecom-api-drop'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-Telecom-Backend'
 
-Add these instead, matching Angular:
-
-```yaml
-- name: runDependencyCheck
-  type: boolean
-  default: false
-
-- name: dependencyCheckCliPath
-  type: string
-  default: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-
-- name: dependencyCheckDataPath
-  type: string
-  default: 'C:\Tools\dependency-check-data'
-
-- name: dependencyCheckProjectName
-  type: string
-  default: '$(Build.Repository.Name)'
-
-- name: dependencyCheckAdditionalArguments
-  type: string
-  default: ''
-```
-
-Your current .NET Core template still has the old extension-task parameter model. 
-
-### 2) Replace the OWASP step
-
-Delete this block:
-
-```yaml
-- task: dependency-check-build-task@6
-  displayName: 'OWASP Dependency Check'
-  condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-  continueOnError: true
-  inputs:
-    projectName: '${{ parameters.dependencyCheckProjectName }}'
-    scanPath: '${{ parameters.dependencyCheckScanPath }}'
-    format: '${{ parameters.dependencyCheckFormats }}'
-    reportsDirectory: '${{ parameters.dependencyCheckReportsDirectory }}'
-    failOnCVSS: '${{ parameters.dependencyCheckFailOnCVSS }}'
-    warnOnCVSSViolation: true
-    additionalArguments: '${{ parameters.dependencyCheckAdditionalArguments }}'
-```
-
-and replace it with this **after Restore and before Build**:
-
-```yaml id="sbwz1z"
-- powershell: |
-    $dc = '${{ parameters.dependencyCheckCliPath }}'
-    $reportDir = '$(Build.ArtifactStagingDirectory)\dependency-check'
-    $scanPath = '$(Build.SourcesDirectory)'
-
-    if (-not (Test-Path $dc)) {
-      throw "Dependency-Check CLI not found at: $dc"
-    }
-
-    New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
-
-    & $dc `
-      --project "${{ parameters.dependencyCheckProjectName }}" `
-      --scan "$scanPath" `
-      --format "HTML" `
-      --format "JSON" `
-      --format "JUNIT" `
-      --out "$reportDir" `
-      --data "${{ parameters.dependencyCheckDataPath }}" `
-      --nvdApiKey "$env:NVD_API_KEY" `
-      --disableKnownExploited `
-      --disableHostedSuppressions `
-      --disableRetireJS `
-      --disableVersionCheck `
-      ${{ parameters.dependencyCheckAdditionalArguments }}
-
-    if ($LASTEXITCODE -ne 0) {
-      exit $LASTEXITCODE
-    }
-  displayName: 'OWASP Dependency Check (local CLI)'
-  condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-  env:
-    NVD_API_KEY: $(NVD_API_KEY)
-```
-
-Then keep PublishTestResults, but make it match Angular:
-
-```yaml id="nqqglt"
-- task: PublishTestResults@2
-  displayName: 'Publish Dependency Check JUnit'
-  condition: and(always(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-  inputs:
-    testResultsFormat: 'JUnit'
-    testResultsFiles: '**\*junit.xml'
-    searchFolder: '$(Build.ArtifactStagingDirectory)\dependency-check'
-    failTaskOnFailedTests: false
-```
-
-## What to change in `build-dotnet-framework-webapi.yml`
-
-### 1) Replace the OWASP parameters
-
-Same change as .NET Core: use the Angular-style parameters and remove the old extension-task ones. Your current Framework template also still uses the old `dependency-check-build-task@6` model. 
-
-### 2) Replace the OWASP step
-
-Delete the current extension block and insert this **after NuGet Restore and before VSBuild Build Project**:
-
-```yaml id="ti9gbj"
-- powershell: |
-    $dc = '${{ parameters.dependencyCheckCliPath }}'
-    $reportDir = '$(Build.ArtifactStagingDirectory)\dependency-check'
-    $scanPath = '$(Build.SourcesDirectory)'
-
-    if (-not (Test-Path $dc)) {
-      throw "Dependency-Check CLI not found at: $dc"
-    }
-
-    New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
-
-    & $dc `
-      --project "${{ parameters.dependencyCheckProjectName }}" `
-      --scan "$scanPath" `
-      --format "HTML" `
-      --format "JSON" `
-      --format "JUNIT" `
-      --out "$reportDir" `
-      --data "${{ parameters.dependencyCheckDataPath }}" `
-      --nvdApiKey "$env:NVD_API_KEY" `
-      --disableKnownExploited `
-      --disableHostedSuppressions `
-      --disableRetireJS `
-      --disableVersionCheck `
-      ${{ parameters.dependencyCheckAdditionalArguments }}
-
-    if ($LASTEXITCODE -ne 0) {
-      exit $LASTEXITCODE
-    }
-  displayName: 'OWASP Dependency Check (local CLI)'
-  condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
-  env:
-    NVD_API_KEY: $(NVD_API_KEY)
-```
-
-And keep the same JUnit publish step as above.
-
-## Parent pipelines
-
-Your parent pipelines should follow the same pattern as the Angular build pipeline:
-
-```yaml
-variables:
-- group: OWASP_SECRETS
-```
-
-and pass the OWASP parameters to the template call. Your Angular parent pipeline already does that. 
-
-### Example parent call for .NET Core
-
-```yaml id="8hyf36"
-- template: pipelines/build-dotnet-core-webapi.yml@templates
-  parameters:
-    jobName: 'BuildApi'
-    jobDisplayName: 'Build API'
-    buildPool: 'Build Pool'
-    buildAgentName: 'UAT-ALTERNA-DK1'
-    publishProject: 'Your.Api/Your.Api.csproj'
-
-    runDependencyCheck: true
-    dependencyCheckProjectName: 'AlternaCardManagement-API'
-    dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-    dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-    dependencyCheckAdditionalArguments: ''
-```
-
-### Example parent call for .NET Framework
-
-```yaml id="dzforl"
-- template: pipelines/build-dotnet-framework-webapi.yml@templates
-  parameters:
-    jobName: 'BuildMvc'
-    jobDisplayName: 'Build MVC'
-    buildPool: 'Build Pool'
-    buildAgentName: 'UAT-ALTERNA-DK1'
-    buildProject: 'Your.Mvc/Your.Mvc.csproj'
-
-    runDependencyCheck: true
-    dependencyCheckProjectName: 'AlternaCardManagement-MVC'
-    dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-    dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-    dependencyCheckAdditionalArguments: ''
-```
-
-## About `services.nvd.nist.gov`
-
-If you want **online** updates from the pipeline, then yes, opening network flow to `services.nvd.nist.gov` is the key host, **but** you should also pass:
-
-```yaml
---nvdApiKey "$env:NVD_API_KEY"
-```
-
-in the command, which your uploaded Angular script does not currently do. 
-
-If you want **offline** mode instead, then:
-
-* keep using `dependencyCheckDataPath`
-* pre-populate that folder
-* add `--noupdate` to the command
-
-## Best choice
-
-Since you said you want the **same OWASP checks** as Angular, the cleanest move is:
-
-* use the **same local CLI pattern** in both .NET templates
-* stop using `dependency-check-build-task@6`
-* keep `OWASP_SECRETS` only in the **parent pipeline**
-* pass `--nvdApiKey "$env:NVD_API_KEY"` if you want live NVD updates
-
-The one thing I would change in your Angular template too is exactly that: add `--nvdApiKey "$env:NVD_API_KEY"` to the command, because right now the secret is injected but not used. 
-
-If you want, I’ll rewrite both full templates end-to-end so you can paste them directly.
+I want to update it so that it supports OWASP dependency checks
