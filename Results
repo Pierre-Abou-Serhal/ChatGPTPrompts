@@ -1,14 +1,3 @@
-Yes — and the good news is that your **ACM release pipeline is already close** to the Alterna Telecom pattern you want. The main gap is that ACM is still **SIT-only and hardcoded**, while Alterna Telecom is already **environment-driven**, resolves builds generically, carries source-branch metadata, and inserts a **DB preview** before approval.    
-
-## What to change in ACM
-
-Do **not** redesign everything. Keep your current ACM flow, but make these changes:
-
-### 1) Add `targetEnvironment`
-
-Change the top of the pipeline from SIT-only to:
-
-```yaml
 name: ACM_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
@@ -20,38 +9,53 @@ parameters:
   - UAT
   - PROD
   displayName: 'Target Environment'
-```
 
-Keep:
+- name: deployDatabase
+  type: boolean
+  default: false
+  displayName: 'Deploy Database'
 
-* `deployDatabase`
-* `deployMvc`
-* `deployApi`
-* `mvcBuildNumber`
-* `apiBuildNumber`
-* `dbBuildNumber`
+- name: deployMvc
+  type: boolean
+  default: false
+  displayName: 'Deploy MVC'
 
----
+- name: deployApi
+  type: boolean
+  default: false
+  displayName: 'Deploy API'
 
-### 2) Replace the hardcoded SIT variables block
+- name: mvcBuildNumber
+  type: string
+  default: '__EMPTY__'
+  displayName: 'MVC Build Number'
 
-Right now ACM hardcodes SIT pipeline names and uses only `SIT_API_VARIABLE_GROUP`. In the Alterna Telecom model, the environment block controls:
+- name: apiBuildNumber
+  type: string
+  default: '__EMPTY__'
+  displayName: 'API Build Number'
 
-* variable groups
-* pipeline names
-* agent names
-* approval text
-* backup root
-* health check URLs
-* deployment tags 
+- name: dbBuildNumber
+  type: string
+  default: '__EMPTY__'
+  displayName: 'Database Build Number'
 
-Use this ACM version:
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
 
-```yaml
+trigger: none
+pr: none
+
 variables:
 - name: deploymentPool
   value: 'Deployment Pool'
 
+# ACM builds are currently produced from sit builds, so the release pipeline
+# validates that the selected builds come from refs/heads/sit.
 - name: expectedSourceBranch
   value: 'refs/heads/sit'
 
@@ -91,119 +95,323 @@ variables:
 # SIT
 - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
   - group: SIT_API_VARIABLE_GROUP
+
   - name: environmentName
     value: 'SIT'
+
   - name: apiPipelineName
     value: 'BUILD - API - AlternaCardManagement'
+
   - name: mvcPipelineName
     value: 'BUILD - MVC - AlternaCardManagement'
+
   - name: dbPipelineName
     value: 'BUILD - DB - AlternaCardManagement'
+
   - name: resolveAgentName
     value: 'SIT-ALTERNA-BN1'
+
   - name: apiAgentName
     value: 'SIT-ALTERNA-BN1'
+
   - name: mvcAgentName
     value: 'SIT-ALTERNA-FN1'
+
   - name: dbAgentName
     value: 'SIT-ALTERNA-BN1'
+
   - name: approvalNotifyUsers
     value: 'SGBL\pabouserhal'
+
   - name: approvalInstructions
-    value: 'Approve SIT AlternaCardManagement deployment.'
+    value: 'Approve SIT Alterna Card Management deployment.'
+
+  - name: managementApprovalNotifyUsers
+    value: 'SGBL\kabbas'
+
+  - name: dbaApprovalNotifyUsers
+    value: 'SGBL\hkassab'
+
+  - name: apiVariableGroup
+    value: 'SIT_API_VARIABLE_GROUP'
+
+  - name: mvcVariableGroup
+    value: 'SIT_MVC_VARIABLE_GROUP'
+
   - name: apiHealthCheckUrl
     value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+
   - name: mvcHealthCheckUrl
     value: 'http://10.0.40.41:8046/'
+
   - name: backupRoot
     value: 'C:\DeployBackups\SIT\AlternaCardManagement'
 
 # UAT
 - ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
   - group: UAT_API_VARIABLE_GROUP
+
   - name: environmentName
     value: 'UAT'
+
   - name: apiPipelineName
     value: 'BUILD - API - AlternaCardManagement'
+
   - name: mvcPipelineName
     value: 'BUILD - MVC - AlternaCardManagement'
+
   - name: dbPipelineName
     value: 'BUILD - DB - AlternaCardManagement'
+
   - name: resolveAgentName
-    value: 'UAT-ALTERNA-BN1'
+    value: 'UAT-ALTERNA-BN1' # TODO verify
+
   - name: apiAgentName
-    value: 'UAT-ALTERNA-BN1'
+    value: 'UAT-ALTERNA-BN1' # TODO verify
+
   - name: mvcAgentName
-    value: 'UAT-ALTERNA-FN1'
+    value: 'UAT-ALTERNA-FN1' # TODO verify
+
   - name: dbAgentName
-    value: 'UAT-ALTERNA-BN1'
+    value: 'UAT-ALTERNA-BN1' # TODO verify
+
   - name: approvalNotifyUsers
-    value: 'SGBL\pabouserhal'
+    value: 'SGBL\pabouserhal' # TODO adjust if needed
+
   - name: approvalInstructions
-    value: 'Approve UAT AlternaCardManagement deployment.'
+    value: 'Approve UAT Alterna Card Management deployment.'
+
+  - name: managementApprovalNotifyUsers
+    value: 'SGBL\kabbas' # TODO adjust if needed
+
+  - name: dbaApprovalNotifyUsers
+    value: 'SGBL\hkassab' # TODO adjust if needed
+
+  - name: apiVariableGroup
+    value: 'UAT_API_VARIABLE_GROUP' # TODO verify
+
+  - name: mvcVariableGroup
+    value: 'UAT_MVC_VARIABLE_GROUP' # TODO verify
+
   - name: apiHealthCheckUrl
-    value: 'http://UAT-API-URL/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+    value: 'http://UAT-ACM-API-URL/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1' # TODO replace
+
   - name: mvcHealthCheckUrl
-    value: 'http://UAT-MVC-URL/'
+    value: 'http://UAT-ACM-MVC-URL/' # TODO replace
+
   - name: backupRoot
     value: 'C:\DeployBackups\UAT\AlternaCardManagement'
 
 # PROD
 - ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
   - group: PROD_API_VARIABLE_GROUP
+
   - name: environmentName
     value: 'PROD'
+
   - name: apiPipelineName
     value: 'BUILD - API - AlternaCardManagement'
+
   - name: mvcPipelineName
     value: 'BUILD - MVC - AlternaCardManagement'
+
   - name: dbPipelineName
     value: 'BUILD - DB - AlternaCardManagement'
+
   - name: resolveAgentName
-    value: 'PROD-ALTERNA-BN1'
+    value: 'PROD-ALTERNA-BN1' # TODO verify
+
   - name: apiAgentName
-    value: 'PROD-ALTERNA-BN1'
+    value: 'PROD-ALTERNA-BN1' # TODO verify
+
   - name: mvcAgentName
-    value: 'PROD-ALTERNA-FN1'
+    value: 'PROD-ALTERNA-FN1' # TODO verify
+
   - name: dbAgentName
-    value: 'PROD-ALTERNA-BN1'
+    value: 'PROD-ALTERNA-BN1' # TODO verify
+
   - name: approvalNotifyUsers
-    value: 'SGBL\pabouserhal'
+    value: 'SGBL\pabouserhal' # TODO adjust if needed
+
   - name: approvalInstructions
-    value: 'Approve PROD AlternaCardManagement deployment.'
+    value: 'Approve PROD Alterna Card Management deployment.'
+
+  - name: managementApprovalNotifyUsers
+    value: 'SGBL\kabbas' # TODO adjust if needed
+
+  - name: dbaApprovalNotifyUsers
+    value: 'SGBL\hkassab' # TODO adjust if needed
+
+  - name: apiVariableGroup
+    value: 'PROD_API_VARIABLE_GROUP' # TODO verify
+
+  - name: mvcVariableGroup
+    value: 'PROD_MVC_VARIABLE_GROUP' # TODO verify
+
   - name: apiHealthCheckUrl
-    value: 'http://PROD-API-URL/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+    value: 'http://PROD-ACM-API-URL/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1' # TODO replace
+
   - name: mvcHealthCheckUrl
-    value: 'http://PROD-MVC-URL/'
+    value: 'http://PROD-ACM-MVC-URL/' # TODO replace
+
   - name: backupRoot
     value: 'C:\DeployBackups\PROD\AlternaCardManagement'
-```
 
-## 3) Make the resolve stage generic
+stages:
 
-Your current ACM resolve stage hardcodes:
+- stage: Resolve_Selected_Builds
+  displayName: 'Resolve selected build numbers'
+  jobs:
+  - job: ResolveBuildNumbers
+    displayName: 'Resolve pipeline names and build numbers'
+    pool:
+      name: '$(deploymentPool)'
+      demands:
+      - Agent.Name -equals $(resolveAgentName)
+    steps:
+    - checkout: none
 
-```powershell
-if ($build.sourceBranch -ne 'refs/heads/sit')
-```
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
 
-Replace it with:
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
+        $expectedBranch = '$(expectedSourceBranch)'
 
-```powershell
-if ($build.sourceBranch -ne '$(expectedSourceBranch)') {
-  throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [$(expectedSourceBranch)]."
-}
-```
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
 
-That keeps ACM aligned with your current build strategy, because your ACM build pipelines still build from `sit`, unlike Alterna Telecom which allows `release/*` and `hotfix/*`. 
+        $deployMvc = "${{ parameters.deployMvc }}".ToLower() -eq 'true'
+        $deployApi = "${{ parameters.deployApi }}".ToLower() -eq 'true'
+        $deployDb  = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
 
-## 4) Add a DB preview stage before approval
+        if (-not ($deployMvc -or $deployApi -or $deployDb)) {
+          throw 'At least one deployment target must be selected: MVC, API, or Database.'
+        }
 
-Alterna Telecom generates a DB preview before approval. ACM should do the same.
+        function Resolve-DefinitionIdByName {
+          param(
+            [string]$Label,
+            [string]$PipelineName
+          )
 
-Add this after `Resolve_Selected_Builds`:
+          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
+            throw "$Label pipeline name is empty."
+          }
 
-```yaml
+          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
+          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
+            $collectionUri,
+            $projectName,
+            $encodedName,
+            $apiVersion
+
+          Write-Host "Resolving $Label pipeline name [$PipelineName]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No pipeline definition found for $Label with name [$PipelineName]."
+          }
+
+          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
+
+          if ($exactMatches.Count -eq 0) {
+            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
+          }
+
+          if ($exactMatches.Count -gt 1) {
+            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
+          }
+
+          $definition = $exactMatches[0]
+
+          Write-Host "$Label definition resolved:"
+          Write-Host "  Definition ID   = $($definition.id)"
+          Write-Host "  Definition Name = $($definition.name)"
+
+          return $definition.id
+        }
+
+        function Resolve-Build {
+          param(
+            [string]$Label,
+            [string]$PipelineName,
+            [string]$BuildNumber
+          )
+
+          if ([string]::IsNullOrWhiteSpace($BuildNumber) -or $BuildNumber -eq '__EMPTY__') {
+            throw "$Label build number is required because deployment of $Label was selected."
+          }
+
+          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
+          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
+
+          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $definitionId,
+            $encodedBuildNumber,
+            $apiVersion
+
+          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
+          }
+
+          $build = $response.value[0]
+
+          if ($build.sourceBranch -ne $expectedBranch) {
+            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [$expectedBranch]."
+          }
+
+          Write-Host "$Label build resolved:"
+          Write-Host "  Build ID         = $($build.id)"
+          Write-Host "  Build Number     = $($build.buildNumber)"
+          Write-Host "  Definition ID    = $definitionId"
+          Write-Host "  Definition Name  = $PipelineName"
+          Write-Host "  Branch           = $($build.sourceBranch)"
+
+          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
+          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
+          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+          Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
+        }
+
+        if ($deployMvc) {
+          Resolve-Build -Label 'Mvc' -PipelineName '$(mvcPipelineName)' -BuildNumber '${{ parameters.mvcBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=MvcPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=MvcBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=MvcResolvedBuildNumber;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=MvcSourceBranch;isOutput=true]'
+        }
+
+        if ($deployApi) {
+          Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=ApiPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiResolvedBuildNumber;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ApiSourceBranch;isOutput=true]'
+        }
+
+        if ($deployDb) {
+          Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
+        } else {
+          Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=DbSourceBranch;isOutput=true]'
+        }
+      name: Resolve
+      displayName: 'Resolve pipeline names and build numbers'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
 - stage: Generate_DB_Preview
   displayName: 'Generate DB preview for $(environmentName)'
   dependsOn:
@@ -212,11 +420,12 @@ Add this after `Resolve_Selected_Builds`:
   variables:
     DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
     DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
   jobs:
   - template: pipelines/generate-db-preview.yml@templates
     parameters:
       jobName: 'GenerateDbPreview'
-      jobDisplayName: 'Generate preview SQL and deploy report'
+      jobDisplayName: 'Generate DB preview for $(environmentName)'
       deployPool: '$(deploymentPool)'
       deployAgentName: '$(dbAgentName)'
       artifactProject: '$(System.TeamProject)'
@@ -225,16 +434,7 @@ Add this after `Resolve_Selected_Builds`:
       artifactName: '$(dbArtifactName)'
       previewArtifactName: 'db-preview-$(environmentName)'
       targetConnectionString: '$(CONN_STRING)'
-```
 
-## 5) Replace `Approval_SIT_Release` with generic `Approval_Release`
-
-Use the Alterna Telecom idea:
-
-* SIT = no approval
-* UAT/PROD = manual approval 
-
-```yaml
 - stage: Approval_Release
   displayName: 'Approval for $(environmentName) release'
   dependsOn:
@@ -269,9 +469,8 @@ Use the Alterna Telecom idea:
           instructions: '$(approvalInstructions)'
           onTimeout: 'reject'
 
-  - ${{ if and(ne(parameters.targetEnvironment, 'SIT'), eq(parameters.deployDatabase, true)) }}:
-    - job: WaitForDbaApproval
-      displayName: 'Wait for DBA approval'
+    - job: WaitForManagementApproval
+      displayName: 'Wait for Management Approval'
       dependsOn: WaitForBusinessApproval
       pool: server
       timeoutInMinutes: 1500
@@ -279,143 +478,279 @@ Use the Alterna Telecom idea:
       - task: ManualValidation@0
         timeoutInMinutes: 1440
         inputs:
-          notifyUsers: 'SGBL\hkassab'
+          notifyUsers: '$(managementApprovalNotifyUsers)'
+          instructions: '$(approvalInstructions)'
+          onTimeout: 'reject'
+
+  - ${{ if and(ne(parameters.targetEnvironment, 'SIT'), eq(parameters.deployDatabase, true)) }}:
+    - job: WaitForDbaApproval
+      displayName: 'Wait for DBA approval'
+      dependsOn: WaitForManagementApproval
+      pool: server
+      timeoutInMinutes: 1500
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(dbaApprovalNotifyUsers)'
           instructions: 'Approve $(environmentName) database deployment.'
           onTimeout: 'reject'
-```
 
-## 6) Rename and generalize the deploy stages
+- stage: Deploy_Applications
+  displayName: 'Deploy applications to $(environmentName)'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Approval_Release
+  condition: and(succeeded(), or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
+  variables:
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+    ApiSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiSourceBranch'] ]
+    MvcPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcPipelineDefinitionId'] ]
+    MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
+    MvcSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcSourceBranch'] ]
+  jobs:
+  - ${{ if eq(parameters.deployApi, true) }}:
+    - template: pipelines/deploy-iis.yml@templates
+      parameters:
+        jobDependsOn: []
+        jobCondition: succeeded()
+        deploymentName: 'DeployAPI'
+        deploymentDisplayName: 'Deploy API to ${{ parameters.targetEnvironment }} (IIS)'
+        environmentName: '${{ parameters.targetEnvironment }}'
+        deployPool: '$(deploymentPool)'
+        deployAgentName: '$(apiAgentName)'
+        variableGroup: '$(apiVariableGroup)'
+        componentName: 'API'
+        artifactName: '$(apiArtifactName)'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '$(ApiPipelineDefinitionId)'
+        artifactBuildId: '$(ApiBuildId)'
+        artifactBranch: '$(ApiSourceBranch)'
+        zipName: '$(apiZipName)'
+        siteName: '$(apiSiteName)'
+        appPoolName: '$(apiAppPoolName)'
+        iisTargetPath: '$(apiTargetPath)'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+        - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BrefBaseUrl: $(BrefBaseUrl)
+          CONN_STRING: $(CONN_STRING)
+          SMSUrl: $(SMSUrl)
+        enableCustomXmlEdits: false
+        customXmlEdits: []
+        enableHealthCheck: true
+        healthCheckUrl: '$(apiHealthCheckUrl)'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        enableLocalBackup: true
+        backupRoot: '$(backupRoot)'
+        backupPath: '$(backupRoot)\API\$(Build.BuildId)'
 
-Use generic stage names like ATC:
+  - ${{ if eq(parameters.deployMvc, true) }}:
+    - template: pipelines/deploy-iis.yml@templates
+      parameters:
+        ${{ if eq(parameters.deployApi, true) }}:
+          jobDependsOn:
+          - DeployAPI
+        ${{ if eq(parameters.deployApi, false) }}:
+          jobDependsOn: []
+        jobCondition: succeeded()
+        deploymentName: 'DeployMVC'
+        deploymentDisplayName: 'Deploy MVC to ${{ parameters.targetEnvironment }} (IIS)'
+        environmentName: '${{ parameters.targetEnvironment }}'
+        deployPool: '$(deploymentPool)'
+        deployAgentName: '$(mvcAgentName)'
+        variableGroup: '$(mvcVariableGroup)'
+        componentName: 'MVC'
+        artifactName: '$(mvcArtifactName)'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '$(MvcPipelineDefinitionId)'
+        artifactBuildId: '$(MvcBuildId)'
+        artifactBranch: '$(MvcSourceBranch)'
+        zipName: '$(mvcZipName)'
+        siteName: '$(mvcSiteName)'
+        appPoolName: '$(mvcAppPoolName)'
+        iisTargetPath: '$(mvcTargetPath)'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: false
+        jsonFiles: ''
+        enableXmlConfigTransform: true
+        xmlConfigFiles:
+        - '**/Web.config'
+        xmlVariableValues:
+          BaseUrl: $(BaseUrl)
+          BaseUrlOsb: $(BaseUrlOsb)
+          CDN_IP_LINK: $(CDN_IP_LINK)
+          DASHBOARD_LINK: $(DASHBOARD_LINK)
+          GenerateAccountFileImportFileNameChecking: $(GenerateAccountFileImportFileNameChecking)
+          GeneratePaymentFileImportFileNameChecking: $(GeneratePaymentFileImportFileNameChecking)
+          LDAP_WEB_SERVICES_IP_ADDRESS: $(LDAP_WEB_SERVICES_IP_ADDRESS)
+          UploadFilesPath: $(UploadFilesPath)
+          USER_GUIDE_LINK: $(USER_GUIDE_LINK)
+        enableCustomXmlEdits: false
+        customXmlEdits: []
+        enableHealthCheck: true
+        healthCheckUrl: '$(mvcHealthCheckUrl)'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        enableLocalBackup: true
+        backupRoot: '$(backupRoot)'
+        backupPath: '$(backupRoot)\MVC\$(Build.BuildId)'
 
-* `Deploy_Applications`
-* `Rollback_API_After_MVC_Failure`
-* `Tag_APP_LKG`
-* `Deploy_DB_After_Apps`
-* `Deploy_DB_Only`
-* `Tag_DB_DEPLOYED`
+- stage: Rollback_API_After_MVC_Failure
+  displayName: 'Rollback API because MVC failed'
+  dependsOn:
+  - Deploy_Applications
+  condition: and(always(), eq('${{ parameters.deployApi }}', 'true'), eq('${{ parameters.deployMvc }}', 'true'), eq(dependencies.Deploy_Applications.outputs['DeployAPI.DeployAPI.publishSuccessOutcome.DeploymentHealthy'], 'true'), ne(dependencies.Deploy_Applications.outputs['DeployMVC.DeployMVC.publishSuccessOutcome.DeploymentHealthy'], 'true'))
+  jobs:
+  - template: pipelines/rollback-iis.yml@templates
+    parameters:
+      deploymentName: 'RollbackAPIAfterMVCFailure'
+      deploymentDisplayName: 'Rollback API from local backup because MVC failed'
+      environmentName: '${{ parameters.targetEnvironment }}'
+      deployPool: '$(deploymentPool)'
+      deployAgentName: '$(apiAgentName)'
+      siteName: '$(apiSiteName)'
+      appPoolName: '$(apiAppPoolName)'
+      iisTargetPath: '$(apiTargetPath)'
+      backupPath: '$(backupRoot)\API\$(Build.BuildId)'
+      cleanExcludeCsv: ''
 
-### API deploy
+- stage: Tag_APP_LKG
+  displayName: 'Tag successful application builds as LKG'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Deploy_Applications
+  condition: and(succeeded('Deploy_Applications'), or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
+  variables:
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    MvcBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcBuildId'] ]
+    MvcPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.MvcPipelineDefinitionId'] ]
+  jobs:
+  - job: TagApplicationBuilds
+    displayName: 'Tag MVC / API builds'
+    pool:
+      name: '$(deploymentPool)'
+      demands:
+      - Agent.Name -equals $(resolveAgentName)
+    steps:
+    - checkout: none
 
-```yaml
-- template: pipelines/deploy-iis.yml@templates
-  parameters:
-    jobDependsOn: []
-    jobCondition: succeeded()
-    deploymentName: 'DeployAPI'
-    deploymentDisplayName: 'Deploy API to ${{ parameters.targetEnvironment }} (IIS)'
-    environmentName: '${{ parameters.targetEnvironment }}'
-    deployPool: '$(deploymentPool)'
-    deployAgentName: '$(apiAgentName)'
-    ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-      variableGroup: 'SIT_API_VARIABLE_GROUP'
-    ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-      variableGroup: 'UAT_API_VARIABLE_GROUP'
-    ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-      variableGroup: 'PROD_API_VARIABLE_GROUP'
-    componentName: 'API'
-    artifactName: '$(apiArtifactName)'
-    artifactBuildType: 'specific'
-    artifactProject: '$(System.TeamProject)'
-    artifactDefinitionId: '$(ApiPipelineDefinitionId)'
-    artifactBuildId: '$(ApiBuildId)'
-    artifactBranch: '$(expectedSourceBranch)'
-    zipName: '$(apiZipName)'
-    siteName: '$(apiSiteName)'
-    appPoolName: '$(apiAppPoolName)'
-    iisTargetPath: '$(apiTargetPath)'
-    cleanTargetBeforeCopy: true
-    cleanExcludeCsv: ''
-    enableJsonTransform: false
-    jsonFiles: ''
-    enableXmlConfigTransform: true
-    xmlConfigFiles:
-    - '**/Web.config'
-    xmlVariableValues:
-      BaseUrl: $(BaseUrl)
-      BrefBaseUrl: $(BrefBaseUrl)
-      CONN_STRING: $(CONN_STRING)
-      SMSUrl: $(SMSUrl)
-    enableCustomXmlEdits: false
-    customXmlEdits: []
-    enableHealthCheck: true
-    healthCheckUrl: '$(apiHealthCheckUrl)'
-    healthCheckExpectedStatusCode: '200'
-    healthCheckRetries: 6
-    healthCheckDelaySeconds: 10
-    enableRollbackOnHealthCheckFailure: true
-    enableLocalBackup: true
-    backupRoot: '$(backupRoot)'
-    backupPath: '$(backupRoot)\API\$(Build.BuildId)'
-```
+    - ${{ if eq(parameters.deployApi, true) }}:
+      - template: pipelines/tag-builds.yml@templates
+        parameters:
+          tagTargets:
+          - name: 'AlternaCardManagement API'
+            buildId: '$(ApiBuildId)'
+            definitionId: '$(ApiPipelineDefinitionId)'
+            deployedTag: 'DEPLOYED-$(environmentName)-ACM-API'
+            lkgTag: 'LKG-$(environmentName)-ACM-API'
+            makeLkgUnique: true
 
-### MVC deploy
+    - ${{ if eq(parameters.deployMvc, true) }}:
+      - template: pipelines/tag-builds.yml@templates
+        parameters:
+          tagTargets:
+          - name: 'AlternaCardManagement MVC'
+            buildId: '$(MvcBuildId)'
+            definitionId: '$(MvcPipelineDefinitionId)'
+            deployedTag: 'DEPLOYED-$(environmentName)-ACM-MVC'
+            lkgTag: 'LKG-$(environmentName)-ACM-MVC'
+            makeLkgUnique: true
 
-Same idea, but:
+- stage: Deploy_DB_After_Apps
+  displayName: 'Deploy DB to $(environmentName) after applications'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Tag_APP_LKG
+  condition: and(succeeded('Tag_APP_LKG'), eq('${{ parameters.deployDatabase }}', 'true'), or(${{ eq(parameters.deployApi, true) }}, ${{ eq(parameters.deployMvc, true) }}))
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy database'
+      environmentName: '${{ parameters.targetEnvironment }}'
+      deployPool: '$(deploymentPool)'
+      deployAgentName: '$(dbAgentName)'
+      artifactName: '$(dbArtifactName)'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: '$(DbSourceBranch)'
+      targetConnectionString: '$(CONN_STRING)'
 
-* `deployAgentName: '$(mvcAgentName)'`
-* environment-specific MVC variable group
-* `artifactName: '$(mvcArtifactName)'`
-* `zipName: '$(mvcZipName)'`
-* `iisTargetPath: '$(mvcTargetPath)'`
-* `healthCheckUrl: '$(mvcHealthCheckUrl)'`
-* `backupPath: '$(backupRoot)\MVC\$(Build.BuildId)'`
+- stage: Deploy_DB_Only
+  displayName: 'Deploy DB to $(environmentName)'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Approval_Release
+  condition: and(succeeded(), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'false'), eq('${{ parameters.deployMvc }}', 'false'))
+  variables:
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
+  jobs:
+  - template: pipelines/deploy-database.yml@templates
+    parameters:
+      deploymentName: 'DeployDb'
+      deploymentDisplayName: 'Deploy database'
+      environmentName: '${{ parameters.targetEnvironment }}'
+      deployPool: '$(deploymentPool)'
+      deployAgentName: '$(dbAgentName)'
+      artifactName: '$(dbArtifactName)'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(DbPipelineDefinitionId)'
+      artifactBuildId: '$(DbBuildId)'
+      artifactBranch: '$(DbSourceBranch)'
+      targetConnectionString: '$(CONN_STRING)'
 
-## 7) Make the tags environment-driven
+- stage: Tag_DB_DEPLOYED
+  displayName: 'Tag deployed database build'
+  dependsOn:
+  - Resolve_Selected_Builds
+  - Deploy_DB_After_Apps
+  - Deploy_DB_Only
+  condition: and(eq('${{ parameters.deployDatabase }}', 'true'), or(eq(dependencies.Deploy_DB_After_Apps.result, 'Succeeded'), eq(dependencies.Deploy_DB_Only.result, 'Succeeded')))
+  variables:
+    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+  jobs:
+  - job: TagDatabaseBuild
+    displayName: 'Tag DB build'
+    pool:
+      name: '$(deploymentPool)'
+      demands:
+      - Agent.Name -equals $(resolveAgentName)
+    steps:
+    - checkout: none
 
-Change:
-
-```yaml
-deployedTag: 'DEPLOYED-SIT-API'
-lkgTag: 'LKG-SIT-API'
-```
-
-to:
-
-```yaml
-deployedTag: 'DEPLOYED-$(environmentName)-ACM-API'
-lkgTag: 'LKG-$(environmentName)-ACM-API'
-```
-
-and similarly:
-
-```yaml
-deployedTag: 'DEPLOYED-$(environmentName)-ACM-MVC'
-lkgTag: 'LKG-$(environmentName)-ACM-MVC'
-deployedTag: 'DEPLOYED-$(environmentName)-ACM-DB'
-lkgTag: 'LKG-$(environmentName)-ACM-DB'
-```
-
-That matches what Alterna Telecom does.
-
-## 8) Keep DB deploy split into “after apps” and “DB only”
-
-That part of your ACM release pipeline is already correct and very close to ATC. Just rename the stage names to remove `_SIT` and replace:
-
-* `environmentName: 'SIT'` → `environmentName: '${{ parameters.targetEnvironment }}'`
-* `deployAgentName: 'SIT-ALTERNA-BN1'` → `deployAgentName: '$(dbAgentName)'`
-* `artifactName: 'card-management-db-drop'` → `artifactName: '$(dbArtifactName)'`
-* `artifactBranch: 'refs/heads/sit'` → `artifactBranch: '$(expectedSourceBranch)'`
-
-## My recommendation
-
-Do this in 2 steps:
-
-### Step 1
-
-Refactor **only** these parts first:
-
-* `targetEnvironment`
-* variables block
-* resolve branch check
-* approval stage
-* deploy template parameterization
-* environment-driven tags
-
-### Step 2
-
-Add the **Generate_DB_Preview** stage.
-
-That way, you can first get ACM to the same structural model as ATC, then add DB preview cleanly.
-
-If you want, next I’ll write the **full final ACM release pipeline YAML** for you, ready to paste.
+    - template: pipelines/tag-builds.yml@templates
+      parameters:
+        tagTargets:
+        - name: 'AlternaCardManagement DB'
+          buildId: '$(DbBuildId)'
+          definitionId: '$(DbPipelineDefinitionId)'
+          deployedTag: 'DEPLOYED-$(environmentName)-ACM-DB'
+          lkgTag: 'LKG-$(environmentName)-ACM-DB'
+          makeLkgUnique: true
