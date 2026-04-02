@@ -1,6 +1,15 @@
-This is my BUILD - API - Alterna Telecom pipeline:
+Yes. Update the **parent pipeline** like this.
 
+### Updated `BUILD - API - Alterna Telecom` pipeline
+
+```yaml
 name: ATC_API_$(SourceBranchName)_rc$(Rev:r)
+
+parameters:
+- name: runDependencyCheck
+  type: boolean
+  default: true
+  displayName: 'Run OWASP Dependency Check'
 
 resources:
   repositories:
@@ -20,6 +29,9 @@ trigger:
       - nuget.config
 
 pr: none
+
+variables:
+- group: OWASP_SECRETS
 
 stages:
 - stage: Build_API
@@ -41,4 +53,104 @@ stages:
       artifactName: 'alterna-telecom-api-drop'
       publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-Telecom-Backend'
 
-I want to update it so that it supports OWASP dependency checks
+      runDependencyCheck: ${{ parameters.runDependencyCheck }}
+      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
+      dependencyCheckProjectName: 'Alterna-Telecom-Backend'
+      dependencyCheckAdditionalArguments: ''
+```
+
+## What this does
+
+* `variables: - group: OWASP_SECRETS` makes `NVD_API_KEY` available to the pipeline
+* `runDependencyCheck` lets you switch OWASP on or off at queue time
+* the CLI path and data path are passed to the template
+* the parent pipeline does **not** need to pass `$(NVD_API_KEY)` directly as an argument
+
+## Important point
+
+This parent pipeline will work **only if** your `build-dotnet-core-webapi.yml` template has already been changed to the **local CLI version**, meaning the template itself contains something like:
+
+```yaml
+env:
+  NVD_API_KEY: $(NVD_API_KEY)
+```
+
+and inside the PowerShell command:
+
+```powershell
+--nvdApiKey "$env:NVD_API_KEY"
+```
+
+So the secret stays inside the template task, not in the parent pipeline arguments.
+
+## If your API template is still using the extension task
+
+Then this parent pipeline is **not enough** by itself.
+You must first update `build-dotnet-core-webapi.yml` to support these parameters:
+
+* `runDependencyCheck`
+* `dependencyCheckCliPath`
+* `dependencyCheckDataPath`
+* `dependencyCheckProjectName`
+* `dependencyCheckAdditionalArguments`
+
+and replace `dependency-check-build-task@6` with the local PowerShell CLI step.
+
+## Recommended API template command
+
+Inside `build-dotnet-core-webapi.yml`, your OWASP step should look like this:
+
+```yaml
+- powershell: |
+    $dc = '${{ parameters.dependencyCheckCliPath }}'
+    $reportDir = '$(Build.ArtifactStagingDirectory)\dependency-check'
+    $scanPath = '$(Build.SourcesDirectory)'
+
+    if (-not (Test-Path $dc)) {
+      throw "Dependency-Check CLI not found at: $dc"
+    }
+
+    New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
+
+    & $dc `
+      --project "${{ parameters.dependencyCheckProjectName }}" `
+      --scan "$scanPath" `
+      --format "HTML" `
+      --format "JSON" `
+      --format "JUNIT" `
+      --out "$reportDir" `
+      --data "${{ parameters.dependencyCheckDataPath }}" `
+      --nvdApiKey "$env:NVD_API_KEY" `
+      --disableKnownExploited `
+      --disableHostedSuppressions `
+      --disableRetireJS `
+      --disableVersionCheck `
+      ${{ parameters.dependencyCheckAdditionalArguments }}
+
+    if ($LASTEXITCODE -ne 0) {
+      exit $LASTEXITCODE
+    }
+  displayName: 'OWASP Dependency Check (local CLI)'
+  condition: and(succeeded(), eq('${{ parameters.runDependencyCheck }}', 'true'))
+  env:
+    NVD_API_KEY: $(NVD_API_KEY)
+```
+
+And then publish the JUnit report after it.
+
+## If you want offline mode later
+
+Then in the template command, add:
+
+```powershell
+--noupdate
+```
+
+and make sure `C:\Tools\dependency-check-data` is already populated.
+
+## If you want online mode
+
+Leave `dependencyCheckAdditionalArguments: ''` as above, and make sure the agent can reach `services.nvd.nist.gov`.
+
+If you want, send me your current `build-dotnet-core-webapi.yml` and I’ll rewrite it fully so it matches this parent pipeline exactly.
