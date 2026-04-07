@@ -1,7 +1,12 @@
-using BrgccReverseProxy.Extensions;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+Yes. The clean way is to register YARP with `AddReverseProxy().LoadFromConfig(...).AddTransforms(...)`, then inspect `builderContext.Route.ClusterId` and add the outbound headers in a request transform. YARP’s transforms apply to the **proxied outbound request**, and the `AddTransforms` callback can inspect the route config each time a route is built or rebuilt. ([Microsoft Learn][1])
+
+Also, in your current `Program.cs`, you are missing the YARP service registration. `app.MapReverseProxy()` alone is not enough.
+
+Use this structure.
+
+### 1) `Program.cs`
+
+```csharp
 using BrgccReverseProxy.Extensions;
 using Serilog;
 
@@ -20,24 +25,199 @@ if (OperatingSystem.IsWindows())
     builder.Host.UseWindowsService();
 }
 
-// Serilog Setup
+// Serilog
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
+
 builder.Host.UseSerilog();
 
-// CORS Setup
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicyConfig", corsPolicyBuilder =>
         corsPolicyBuilder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
+// Register YARP + per-cluster auth transform
+builder.Services.AddClusterBasedReverseProxyAuth(builder.Configuration);
+
 var app = builder.Build();
 
 app.UseCors("CorsPolicyConfig");
-app.UseRequestLogging(); // Logging Middleware
+app.UseRequestLogging();
 app.UseHttpsRedirection();
 app.UseRouting();
+
 app.MapReverseProxy();
+
 app.Run();
+```
+
+### 2) Create the extension class
+
+`Extensions/ReverseProxyAuthExtensions.cs`
+
+```csharp
+using System.Text;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Yarp.ReverseProxy.Transforms;
+
+namespace BrgccReverseProxy.Extensions;
+
+public static class ReverseProxyAuthExtensions
+{
+    public static IServiceCollection AddClusterBasedReverseProxyAuth(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<ClusterAuthOptions>(
+            configuration.GetSection("ClusterAuth"));
+
+        services
+            .AddReverseProxy()
+            .LoadFromConfig(configuration.GetSection("ReverseProxy"))
+            .AddTransforms(builderContext =>
+            {
+                var authOptions = builderContext.Services
+                    .GetRequiredService<IOptions<ClusterAuthOptions>>()
+                    .Value;
+
+                var clusterId = builderContext.Route.ClusterId;
+
+                if (string.IsNullOrWhiteSpace(clusterId))
+                    return;
+
+                if (!authOptions.Clusters.TryGetValue(clusterId, out var clusterAuth))
+                    return;
+
+                if (string.IsNullOrWhiteSpace(clusterAuth.Username) ||
+                    string.IsNullOrWhiteSpace(clusterAuth.Password))
+                    return;
+
+                builderContext.AddRequestTransform(transformContext =>
+                {
+                    // OPTION A: Standard HTTP Basic auth
+                    var raw = $"{clusterAuth.Username}:{clusterAuth.Password}";
+                    var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(raw));
+
+                    transformContext.ProxyRequest.Headers.Remove("Authorization");
+                    transformContext.ProxyRequest.Headers.TryAddWithoutValidation(
+                        "Authorization",
+                        $"Basic {base64}");
+
+                    return ValueTask.CompletedTask;
+                });
+            });
+
+        return services;
+    }
+}
+
+public sealed class ClusterAuthOptions
+{
+    public Dictionary<string, ClusterCredential> Clusters { get; set; } = new();
+}
+
+public sealed class ClusterCredential
+{
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
+```
+
+### 3) Add config
+
+`appsettings.json`
+
+```json
+{
+  "ClusterAuth": {
+    "Clusters": {
+      "cluster1": {
+        "Username": "myUser1",
+        "Password": "myPassword1"
+      },
+      "cluster2": {
+        "Username": "myUser2",
+        "Password": "myPassword2"
+      }
+    }
+  },
+  "ReverseProxy": {
+    "Routes": {
+      "route1": {
+        "ClusterId": "cluster1",
+        "Match": {
+          "Path": "/api/service1/{**catch-all}"
+        }
+      },
+      "route2": {
+        "ClusterId": "cluster2",
+        "Match": {
+          "Path": "/api/service2/{**catch-all}"
+        }
+      }
+    },
+    "Clusters": {
+      "cluster1": {
+        "Destinations": {
+          "d1": {
+            "Address": "https://localhost:7001/"
+          }
+        }
+      },
+      "cluster2": {
+        "Destinations": {
+          "d1": {
+            "Address": "https://localhost:7002/"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### If your target API really expects custom headers named `Username` and `Password`
+
+Replace the transform block with this:
+
+```csharp
+builderContext.AddRequestTransform(transformContext =>
+{
+    transformContext.ProxyRequest.Headers.Remove("Username");
+    transformContext.ProxyRequest.Headers.Remove("Password");
+
+    transformContext.ProxyRequest.Headers.TryAddWithoutValidation(
+        "Username",
+        clusterAuth.Username);
+
+    transformContext.ProxyRequest.Headers.TryAddWithoutValidation(
+        "Password",
+        clusterAuth.Password);
+
+    return ValueTask.CompletedTask;
+});
+```
+
+### Which one should you use?
+
+If the backend says “username/password authentication” in the normal HTTP sense, use:
+
+```http
+Authorization: Basic base64(username:password)
+```
+
+That is the standard Basic auth format defined in RFC 7617, and because it is only Base64-encoded rather than encrypted, it should be used over HTTPS. ([IETF Datatracker][2])
+
+### Recommendation
+
+Store the credentials in environment variables or a secret store rather than plain `appsettings.json` for production.
+
+If you want, I can turn this into a version that reads the username/password from `appsettings.Development.json` plus environment variables for production.
+
+[1]: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/yarp/transforms?view=aspnetcore-10.0 "YARP Request and Response Transforms | Microsoft Learn"
+[2]: https://datatracker.ietf.org/doc/html/rfc7617?utm_source=chatgpt.com "RFC 7617 - The 'Basic' HTTP Authentication Scheme"
