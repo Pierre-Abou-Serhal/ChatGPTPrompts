@@ -1,12 +1,73 @@
-Yes. The clean way is to register YARP with `AddReverseProxy().LoadFromConfig(...).AddTransforms(...)`, then inspect `builderContext.Route.ClusterId` and add the outbound headers in a request transform. YARP’s transforms apply to the **proxied outbound request**, and the `AddTransforms` callback can inspect the route config each time a route is built or rebuilt. ([Microsoft Learn][1])
+This is the URL that I am calling:
 
-Also, in your current `Program.cs`, you are missing the YARP service registration. `app.MapReverseProxy()` alone is not enough.
+http://localhost:8208/factset/v1/cross-sectional?ids=IBM&symbolType=DEFAULT&universe=&universeType=EQUITY&formulas=P_PRICE(0)&backTestDate=2020-06-01&calendar=FIVEDAY&fsymId=N&displayName=&flatten=N&batch=N&startDate=2020-05-01&endDate=2020-05-31&frequency=
 
-Use this structure.
+This is my appsettings.json:
+{
+  "Urls": "http://localhost:8208",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "ClusterAuth": {
+    "Clusters": {
+      "factSetCluster": {
+        "Username": "myUser1",
+        "Password": "myPassword1"
+      }
+    }
+  },
+  "ReverseProxy": {
+    "Routes": {
+      "factSet-route": {
+        "ClusterId": "factSetCluster",
+        "Match": {
+          "Path": "/factset/{**catch-all}"
+        },
+        "Transforms": [
+          { "PathRemovePrefix": "/factset" }
+        ]
+      }
+    },
+    "Clusters": {
+      "factSetCluster": {
+        "Destinations": {
+          "factSetDestination": {
+            "Address": "https://api.factset.com/formula-api/"
+          }
+        }
+      }
+    }
+  },
+  "WebProxyAddress": "http://10.0.30.222:3128",
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.File" ],
+    "MinimumLevel": "Information",
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/ProxyService-.log",
+          "rollingInterval": "Day",
+          "fileSizeLimitBytes": "65535000",
+          "retainedFileCountLimit": "100",
+          "rollOnFileSizeLimit": true
+        }
+      }
+    ],
+    "Enrich": [ "FromLogContext" ]
+  }
+}
 
-### 1) `Program.cs`
-
-```csharp
+This is my Program.cs:
+using BrgccReverseProxy.Extensions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using BrgccReverseProxy.Extensions;
 using Serilog;
 
@@ -25,14 +86,13 @@ if (OperatingSystem.IsWindows())
     builder.Host.UseWindowsService();
 }
 
-// Serilog
+// Serilog Setup
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
-
 builder.Host.UseSerilog();
 
-// CORS
+// CORS Setup
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicyConfig", corsPolicyBuilder =>
@@ -45,20 +105,14 @@ builder.Services.AddClusterBasedReverseProxyAuth(builder.Configuration);
 var app = builder.Build();
 
 app.UseCors("CorsPolicyConfig");
-app.UseRequestLogging();
+app.UseRequestLogging(); // Logging Middleware
 app.UseHttpsRedirection();
 app.UseRouting();
-
 app.MapReverseProxy();
-
 app.Run();
-```
 
-### 2) Create the extension class
+This is the ReverseProxyAuthExtensions:
 
-`Extensions/ReverseProxyAuthExtensions.cs`
-
-```csharp
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -87,14 +141,14 @@ public static class ReverseProxyAuthExtensions
 
                 var clusterId = builderContext.Route.ClusterId;
 
-                if (string.IsNullOrWhiteSpace(clusterId))
+                if (String.IsNullOrWhiteSpace(clusterId))
                     return;
 
                 if (!authOptions.Clusters.TryGetValue(clusterId, out var clusterAuth))
                     return;
 
-                if (string.IsNullOrWhiteSpace(clusterAuth.Username) ||
-                    string.IsNullOrWhiteSpace(clusterAuth.Password))
+                if (String.IsNullOrWhiteSpace(clusterAuth.Username) ||
+                    String.IsNullOrWhiteSpace(clusterAuth.Password))
                     return;
 
                 builderContext.AddRequestTransform(transformContext =>
@@ -118,106 +172,13 @@ public static class ReverseProxyAuthExtensions
 
 public sealed class ClusterAuthOptions
 {
-    public Dictionary<string, ClusterCredential> Clusters { get; set; } = new();
+    public Dictionary<String, ClusterCredential> Clusters { get; set; } = new();
 }
 
 public sealed class ClusterCredential
 {
-    public string Username { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
+    public String Username { get; set; } = String.Empty;
+    public String Password { get; set; } = String.Empty;
 }
-```
 
-### 3) Add config
-
-`appsettings.json`
-
-```json
-{
-  "ClusterAuth": {
-    "Clusters": {
-      "cluster1": {
-        "Username": "myUser1",
-        "Password": "myPassword1"
-      },
-      "cluster2": {
-        "Username": "myUser2",
-        "Password": "myPassword2"
-      }
-    }
-  },
-  "ReverseProxy": {
-    "Routes": {
-      "route1": {
-        "ClusterId": "cluster1",
-        "Match": {
-          "Path": "/api/service1/{**catch-all}"
-        }
-      },
-      "route2": {
-        "ClusterId": "cluster2",
-        "Match": {
-          "Path": "/api/service2/{**catch-all}"
-        }
-      }
-    },
-    "Clusters": {
-      "cluster1": {
-        "Destinations": {
-          "d1": {
-            "Address": "https://localhost:7001/"
-          }
-        }
-      },
-      "cluster2": {
-        "Destinations": {
-          "d1": {
-            "Address": "https://localhost:7002/"
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-### If your target API really expects custom headers named `Username` and `Password`
-
-Replace the transform block with this:
-
-```csharp
-builderContext.AddRequestTransform(transformContext =>
-{
-    transformContext.ProxyRequest.Headers.Remove("Username");
-    transformContext.ProxyRequest.Headers.Remove("Password");
-
-    transformContext.ProxyRequest.Headers.TryAddWithoutValidation(
-        "Username",
-        clusterAuth.Username);
-
-    transformContext.ProxyRequest.Headers.TryAddWithoutValidation(
-        "Password",
-        clusterAuth.Password);
-
-    return ValueTask.CompletedTask;
-});
-```
-
-### Which one should you use?
-
-If the backend says “username/password authentication” in the normal HTTP sense, use:
-
-```http
-Authorization: Basic base64(username:password)
-```
-
-That is the standard Basic auth format defined in RFC 7617, and because it is only Base64-encoded rather than encrypted, it should be used over HTTPS. ([IETF Datatracker][2])
-
-### Recommendation
-
-Store the credentials in environment variables or a secret store rather than plain `appsettings.json` for production.
-
-If you want, I can turn this into a version that reads the username/password from `appsettings.Development.json` plus environment variables for production.
-
-[1]: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/yarp/transforms?view=aspnetcore-10.0 "YARP Request and Response Transforms | Microsoft Learn"
-[2]: https://datatracker.ietf.org/doc/html/rfc7617?utm_source=chatgpt.com "RFC 7617 - The 'Basic' HTTP Authentication Scheme"
+I am getting 404 not found.
