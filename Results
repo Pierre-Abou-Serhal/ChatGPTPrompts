@@ -1,131 +1,104 @@
-This is how I want to do it:
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
+namespace BrgccReverseProxy.Middleware;
+
+public class RequestLoggingMiddleware
 {
-  "Urls": "http://localhost:8208",
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft": "Warning",
-      "Microsoft.Hosting.Lifetime": "Information"
-    }
-  },
-  "AllowedHosts": "*",
-  "ClusterAuth": {
-    "ClusterCredentials": [
-        {
-          "ClusterId": "factSetCluster", 
-          "Username": "myUser1",
-          "Password": "myPassword1"
-        }
-      ]
-  },
-  "ReverseProxy": {
-    "Routes": {
-      "factSet-route": {
-        "ClusterId": "factSetCluster",
-        "Match": {
-          "Path": "/factset/{**catch-all}"
-        },
-        "Transforms": [
-          { "PathRemovePrefix": "/factset" }
-        ]
-      }
-    },
-    "Clusters": {
-      "factSetCluster": {
-        "HttpClient": {
-          "WebProxy": {
-            "Address": "http://10.0.30.222:3128",
-            "BypassOnLocal": true,
-            "UseDefaultCredentials": false
-          }
-        },
-        "Destinations": {
-          "factSetDestination": {
-            "Address": "https://api.factset.com/formula-api/v1/"
-          }
-        }
-      }
-    }
-  },
-  "Serilog": {
-    "Using": [ "Serilog.Sinks.File" ],
-    "MinimumLevel": "Information",
-    "WriteTo": [
-      {
-        "Name": "File",
-        "Args": {
-          "path": "logs/ProxyService-.log",
-          "rollingInterval": "Day",
-          "fileSizeLimitBytes": "65535000",
-          "retainedFileCountLimit": "100",
-          "rollOnFileSizeLimit": true
-        }
-      }
-    ],
-    "Enrich": [ "FromLogContext" ]
-  }
-}
+    private readonly RequestDelegate _next;
+    private readonly ILogger<RequestLoggingMiddleware> _logger;
 
-
-using System.Text;
-using BrgccReverseProxy.Common;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Yarp.ReverseProxy.Transforms;
-
-namespace BrgccReverseProxy.Extensions;
-
-public static class ReverseProxyAuthExtensions
-{
-    public static IServiceCollection AddClusterBasedReverseProxyAuth(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    public RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggingMiddleware> logger)
     {
-        ClusterAuthOption clusterAuthOption = configuration.GetSection("ClusterAuth").Get<ClusterAuthOption>() ?? new();
-        
-        services
-            .AddReverseProxy()
-            .LoadFromConfig(configuration.GetSection("ReverseProxy"))
-            .AddTransforms(builderContext =>
-            {
-                String? clusterId = builderContext.Route.ClusterId;
-                
-                ClusterCredential? clusterCredential = clusterAuthOption.ClusterCredentials
-                    .FirstOrDefault(i => i.ClusterId.Equals(clusterId, StringComparison.OrdinalIgnoreCase));
-                
-                if (String.IsNullOrWhiteSpace(clusterId))
-                    return;
-                
-                if (clusterCredential is null)
-                    return;
+        _next = next;
+        _logger = logger;
+    }
 
-                if (String.IsNullOrWhiteSpace(clusterCredential.Username) ||
-                    String.IsNullOrWhiteSpace(clusterCredential.Password))
-                    return;
+    public async Task Invoke(HttpContext context)
+    {
+        _logger.LogInformation("Request Received: {Method} {Path}{QueryString}",
+            context.Request.Method, context.Request.Path, context.Request.QueryString);
 
-                builderContext.AddRequestTransform(transformContext =>
-                {
-                    // OPTION A: Standard HTTP Basic auth
-                    var raw = $"{clusterCredential.Username}:{clusterCredential.Password}";
-                    var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(raw));
+        context.Request.EnableBuffering();
 
-                    transformContext.ProxyRequest.Headers.Remove("Authorization");
-                    transformContext.ProxyRequest.Headers.TryAddWithoutValidation(
-                        "Authorization",
-                        $"Basic {base64}");
+        if (context.Request.ContentLength > 0 && context.Request.Body.CanSeek)
+        {
+            context.Request.Body.Position = 0;
+            using var reader = new StreamReader(context.Request.Body, leaveOpen: true);
+            var body = await reader.ReadToEndAsync();
+            _logger.LogInformation("Request Body: {Body}", body);
+            context.Request.Body.Position = 0;
+        }
 
-                    return ValueTask.CompletedTask;
-                });
-            });
+        var originalBodyStream = context.Response.Body;
+        await using var responseBody = new MemoryStream();
+        context.Response.Body = responseBody;
 
-        return services;
+        await _next(context);
+
+        _logger.LogInformation("Response Status: {StatusCode}", context.Response.StatusCode);
+
+        responseBody.Seek(0, SeekOrigin.Begin);
+        var responseText = await new StreamReader(responseBody).ReadToEndAsync();
+        _logger.LogInformation("Response Body: {Body}", responseText);
+
+        responseBody.Seek(0, SeekOrigin.Begin);
+        await responseBody.CopyToAsync(originalBodyStream);
     }
 }
 
-But:
-        ClusterAuthOption clusterAuthOption = configuration.GetSection("ClusterAuth").Get<ClusterAuthOption>() ?? new();
 
+public static class MiddlewareExtensions
+{
+    public static IApplicationBuilder UseRequestLogging(this IApplicationBuilder app)
+    {
+        return app.UseMiddleware<RequestLoggingMiddleware>();
+    }
+}
 
-is returning a List count = 0 why ?
+using BrgccReverseProxy.Extensions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using BrgccReverseProxy.Extensions;
+using Serilog;
+
+var isWindowsService = !Environment.UserInteractive;
+if (isWindowsService)
+{
+    Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+}
+
+Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "logs"));
+
+var builder = WebApplication.CreateBuilder(args);
+
+if (OperatingSystem.IsWindows())
+{
+    builder.Host.UseWindowsService();
+}
+
+// Serilog Setup
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .CreateLogger();
+builder.Host.UseSerilog();
+
+// CORS Setup
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicyConfig", corsPolicyBuilder =>
+        corsPolicyBuilder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+});
+
+// Register YARP + per-cluster auth transform
+builder.Services.AddClusterBasedReverseProxyAuth(builder.Configuration);
+
+var app = builder.Build();
+
+app.UseCors("CorsPolicyConfig");
+app.UseRequestLogging(); // Logging Middleware
+app.UseHttpsRedirection();
+app.UseRouting();
+app.MapReverseProxy();
+app.Run();
