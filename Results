@@ -1,39 +1,41 @@
-Yes, **but only if your current target actually needs it**.
+This is how I want to do it:
 
-For your current project:
-
-* Use the **certificate part** only if the downstream API requires **mutual TLS / client certificate authentication**. YARP’s documented way to add a client certificate is through `ConfigureHttpClient(...)` on the proxy registration. ([Microsoft Learn][1])
-* Use the **web proxy part** only if your app must go through an **outbound corporate proxy** to reach the destination. YARP supports outbound proxy settings per cluster via `HttpClient.WebProxy` in configuration. ([Microsoft Learn][1])
-* If FactSet is only using **Basic Auth** and your machine can reach it directly, then you do **not** need the certificate code, and you do **not** need the web proxy code. ([Microsoft Learn][1])
-
-### Best rule
-
-* **Basic Auth only** → keep your auth-header transform
-* **Basic Auth + corporate outbound proxy** → keep auth-header transform **and** add web proxy
-* **mTLS/client certificate** → add certificate config with `ConfigureHttpClient(...)`
-* **mTLS + proxy + Basic Auth** → you can use all three together ([Microsoft Learn][1])
-
-### Important detail for YARP
-
-YARP documents that the default `ForwarderHttpClientFactory` sets `UseProxy = false` by default. That means a `WebProxyAddress` sitting in your config does nothing unless you either:
-
-* configure `HttpClient.WebProxy` in YARP config, or
-* set proxy behavior in `ConfigureHttpClient(...)`. ([Microsoft Learn][1])
-
-### For your current project, I would do this
-
-#### Option 1: if you need only outbound proxy, use `appsettings.json`
-
-You do **not** need code for the proxy part.
-
-```json
 {
+  "Urls": "http://localhost:8208",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "ClusterAuth": {
+    "ClusterCredentials": [
+        {
+          "ClusterId": "factSetCluster", 
+          "Username": "myUser1",
+          "Password": "myPassword1"
+        }
+      ]
+  },
   "ReverseProxy": {
+    "Routes": {
+      "factSet-route": {
+        "ClusterId": "factSetCluster",
+        "Match": {
+          "Path": "/factset/{**catch-all}"
+        },
+        "Transforms": [
+          { "PathRemovePrefix": "/factset" }
+        ]
+      }
+    },
     "Clusters": {
       "factSetCluster": {
         "HttpClient": {
           "WebProxy": {
-            "Address": "http://your-proxy-host:8080",
+            "Address": "http://10.0.30.222:3128",
             "BypassOnLocal": true,
             "UseDefaultCredentials": false
           }
@@ -45,36 +47,85 @@ You do **not** need code for the proxy part.
         }
       }
     }
+  },
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.File" ],
+    "MinimumLevel": "Information",
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/ProxyService-.log",
+          "rollingInterval": "Day",
+          "fileSizeLimitBytes": "65535000",
+          "retainedFileCountLimit": "100",
+          "rollOnFileSizeLimit": true
+        }
+      }
+    ],
+    "Enrich": [ "FromLogContext" ]
   }
 }
-```
 
-YARP supports `HttpClient.WebProxy` in configuration for outbound proxying. ([Microsoft Learn][1])
 
-#### Option 2: if you need client certificate too, keep code
+using System.Text;
+using BrgccReverseProxy.Common;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Yarp.ReverseProxy.Transforms;
 
-Your old extension approach is valid in principle, because `ConfigureHttpClient(...)` is the documented hook for customizing the `SocketsHttpHandler`, including adding client certificates. ([Microsoft Learn][1])
+namespace BrgccReverseProxy.Extensions;
 
-### So should you use it in the current project?
+public static class ReverseProxyAuthExtensions
+{
+    public static IServiceCollection AddClusterBasedReverseProxyAuth(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        ClusterAuthOption clusterAuthOption = configuration.GetSection("ClusterAuth").Get<ClusterAuthOption>() ?? new();
+        
+        services
+            .AddReverseProxy()
+            .LoadFromConfig(configuration.GetSection("ReverseProxy"))
+            .AddTransforms(builderContext =>
+            {
+                String? clusterId = builderContext.Route.ClusterId;
+                
+                ClusterCredential? clusterCredential = clusterAuthOption.ClusterCredentials
+                    .FirstOrDefault(i => i.ClusterId.Equals(clusterId, StringComparison.OrdinalIgnoreCase));
+                
+                if (String.IsNullOrWhiteSpace(clusterId))
+                    return;
+                
+                if (clusterCredential is null)
+                    return;
 
-**Use only the part you actually need.**
+                if (String.IsNullOrWhiteSpace(clusterCredential.Username) ||
+                    String.IsNullOrWhiteSpace(clusterCredential.Password))
+                    return;
 
-For your current FactSet scenario, the likely answer is:
+                builderContext.AddRequestTransform(transformContext =>
+                {
+                    // OPTION A: Standard HTTP Basic auth
+                    var raw = $"{clusterCredential.Username}:{clusterCredential.Password}";
+                    var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(raw));
 
-* **Auth extension:** yes
-* **Web proxy:** only if your network requires it
-* **Client certificate:** probably no, unless FactSet or your gateway explicitly requires client-cert auth
+                    transformContext.ProxyRequest.Headers.Remove("Authorization");
+                    transformContext.ProxyRequest.Headers.TryAddWithoutValidation(
+                        "Authorization",
+                        $"Basic {base64}");
 
-### Recommendation
+                    return ValueTask.CompletedTask;
+                });
+            });
 
-Keep your current project split like this:
+        return services;
+    }
+}
 
-* one extension for **Basic Auth header by `ClusterId`**
-* optional YARP config in `appsettings.json` for **`HttpClient.WebProxy`**
-* optional `ConfigureHttpClient(...)` code only for **client certificates**
+But:
+        ClusterAuthOption clusterAuthOption = configuration.GetSection("ClusterAuth").Get<ClusterAuthOption>() ?? new();
 
-That keeps it cleaner than always loading certificate logic for every cluster.
 
-I can combine your auth extension and proxy/certificate extension into one clean `AddConfiguredReverseProxy(...)` method with `ClusterId`-based auth plus optional proxy/cert support.
-
-[1]: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/yarp/http-client-config?view=aspnetcore-10.0 "YARP HTTP Client Configuration | Microsoft Learn"
+is returning a List count = 0 why ?
