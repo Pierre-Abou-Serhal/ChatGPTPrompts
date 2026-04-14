@@ -1,312 +1,16 @@
-Yes — here is the clean DataExport version, aligned with the newer pattern you already applied elsewhere:
+I have one project remaining: DataGatewayService
 
-* the **API build** uses the updated .NET Core template and OWASP parameters, which the current `build-dotnet-core-webapi.yml` already supports 
-* the **DB build** uses the current `build-database-project.yml`, which now only builds and publishes the DACPAC, so I removed `previewConnectionString` from the parent pipeline because that parameter is no longer in the template 
-* the **release pipeline** becomes environment-driven and validates `release/*` or `hotfix/*` builds instead of `refs/heads/sit`, which matches the newer release pattern you’ve been moving to
-* the **DB preview pipeline** follows the same model as your Alterna Telecom preview flow and uses the shared `generate-db-preview.yml` template
-
-## 1) BUILD - API - Alterna-DataExport
-
-```yaml id="dte_api_build"
-name: DTE_API_$(SourceBranchName)_rc$(Rev:r)
+This is my release pipeline
+name: DATAGATEWAY_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
-- name: runDependencyCheck
-  type: boolean
-  default: true
-  displayName: 'Run OWASP Dependency Check'
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-      - release/*
-      - hotfix/*
-  paths:
-    include:
-      - Alterna-DataExport/**
-  paths:
-    exclude:
-      - '*.yml'
-      - global.json
-      - nuget.config
-
-pr: none
-
-variables:
-- group: OWASP_SECRETS
-
-stages:
-- stage: Build
-  displayName: 'Build & Publish Artifact'
-  jobs:
-  - template: pipelines/build-dotnet-core-webapi.yml@templates
-    parameters:
-      jobName: 'BuildJob'
-      jobDisplayName: 'Build DataExport'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      buildConfiguration: 'Release'
-      restoreProjects: '**/*.csproj'
-      runTests: false
-      testProjects: ''
-      publishProject: 'Alterna-DataExport/Alterna-DataExport/Alterna-DataExport.csproj'
-      nugetConfigPath: 'nuget.config'
-      zipName: 'Alterna-DataExport.zip'
-      artifactName: 'data-export-api-drop'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-DataExport'
-
-      runDependencyCheck: ${{ parameters.runDependencyCheck }}
-      dependencyCheckProjectName: 'Alterna-DataExport-API'
-      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-      dependencyCheckAdditionalArguments: ''
-```
-
-## 2) BUILD - DB - Alterna-DataExport
-
-```yaml id="dte_db_build"
-name: DTE_DB_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-    - release/*
-    - hotfix/*
-  paths:
-    include:
-    - DatabaseProjectAlterna_DataExport/**
-  paths:
-    exclude:
-    - '*.yml'
-
-pr: none
-
-stages:
-- stage: Build_DB
-  displayName: 'Build DB'
-  jobs:
-  - template: pipelines/build-database-project.yml@templates
-    parameters:
-      jobName: 'BuildDb'
-      jobDisplayName: 'Build database project'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      sqlProjectPath: 'DatabaseProjectAlterna_DataExport/DatabaseProjectAlterna_DataExport.sqlproj'
-      artifactName: 'data-export-db-drop'
-```
-
-## 3) PREVIEW DB CHANGES - Alterna-DataExport
-
-```yaml id="dte_db_preview"
-name: DTE_DB_PREVIEW_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
-
-parameters:
-- name: targetEnvironment
-  type: string
-  default: SIT
-  values:
-  - SIT
-  - UAT
-  - PROD
-  displayName: 'Target Environment'
-
-- name: dbBuildNumber
-  type: string
-  default: ''
-  displayName: 'DB Build Number'
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger: none
-pr: none
-
-variables:
-- name: deploymentPool
-  value: 'Deployment Pool'
-
-- name: buildSourceBranchRegex
-  value: '^refs/heads/(release|hotfix)/'
-
-- name: dbPipelineName
-  value: 'BUILD - DB - Alterna-DataExport'
-
-- name: dbArtifactName
-  value: 'data-export-db-drop'
-
-# SIT
-- ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-  - group: SIT_VARIABLE_GROUP
-  - name: environmentName
-    value: 'SIT'
-  - name: dbAgentName
-    value: 'SIT-ALTERNA-BN1'
-
-# UAT
-- ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-  - group: UAT_VARIABLE_GROUP   # TODO verify
-  - name: environmentName
-    value: 'UAT'
-  - name: dbAgentName
-    value: 'UAT-ALTERNA-BN1'    # TODO verify
-
-# PROD
-- ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-  - group: PROD_VARIABLE_GROUP  # TODO verify
-  - name: environmentName
-    value: 'PROD'
-  - name: dbAgentName
-    value: 'PROD-ALTERNA-BN1'   # TODO verify
-
-stages:
-- stage: Resolve_DB_Build
-  displayName: 'Resolve DB build'
-  jobs:
-  - job: ResolveDbBuild
-    displayName: 'Resolve DB build number'
-    pool:
-      name: '$(deploymentPool)'
-      demands:
-      - Agent.Name -equals $(dbAgentName)
-    steps:
-    - checkout: none
-
-    - powershell: |
-        $ErrorActionPreference = 'Stop'
-
-        if ([string]::IsNullOrWhiteSpace('${{ parameters.dbBuildNumber }}')) {
-          throw 'dbBuildNumber is required.'
-        }
-
-        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-        $apiVersion    = '7.1'
-        $allowedBranchPattern = '$(buildSourceBranchRegex)'
-
-        $headers = @{
-          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-        }
-
-        $pipelineName = '$(dbPipelineName)'
-        $encodedName = [System.Uri]::EscapeDataString($pipelineName)
-
-        $definitionsUri = "{0}/{1}/_apis/build/definitions?name={2}&api-version={3}" -f `
-          $collectionUri, $projectName, $encodedName, $apiVersion
-
-        $definitions = Invoke-RestMethod -Method Get -Uri $definitionsUri -Headers $headers
-        $definition = @($definitions.value | Where-Object { $_.name -eq $pipelineName }) | Select-Object -First 1
-
-        if (-not $definition) {
-          throw "Could not resolve pipeline definition for [$pipelineName]."
-        }
-
-        $buildNumber = [System.Uri]::EscapeDataString('${{ parameters.dbBuildNumber }}')
-
-        $buildsUri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-          $collectionUri, $projectName, $definition.id, $buildNumber, $apiVersion
-
-        $builds = Invoke-RestMethod -Method Get -Uri $buildsUri -Headers $headers
-        $build = @($builds.value) | Select-Object -First 1
-
-        if (-not $build) {
-          throw "No successful DB build found for build number [${{ parameters.dbBuildNumber }}]."
-        }
-
-        if ($build.sourceBranch -notmatch $allowedBranchPattern) {
-          throw "DB build belongs to branch [$($build.sourceBranch)]. Only release/* or hotfix/* builds can be previewed."
-        }
-
-        Write-Host "Resolved build:"
-        Write-Host "  Definition ID = $($definition.id)"
-        Write-Host "  Build ID      = $($build.id)"
-        Write-Host "  Build Number  = $($build.buildNumber)"
-        Write-Host "  Source Branch = $($build.sourceBranch)"
-
-        Write-Host "##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]$($definition.id)"
-        Write-Host "##vso[task.setvariable variable=DbBuildId;isOutput=true]$($build.id)"
-        Write-Host "##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-      name: Resolve
-      displayName: 'Resolve DB build number'
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-- stage: Generate_DB_Preview
-  displayName: 'Generate DB preview for $(environmentName)'
-  dependsOn:
-  - Resolve_DB_Build
-  condition: succeeded('Resolve_DB_Build')
-  variables:
-  - name: DbPipelineDefinitionId
-    value: $[ stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbPipelineDefinitionId'] ]
-  - name: DbBuildId
-    value: $[ stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbBuildId'] ]
-  jobs:
-  - template: pipelines/generate-db-preview.yml@templates
-    parameters:
-      jobName: 'GenerateDbPreview'
-      jobDisplayName: 'Generate DB preview for $(environmentName)'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(dbAgentName)'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactName: '$(dbArtifactName)'
-      previewArtifactName: 'db-preview-$(environmentName)'
-      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
-```
-
-## 4) RELEASE - Alterna-DataExport
-
-```yaml id="dte_release"
-name: DTE_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
-
-parameters:
-- name: targetEnvironment
-  type: string
-  default: SIT
-  values:
-  - SIT
-  - UAT
-  - PROD
-  displayName: 'Target Environment'
-
 - name: deployApi
   type: boolean
   default: false
-  displayName: 'Deploy API'
-
-- name: deployDatabase
-  type: boolean
-  default: false
-  displayName: 'Deploy Database'
 
 - name: apiBuildNumber
   type: string
   default: '__EMPTY__'
-  displayName: 'API Build Number'
-
-- name: dbBuildNumber
-  type: string
-  default: '__EMPTY__'
-  displayName: 'DB Build Number'
 
 resources:
   repositories:
@@ -319,161 +23,22 @@ trigger: none
 pr: none
 
 variables:
-- name: deploymentPool
-  value: 'Deployment Pool'
+- group: SIT_VARIABLE_GROUP
 
-- name: buildSourceBranchRegex
-  value: '^refs/heads/(release|hotfix)/'
-
-- name: apiArtifactName
-  value: 'data-export-api-drop'
-
-- name: dbArtifactName
-  value: 'data-export-db-drop'
-
-- name: apiZipName
-  value: 'Alterna-DataExport.zip'
-
-- name: apiSiteName
-  value: 'AlternaDataExportServiceAzureDevOps'
-
-- name: apiAppPoolName
-  value: 'AlternaDataExportServiceAzureDevOps'
-
-- name: apiTargetPath
-  value: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1'
-
-# SIT
-- ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-  - group: SIT_VARIABLE_GROUP
-
-  - name: environmentName
-    value: 'SIT'
-
-  - name: apiPipelineName
-    value: 'BUILD - API - Alterna-DataExport'
-
-  - name: dbPipelineName
-    value: 'BUILD - DB - Alterna-DataExport'
-
-  - name: resolveAgentName
-    value: 'SIT-ALTERNA-BN1'
-
-  - name: apiAgentName
-    value: 'SIT-ALTERNA-BN1'
-
-  - name: dbAgentName
-    value: 'SIT-ALTERNA-BN1'
-
-  - name: approvalNotifyUsers
-    value: 'SGBL\pabouserhal'
-
-  - name: approvalInstructions
-    value: 'Approve SIT DataExport deployment.'
-
-  - name: managementApprovalNotifyUsers
-    value: 'SGBL\kabbas'
-
-  - name: dbaApprovalNotifyUsers
-    value: 'SGBL\hkassab'
-
-  - name: apiHealthCheckUrl
-    value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
-
-  - name: backupRoot
-    value: 'C:\DeployBackups\SIT\DataExport'
-
-# UAT
-- ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-  - group: UAT_VARIABLE_GROUP   # TODO verify
-
-  - name: environmentName
-    value: 'UAT'
-
-  - name: apiPipelineName
-    value: 'BUILD - API - Alterna-DataExport'
-
-  - name: dbPipelineName
-    value: 'BUILD - DB - Alterna-DataExport'
-
-  - name: resolveAgentName
-    value: 'UAT-ALTERNA-BN1'   # TODO verify
-
-  - name: apiAgentName
-    value: 'UAT-ALTERNA-BN1'   # TODO verify
-
-  - name: dbAgentName
-    value: 'UAT-ALTERNA-BN1'   # TODO verify
-
-  - name: approvalNotifyUsers
-    value: 'SGBL\pabouserhal'
-
-  - name: approvalInstructions
-    value: 'Approve UAT DataExport deployment.'
-
-  - name: managementApprovalNotifyUsers
-    value: 'SGBL\kabbas'
-
-  - name: dbaApprovalNotifyUsers
-    value: 'SGBL\hkassab'
-
-  - name: apiHealthCheckUrl
-    value: 'http://UAT-DTE-API-URL/health'   # TODO replace
-
-  - name: backupRoot
-    value: 'C:\DeployBackups\UAT\DataExport'
-
-# PROD
-- ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-  - group: PROD_VARIABLE_GROUP  # TODO verify
-
-  - name: environmentName
-    value: 'PROD'
-
-  - name: apiPipelineName
-    value: 'BUILD - API - Alterna-DataExport'
-
-  - name: dbPipelineName
-    value: 'BUILD - DB - Alterna-DataExport'
-
-  - name: resolveAgentName
-    value: 'PROD-ALTERNA-BN1'   # TODO verify
-
-  - name: apiAgentName
-    value: 'PROD-ALTERNA-BN1'   # TODO verify
-
-  - name: dbAgentName
-    value: 'PROD-ALTERNA-BN1'   # TODO verify
-
-  - name: approvalNotifyUsers
-    value: 'SGBL\pabouserhal'
-
-  - name: approvalInstructions
-    value: 'Approve PROD DataExport deployment.'
-
-  - name: managementApprovalNotifyUsers
-    value: 'SGBL\kabbas'
-
-  - name: dbaApprovalNotifyUsers
-    value: 'SGBL\hkassab'
-
-  - name: apiHealthCheckUrl
-    value: 'http://PROD-DTE-API-URL/health'   # TODO replace
-
-  - name: backupRoot
-    value: 'C:\DeployBackups\PROD\DataExport'
+- name: apiPipelineName
+  value: 'SIT - BUILD - API - DataGateway'
 
 stages:
 
-- stage: Resolve_Selected_Builds
-  displayName: 'Resolve selected build numbers'
+- stage: Resolve_Selected_Build
+  displayName: 'Resolve selected build number'
   jobs:
-  - job: ResolveBuildNumbers
-    displayName: 'Resolve pipeline names and build numbers'
+  - job: ResolveBuildNumber
+    displayName: 'Resolve pipeline name and build number'
     pool:
-      name: '$(deploymentPool)'
+      name: 'Deployment Pool'
       demands:
-      - Agent.Name -equals $(resolveAgentName)
+      - Agent.Name -equals SIT-ALTERNA-BN1
     steps:
     - checkout: none
 
@@ -483,17 +48,15 @@ stages:
         $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
         $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
         $apiVersion    = '7.1'
-        $allowedBranchPattern = '$(buildSourceBranchRegex)'
 
         $headers = @{
           Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
         }
 
         $deployApi = "${{ parameters.deployApi }}".ToLower() -eq 'true'
-        $deployDb  = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
 
-        if (-not ($deployApi -or $deployDb)) {
-          throw 'At least one deployment target must be selected: API or Database.'
+        if (-not $deployApi) {
+          throw 'At least one deployment target must be selected: API.'
         }
 
         function Normalize-BuildNumber {
@@ -581,8 +144,8 @@ stages:
 
           $build = $response.value[0]
 
-          if ($build.sourceBranch -notmatch $allowedBranchPattern) {
-            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)]. Only release/* or hotfix/* builds can be deployed."
+          if ($build.sourceBranch -ne 'refs/heads/sit') {
+            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
           }
 
           Write-Host "$Label build resolved:"
@@ -595,291 +158,200 @@ stages:
           Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
           Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
           Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-          Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
         }
 
-        if ($deployApi) {
-          Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
-        } else {
-          Write-Host '##vso[task.setvariable variable=ApiPipelineDefinitionId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=ApiBuildId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=ApiResolvedBuildNumber;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=ApiSourceBranch;isOutput=true]'
-        }
-
-        if ($deployDb) {
-          Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
-        } else {
-          Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=DbSourceBranch;isOutput=true]'
-        }
+        Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
       name: Resolve
-      displayName: 'Resolve pipeline names and build numbers'
+      displayName: 'Resolve pipeline name and build number'
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
-- stage: Generate_DB_Preview
-  displayName: 'Generate DB preview for $(environmentName)'
+- stage: Approval_SIT_Release
+  displayName: 'Approval for SIT release'
   dependsOn:
-  - Resolve_Selected_Builds
-  condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployDatabase }}', 'true'))
-  variables:
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+  - Resolve_Selected_Build
+  condition: succeeded('Resolve_Selected_Build')
   jobs:
-  - template: pipelines/generate-db-preview.yml@templates
-    parameters:
-      jobName: 'GenerateDbPreview'
-      jobDisplayName: 'Generate DB preview for $(environmentName)'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(dbAgentName)'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactName: '$(dbArtifactName)'
-      previewArtifactName: 'db-preview-$(environmentName)'
-      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+  - job: WaitForBusinessApproval
+    displayName: 'Wait for Business Approval'
+    pool: server
+    timeoutInMinutes: 1500
+    steps:
+    - task: ManualValidation@0
+      timeoutInMinutes: 1440
+      inputs:
+        notifyUsers: 'SGBL\pabouserhal'
+        instructions: 'Approve SIT DataGateway deployment.'
+        onTimeout: 'reject'
 
-- stage: Approval_Release
-  displayName: 'Approval for $(environmentName) release'
+  # - job: WaitForManagementApproval
+  #   displayName: 'Wait for Management Approval'
+  #   dependsOn: WaitForBusinessApproval
+  #   pool: server
+  #   timeoutInMinutes: 1500
+  #   steps:
+  #   - task: ManualValidation@0
+  #     timeoutInMinutes: 1440
+  #     inputs:
+  #       notifyUsers: 'SGBL\kabbas'
+  #       instructions: 'Approve SIT DataGateway deployment.'
+  #       onTimeout: 'reject'
+
+- stage: Deploy_API_SIT
+  displayName: 'Deploy API to SIT'
   dependsOn:
-  - Resolve_Selected_Builds
-  - ${{ if eq(parameters.deployDatabase, true) }}:
-    - Generate_DB_Preview
-  condition: succeeded()
-  jobs:
-  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-    - job: NoApprovalRequired
-      displayName: 'No approval required for SIT'
-      pool:
-        name: '$(deploymentPool)'
-        demands:
-        - Agent.Name -equals $(resolveAgentName)
-      steps:
-      - checkout: none
-      - powershell: |
-          Write-Host 'SIT selected. No manual approval is required.'
-        displayName: 'Skip manual approval'
-
-  - ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
-    - job: WaitForBusinessApproval
-      displayName: 'Wait for Business Approval'
-      pool: server
-      timeoutInMinutes: 1500
-      steps:
-      - task: ManualValidation@0
-        timeoutInMinutes: 1440
-        inputs:
-          notifyUsers: '$(approvalNotifyUsers)'
-          instructions: '$(approvalInstructions)'
-          onTimeout: 'reject'
-
-    - job: WaitForManagementApproval
-      displayName: 'Wait for Management Approval'
-      dependsOn: WaitForBusinessApproval
-      pool: server
-      timeoutInMinutes: 1500
-      steps:
-      - task: ManualValidation@0
-        timeoutInMinutes: 1440
-        inputs:
-          notifyUsers: '$(managementApprovalNotifyUsers)'
-          instructions: '$(approvalInstructions)'
-          onTimeout: 'reject'
-
-  - ${{ if and(ne(parameters.targetEnvironment, 'SIT'), eq(parameters.deployDatabase, true)) }}:
-    - job: WaitForDbaApproval
-      displayName: 'Wait for DBA approval'
-      dependsOn: WaitForManagementApproval
-      pool: server
-      timeoutInMinutes: 1500
-      steps:
-      - task: ManualValidation@0
-        timeoutInMinutes: 1440
-        inputs:
-          notifyUsers: '$(dbaApprovalNotifyUsers)'
-          instructions: 'Approve $(environmentName) DataExport database deployment.'
-          onTimeout: 'reject'
-
-- stage: Deploy_API
-  displayName: 'Deploy API to $(environmentName)'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Approval_Release
+  - Resolve_Selected_Build
+  - Approval_SIT_Release
   condition: and(succeeded(), eq('${{ parameters.deployApi }}', 'true'))
   variables:
-    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
-    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
-    ApiSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiSourceBranch'] ]
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiBuildId'] ]
   jobs:
   - template: pipelines/deploy-iis.yml@templates
     parameters:
       jobDependsOn: []
       jobCondition: succeeded()
       deploymentName: 'DeployAPI'
-      deploymentDisplayName: 'Deploy DataExport API to ${{ parameters.targetEnvironment }} (IIS)'
-      environmentName: '${{ parameters.targetEnvironment }}'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(apiAgentName)'
-      ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-        variableGroup: 'SIT_VARIABLE_GROUP'
-      ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-        variableGroup: 'UAT_VARIABLE_GROUP'
-      ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-        variableGroup: 'PROD_VARIABLE_GROUP'
+      deploymentDisplayName: 'Deploy DataGateway API to SIT (IIS)'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      variableGroup: 'SIT_VARIABLE_GROUP'
       componentName: 'API'
-      artifactName: '$(apiArtifactName)'
+      artifactName: 'datagateway-api-drop'
       artifactBuildType: 'specific'
       artifactProject: '$(System.TeamProject)'
       artifactDefinitionId: '$(ApiPipelineDefinitionId)'
       artifactBuildId: '$(ApiBuildId)'
-      artifactBranch: '$(ApiSourceBranch)'
-      zipName: '$(apiZipName)'
-      siteName: '$(apiSiteName)'
-      appPoolName: '$(apiAppPoolName)'
-      iisTargetPath: '$(apiTargetPath)'
+      artifactBranch: 'refs/heads/sit'
+      zipName: 'DataGatewayService.zip'
+      siteName: 'AlternaDataGatewayServiceAzureDevOps'
+      appPoolName: 'AlternaDataGatewayServiceAzureDevOps'
+      iisTargetPath: 'C:\inetpub\wwwroot\AlternaDataGatewayService-AzureDevOps-BN1'
       cleanTargetBeforeCopy: true
       cleanExcludeCsv: ''
-      enableJsonTransform: true
-      jsonFiles: '**/appsettings.json'
-      enableXmlConfigTransform: false
-      xmlConfigFiles: []
-      xmlVariableValues: {}
-      enableCustomXmlEdits: false
-      customXmlEdits: []
-      customXmlVariableValues: {}
+      enableJsonTransform: false
+      jsonFiles: ''
+      enableXmlConfigTransform: true
+      xmlConfigFiles:
+      - '**/App.config'
+      - '**/API.dll.config'
+      xmlVariableValues:
+        API_TOKEN_CHECK: $(API_TOKEN_CHECK)
+        CONN_STRING_User: $(CONN_STRING_User)
+        NLog_MaxArchiveDays: $(NLog_MaxArchiveDays)
+      enableCustomXmlEdits: true
+      customXmlVariableValues:
+        TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE: $(TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE)
+        TOKEN_GET_CUSTOMER_AMS: $(TOKEN_GET_CUSTOMER_AMS)
+        TOKEN_GET_CUSTOMER_FRESH_ACCOUNT: $(TOKEN_GET_CUSTOMER_FRESH_ACCOUNT)
+        TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE_HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES: $(TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE_HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES)
+        TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE: $(TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE)
+        TOKEN_GET_T24USER_AMS: $(TOKEN_GET_T24USER_AMS)
+        TOKEN_LDAP_PSS: $(TOKEN_LDAP_PSS)
+        TOKEN_GET_PRODUCT_FRESH_ACCOUNT: $(TOKEN_GET_PRODUCT_FRESH_ACCOUNT)
+      customXmlEdits:
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@VALUE'
+        variable: 'TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="AMS"]/@VALUE'
+        variable: 'TOKEN_GET_CUSTOMER_AMS'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@VALUE'
+        variable: 'TOKEN_GET_CUSTOMER_FRESH_ACCOUNT'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_CUSTOMER/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES'
+        variable: 'TOKEN_GET_CUSTOMER_APPORTEUR_AFFAIRE_HAVE_ACCESS_TO_GET_AVAILABLE_VARIABLES'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_COMPANY/TOKEN[@APPLICATION_NAME="APPORTEUR_AFFAIRE"]/@VALUE'
+        variable: 'TOKEN_GET_COMPANY_APPORTEUR_AFFAIRE'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_T24USER/TOKEN[@APPLICATION_NAME="AMS"]/@VALUE'
+        variable: 'TOKEN_GET_T24USER_AMS'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/LDAP/TOKEN[@APPLICATION_NAME="PSS"]/@VALUE'
+        variable: 'TOKEN_LDAP_PSS'
+      - file: '**/APITOKENS.xml'
+        xpath: '/APITOKEN/GET_PRODUCT/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@VALUE'
+        variable: 'TOKEN_GET_PRODUCT_FRESH_ACCOUNT'
       enableHealthCheck: true
-      healthCheckUrl: '$(apiHealthCheckUrl)'
+      healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
       healthCheckExpectedStatusCode: '200'
       healthCheckRetries: 6
       healthCheckDelaySeconds: 10
       enableRollbackOnHealthCheckFailure: true
       enableLocalBackup: true
       backupRoot: 'C:\DeployBackups'
-      backupPath: '$(backupRoot)\API\$(Build.BuildId)'
+      backupPath: 'C:\DeployBackups\SIT\DataGateway\API\$(Build.BuildId)'
 
-- stage: Tag_API_LKG
+- stage: Tag_API_LKG_SIT
   displayName: 'Tag successful API build as LKG'
   dependsOn:
-  - Resolve_Selected_Builds
-  - Deploy_API
-  condition: and(succeeded('Deploy_API'), eq('${{ parameters.deployApi }}', 'true'))
+  - Resolve_Selected_Build
+  - Deploy_API_SIT
+  condition: and(succeeded('Deploy_API_SIT'), eq('${{ parameters.deployApi }}', 'true'))
   variables:
-    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
-    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    ApiBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiBuildId'] ]
+    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiPipelineDefinitionId'] ]
   jobs:
   - job: TagApiBuild
     displayName: 'Tag API build'
     pool:
-      name: '$(deploymentPool)'
+      name: 'Deployment Pool'
       demands:
-      - Agent.Name -equals $(resolveAgentName)
+      - Agent.Name -equals SIT-ALTERNA-BN1
     steps:
     - checkout: none
 
     - template: pipelines/tag-builds.yml@templates
       parameters:
         tagTargets:
-        - name: 'Alterna-DataExport API'
+        - name: 'DataGateway API'
           buildId: '$(ApiBuildId)'
           definitionId: '$(ApiPipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-$(environmentName)-DTE-API'
-          lkgTag: 'LKG-$(environmentName)-DTE-API'
+          deployedTag: 'DEPLOYED-SIT-DATAGATEWAY-API'
+          lkgTag: 'LKG-SIT-DATAGATEWAY-API'
           makeLkgUnique: true
 
-- stage: Deploy_DB_After_API
-  displayName: 'Deploy DB to $(environmentName) after API'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Tag_API_LKG
-  condition: and(succeeded('Tag_API_LKG'), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'true'))
-  variables:
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
+
+And this is my build pipeline:
+
+name: DGW_API_SIT_$(Date:yyyyMMdd).$(Rev:r)
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - sit
+  paths:
+    include:
+    - DataGatewayService/**
+
+pr: none
+
+stages:
+- stage: Build
+  displayName: 'Build & Publish Artifact'
   jobs:
-  - template: pipelines/deploy-database.yml@templates
+  - template: pipelines/build-dotnet-core-webapi.yml@templates
     parameters:
-      jobDependsOn: []
-      jobCondition: succeeded()
-      deploymentName: 'DeployDb'
-      deploymentDisplayName: 'Deploy DataExport database'
-      environmentName: '${{ parameters.targetEnvironment }}'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(dbAgentName)'
-      artifactName: '$(dbArtifactName)'
-      artifactBuildType: 'specific'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactBranch: '$(DbSourceBranch)'
-      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
-
-- stage: Deploy_DB_Only
-  displayName: 'Deploy DB to $(environmentName)'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Approval_Release
-  condition: and(succeeded(), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'false'))
-  variables:
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
-  jobs:
-  - template: pipelines/deploy-database.yml@templates
-    parameters:
-      jobDependsOn: []
-      jobCondition: succeeded()
-      deploymentName: 'DeployDb'
-      deploymentDisplayName: 'Deploy DataExport database'
-      environmentName: '${{ parameters.targetEnvironment }}'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(dbAgentName)'
-      artifactName: '$(dbArtifactName)'
-      artifactBuildType: 'specific'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactBranch: '$(DbSourceBranch)'
-      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
-
-- stage: Tag_DB_DEPLOYED
-  displayName: 'Tag deployed database build'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Deploy_DB_After_API
-  - Deploy_DB_Only
-  condition: and(eq('${{ parameters.deployDatabase }}', 'true'), or(eq(dependencies.Deploy_DB_After_API.result, 'Succeeded'), eq(dependencies.Deploy_DB_Only.result, 'Succeeded')))
-  variables:
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-  jobs:
-  - job: TagDatabaseBuild
-    displayName: 'Tag DB build'
-    pool:
-      name: '$(deploymentPool)'
-      demands:
-      - Agent.Name -equals $(resolveAgentName)
-    steps:
-    - checkout: none
-
-    - template: pipelines/tag-builds.yml@templates
-      parameters:
-        tagTargets:
-        - name: 'Alterna-DataExport DB'
-          buildId: '$(DbBuildId)'
-          definitionId: '$(DbPipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-$(environmentName)-DTE-DB'
-          lkgTag: 'LKG-$(environmentName)-DTE-DB'
-          makeLkgUnique: true
-```
-
-Two important notes before you paste these:
-
-The pipeline definition names inside the release and preview flows must match the actual Azure DevOps pipeline names you will end up with, for example `BUILD - API - Alterna-DataExport` and `BUILD - DB - Alterna-DataExport`. Your current pipelines are still SIT-named versions like `DTE_API_SIT_...` and `DTE_DB_SIT_...`, so rename the Azure DevOps pipeline definitions accordingly if you want the resolve step to work as written. 
-
-For UAT and PROD, I used placeholders like `UAT_VARIABLE_GROUP`, `PROD_VARIABLE_GROUP`, `UAT-ALTERNA-BN1`, and the API health-check URLs. Replace those with your real values before running outside SIT. The deploy templates already support this environment-driven pattern.
-
-If you want, next I’ll do the same conversion for the next project in the exact same format.
+      jobName: 'BuildJob'
+      jobDisplayName: 'Build Alterna Data Gateway Service'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      buildConfiguration: 'Release'
+      restoreProjects: 'DataGatewayService/API/API.csproj'
+      runTests: false
+      testProjects: ''
+      publishProject: 'DataGatewayService/API/API.csproj'
+      nugetConfigPath: 'nuget.config'
+      zipName: 'DataGatewayService.zip'
+      artifactName: 'datagateway-api-drop'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\DataGatewayService'
