@@ -1,32 +1,327 @@
-Your `.gitignore` already contains rules that should ignore both `bin` and `obj`, including `[Oo]bj/`, `[Bb]in/`, and recursive bin rules. So the reason you still see changes is most likely that those files were **already tracked by Git before** the ignore rule was added. 
+Based on what we have done so far, I want to apply the newly updated templates and pipelines to my other project.
 
-`.gitignore` only ignores **untracked** files. It does not stop Git from watching files that are already in the index.
+I will begin with Alterna.Logger. It is build using dotnet core and deployed as a windows service
 
-Use these commands from the repo root:
+Build-pipeline:
+name: LGR_SVC_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
-```bash
-git rm -r --cached BrgccReverseProxy/obj BrgccReverseProxy/bin
-git commit -m "Stop tracking bin and obj folders"
-```
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: 'Azure Templates/Azure Templates'
+      ref: refs/heads/main
 
-Or, if you want to clear all tracked files that should now be ignored:
+trigger:
+  branches:
+    include:
+      - sit
+  paths:
+    exclude:
+      - '*.yml'
+      - global.json
+      - nuget.config
 
-```bash
-git rm -r --cached .
-git add .
-git commit -m "Reapply gitignore"
-```
+pr: none
 
-To verify what Git thinks, run:
+stages:
+- stage: Build_Service
+  displayName: 'Build & Publish Artifact'
+  jobs:
+  - template: pipelines/build-dotnet-core-webapi.yml@templates
+    parameters:
+      jobName: 'BuildLoggerService'
+      jobDisplayName: 'Build Alterna Logger Service'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      buildConfiguration: 'Release'
+      restoreProjects: '**/*.csproj'
+      runTests: false
+      testProjects: ''
+      publishProject: 'Logger/Logger.csproj'
+      nugetConfigPath: 'nuget.config'
+      zipName: 'Alterna-Logger-drop.zip'
+      artifactName: 'logger-service-drop'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-Logger'
+      deploymentMode: 'self-contained'
+      targetRuntime: 'win-x64'
+      produceSingleFile: true
+      readyToRun: false
+      trim: false
 
-```bash
-git check-ignore -v BrgccReverseProxy/obj
-git ls-files BrgccReverseProxy/obj
-```
+Release pipeline:
+name: LOGGER_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
 
-What to expect:
+parameters:
+- name: deployService
+  type: boolean
+  default: false
+  displayName: 'Deploy Logger Service'
 
-* If `git check-ignore -v ...` shows a matching rule, your `.gitignore` is fine.
-* If `git ls-files ...` returns files, they are already tracked, which is why they still appear.
+- name: serviceBuildNumber
+  type: string
+  default: '__EMPTY__'
+  displayName: 'Service Build Number'
 
-So the issue is probably **not** the ignore pattern. It is that `obj` and `bin` were committed earlier.
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger: none
+pr: none
+
+variables:
+- group: SIT_VARIABLE_GROUP
+
+- name: servicePipelineName
+  value: 'SIT - BUILD - SERVICE - Alterna Logger'
+
+stages:
+
+- stage: Resolve_Selected_Build
+  displayName: 'Resolve selected build number'
+  jobs:
+  - job: ResolveBuildNumber
+    displayName: 'Resolve pipeline name and build number'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+
+    - powershell: |
+        $ErrorActionPreference = 'Stop'
+
+        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+        $apiVersion    = '7.1'
+
+        $headers = @{
+          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+        }
+
+        $deployService = "${{ parameters.deployService }}".ToLower() -eq 'true'
+
+        if (-not $deployService) {
+          throw 'At least one deployment target must be selected: Logger Service.'
+        }
+
+        function Normalize-BuildNumber {
+          param([string]$BuildNumber)
+
+          if ($BuildNumber -eq '__EMPTY__') {
+            return ''
+          }
+
+          return $BuildNumber
+        }
+
+        function Resolve-DefinitionIdByName {
+          param(
+            [string]$Label,
+            [string]$PipelineName
+          )
+
+          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
+            throw "$Label pipeline name is empty."
+          }
+
+          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
+          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
+            $collectionUri,
+            $projectName,
+            $encodedName,
+            $apiVersion
+
+          Write-Host "Resolving $Label pipeline name [$PipelineName]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No pipeline definition found for $Label with name [$PipelineName]."
+          }
+
+          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
+
+          if ($exactMatches.Count -eq 0) {
+            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
+          }
+
+          if ($exactMatches.Count -gt 1) {
+            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
+          }
+
+          $definition = $exactMatches[0]
+
+          Write-Host "$Label definition resolved:"
+          Write-Host "  Definition ID   = $($definition.id)"
+          Write-Host "  Definition Name = $($definition.name)"
+
+          return $definition.id
+        }
+
+        function Resolve-Build {
+          param(
+            [string]$Label,
+            [string]$PipelineName,
+            [string]$BuildNumber
+          )
+
+          $BuildNumber = Normalize-BuildNumber -BuildNumber $BuildNumber
+
+          if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
+            throw "$Label build number is required because deployment of $Label was selected."
+          }
+
+          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
+          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
+
+          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
+            $collectionUri,
+            $projectName,
+            $definitionId,
+            $encodedBuildNumber,
+            $apiVersion
+
+          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
+          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+          if (-not $response.value -or $response.count -lt 1) {
+            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
+          }
+
+          $build = $response.value[0]
+
+          if ($build.sourceBranch -ne 'refs/heads/sit') {
+            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
+          }
+
+          Write-Host "$Label build resolved:"
+          Write-Host "  Build ID         = $($build.id)"
+          Write-Host "  Build Number     = $($build.buildNumber)"
+          Write-Host "  Definition ID    = $definitionId"
+          Write-Host "  Definition Name  = $PipelineName"
+          Write-Host "  Branch           = $($build.sourceBranch)"
+
+          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
+          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
+          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+        }
+
+        Resolve-Build -Label 'Service' -PipelineName '$(servicePipelineName)' -BuildNumber '${{ parameters.serviceBuildNumber }}'
+      name: Resolve
+      displayName: 'Resolve pipeline name and build number'
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: Approval_SIT_Release
+  displayName: 'Approval for SIT release'
+  dependsOn:
+  - Resolve_Selected_Build
+  condition: succeeded('Resolve_Selected_Build')
+  jobs:
+  - job: WaitForBusinessApproval
+    displayName: 'Wait for Business Approval'
+    pool: server
+    timeoutInMinutes: 1500
+    steps:
+    - task: ManualValidation@0
+      timeoutInMinutes: 1440
+      inputs:
+        notifyUsers: 'SGBL\pabouserhal'
+        instructions: 'Approve SIT Alterna Logger deployment.'
+        onTimeout: 'reject'
+
+  # - job: WaitForManagementApproval
+  #   displayName: 'Wait for Management Approval'
+  #   dependsOn: WaitForBusinessApproval
+  #   pool: server
+  #   timeoutInMinutes: 1500
+  #   steps:
+  #   - task: ManualValidation@0
+  #     timeoutInMinutes: 1440
+  #     inputs:
+  #       notifyUsers: 'SGBL\kabbas'
+  #       instructions: 'Approve SIT Alterna Logger deployment.'
+  #       onTimeout: 'reject'
+
+- stage: Deploy_Service_SIT
+  displayName: 'Deploy Logger Service to SIT'
+  dependsOn:
+  - Resolve_Selected_Build
+  - Approval_SIT_Release
+  condition: and(succeeded(), eq('${{ parameters.deployService }}', 'true'))
+  variables:
+    ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServicePipelineDefinitionId'] ]
+    ServiceBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceBuildId'] ]
+  jobs:
+  - template: pipelines/deploy-windows-service.yml@templates
+    parameters:
+      jobDependsOn: []
+      jobCondition: succeeded()
+      deploymentName: 'DeployLoggerService'
+      deploymentDisplayName: 'Deploy Alterna Logger Windows Service - SIT'
+      environmentName: 'SIT'
+      deployPool: 'Deployment Pool'
+      deployAgentName: 'SIT-ALTERNA-BN1'
+      variableGroup: 'SIT_VARIABLE_GROUP'
+      componentName: 'LOGGER'
+      artifactName: 'logger-service-drop'
+      artifactBuildType: 'specific'
+      artifactProject: '$(System.TeamProject)'
+      artifactDefinitionId: '$(ServicePipelineDefinitionId)'
+      artifactBuildId: '$(ServiceBuildId)'
+      artifactBranch: 'refs/heads/sit'
+      zipName: 'Alterna-Logger-drop.zip'
+      serviceName: 'LoggerServiceAzureDevOps'
+      serviceTargetPath: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps'
+      cleanTargetBeforeCopy: true
+      cleanExcludeCsv: 'logs,Keys'
+      enableJsonTransform: true
+      jsonFiles: '**/appsettings.json'
+      enableXmlConfigTransform: false
+      xmlConfigFiles: []
+      xmlVariableValues: {}
+      enableCustomXmlEdits: false
+      customXmlEdits: []
+      customXmlVariableValues: {}
+      enableHealthCheck: true
+      healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+      healthCheckExpectedStatusCode: '200'
+      healthCheckRetries: 6
+      healthCheckDelaySeconds: 10
+      enableLocalBackup: true
+      backupRoot: 'C:\DeployBackups'
+      backupPath: 'C:\DeployBackups\SIT\LOGGER\$(Build.BuildId)'
+
+- stage: Tag_SERVICE_LKG_SIT
+  displayName: 'Tag successful service build as LKG'
+  dependsOn:
+  - Resolve_Selected_Build
+  - Deploy_Service_SIT
+  condition: and(succeeded('Deploy_Service_SIT'), eq('${{ parameters.deployService }}', 'true'))
+  variables:
+    ServiceBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceBuildId'] ]
+    ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServicePipelineDefinitionId'] ]
+  jobs:
+  - job: TagServiceBuild
+    displayName: 'Tag service build'
+    pool:
+      name: 'Deployment Pool'
+      demands:
+      - Agent.Name -equals SIT-ALTERNA-BN1
+    steps:
+    - checkout: none
+
+    - template: pipelines/tag-builds.yml@templates
+      parameters:
+        tagTargets:
+        - name: 'Alterna Logger Service'
+          buildId: '$(ServiceBuildId)'
+          definitionId: '$(ServicePipelineDefinitionId)'
+          deployedTag: 'DEPLOYED-SIT-LOGGER-SVC'
+          lkgTag: 'LKG-SIT-LOGGER-SVC'
+          makeLkgUnique: true
