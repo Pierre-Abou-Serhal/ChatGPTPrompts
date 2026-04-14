@@ -1,9 +1,21 @@
-Based on what we have done so far, I want to apply the newly updated templates and pipelines to my other project.
+Your current Logger setup is still **SIT-only** on both sides: the build triggers on `sit`, and the release validates `refs/heads/sit`, deploys the Windows service through `deploy-windows-service.yml`, and tags the build as `DEPLOYED-SIT-LOGGER-SVC` / `LKG-SIT-LOGGER-SVC`.   
 
-I will begin with Alterna.Logger. It is build using dotnet core and deployed as a windows service
+Below is the updated version to match the newer pattern you’ve been moving to:
 
-Build-pipeline:
-name: LGR_SVC_SIT_$(Date:yyyyMMdd).$(Rev:r)
+* **build pipeline** uses the updated `build-dotnet-core-webapi.yml` template with OWASP parameters and `OWASP_SECRETS` 
+* **release pipeline** becomes **environment-driven** and validates **`release/*` or `hotfix/*`** builds like the newer flows you’re aligning to 
+* deployment still uses `deploy-windows-service.yml`, which already supports **specific build download, variable group injection, health check, local backup, and rollback inside the deployment job**   
+
+## BUILD - SERVICE - Alterna Logger
+
+```yaml
+name: LGR_SVC_$(SourceBranchName)_rc$(Rev:r)
+
+parameters:
+- name: runDependencyCheck
+  type: boolean
+  default: true
+  displayName: 'Run OWASP Dependency Check'
 
 resources:
   repositories:
@@ -15,7 +27,8 @@ resources:
 trigger:
   branches:
     include:
-      - sit
+      - release/*
+      - hotfix/*
   paths:
     exclude:
       - '*.yml'
@@ -23,6 +36,9 @@ trigger:
       - nuget.config
 
 pr: none
+
+variables:
+- group: OWASP_SECRETS
 
 stages:
 - stage: Build_Service
@@ -49,10 +65,28 @@ stages:
       readyToRun: false
       trim: false
 
-Release pipeline:
-name: LOGGER_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
+      runDependencyCheck: ${{ parameters.runDependencyCheck }}
+      dependencyCheckProjectName: 'Alterna-Logger-Service'
+      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
+      dependencyCheckAdditionalArguments: ''
+```
+
+## RELEASE - Alterna Logger
+
+```yaml
+name: LOGGER_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
+- name: targetEnvironment
+  type: string
+  default: SIT
+  values:
+  - SIT
+  - UAT
+  - PROD
+  displayName: 'Target Environment'
+
 - name: deployService
   type: boolean
   default: false
@@ -74,10 +108,128 @@ trigger: none
 pr: none
 
 variables:
-- group: SIT_VARIABLE_GROUP
+- name: deploymentPool
+  value: 'Deployment Pool'
 
-- name: servicePipelineName
-  value: 'SIT - BUILD - SERVICE - Alterna Logger'
+- name: buildSourceBranchRegex
+  value: '^refs/heads/(release|hotfix)/'
+
+- name: serviceArtifactName
+  value: 'logger-service-drop'
+
+- name: serviceZipName
+  value: 'Alterna-Logger-drop.zip'
+
+# SIT
+- ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+  - group: SIT_VARIABLE_GROUP
+
+  - name: environmentName
+    value: 'SIT'
+
+  - name: servicePipelineName
+    value: 'BUILD - SERVICE - Alterna Logger'
+
+  - name: resolveAgentName
+    value: 'SIT-ALTERNA-BN1'
+
+  - name: serviceAgentName
+    value: 'SIT-ALTERNA-BN1'
+
+  - name: approvalNotifyUsers
+    value: 'SGBL\pabouserhal'
+
+  - name: approvalInstructions
+    value: 'Approve SIT Alterna Logger deployment.'
+
+  - name: managementApprovalNotifyUsers
+    value: 'SGBL\kabbas'
+
+  - name: serviceNameValue
+    value: 'LoggerServiceAzureDevOps'
+
+  - name: serviceTargetPathValue
+    value: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps'
+
+  - name: healthCheckUrlValue
+    value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+
+  - name: backupRoot
+    value: 'C:\DeployBackups\SIT\LOGGER'
+
+# UAT
+- ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+  - group: UAT_VARIABLE_GROUP   # TODO verify actual group name
+
+  - name: environmentName
+    value: 'UAT'
+
+  - name: servicePipelineName
+    value: 'BUILD - SERVICE - Alterna Logger'
+
+  - name: resolveAgentName
+    value: 'UAT-ALTERNA-BN1'   # TODO verify
+
+  - name: serviceAgentName
+    value: 'UAT-ALTERNA-BN1'   # TODO verify
+
+  - name: approvalNotifyUsers
+    value: 'SGBL\pabouserhal'
+
+  - name: approvalInstructions
+    value: 'Approve UAT Alterna Logger deployment.'
+
+  - name: managementApprovalNotifyUsers
+    value: 'SGBL\kabbas'
+
+  - name: serviceNameValue
+    value: 'LoggerServiceAzureDevOps'   # TODO verify
+
+  - name: serviceTargetPathValue
+    value: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps-UAT'   # TODO verify
+
+  - name: healthCheckUrlValue
+    value: 'http://UAT-LOGGER-URL/health'   # TODO replace
+
+  - name: backupRoot
+    value: 'C:\DeployBackups\UAT\LOGGER'
+
+# PROD
+- ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+  - group: PROD_VARIABLE_GROUP   # TODO verify actual group name
+
+  - name: environmentName
+    value: 'PROD'
+
+  - name: servicePipelineName
+    value: 'BUILD - SERVICE - Alterna Logger'
+
+  - name: resolveAgentName
+    value: 'PROD-ALTERNA-BN1'   # TODO verify
+
+  - name: serviceAgentName
+    value: 'PROD-ALTERNA-BN1'   # TODO verify
+
+  - name: approvalNotifyUsers
+    value: 'SGBL\pabouserhal'
+
+  - name: approvalInstructions
+    value: 'Approve PROD Alterna Logger deployment.'
+
+  - name: managementApprovalNotifyUsers
+    value: 'SGBL\kabbas'
+
+  - name: serviceNameValue
+    value: 'LoggerServiceAzureDevOps'   # TODO verify
+
+  - name: serviceTargetPathValue
+    value: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps-PROD'   # TODO verify
+
+  - name: healthCheckUrlValue
+    value: 'http://PROD-LOGGER-URL/health'   # TODO replace
+
+  - name: backupRoot
+    value: 'C:\DeployBackups\PROD\LOGGER'
 
 stages:
 
@@ -87,9 +239,9 @@ stages:
   - job: ResolveBuildNumber
     displayName: 'Resolve pipeline name and build number'
     pool:
-      name: 'Deployment Pool'
+      name: '$(deploymentPool)'
       demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
+      - Agent.Name -equals $(resolveAgentName)
     steps:
     - checkout: none
 
@@ -99,6 +251,7 @@ stages:
         $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
         $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
         $apiVersion    = '7.1'
+        $allowedBranchPattern = '$(buildSourceBranchRegex)'
 
         $headers = @{
           Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
@@ -195,8 +348,8 @@ stages:
 
           $build = $response.value[0]
 
-          if ($build.sourceBranch -ne 'refs/heads/sit') {
-            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
+          if ($build.sourceBranch -notmatch $allowedBranchPattern) {
+            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)]. Only release/* or hotfix/* builds can be deployed."
           }
 
           Write-Host "$Label build resolved:"
@@ -209,6 +362,7 @@ stages:
           Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
           Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
           Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+          Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
         }
 
         Resolve-Build -Label 'Service' -PipelineName '$(servicePipelineName)' -BuildNumber '${{ parameters.serviceBuildNumber }}'
@@ -217,67 +371,87 @@ stages:
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
-- stage: Approval_SIT_Release
-  displayName: 'Approval for SIT release'
+- stage: Approval_Release
+  displayName: 'Approval for $(environmentName) release'
   dependsOn:
   - Resolve_Selected_Build
-  condition: succeeded('Resolve_Selected_Build')
+  condition: succeeded()
   jobs:
-  - job: WaitForBusinessApproval
-    displayName: 'Wait for Business Approval'
-    pool: server
-    timeoutInMinutes: 1500
-    steps:
-    - task: ManualValidation@0
-      timeoutInMinutes: 1440
-      inputs:
-        notifyUsers: 'SGBL\pabouserhal'
-        instructions: 'Approve SIT Alterna Logger deployment.'
-        onTimeout: 'reject'
+  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+    - job: NoApprovalRequired
+      displayName: 'No approval required for SIT'
+      pool:
+        name: '$(deploymentPool)'
+        demands:
+        - Agent.Name -equals $(resolveAgentName)
+      steps:
+      - checkout: none
+      - powershell: |
+          Write-Host 'SIT selected. No manual approval is required.'
+        displayName: 'Skip manual approval'
 
-  # - job: WaitForManagementApproval
-  #   displayName: 'Wait for Management Approval'
-  #   dependsOn: WaitForBusinessApproval
-  #   pool: server
-  #   timeoutInMinutes: 1500
-  #   steps:
-  #   - task: ManualValidation@0
-  #     timeoutInMinutes: 1440
-  #     inputs:
-  #       notifyUsers: 'SGBL\kabbas'
-  #       instructions: 'Approve SIT Alterna Logger deployment.'
-  #       onTimeout: 'reject'
+  - ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
+    - job: WaitForBusinessApproval
+      displayName: 'Wait for Business Approval'
+      pool: server
+      timeoutInMinutes: 1500
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(approvalNotifyUsers)'
+          instructions: '$(approvalInstructions)'
+          onTimeout: 'reject'
 
-- stage: Deploy_Service_SIT
-  displayName: 'Deploy Logger Service to SIT'
+    - job: WaitForManagementApproval
+      displayName: 'Wait for Management Approval'
+      dependsOn: WaitForBusinessApproval
+      pool: server
+      timeoutInMinutes: 1500
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(managementApprovalNotifyUsers)'
+          instructions: '$(approvalInstructions)'
+          onTimeout: 'reject'
+
+- stage: Deploy_Service
+  displayName: 'Deploy Logger Service to $(environmentName)'
   dependsOn:
   - Resolve_Selected_Build
-  - Approval_SIT_Release
+  - Approval_Release
   condition: and(succeeded(), eq('${{ parameters.deployService }}', 'true'))
   variables:
     ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServicePipelineDefinitionId'] ]
     ServiceBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceBuildId'] ]
+    ServiceSourceBranch: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceSourceBranch'] ]
   jobs:
   - template: pipelines/deploy-windows-service.yml@templates
     parameters:
       jobDependsOn: []
       jobCondition: succeeded()
       deploymentName: 'DeployLoggerService'
-      deploymentDisplayName: 'Deploy Alterna Logger Windows Service - SIT'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-BN1'
-      variableGroup: 'SIT_VARIABLE_GROUP'
+      deploymentDisplayName: 'Deploy Alterna Logger Windows Service - ${{ parameters.targetEnvironment }}'
+      environmentName: '${{ parameters.targetEnvironment }}'
+      deployPool: '$(deploymentPool)'
+      deployAgentName: '$(serviceAgentName)'
+      ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+        variableGroup: 'SIT_VARIABLE_GROUP'
+      ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+        variableGroup: 'UAT_VARIABLE_GROUP'
+      ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+        variableGroup: 'PROD_VARIABLE_GROUP'
       componentName: 'LOGGER'
-      artifactName: 'logger-service-drop'
+      artifactName: '$(serviceArtifactName)'
       artifactBuildType: 'specific'
       artifactProject: '$(System.TeamProject)'
       artifactDefinitionId: '$(ServicePipelineDefinitionId)'
       artifactBuildId: '$(ServiceBuildId)'
-      artifactBranch: 'refs/heads/sit'
-      zipName: 'Alterna-Logger-drop.zip'
-      serviceName: 'LoggerServiceAzureDevOps'
-      serviceTargetPath: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps'
+      artifactBranch: '$(ServiceSourceBranch)'
+      zipName: '$(serviceZipName)'
+      serviceName: '$(serviceNameValue)'
+      serviceTargetPath: '$(serviceTargetPathValue)'
       cleanTargetBeforeCopy: true
       cleanExcludeCsv: 'logs,Keys'
       enableJsonTransform: true
@@ -289,20 +463,20 @@ stages:
       customXmlEdits: []
       customXmlVariableValues: {}
       enableHealthCheck: true
-      healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+      healthCheckUrl: '$(healthCheckUrlValue)'
       healthCheckExpectedStatusCode: '200'
       healthCheckRetries: 6
       healthCheckDelaySeconds: 10
       enableLocalBackup: true
       backupRoot: 'C:\DeployBackups'
-      backupPath: 'C:\DeployBackups\SIT\LOGGER\$(Build.BuildId)'
+      backupPath: '$(backupRoot)\$(Build.BuildId)'
 
-- stage: Tag_SERVICE_LKG_SIT
+- stage: Tag_SERVICE_LKG
   displayName: 'Tag successful service build as LKG'
   dependsOn:
   - Resolve_Selected_Build
-  - Deploy_Service_SIT
-  condition: and(succeeded('Deploy_Service_SIT'), eq('${{ parameters.deployService }}', 'true'))
+  - Deploy_Service
+  condition: and(succeeded('Deploy_Service'), eq('${{ parameters.deployService }}', 'true'))
   variables:
     ServiceBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceBuildId'] ]
     ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServicePipelineDefinitionId'] ]
@@ -310,9 +484,9 @@ stages:
   - job: TagServiceBuild
     displayName: 'Tag service build'
     pool:
-      name: 'Deployment Pool'
+      name: '$(deploymentPool)'
       demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
+      - Agent.Name -equals $(resolveAgentName)
     steps:
     - checkout: none
 
@@ -322,6 +496,17 @@ stages:
         - name: 'Alterna Logger Service'
           buildId: '$(ServiceBuildId)'
           definitionId: '$(ServicePipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-SIT-LOGGER-SVC'
-          lkgTag: 'LKG-SIT-LOGGER-SVC'
+          deployedTag: 'DEPLOYED-$(environmentName)-LOGGER-SVC'
+          lkgTag: 'LKG-$(environmentName)-LOGGER-SVC'
           makeLkgUnique: true
+```
+
+A few assumptions I made:
+
+* I changed the **build trigger** from `sit` to `release/*` and `hotfix/*`, because that is the newer pattern you’ve been applying. Your current Logger build is still `sit`-triggered. 
+* I changed the **release validation** from `refs/heads/sit` to `release/* | hotfix/*`, matching the updated branch strategy. Your current Logger release still checks only `refs/heads/sit`. 
+* I set SIT to **no manual approval**, matching the newer release pattern. Your current Logger SIT release still has a business approval stage. 
+* I used `UAT_VARIABLE_GROUP` / `PROD_VARIABLE_GROUP` as placeholders. Replace them if your real names differ.
+* I used `BUILD - SERVICE - Alterna Logger` as the pipeline definition name. Replace it if your actual Azure DevOps pipeline definition still has a different display name.
+
+The current release pipeline should be replaced by the one above from `targetEnvironment` onward. The original one you pasted is the SIT-only version. 
