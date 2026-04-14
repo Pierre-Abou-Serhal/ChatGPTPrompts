@@ -1,16 +1,98 @@
-I have one project remaining: DataGatewayService
+Below are the updated **BUILD - API - DataGateway** and **RELEASE - DataGateway** pipelines, aligned with the same pattern you’ve been applying to the other projects: branch strategy on `release/*` and `hotfix/*`, OWASP-enabled .NET Core build template usage, and an environment-driven release flow. This is based on your current SIT-only DataGateway build/release and the shared .NET Core / IIS deployment templates you’re already using.
 
-This is my release pipeline
-name: DATAGATEWAY_REL_SIT_$(Date:yyyyMMdd).$(Rev:r)
+## BUILD - API - DataGateway
+
+```yaml
+name: DGW_API_$(SourceBranchName)_rc$(Rev:r)
 
 parameters:
+- name: runDependencyCheck
+  type: boolean
+  default: true
+  displayName: 'Run OWASP Dependency Check'
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: 'Azure Templates/Azure Templates'
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - release/*
+    - hotfix/*
+  paths:
+    include:
+    - DataGatewayService/**
+    exclude:
+    - '*.yml'
+    - global.json
+    - nuget.config
+
+pr: none
+
+variables:
+- group: OWASP_SECRETS
+
+stages:
+- stage: Build
+  displayName: 'Build & Publish Artifact'
+  jobs:
+  - template: pipelines/build-dotnet-core-webapi.yml@templates
+    parameters:
+      jobName: 'BuildJob'
+      jobDisplayName: 'Build Alterna Data Gateway Service'
+      buildPool: 'Build Pool'
+      buildAgentName: 'UAT-ALTERNA-DK1'
+      buildConfiguration: 'Release'
+      restoreProjects: 'DataGatewayService/API/API.csproj'
+      runTests: false
+      testProjects: ''
+      publishProject: 'DataGatewayService/API/API.csproj'
+      nugetConfigPath: 'nuget.config'
+      zipName: 'DataGatewayService.zip'
+      artifactName: 'datagateway-api-drop'
+      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\DataGatewayService'
+
+      runDependencyCheck: ${{ parameters.runDependencyCheck }}
+      dependencyCheckProjectName: 'DataGatewayService-API'
+      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
+      dependencyCheckAdditionalArguments: ''
+```
+
+## RELEASE - DataGateway
+
+This assumes your Azure DevOps pipeline definition name becomes:
+
+```text
+BUILD - API - DataGateway
+```
+
+```yaml
+name: DATAGATEWAY_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+- name: targetEnvironment
+  type: string
+  default: SIT
+  values:
+  - SIT
+  - UAT
+  - PROD
+  displayName: 'Target Environment'
+
 - name: deployApi
   type: boolean
   default: false
+  displayName: 'Deploy API'
 
 - name: apiBuildNumber
   type: string
   default: '__EMPTY__'
+  displayName: 'API Build Number'
 
 resources:
   repositories:
@@ -23,10 +105,119 @@ trigger: none
 pr: none
 
 variables:
-- group: SIT_VARIABLE_GROUP
+- name: deploymentPool
+  value: 'Deployment Pool'
 
-- name: apiPipelineName
-  value: 'SIT - BUILD - API - DataGateway'
+- name: buildSourceBranchRegex
+  value: '^refs/heads/(release|hotfix)/'
+
+- name: apiArtifactName
+  value: 'datagateway-api-drop'
+
+- name: apiZipName
+  value: 'DataGatewayService.zip'
+
+- name: apiSiteName
+  value: 'AlternaDataGatewayServiceAzureDevOps'
+
+- name: apiAppPoolName
+  value: 'AlternaDataGatewayServiceAzureDevOps'
+
+- name: apiTargetPath
+  value: 'C:\inetpub\wwwroot\AlternaDataGatewayService-AzureDevOps-BN1'
+
+# SIT
+- ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+  - group: SIT_VARIABLE_GROUP
+
+  - name: environmentName
+    value: 'SIT'
+
+  - name: apiPipelineName
+    value: 'BUILD - API - DataGateway'
+
+  - name: resolveAgentName
+    value: 'SIT-ALTERNA-BN1'
+
+  - name: apiAgentName
+    value: 'SIT-ALTERNA-BN1'
+
+  - name: approvalNotifyUsers
+    value: 'SGBL\pabouserhal'
+
+  - name: approvalInstructions
+    value: 'Approve SIT DataGateway deployment.'
+
+  - name: managementApprovalNotifyUsers
+    value: 'SGBL\kabbas'
+
+  - name: apiHealthCheckUrl
+    value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+
+  - name: backupRoot
+    value: 'C:\DeployBackups\SIT\DataGateway'
+
+# UAT
+- ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+  - group: UAT_VARIABLE_GROUP   # TODO verify
+
+  - name: environmentName
+    value: 'UAT'
+
+  - name: apiPipelineName
+    value: 'BUILD - API - DataGateway'
+
+  - name: resolveAgentName
+    value: 'UAT-ALTERNA-BN1'   # TODO verify
+
+  - name: apiAgentName
+    value: 'UAT-ALTERNA-BN1'   # TODO verify
+
+  - name: approvalNotifyUsers
+    value: 'SGBL\pabouserhal'
+
+  - name: approvalInstructions
+    value: 'Approve UAT DataGateway deployment.'
+
+  - name: managementApprovalNotifyUsers
+    value: 'SGBL\kabbas'
+
+  - name: apiHealthCheckUrl
+    value: 'http://UAT-DATAGATEWAY-API-URL/health'   # TODO replace
+
+  - name: backupRoot
+    value: 'C:\DeployBackups\UAT\DataGateway'
+
+# PROD
+- ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+  - group: PROD_VARIABLE_GROUP   # TODO verify
+
+  - name: environmentName
+    value: 'PROD'
+
+  - name: apiPipelineName
+    value: 'BUILD - API - DataGateway'
+
+  - name: resolveAgentName
+    value: 'PROD-ALTERNA-BN1'   # TODO verify
+
+  - name: apiAgentName
+    value: 'PROD-ALTERNA-BN1'   # TODO verify
+
+  - name: approvalNotifyUsers
+    value: 'SGBL\pabouserhal'
+
+  - name: approvalInstructions
+    value: 'Approve PROD DataGateway deployment.'
+
+  - name: managementApprovalNotifyUsers
+    value: 'SGBL\kabbas'
+
+  - name: apiHealthCheckUrl
+    value: 'http://PROD-DATAGATEWAY-API-URL/health'   # TODO replace
+
+  - name: backupRoot
+    value: 'C:\DeployBackups\PROD\DataGateway'
 
 stages:
 
@@ -36,9 +227,9 @@ stages:
   - job: ResolveBuildNumber
     displayName: 'Resolve pipeline name and build number'
     pool:
-      name: 'Deployment Pool'
+      name: '$(deploymentPool)'
       demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
+      - Agent.Name -equals $(resolveAgentName)
     steps:
     - checkout: none
 
@@ -48,6 +239,7 @@ stages:
         $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
         $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
         $apiVersion    = '7.1'
+        $allowedBranchPattern = '$(buildSourceBranchRegex)'
 
         $headers = @{
           Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
@@ -144,8 +336,8 @@ stages:
 
           $build = $response.value[0]
 
-          if ($build.sourceBranch -ne 'refs/heads/sit') {
-            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)] instead of [refs/heads/sit]."
+          if ($build.sourceBranch -notmatch $allowedBranchPattern) {
+            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)]. Only release/* or hotfix/* builds can be deployed."
           }
 
           Write-Host "$Label build resolved:"
@@ -158,6 +350,7 @@ stages:
           Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
           Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
           Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+          Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
         }
 
         Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
@@ -166,68 +359,88 @@ stages:
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
-- stage: Approval_SIT_Release
-  displayName: 'Approval for SIT release'
+- stage: Approval_Release
+  displayName: 'Approval for $(environmentName) release'
   dependsOn:
   - Resolve_Selected_Build
-  condition: succeeded('Resolve_Selected_Build')
+  condition: succeeded()
   jobs:
-  - job: WaitForBusinessApproval
-    displayName: 'Wait for Business Approval'
-    pool: server
-    timeoutInMinutes: 1500
-    steps:
-    - task: ManualValidation@0
-      timeoutInMinutes: 1440
-      inputs:
-        notifyUsers: 'SGBL\pabouserhal'
-        instructions: 'Approve SIT DataGateway deployment.'
-        onTimeout: 'reject'
+  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+    - job: NoApprovalRequired
+      displayName: 'No approval required for SIT'
+      pool:
+        name: '$(deploymentPool)'
+        demands:
+        - Agent.Name -equals $(resolveAgentName)
+      steps:
+      - checkout: none
+      - powershell: |
+          Write-Host 'SIT selected. No manual approval is required.'
+        displayName: 'Skip manual approval'
 
-  # - job: WaitForManagementApproval
-  #   displayName: 'Wait for Management Approval'
-  #   dependsOn: WaitForBusinessApproval
-  #   pool: server
-  #   timeoutInMinutes: 1500
-  #   steps:
-  #   - task: ManualValidation@0
-  #     timeoutInMinutes: 1440
-  #     inputs:
-  #       notifyUsers: 'SGBL\kabbas'
-  #       instructions: 'Approve SIT DataGateway deployment.'
-  #       onTimeout: 'reject'
+  - ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
+    - job: WaitForBusinessApproval
+      displayName: 'Wait for Business Approval'
+      pool: server
+      timeoutInMinutes: 1500
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(approvalNotifyUsers)'
+          instructions: '$(approvalInstructions)'
+          onTimeout: 'reject'
 
-- stage: Deploy_API_SIT
-  displayName: 'Deploy API to SIT'
+    - job: WaitForManagementApproval
+      displayName: 'Wait for Management Approval'
+      dependsOn: WaitForBusinessApproval
+      pool: server
+      timeoutInMinutes: 1500
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: '$(managementApprovalNotifyUsers)'
+          instructions: '$(approvalInstructions)'
+          onTimeout: 'reject'
+
+- stage: Deploy_API
+  displayName: 'Deploy API to $(environmentName)'
   dependsOn:
   - Resolve_Selected_Build
-  - Approval_SIT_Release
+  - Approval_Release
   condition: and(succeeded(), eq('${{ parameters.deployApi }}', 'true'))
   variables:
     ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiPipelineDefinitionId'] ]
     ApiBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiBuildId'] ]
+    ApiSourceBranch: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiSourceBranch'] ]
   jobs:
   - template: pipelines/deploy-iis.yml@templates
     parameters:
       jobDependsOn: []
       jobCondition: succeeded()
       deploymentName: 'DeployAPI'
-      deploymentDisplayName: 'Deploy DataGateway API to SIT (IIS)'
-      environmentName: 'SIT'
-      deployPool: 'Deployment Pool'
-      deployAgentName: 'SIT-ALTERNA-BN1'
-      variableGroup: 'SIT_VARIABLE_GROUP'
+      deploymentDisplayName: 'Deploy DataGateway API to ${{ parameters.targetEnvironment }} (IIS)'
+      environmentName: '${{ parameters.targetEnvironment }}'
+      deployPool: '$(deploymentPool)'
+      deployAgentName: '$(apiAgentName)'
+      ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+        variableGroup: 'SIT_VARIABLE_GROUP'
+      ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+        variableGroup: 'UAT_VARIABLE_GROUP'
+      ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+        variableGroup: 'PROD_VARIABLE_GROUP'
       componentName: 'API'
-      artifactName: 'datagateway-api-drop'
+      artifactName: '$(apiArtifactName)'
       artifactBuildType: 'specific'
       artifactProject: '$(System.TeamProject)'
       artifactDefinitionId: '$(ApiPipelineDefinitionId)'
       artifactBuildId: '$(ApiBuildId)'
-      artifactBranch: 'refs/heads/sit'
-      zipName: 'DataGatewayService.zip'
-      siteName: 'AlternaDataGatewayServiceAzureDevOps'
-      appPoolName: 'AlternaDataGatewayServiceAzureDevOps'
-      iisTargetPath: 'C:\inetpub\wwwroot\AlternaDataGatewayService-AzureDevOps-BN1'
+      artifactBranch: '$(ApiSourceBranch)'
+      zipName: '$(apiZipName)'
+      siteName: '$(apiSiteName)'
+      appPoolName: '$(apiAppPoolName)'
+      iisTargetPath: '$(apiTargetPath)'
       cleanTargetBeforeCopy: true
       cleanExcludeCsv: ''
       enableJsonTransform: false
@@ -276,21 +489,21 @@ stages:
         xpath: '/APITOKEN/GET_PRODUCT/TOKEN[@APPLICATION_NAME="FRESH_ACCOUNT"]/@VALUE'
         variable: 'TOKEN_GET_PRODUCT_FRESH_ACCOUNT'
       enableHealthCheck: true
-      healthCheckUrl: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+      healthCheckUrl: '$(apiHealthCheckUrl)'
       healthCheckExpectedStatusCode: '200'
       healthCheckRetries: 6
       healthCheckDelaySeconds: 10
       enableRollbackOnHealthCheckFailure: true
       enableLocalBackup: true
       backupRoot: 'C:\DeployBackups'
-      backupPath: 'C:\DeployBackups\SIT\DataGateway\API\$(Build.BuildId)'
+      backupPath: '$(backupRoot)\API\$(Build.BuildId)'
 
-- stage: Tag_API_LKG_SIT
+- stage: Tag_API_LKG
   displayName: 'Tag successful API build as LKG'
   dependsOn:
   - Resolve_Selected_Build
-  - Deploy_API_SIT
-  condition: and(succeeded('Deploy_API_SIT'), eq('${{ parameters.deployApi }}', 'true'))
+  - Deploy_API
+  condition: and(succeeded('Deploy_API'), eq('${{ parameters.deployApi }}', 'true'))
   variables:
     ApiBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiBuildId'] ]
     ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ApiPipelineDefinitionId'] ]
@@ -298,9 +511,9 @@ stages:
   - job: TagApiBuild
     displayName: 'Tag API build'
     pool:
-      name: 'Deployment Pool'
+      name: '$(deploymentPool)'
       demands:
-      - Agent.Name -equals SIT-ALTERNA-BN1
+      - Agent.Name -equals $(resolveAgentName)
     steps:
     - checkout: none
 
@@ -310,48 +523,14 @@ stages:
         - name: 'DataGateway API'
           buildId: '$(ApiBuildId)'
           definitionId: '$(ApiPipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-SIT-DATAGATEWAY-API'
-          lkgTag: 'LKG-SIT-DATAGATEWAY-API'
+          deployedTag: 'DEPLOYED-$(environmentName)-DATAGATEWAY-API'
+          lkgTag: 'LKG-$(environmentName)-DATAGATEWAY-API'
           makeLkgUnique: true
+```
 
+Two things to review before using it:
 
-And this is my build pipeline:
+* replace the UAT/PROD placeholders for variable groups, agents, and health-check URLs
+* rename the Azure DevOps pipeline definition to match the value used in `apiPipelineName`
 
-name: DGW_API_SIT_$(Date:yyyyMMdd).$(Rev:r)
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-    - sit
-  paths:
-    include:
-    - DataGatewayService/**
-
-pr: none
-
-stages:
-- stage: Build
-  displayName: 'Build & Publish Artifact'
-  jobs:
-  - template: pipelines/build-dotnet-core-webapi.yml@templates
-    parameters:
-      jobName: 'BuildJob'
-      jobDisplayName: 'Build Alterna Data Gateway Service'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      buildConfiguration: 'Release'
-      restoreProjects: 'DataGatewayService/API/API.csproj'
-      runTests: false
-      testProjects: ''
-      publishProject: 'DataGatewayService/API/API.csproj'
-      nugetConfigPath: 'nuget.config'
-      zipName: 'DataGatewayService.zip'
-      artifactName: 'datagateway-api-drop'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\DataGatewayService'
+If you want to keep SIT manual approval instead of skipping it, replace the `NoApprovalRequired` job with the manual validation job from your current SIT release.
