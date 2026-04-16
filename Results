@@ -1,97 +1,59 @@
-PS C:\Users\pabouserhal> nslookup services.nvd.nist.gov
-nslookup : *** Request to PRD-DC-N1.sgbl.com.lb timed-out
-At line:1 char:1
-+ nslookup services.nvd.nist.gov
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (*** Request to ...om.lb timed-out:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-Server:  PRD-DC-N1.sgbl.com.lb
-Address:  10.0.32.1
+Because in your case the CLI proxy flags are probably **not the proxy settings actually used by the NVD download path**.
 
-DNS request timed out.
-    timeout was 2 seconds.
-DNS request timed out.
-    timeout was 2 seconds.
-DNS request timed out.
-    timeout was 2 seconds.
-DNS request timed out.
-    timeout was 2 seconds.
+Here is the important part from the Dependency-Check docs: the proxy configuration is “in transition” and, if needed, “will likely need to be configured twice.” The docs say the **go-forward** configuration is via Java/Apache HTTP client system properties such as `https.proxyHost` and `https.proxyPort`, usually through `JAVA_TOOL_OPTIONS`, while the CLI flags are described as **legacy configuration**. ([Dependency Check][1])
 
-PS C:\Users\pabouserhal> Test-NetConnection services.nvd.nist.gov -Port 443
-WARNING: Name resolution of services.nvd.nist.gov failed
+That fits your evidence perfectly:
 
+* direct DNS from the server fails for `services.nvd.nist.gov`
+* direct curl without proxy fails
+* curl **through the proxy** succeeds with `200 OK` 
 
-ComputerName   : services.nvd.nist.gov
-RemoteAddress  : 
-InterfaceAlias : 
-SourceAddress  : 
-PingSucceeded  : False
+So if Dependency-Check were truly using the proxy for that NVD request, it should behave more like your proxied curl. The fact that it still fails strongly suggests the NVD HTTP client path is falling back to a Java networking path that is **not using your CLI proxy flags**, then tries local name resolution, and dies there.
 
+There is another piece that matters: Java does **not** automatically use the machine’s system proxy by default. Oracle documents `java.net.useSystemProxies` with default `false`, and the HTTPS handler uses Java properties like `https.proxyHost` / `https.proxyPort`. Those are checked at JVM startup. ([Oracle Docs][2])
 
+So “the server has a company proxy configured” does **not** guarantee a Java CLI will inherit it. In practice, for Dependency-Check, the safer assumption is:
 
+* CLI flags may cover some legacy downloader paths
+* Java system proxy properties are needed for the newer HTTP client path
+* OS-level proxy config alone is not enough for Java unless explicitly enabled/configured ([Dependency Check][1])
 
-PS C:\Users\pabouserhal> curl.exe -I https://services.nvd.nist.gov/rest/json/cves/2.0
-curl.exe :   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-At line:1 char:1
-+ curl.exe -I https://services.nvd.nist.gov/rest/json/cves/2.0
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (  % Total    % ...  Time  Current:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:10 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:11 --:--:--     0curl: (6) Could not resolve host: services.nvd.nist.gov
+Why it likely failed in your exact case:
 
-PS C:\Users\pabouserhal> curl.exe -I --proxy http://10.0.30.222:3128 https://services.nvd.nist.gov/rest/json/cves/2.0
-curl.exe :   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-At line:1 char:1
-+ curl.exe -I --proxy http://10.0.30.222:3128 https://services.nvd.nist ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (  % Total    % ...  Time  Current:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0
-  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0
-HTTP/1.1 200 Connection established
+1. Your server cannot resolve `services.nvd.nist.gov` directly. 
+2. The proxy can resolve and reach it. 
+3. Dependency-Check likely made the NVD call through a Java client path that did **not** honor only `--proxyserver/--proxyport`, so it attempted direct resolution and failed. This is consistent with the project’s own “configure twice” proxy note. ([Dependency Check][1])
 
-HTTP/1.1 200 OK
-Date: Thu, 16 Apr 2026 12:53:21 GMT
-Content-Type: application/json
-Content-Length: 0
-Connection: keep-alive
-x-frame-options: SAMEORIGIN
-access-control-allow-origin: *
-access-control-allow-headers: accept, apiKey, content-type, origin, x-requested-with
-access-control-allow-methods: GET, HEAD, OPTIONS
-access-control-allow-credentials: false
-strict-transport-security: max-age=31536000
-cf-cache-status: DYNAMIC
-set-cookie: __cf_bm=qkas4xnr.TVFx2bcaCauAXi.rmMGtci7n0_8j82dy7U-1776343993.8879616-1.0.1.1-vwl008WSw8qAjxd5E840fm9PHFAAbe2EgSL66ZgM0gK9dKhUm2Bn8lT7iP0I
-aMFIiuUAszZiE_P5Ypca_U3v2AX75lsnkgLyhEBl8vcJZLxTymk6yXYDszvEYArTeH3q; HttpOnly; Secure; Path=/; Domain=nist.gov; Expires=Thu, 16 Apr 2026 13:23:21 GMT
-set-cookie: _cfuvid=Jl_PmJ3M2eCkqCiN005dsmfm.G.x_f167wIR9Aih2I4-1776343993.8879616-1.0.1.1-Elk6WpwR2UCZPA041agTi0XkZL2vD7B6en6p.OFCMp0; HttpOnly; SameS
-ite=None; Secure; Path=/; Domain=nist.gov
-Server: cloudflare
-CF-RAY: 9ed354e9ce5d9adf-MIA
+What I would use on your server instead:
+
+```powershell
+$env:JAVA_TOOL_OPTIONS='-Dhttps.proxyHost=10.0.30.222 -Dhttps.proxyPort=3128 -Dhttp.proxyHost=10.0.30.222 -Dhttp.proxyPort=3128'
+
+C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat `
+  --updateonly `
+  --data "C:\Tools\dependency-check-data" `
+  --nvdApiKey "<key>" `
+  --proxyserver "10.0.30.222" `
+  --proxyport 3128 `
+  --disableKnownExploited `
+  --disableHostedSuppressions `
+  --disableRetireJS `
+  --disableVersionCheck `
+  --log "C:\temp\odc-update.log"
+```
+
+Why I included both:
+
+* `JAVA_TOOL_OPTIONS` for the current Java/HTTP-client path Dependency-Check recommends
+* `--proxyserver` / `--proxyport` for legacy paths still using the old config model ([Dependency Check][1])
+
+One more edge case exists in the docs: some proxies block `HEAD` requests, and Dependency-Check says its detection of that is not always reliable. But your proxied `curl -I` returned `200 OK`, so that is **less likely** in your environment.  ([Dependency Check][1])
+
+So the short explanation is:
+
+**It failed because Java/Dependency-Check did not fully use the proxy path for the NVD request, and since your server cannot resolve the NVD hostname directly, the request kept retrying and failed.**
+
+If you want, I can rewrite your Azure DevOps PowerShell step so it sets `JAVA_TOOL_OPTIONS` correctly before launching Dependency-Check.
+
+[1]: https://dependency-check.github.io/DependencyCheck/data/proxy.html "Proxy Configuration – dependency-check-maven"
+[2]: https://docs.oracle.com/en/java/javase/19/docs/api/java.base/java/net/doc-files/net-properties.html "Networking Properties (Java SE 19 & JDK 19)"
