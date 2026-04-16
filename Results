@@ -1,234 +1,47 @@
-PS C:\Users\pabouserhal> C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat `
-  --updateonly `
-  --data "C:\Tools\dependency-check-data" `
-  --nvdApiKey "16d47f4a-18eb-4804-a3fa-72c6af029e3f" `
-  --proxyserver "10.0.30.222" `
-  --proxyport 3128 `
-  --disableKnownExploited `
-  --disableHostedSuppressions `
-  --disableRetireJS `
-  --disableVersionCheck `
-  --log "C:\temp\odc-update.log"
-[INFO] Checking for updates
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 4th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 5th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 6th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 7th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 8th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 9th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 10th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 11th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 12th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 13th time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=0 : 14th time
-[WARN] NVD API request failures are occurring; retrying request for the 15th time
-[WARN] NVD API request failures are occurring; retrying request for the 16th time
-[WARN] NVD API request failures are occurring; retrying request for the 17th time
-[WARN] NVD API request failures are occurring; retrying request for the 18th time
-[WARN] NVD API request failures are occurring; retrying request for the 19th time
-[WARN] NVD API request failures are occurring; retrying request for the 20th time
-[WARN] NVD API request failures are occurring; retrying request for the 21st time
-[WARN] NVD API request failures are occurring; retrying request for the 22nd time
-[WARN] NVD API request failures are occurring; retrying request for the 23rd time
-[WARN] NVD API request failures are occurring; retrying request for the 24th time
-[WARN] NVD API request failures are occurring; retrying request for the 25th time
-[WARN] NVD API request failures are occurring; retrying request for the 26th time
-[WARN] NVD API request failures are occurring; retrying request for the 27th time
-[WARN] NVD API request failures are occurring; retrying request for the 28th time
-[WARN] NVD API request failures are occurring; retrying request for the 29th time
-[WARN] NVD API request failures are occurring; retrying request for the 30th time
-[WARN] NVD API request failures are occurring; retrying request for the 31st time
-[ERROR] Error updating the NVD Data
-org.owasp.dependencycheck.data.update.exception.UpdateException: Error updating the NVD Data
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:387)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.update(NvdApiDataSource.java:128)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:902)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:874)
-	at org.owasp.dependencycheck.App.runUpdateOnly(App.java:449)
-	at org.owasp.dependencycheck.App.run(App.java:178)
-	at org.owasp.dependencycheck.App.main(App.java:93)
-Caused by: io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryExceededException: NVD Update Failed: attempted to retrieve data from the NVD u
-nsuccessfully five times.
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:361)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient.next(NvdCveClient.java:356)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:343)
-	... 6 common frames omitted
-[ERROR] Error updating the NVD Data
-org.owasp.dependencycheck.data.update.exception.UpdateException: Error updating the NVD Data
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:387)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.update(NvdApiDataSource.java:128)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:902)
-	at org.owasp.dependencycheck.Engine.doUpdates(Engine.java:874)
-	at org.owasp.dependencycheck.App.runUpdateOnly(App.java:449)
-	at org.owasp.dependencycheck.App.run(App.java:178)
-	at org.owasp.dependencycheck.App.main(App.java:93)
-Caused by: io.github.jeremylong.openvulnerability.client.nvd.NvdApiRetryExceededException: NVD Update Failed: attempted to retrieve data from the NVD u
-nsuccessfully five times.
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:361)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient._next(NvdCveClient.java:456)
-	at io.github.jeremylong.openvulnerability.client.nvd.NvdCveClient.next(NvdCveClient.java:356)
-	at org.owasp.dependencycheck.data.update.NvdApiDataSource.processApi(NvdApiDataSource.java:343)
-	... 6 common frames omitted
+Most likely because the endpoint you asked the network team to open is the wrong hostname.
+
+The NVD CVE API used by Dependency-Check is `https://services.nvd.nist.gov/rest/json/cves/2.0`, on host **services.nvd.nist.gov** — with **nist**, not **nsit**. That is the official base URL for the CVE 2.0 API. ([NVD][1])
+
+Your log shows Dependency-Check is repeatedly trying to call `/rest/json/cves/2.0?resultsPerPage=2000&startIndex=0` and eventually fails with `NvdApiRetryExceededException`, so the tool is definitely failing while contacting the NVD API update endpoint, not during local scan logic. 
+
+Also, Dependency-Check does support `--proxyserver` and `--proxyport`, but the project’s own docs say proxy setups can still fail because of certificate issues, and in that case the proxy or signing chain may need to be added to the Java trust store. ([Dependency Check][2])
+
+So the likely order of causes is:
+
+1. **Wrong FQDN opened in firewall**
+   You wrote `services.nvd.nsit.gov:443`, but the real host is `services.nvd.nist.gov:443`. ([NVD][1])
+
+2. **Even after opening the right host, proxy/TLS may still block it**
+   Your command is using proxy `10.0.30.222:3128`, so success depends on:
+
+   * that proxy being reachable,
+   * the proxy allowing CONNECT to `services.nvd.nist.gov:443`,
+   * no SSL inspection/trust-store issue,
+   * no proxy authentication requirement you did not pass.  ([Dependency Check][2])
+
+3. **The stack trace alone does not prove “port 443 is closed”**
+   It only proves the NVD requests failed repeatedly. With the log you shared, the exact lower-level reason could still be DNS, proxy deny, TLS handshake, certificate trust, or proxy auth. 
+
+What I would ask infra/security to verify:
+
+* Open outbound access to **services.nvd.nist.gov:443**
+* Allow your proxy to tunnel HTTPS CONNECT to that host
+* Confirm no SSL inspection breaks Java trust
+* Confirm whether proxy auth is required
+
+Useful tests from the build server:
+
+```powershell
+nslookup services.nvd.nist.gov
+Test-NetConnection services.nvd.nist.gov -Port 443
+
+curl.exe -I https://services.nvd.nist.gov/rest/json/cves/2.0
+curl.exe -I --proxy http://10.0.30.222:3128 https://services.nvd.nist.gov/rest/json/cves/2.0
+```
+
+If direct curl works but Dependency-Check still fails, then it is very likely a Java proxy/certificate trust problem, not a firewall problem.
+
+The first thing I would correct immediately is the firewall request: change **nsit** to **nist**.
+
+[1]: https://nvd.nist.gov/developers/vulnerabilities "Vulnerability APIs"
+[2]: https://dependency-check.github.io/DependencyCheck/data/proxy.html "Proxy Configuration – dependency-check-maven"
