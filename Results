@@ -1,47 +1,97 @@
-Most likely because the endpoint you asked the network team to open is the wrong hostname.
+PS C:\Users\pabouserhal> nslookup services.nvd.nist.gov
+nslookup : *** Request to PRD-DC-N1.sgbl.com.lb timed-out
+At line:1 char:1
++ nslookup services.nvd.nist.gov
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (*** Request to ...om.lb timed-out:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Server:  PRD-DC-N1.sgbl.com.lb
+Address:  10.0.32.1
 
-The NVD CVE API used by Dependency-Check is `https://services.nvd.nist.gov/rest/json/cves/2.0`, on host **services.nvd.nist.gov** — with **nist**, not **nsit**. That is the official base URL for the CVE 2.0 API. ([NVD][1])
+DNS request timed out.
+    timeout was 2 seconds.
+DNS request timed out.
+    timeout was 2 seconds.
+DNS request timed out.
+    timeout was 2 seconds.
+DNS request timed out.
+    timeout was 2 seconds.
 
-Your log shows Dependency-Check is repeatedly trying to call `/rest/json/cves/2.0?resultsPerPage=2000&startIndex=0` and eventually fails with `NvdApiRetryExceededException`, so the tool is definitely failing while contacting the NVD API update endpoint, not during local scan logic. 
+PS C:\Users\pabouserhal> Test-NetConnection services.nvd.nist.gov -Port 443
+WARNING: Name resolution of services.nvd.nist.gov failed
 
-Also, Dependency-Check does support `--proxyserver` and `--proxyport`, but the project’s own docs say proxy setups can still fail because of certificate issues, and in that case the proxy or signing chain may need to be added to the Java trust store. ([Dependency Check][2])
 
-So the likely order of causes is:
+ComputerName   : services.nvd.nist.gov
+RemoteAddress  : 
+InterfaceAlias : 
+SourceAddress  : 
+PingSucceeded  : False
 
-1. **Wrong FQDN opened in firewall**
-   You wrote `services.nvd.nsit.gov:443`, but the real host is `services.nvd.nist.gov:443`. ([NVD][1])
 
-2. **Even after opening the right host, proxy/TLS may still block it**
-   Your command is using proxy `10.0.30.222:3128`, so success depends on:
 
-   * that proxy being reachable,
-   * the proxy allowing CONNECT to `services.nvd.nist.gov:443`,
-   * no SSL inspection/trust-store issue,
-   * no proxy authentication requirement you did not pass.  ([Dependency Check][2])
 
-3. **The stack trace alone does not prove “port 443 is closed”**
-   It only proves the NVD requests failed repeatedly. With the log you shared, the exact lower-level reason could still be DNS, proxy deny, TLS handshake, certificate trust, or proxy auth. 
+PS C:\Users\pabouserhal> curl.exe -I https://services.nvd.nist.gov/rest/json/cves/2.0
+curl.exe :   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+At line:1 char:1
++ curl.exe -I https://services.nvd.nist.gov/rest/json/cves/2.0
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (  % Total    % ...  Time  Current:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:10 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:11 --:--:--     0curl: (6) Could not resolve host: services.nvd.nist.gov
 
-What I would ask infra/security to verify:
+PS C:\Users\pabouserhal> curl.exe -I --proxy http://10.0.30.222:3128 https://services.nvd.nist.gov/rest/json/cves/2.0
+curl.exe :   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+At line:1 char:1
++ curl.exe -I --proxy http://10.0.30.222:3128 https://services.nvd.nist ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (  % Total    % ...  Time  Current:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0
+HTTP/1.1 200 Connection established
 
-* Open outbound access to **services.nvd.nist.gov:443**
-* Allow your proxy to tunnel HTTPS CONNECT to that host
-* Confirm no SSL inspection breaks Java trust
-* Confirm whether proxy auth is required
-
-Useful tests from the build server:
-
-```powershell
-nslookup services.nvd.nist.gov
-Test-NetConnection services.nvd.nist.gov -Port 443
-
-curl.exe -I https://services.nvd.nist.gov/rest/json/cves/2.0
-curl.exe -I --proxy http://10.0.30.222:3128 https://services.nvd.nist.gov/rest/json/cves/2.0
-```
-
-If direct curl works but Dependency-Check still fails, then it is very likely a Java proxy/certificate trust problem, not a firewall problem.
-
-The first thing I would correct immediately is the firewall request: change **nsit** to **nist**.
-
-[1]: https://nvd.nist.gov/developers/vulnerabilities "Vulnerability APIs"
-[2]: https://dependency-check.github.io/DependencyCheck/data/proxy.html "Proxy Configuration – dependency-check-maven"
+HTTP/1.1 200 OK
+Date: Thu, 16 Apr 2026 12:53:21 GMT
+Content-Type: application/json
+Content-Length: 0
+Connection: keep-alive
+x-frame-options: SAMEORIGIN
+access-control-allow-origin: *
+access-control-allow-headers: accept, apiKey, content-type, origin, x-requested-with
+access-control-allow-methods: GET, HEAD, OPTIONS
+access-control-allow-credentials: false
+strict-transport-security: max-age=31536000
+cf-cache-status: DYNAMIC
+set-cookie: __cf_bm=qkas4xnr.TVFx2bcaCauAXi.rmMGtci7n0_8j82dy7U-1776343993.8879616-1.0.1.1-vwl008WSw8qAjxd5E840fm9PHFAAbe2EgSL66ZgM0gK9dKhUm2Bn8lT7iP0I
+aMFIiuUAszZiE_P5Ypca_U3v2AX75lsnkgLyhEBl8vcJZLxTymk6yXYDszvEYArTeH3q; HttpOnly; Secure; Path=/; Domain=nist.gov; Expires=Thu, 16 Apr 2026 13:23:21 GMT
+set-cookie: _cfuvid=Jl_PmJ3M2eCkqCiN005dsmfm.G.x_f167wIR9Aih2I4-1776343993.8879616-1.0.1.1-Elk6WpwR2UCZPA041agTi0XkZL2vD7B6en6p.OFCMp0; HttpOnly; SameS
+ite=None; Secure; Path=/; Domain=nist.gov
+Server: cloudflare
+CF-RAY: 9ed354e9ce5d9adf-MIA
