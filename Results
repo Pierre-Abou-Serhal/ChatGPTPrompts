@@ -1,5 +1,28 @@
-Same, fix Alterna-DataExport Release pipeline (dacpac + stage runtime contitions):
+Below is the **full rewritten Alterna-DataExport release pipeline** updated with the same two release-side changes you applied on Telecom:
 
+* **compile-time stage inclusion** for API / DB-only paths
+* **DB deploy parameters**: `dacpacFileName` and `artifactDownloadPath`
+
+This is based on the DataExport release YAML you pasted here. 
+
+**Assumption:** your DB build publishes:
+
+```yaml
+DatabaseProjectAlterna_DataExport.dacpac
+```
+
+If your DB build uses a different DACPAC filename, change only these two occurrences:
+
+```yaml
+dacpacFileName: 'DatabaseProjectAlterna_DataExport.dacpac'
+```
+
+in:
+
+* `Deploy_DB_After_API`
+* `Deploy_DB_Only`
+
+```yaml
 name: DTE_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
@@ -427,174 +450,196 @@ stages:
           instructions: 'Approve $(environmentName) DataExport database deployment.'
           onTimeout: 'reject'
 
-- stage: Deploy_API
-  displayName: 'Deploy API to $(environmentName)'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Approval_Release
-  condition: and(succeeded(), eq('${{ parameters.deployApi }}', 'true'))
-  variables:
-    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
-    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
-    ApiSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiSourceBranch'] ]
-  jobs:
-  - template: pipelines/deploy-iis.yml@templates
-    parameters:
-      jobDependsOn: []
-      jobCondition: succeeded()
-      deploymentName: 'DeployAPI'
-      deploymentDisplayName: 'Deploy DataExport API to ${{ parameters.targetEnvironment }} (IIS)'
-      environmentName: '${{ parameters.targetEnvironment }}'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(apiAgentName)'
-      ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-        variableGroup: 'SIT_VARIABLE_GROUP'
-      ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-        variableGroup: 'UAT_VARIABLE_GROUP'
-      ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-        variableGroup: 'PROD_VARIABLE_GROUP'
-      componentName: 'API'
-      artifactName: '$(apiArtifactName)'
-      artifactBuildType: 'specific'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(ApiPipelineDefinitionId)'
-      artifactBuildId: '$(ApiBuildId)'
-      artifactBranch: '$(ApiSourceBranch)'
-      zipName: '$(apiZipName)'
-      siteName: '$(apiSiteName)'
-      appPoolName: '$(apiAppPoolName)'
-      iisTargetPath: '$(apiTargetPath)'
-      cleanTargetBeforeCopy: true
-      cleanExcludeCsv: ''
-      enableJsonTransform: true
-      jsonFiles: '**/appsettings.json'
-      enableXmlConfigTransform: false
-      xmlConfigFiles: []
-      xmlVariableValues: {}
-      enableCustomXmlEdits: false
-      customXmlEdits: []
-      customXmlVariableValues: {}
-      enableHealthCheck: true
-      healthCheckUrl: '$(apiHealthCheckUrl)'
-      healthCheckExpectedStatusCode: '200'
-      healthCheckRetries: 6
-      healthCheckDelaySeconds: 10
-      enableRollbackOnHealthCheckFailure: true
-      enableLocalBackup: true
-      backupRoot: 'C:\DeployBackups'
-      backupPath: '$(backupRoot)\API\$(Build.BuildId)'
-
-- stage: Tag_API_LKG
-  displayName: 'Tag successful API build as LKG'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Deploy_API
-  condition: and(succeeded('Deploy_API'), eq('${{ parameters.deployApi }}', 'true'))
-  variables:
-    ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
-    ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
-  jobs:
-  - job: TagApiBuild
-    displayName: 'Tag API build'
-    pool:
-      name: '$(deploymentPool)'
-      demands:
-      - Agent.Name -equals $(resolveAgentName)
-    steps:
-    - checkout: none
-
-    - template: pipelines/tag-builds.yml@templates
+- ${{ if eq(parameters.deployApi, true) }}:
+  - stage: Deploy_API
+    displayName: 'Deploy API to $(environmentName)'
+    dependsOn:
+    - Resolve_Selected_Builds
+    - Approval_Release
+    condition: succeeded()
+    variables:
+      ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+      ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+      ApiSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiSourceBranch'] ]
+    jobs:
+    - template: pipelines/deploy-iis.yml@templates
       parameters:
-        tagTargets:
-        - name: 'Alterna-DataExport API'
-          buildId: '$(ApiBuildId)'
-          definitionId: '$(ApiPipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-$(environmentName)-DTE-API'
-          lkgTag: 'LKG-$(environmentName)-DTE-API'
-          makeLkgUnique: true
+        jobDependsOn: []
+        jobCondition: succeeded()
+        deploymentName: 'DeployAPI'
+        deploymentDisplayName: 'Deploy DataExport API to ${{ parameters.targetEnvironment }} (IIS)'
+        environmentName: '${{ parameters.targetEnvironment }}'
+        deployPool: '$(deploymentPool)'
+        deployAgentName: '$(apiAgentName)'
+        ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+          variableGroup: 'SIT_VARIABLE_GROUP'
+        ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+          variableGroup: 'UAT_VARIABLE_GROUP'
+        ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+          variableGroup: 'PROD_VARIABLE_GROUP'
+        componentName: 'API'
+        artifactName: '$(apiArtifactName)'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '$(ApiPipelineDefinitionId)'
+        artifactBuildId: '$(ApiBuildId)'
+        artifactBranch: '$(ApiSourceBranch)'
+        zipName: '$(apiZipName)'
+        siteName: '$(apiSiteName)'
+        appPoolName: '$(apiAppPoolName)'
+        iisTargetPath: '$(apiTargetPath)'
+        cleanTargetBeforeCopy: true
+        cleanExcludeCsv: ''
+        enableJsonTransform: true
+        jsonFiles: '**/appsettings.json'
+        enableXmlConfigTransform: false
+        xmlConfigFiles: []
+        xmlVariableValues: {}
+        enableCustomXmlEdits: false
+        customXmlEdits: []
+        customXmlVariableValues: {}
+        enableHealthCheck: true
+        healthCheckUrl: '$(apiHealthCheckUrl)'
+        healthCheckExpectedStatusCode: '200'
+        healthCheckRetries: 6
+        healthCheckDelaySeconds: 10
+        enableRollbackOnHealthCheckFailure: true
+        enableLocalBackup: true
+        backupRoot: 'C:\DeployBackups'
+        backupPath: '$(backupRoot)\API\$(Build.BuildId)'
 
-- stage: Deploy_DB_After_API
-  displayName: 'Deploy DB to $(environmentName) after API'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Tag_API_LKG
-  condition: and(succeeded('Tag_API_LKG'), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'true'))
-  variables:
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
-  jobs:
-  - template: pipelines/deploy-database.yml@templates
-    parameters:
-      jobDependsOn: []
-      jobCondition: succeeded()
-      deploymentName: 'DeployDb'
-      deploymentDisplayName: 'Deploy DataExport database'
-      environmentName: '${{ parameters.targetEnvironment }}'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(dbAgentName)'
-      artifactName: '$(dbArtifactName)'
-      artifactBuildType: 'specific'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactBranch: '$(DbSourceBranch)'
-      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+- ${{ if eq(parameters.deployApi, true) }}:
+  - stage: Tag_API_LKG
+    displayName: 'Tag successful API build as LKG'
+    dependsOn:
+    - Resolve_Selected_Builds
+    - Deploy_API
+    condition: succeeded('Deploy_API')
+    variables:
+      ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
+      ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+    jobs:
+    - job: TagApiBuild
+      displayName: 'Tag API build'
+      pool:
+        name: '$(deploymentPool)'
+        demands:
+        - Agent.Name -equals $(resolveAgentName)
+      steps:
+      - checkout: none
 
-- stage: Deploy_DB_Only
-  displayName: 'Deploy DB to $(environmentName)'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Approval_Release
-  condition: and(succeeded(), eq('${{ parameters.deployDatabase }}', 'true'), eq('${{ parameters.deployApi }}', 'false'))
-  variables:
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
-  jobs:
-  - template: pipelines/deploy-database.yml@templates
-    parameters:
-      jobDependsOn: []
-      jobCondition: succeeded()
-      deploymentName: 'DeployDb'
-      deploymentDisplayName: 'Deploy DataExport database'
-      environmentName: '${{ parameters.targetEnvironment }}'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(dbAgentName)'
-      artifactName: '$(dbArtifactName)'
-      artifactBuildType: 'specific'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactBranch: '$(DbSourceBranch)'
-      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+      - template: pipelines/tag-builds.yml@templates
+        parameters:
+          tagTargets:
+          - name: 'Alterna-DataExport API'
+            buildId: '$(ApiBuildId)'
+            definitionId: '$(ApiPipelineDefinitionId)'
+            deployedTag: 'DEPLOYED-$(environmentName)-DTE-API'
+            lkgTag: 'LKG-$(environmentName)-DTE-API'
+            makeLkgUnique: true
 
-- stage: Tag_DB_DEPLOYED
-  displayName: 'Tag deployed database build'
-  dependsOn:
-  - Resolve_Selected_Builds
-  - Deploy_DB_After_API
-  - Deploy_DB_Only
-  condition: and(eq('${{ parameters.deployDatabase }}', 'true'), or(eq(dependencies.Deploy_DB_After_API.result, 'Succeeded'), eq(dependencies.Deploy_DB_Only.result, 'Succeeded')))
-  variables:
-    DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-  jobs:
-  - job: TagDatabaseBuild
-    displayName: 'Tag DB build'
-    pool:
-      name: '$(deploymentPool)'
-      demands:
-      - Agent.Name -equals $(resolveAgentName)
-    steps:
-    - checkout: none
-
-    - template: pipelines/tag-builds.yml@templates
+- ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployApi, true)) }}:
+  - stage: Deploy_DB_After_API
+    displayName: 'Deploy DB to $(environmentName) after API'
+    dependsOn:
+    - Resolve_Selected_Builds
+    - Tag_API_LKG
+    condition: succeeded('Tag_API_LKG')
+    variables:
+      DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+      DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+      DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
+    jobs:
+    - template: pipelines/deploy-database.yml@templates
       parameters:
-        tagTargets:
-        - name: 'Alterna-DataExport DB'
-          buildId: '$(DbBuildId)'
-          definitionId: '$(DbPipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-$(environmentName)-DTE-DB'
-          lkgTag: 'LKG-$(environmentName)-DTE-DB'
-          makeLkgUnique: true
+        jobDependsOn: []
+        jobCondition: succeeded()
+        deploymentName: 'DeployDb'
+        deploymentDisplayName: 'Deploy DataExport database'
+        environmentName: '${{ parameters.targetEnvironment }}'
+        deployPool: '$(deploymentPool)'
+        deployAgentName: '$(dbAgentName)'
+        artifactName: '$(dbArtifactName)'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '$(DbPipelineDefinitionId)'
+        artifactBuildId: '$(DbBuildId)'
+        artifactBranch: '$(DbSourceBranch)'
+        targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+        dacpacFileName: 'DatabaseProjectAlterna_DataExport.dacpac'
+        artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
+
+- ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployApi, false)) }}:
+  - stage: Deploy_DB_Only
+    displayName: 'Deploy DB to $(environmentName)'
+    dependsOn:
+    - Resolve_Selected_Builds
+    - Approval_Release
+    condition: succeeded('Approval_Release')
+    variables:
+      DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+      DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+      DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
+    jobs:
+    - template: pipelines/deploy-database.yml@templates
+      parameters:
+        jobDependsOn: []
+        jobCondition: succeeded()
+        deploymentName: 'DeployDb'
+        deploymentDisplayName: 'Deploy DataExport database'
+        environmentName: '${{ parameters.targetEnvironment }}'
+        deployPool: '$(deploymentPool)'
+        deployAgentName: '$(dbAgentName)'
+        artifactName: '$(dbArtifactName)'
+        artifactBuildType: 'specific'
+        artifactProject: '$(System.TeamProject)'
+        artifactDefinitionId: '$(DbPipelineDefinitionId)'
+        artifactBuildId: '$(DbBuildId)'
+        artifactBranch: '$(DbSourceBranch)'
+        targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+        dacpacFileName: 'DatabaseProjectAlterna_DataExport.dacpac'
+        artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
+
+- ${{ if eq(parameters.deployDatabase, true) }}:
+  - stage: Tag_DB_DEPLOYED
+    displayName: 'Tag deployed database build'
+    dependsOn:
+    - Resolve_Selected_Builds
+    - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployApi, true)) }}:
+      - Deploy_DB_After_API
+    - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployApi, false)) }}:
+      - Deploy_DB_Only
+    condition: succeeded()
+    variables:
+      DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
+      DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
+    jobs:
+    - job: TagDatabaseBuild
+      displayName: 'Tag DB build'
+      pool:
+        name: '$(deploymentPool)'
+        demands:
+        - Agent.Name -equals $(resolveAgentName)
+      steps:
+      - checkout: none
+
+      - template: pipelines/tag-builds.yml@templates
+        parameters:
+          tagTargets:
+          - name: 'Alterna-DataExport DB'
+            buildId: '$(DbBuildId)'
+            definitionId: '$(DbPipelineDefinitionId)'
+            deployedTag: 'DEPLOYED-$(environmentName)-DTE-DB'
+            lkgTag: 'LKG-$(environmentName)-DTE-DB'
+            makeLkgUnique: true
+```
+
+This matches the same two release-side changes you applied on Telecom:
+
+* stage inclusion is now **compile-time**
+* DB deploy calls now include:
+
+  * `dacpacFileName`
+  * `artifactDownloadPath`
+
+If you want, next I’ll rewrite the **DataExport preview pipeline** too so it also matches the DACPAC naming approach.
