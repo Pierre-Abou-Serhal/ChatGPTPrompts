@@ -1,33 +1,158 @@
-SELECT
-    comp.Code AS CompanyCode,
-    comp.CompanyName,
-    c.Id AS ContainerId,
-    c.Code AS ContainerCode,
-    c.StatusCode AS ContainerCurrentStatus,
-    cs.CreatedBy AS SentStatusCreatedBy,
-    cs.CreatedDate AS SentStatusCreatedDate,
-    f.Id AS FileId,
-    f.Name AS FileName,
-    f.FileTypeCode,
-    f.StatusCode AS FileStatus,
-    f.FromDate,
-    f.ToDate
-FROM dbo.t_Container c
-INNER JOIN dbo.t_CurrentContainerFileRelationship ccfr
-    ON ccfr.ContainerId = c.Id
-INNER JOIN dbo.t_File f
-    ON f.Id = ccfr.FileId
-INNER JOIN dbo.t_Company comp
-    ON comp.Code = c.CompanyCode
-CROSS APPLY (
-    SELECT TOP 1
-        s.CreatedBy,
-        s.CreatedDate
-    FROM dbo.t_ContainerStatus s
-    WHERE s.ContainerId = c.Id
-      AND s.StatusCode = 'SENT'
-    ORDER BY s.CreatedDate DESC, s.Id DESC
-) cs
-WHERE c.isDeleted = 0
-  AND f.isDeleted = 0
-ORDER BY comp.Code, c.Code, f.Name;
+Yes — here is a standalone PowerShell script you can run directly on the build server.
+
+It does **not** have an Azure DevOps timeout, so it will keep running until Dependency-Check finishes, fails, or the machine/user stops it. It also matches the way your current templates call the local OWASP CLI, but adds the Java proxy settings that were missing from the pipeline step. Your current template only passes `NVD_API_KEY` and the CLI arguments.  
+
+```powershell
+param(
+    [string]$ProjectName = "Manual-Dependency-Check",
+    [string]$ScanPath = "C:\Repos\MyProject",
+    [string]$ReportDir = "C:\temp\dependency-check-report",
+    [string]$DataDir = "C:\Tools\dependency-check-data",
+    [string]$DependencyCheckCliPath = "C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat",
+    [string]$NvdApiKey = "",
+    [string]$ProxyHost = "10.0.30.222",
+    [int]$ProxyPort = 3128,
+    [switch]$UpdateOnly
+)
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "========== OWASP Dependency-Check Standalone =========="
+Write-Host "ProjectName : $ProjectName"
+Write-Host "ScanPath    : $ScanPath"
+Write-Host "ReportDir   : $ReportDir"
+Write-Host "DataDir     : $DataDir"
+Write-Host "CLI Path    : $DependencyCheckCliPath"
+Write-Host "UpdateOnly  : $UpdateOnly"
+Write-Host "======================================================="
+
+if (-not (Test-Path $DependencyCheckCliPath)) {
+    throw "Dependency-Check CLI not found at: $DependencyCheckCliPath"
+}
+
+if (-not $UpdateOnly -and -not (Test-Path $ScanPath)) {
+    throw "Scan path not found: $ScanPath"
+}
+
+New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
+New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
+
+# Make Java use the company proxy
+$env:JAVA_TOOL_OPTIONS = "-Dhttps.proxyHost=$ProxyHost -Dhttps.proxyPort=$ProxyPort -Dhttp.proxyHost=$ProxyHost -Dhttp.proxyPort=$ProxyPort"
+
+if ([string]::IsNullOrWhiteSpace($NvdApiKey)) {
+    Write-Warning "NvdApiKey is empty. The update may be much slower or rate-limited."
+}
+
+$logFile = Join-Path $ReportDir ("dependency-check-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".log")
+
+Write-Host "JAVA_TOOL_OPTIONS = $env:JAVA_TOOL_OPTIONS"
+Write-Host "Log file          = $logFile"
+Write-Host ""
+
+# Build the argument list
+$arguments = @()
+
+if ($UpdateOnly) {
+    $arguments += "--updateonly"
+} else {
+    $arguments += "--project"
+    $arguments += $ProjectName
+    $arguments += "--scan"
+    $arguments += $ScanPath
+    $arguments += "--format"
+    $arguments += "HTML"
+    $arguments += "--format"
+    $arguments += "JSON"
+    $arguments += "--format"
+    $arguments += "JUNIT"
+    $arguments += "--out"
+    $arguments += $ReportDir
+}
+
+$arguments += "--data"
+$arguments += $DataDir
+
+if (-not [string]::IsNullOrWhiteSpace($NvdApiKey)) {
+    $arguments += "--nvdApiKey"
+    $arguments += $NvdApiKey
+}
+
+# Keep both Java proxy settings and CLI proxy settings
+$arguments += "--proxyserver"
+$arguments += $ProxyHost
+$arguments += "--proxyport"
+$arguments += $ProxyPort
+
+# Same disable flags you are using in your templates
+$arguments += "--disableKnownExploited"
+$arguments += "--disableHostedSuppressions"
+$arguments += "--disableRetireJS"
+$arguments += "--disableVersionCheck"
+
+# Add Node-related disables only when doing a full scan
+if (-not $UpdateOnly) {
+    $arguments += "--disableYarnAudit"
+    $arguments += "--disablePnpmAudit"
+    $arguments += "--disableNodeAudit"
+}
+
+# Optional but useful for troubleshooting
+$arguments += "--log"
+$arguments += $logFile
+
+Write-Host "Starting Dependency-Check..."
+Write-Host ""
+
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+
+& $DependencyCheckCliPath @arguments
+
+$exitCode = $LASTEXITCODE
+$sw.Stop()
+
+Write-Host ""
+Write-Host "Dependency-Check finished with exit code: $exitCode"
+Write-Host "Elapsed time: $($sw.Elapsed)"
+Write-Host "Log file: $logFile"
+
+if ($exitCode -ne 0) {
+    throw "Dependency-Check failed with exit code $exitCode"
+}
+```
+
+Use it like this for a full scan:
+
+```powershell
+.\Run-OwaspDependencyCheck.ps1 `
+  -ProjectName "Alterna-Telecom-Frontend" `
+  -ScanPath "C:\Repos\Alterna-Telecom" `
+  -ReportDir "C:\temp\odc-report" `
+  -DataDir "C:\Tools\dependency-check-data" `
+  -DependencyCheckCliPath "C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat" `
+  -NvdApiKey "YOUR_API_KEY" `
+  -ProxyHost "10.0.30.222" `
+  -ProxyPort 3128
+```
+
+And like this if you only want to warm/update the NVD cache:
+
+```powershell
+.\Run-OwaspDependencyCheck.ps1 `
+  -UpdateOnly `
+  -ReportDir "C:\temp\odc-update" `
+  -DataDir "C:\Tools\dependency-check-data" `
+  -DependencyCheckCliPath "C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat" `
+  -NvdApiKey "YOUR_API_KEY" `
+  -ProxyHost "10.0.30.222" `
+  -ProxyPort 3128
+```
+
+My recommendation is:
+
+* run `-UpdateOnly` manually once first
+* then run the full scan after the cache is populated
+
+That will usually be much faster than letting the full scan do the first big NVD update itself.
+
+If you want, I can also give you a version that writes everything to a transcript file and retries the whole command automatically if the NVD download fails halfway.
