@@ -1,23 +1,38 @@
-SELECT
-    comp.Code AS CompanyCode,
-    comp.CompanyName,
-    c.Id AS ContainerId,
-    c.Code AS ContainerCode,
-    c.StatusCode AS ContainerStatus,
-    f.Id AS FileId,
-    f.Name AS FileName,
-    f.FileTypeCode,
-    f.StatusCode AS FileStatus,
-    f.FromDate,
-    f.ToDate
-FROM dbo.t_Container c
-INNER JOIN dbo.t_CurrentContainerFileRelationship ccfr
-    ON ccfr.ContainerId = c.Id
-INNER JOIN dbo.t_File f
-    ON f.Id = ccfr.FileId
-INNER JOIN dbo.t_Company comp
-    ON comp.Code = c.CompanyCode
-WHERE c.StatusCode = 'SENT'
-  AND c.isDeleted = 0
-  AND f.isDeleted = 0
-ORDER BY comp.Code, c.Code, f.Name;
+USE [Alterna.Archive.PRD2]
+GO
+
+/****** Object:  Table [dbo].[t_ContainerStatus]    Script Date: 17/04/2026 11:00:44 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[t_ContainerStatus](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[ContainerId] [int] NOT NULL,
+	[StatusCode] [nvarchar](10) NOT NULL,
+	[HoldingEntityCode] [nvarchar](11) NOT NULL,
+	[isCurrentStatus] [bit] NOT NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime] NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime] NOT NULL,
+ CONSTRAINT [PK_t_ContainerStatus] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+ALTER TABLE [dbo].[t_ContainerStatus] ADD  CONSTRAINT [DF_t_ContainerStatus_isCurrentStatus]  DEFAULT ((1)) FOR [isCurrentStatus]
+GO
+
+ALTER TABLE [dbo].[t_ContainerStatus] ADD  CONSTRAINT [DF__t_Contain__Creat__25518C17]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+
+ALTER TABLE [dbo].[t_ContainerStatus] ADD  CONSTRAINT [DF__t_Contain__LastM__2645B050]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+
+
