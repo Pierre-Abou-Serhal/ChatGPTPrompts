@@ -3,7 +3,7 @@ SELECT
     comp.CompanyName,
     c.Id AS ContainerId,
     c.Code AS ContainerCode,
-    c.StatusCode AS ContainerStatus,
+    c.StatusCode AS ContainerCurrentStatus,
     cs.CreatedBy AS SentStatusCreatedBy,
     cs.CreatedDate AS SentStatusCreatedDate,
     f.Id AS FileId,
@@ -19,11 +19,15 @@ INNER JOIN dbo.t_File f
     ON f.Id = ccfr.FileId
 INNER JOIN dbo.t_Company comp
     ON comp.Code = c.CompanyCode
-INNER JOIN dbo.t_ContainerStatus cs
-    ON cs.ContainerId = c.Id
-   AND cs.StatusCode = 'SENT'
-   AND cs.isCurrentStatus = 1
-WHERE c.StatusCode = 'SENT'
-  AND c.isDeleted = 0
+CROSS APPLY (
+    SELECT TOP 1
+        s.CreatedBy,
+        s.CreatedDate
+    FROM dbo.t_ContainerStatus s
+    WHERE s.ContainerId = c.Id
+      AND s.StatusCode = 'SENT'
+    ORDER BY s.CreatedDate DESC, s.Id DESC
+) cs
+WHERE c.isDeleted = 0
   AND f.isDeleted = 0
 ORDER BY comp.Code, c.Code, f.Name;
