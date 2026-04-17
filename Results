@@ -1,40 +1,185 @@
-Starting: OWASP Dependency Check (local CLI)
-==============================================================================
-Task         : PowerShell
-Description  : Run a PowerShell script on Linux, macOS, or Windows
-Version      : 2.232.0
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/powershell
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command ". 'C:\agent\_work\_temp\caaa1510-8b24-4376-9fd0-e1060e58733d.ps1'"
-Picked up JAVA_TOOL_OPTIONS: -Dhttps.proxyHost=10.0.30.222 -Dhttps.proxyPort=3128 -Dhttp.proxyHost=10.0.30.222 -Dhttp.proxyPort=3128
-[INFO] Checking for updates
-[INFO] NVD API has 344,924 records in this update
-[INFO] Downloaded 10,000/344,924 (3%)
-[INFO] Downloaded 20,000/344,924 (6%)
-[INFO] Downloaded 30,000/344,924 (9%)
-[INFO] Downloaded 40,000/344,924 (12%)
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=44000 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=48000 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=48000 : 3rd time
-[INFO] Downloaded 50,000/344,924 (14%)
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=52000 : 2nd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=52000 : 3rd time
-[WARN] Retrying request /rest/json/cves/2.0?resultsPerPage=2000&startIndex=52000 : 4th time
-[INFO] Downloaded 60,000/344,929 (17%)
-##[error]The Operation will be canceled. The next steps may not contain expected logs.
-2026-04-16 17:34:01
-Full thread dump Java HotSpot(TM) 64-Bit Server VM (21.0.10+8-LTS-217 mixed mode, sharing):
+I have a query to build
 
-Threads class SMR info:
-_java_thread_list=0x0000027c547e0aa0, length=19, elements={
-0x0000027c6e153de0, 0x0000027c7dad7790, 0x0000027c7dad81f0, 0x0000027c7dad9df0,
-0x0000027c7dadad10, 0x0000027c7dadc2c0, 0x0000027c7dadfdb0, 0x0000027c7dae4160,
-0x0000027c7dae5520, 0x0000027c7deb8490, 0x0000027c7deb8b20, 0x0000027c7deb56a0,
-0x0000027c54199410, 0x0000027c54199aa0, 0x0000027c5419bb70, 0x0000027c5419d5b0,
-0x0000027c54197340, 0x0000027c56707670, 0x0000027c54410550
-}
+The query will be grouping files of containers per CompanyBook 
+I only want to get the contains taht have a status = 'SENT'
 
-"main" #1 [756] prio=5 os_prio=0 cpu=30265.62ms elapsed=3585.95s tid=0x0000027c6e153de0 nid=756 waiting on condition  [0x000000cb953fe000]
+
+USE [Alterna.Archive.PRD2]
+GO
+
+/****** Object:  Table [dbo].[t_Container]    Script Date: 17/04/2026 10:45:24 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[t_Container](
+	[Id] [int] IDENTITY(1,1) NOT NULL,
+	[Code] [nvarchar](50) NOT NULL,
+	[CompanyCode] [nvarchar](9) NOT NULL,
+	[Entity] [nvarchar](10) NOT NULL,
+	[CurrentLocation] [nvarchar](50) NOT NULL,
+	[StatusCode] [nvarchar](10) NOT NULL,
+	[ArchivingDate] [datetime] NULL,
+	[isDeleted] [bit] NOT NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime] NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime] NOT NULL,
+	[isNotified] [bit] NOT NULL,
+ CONSTRAINT [PK_t_Container] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+ALTER TABLE [dbo].[t_Container] ADD  CONSTRAINT [DF_t_Container_isDeleted]  DEFAULT ((0)) FOR [isDeleted]
+GO
+
+ALTER TABLE [dbo].[t_Container] ADD  CONSTRAINT [DF__t_Contain__Creat__1BC821DD]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+
+ALTER TABLE [dbo].[t_Container] ADD  CONSTRAINT [DF__t_Contain__LastM__1CBC4616]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+
+ALTER TABLE [dbo].[t_Container] ADD  DEFAULT ((0)) FOR [isNotified]
+GO
+
+
+
+USE [Alterna.Archive.PRD2]
+GO
+
+/****** Object:  Table [dbo].[t_File]    Script Date: 17/04/2026 10:45:40 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[t_File](
+	[Id] [int] IDENTITY(1,1) NOT NULL,
+	[CustomerId] [int] NULL,
+	[Name] [nvarchar](250) NOT NULL,
+	[FileTypeCode] [nvarchar](10) NOT NULL,
+	[StatusCode] [nvarchar](10) NOT NULL,
+	[CompanyCode] [nvarchar](9) NOT NULL,
+	[FromDate] [date] NULL,
+	[ToDate] [date] NULL,
+	[AdditionalInfo] [nvarchar](1000) NULL,
+	[isDeleted] [bit] NOT NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime] NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime] NOT NULL,
+ CONSTRAINT [PK_t_File] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+ALTER TABLE [dbo].[t_File] ADD  CONSTRAINT [DF_t_File_FromDate]  DEFAULT (getdate()) FOR [FromDate]
+GO
+
+ALTER TABLE [dbo].[t_File] ADD  CONSTRAINT [DF_t_File_ToDate]  DEFAULT (getdate()) FOR [ToDate]
+GO
+
+ALTER TABLE [dbo].[t_File] ADD  CONSTRAINT [DF_t_File_isDeleted]  DEFAULT ((0)) FOR [isDeleted]
+GO
+
+ALTER TABLE [dbo].[t_File] ADD  CONSTRAINT [DF__t_File__CreatedD__2B0A656D]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+
+ALTER TABLE [dbo].[t_File] ADD  CONSTRAINT [DF__t_File__LastModi__2BFE89A6]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+
+
+
+
+USE [Alterna.Archive.PRD2]
+GO
+
+/****** Object:  Table [dbo].[t_CurrentContainerFileRelationship]    Script Date: 17/04/2026 10:45:54 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[t_CurrentContainerFileRelationship](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[FileId] [int] NOT NULL,
+	[ContainerId] [int] NOT NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime] NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime] NOT NULL,
+ CONSTRAINT [PK_t_CurrentContainerFileRelationship] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+ALTER TABLE [dbo].[t_CurrentContainerFileRelationship] ADD  CONSTRAINT [DF__t_Current__Creat__2739D489]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+
+ALTER TABLE [dbo].[t_CurrentContainerFileRelationship] ADD  CONSTRAINT [DF__t_Current__LastM__282DF8C2]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+
+
+
+
+USE [Alterna.Archive.PRD2]
+GO
+
+/****** Object:  Table [dbo].[t_Company]    Script Date: 17/04/2026 10:46:07 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[t_Company](
+	[Code] [nvarchar](11) NOT NULL,
+	[CompanyName] [nvarchar](22) NOT NULL,
+	[NameAddress] [nvarchar](35) NOT NULL,
+	[Mnemonic] [nvarchar](50) NOT NULL,
+	[DisplayDescription] [nvarchar](250) NULL,
+	[isBranch] [bit] NOT NULL,
+	[IsActive] [bit] NOT NULL,
+	[CreatedBy] [nvarchar](250) NOT NULL,
+	[CreatedDate] [datetime] NOT NULL,
+	[LastModifiedBy] [nvarchar](250) NOT NULL,
+	[LastModifiedDate] [datetime] NOT NULL,
+ CONSTRAINT [PK_t_Branch] PRIMARY KEY CLUSTERED 
+(
+	[Code] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+
+ALTER TABLE [dbo].[t_Company] ADD  CONSTRAINT [DF__t_Company__isBra__4D5F7D71]  DEFAULT ((1)) FOR [isBranch]
+GO
+
+ALTER TABLE [dbo].[t_Company] ADD  CONSTRAINT [DF__t_Company__IsAct__7A3223E8]  DEFAULT ((1)) FOR [IsActive]
+GO
+
+ALTER TABLE [dbo].[t_Company] ADD  CONSTRAINT [DF_t_Company_CreatedBy]  DEFAULT ('ETLSysUser') FOR [CreatedBy]
+GO
+
+ALTER TABLE [dbo].[t_Company] ADD  CONSTRAINT [DF__t_Company__Creat__19DFD96B]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+
+ALTER TABLE [dbo].[t_Company] ADD  CONSTRAINT [DF_t_Company_LastModifiedBy]  DEFAULT ('ETLSysUser') FOR [LastModifiedBy]
+GO
+
+ALTER TABLE [dbo].[t_Company] ADD  CONSTRAINT [DF__t_Company__LastM__1AD3FDA4]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
