@@ -1,94 +1,3 @@
-This is my BUILD - DB - Alterna Logger pipeline:
-name: LGR_DB_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-    - release/*
-  paths:
-    include:
-    - DatabaseProjectAlterna.Logger/**
-
-pr: none
-
-stages:
-- stage: Build_DB
-  displayName: 'Build DB'
-  jobs:
-  - template: pipelines/build-database-project.yml@templates
-    parameters:
-      jobName: 'BuildDb'
-      jobDisplayName: 'Build database project'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      sqlProjectPath: 'DatabaseProjectAlterna.Logger/DatabaseProjectAlterna.Logger.sqlproj'
-      artifactName: 'alterna-logger-db-drop'
-      dacpacFileName: 'DatabaseProjectAlterna.Logger.dacpac'
-
-And this is my BUILD - SERVICE - Alterna Logger:
-name: LGR_SVC_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-      - release/*
-  paths:
-    exclude:
-      - '*.yml'
-      - global.json
-      - nuget.config
-
-pr: none
-
-variables:
-- group: OWASP_SECRETS
-
-stages:
-- stage: Build_Service
-  displayName: 'Build & Publish Artifact'
-  jobs:
-  - template: pipelines/build-dotnet-core-webapi.yml@templates
-    parameters:
-      jobName: 'BuildLoggerService'
-      jobDisplayName: 'Build Alterna Logger Service'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      buildConfiguration: 'Release'
-      restoreProjects: '**/*.csproj'
-      runTests: false
-      testProjects: ''
-      publishProject: 'Logger/Logger.csproj'
-      nugetConfigPath: 'nuget.config'
-      zipName: 'Alterna-Logger-drop.zip'
-      artifactName: 'logger-service-drop'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-Logger'
-      deploymentMode: 'self-contained'
-      targetRuntime: 'win-x64'
-      produceSingleFile: true
-      readyToRun: false
-      trim: false
-
-      runDependencyCheck: false
-      dependencyCheckProjectName: 'Alterna-Logger-Service'
-      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-      dependencyCheckAdditionalArguments: ''
-
-And this is my RELEASE - Alterna Logger Pipeline:
 name: LOGGER_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
@@ -106,446 +15,15 @@ parameters:
   default: false
   displayName: 'Deploy Logger Service'
 
+- name: deployDatabase
+  type: boolean
+  default: false
+  displayName: 'Deploy Logger Database'
+
 - name: serviceBuildNumber
   type: string
   default: '__EMPTY__'
   displayName: 'Service Build Number'
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger: none
-pr: none
-
-variables:
-- name: deploymentPool
-  value: 'Deployment Pool'
-
-- name: buildSourceBranchRegex
-  value: '^refs/heads/(release|hotfix)/'
-
-- name: serviceArtifactName
-  value: 'logger-service-drop'
-
-- name: serviceZipName
-  value: 'Alterna-Logger-drop.zip'
-
-# SIT
-- ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-  - group: SIT_VARIABLE_GROUP
-
-  - name: environmentName
-    value: 'SIT'
-
-  - name: servicePipelineName
-    value: 'BUILD - SERVICE - Alterna Logger'
-
-  - name: resolveAgentName
-    value: 'SIT-ALTERNA-BN1'
-
-  - name: serviceAgentName
-    value: 'SIT-ALTERNA-BN1'
-
-  - name: approvalNotifyUsers
-    value: 'SGBL\pabouserhal'
-
-  - name: approvalInstructions
-    value: 'Approve SIT Alterna Logger deployment.'
-
-  - name: managementApprovalNotifyUsers
-    value: 'SGBL\kabbas'
-
-  - name: serviceNameValue
-    value: 'LoggerServiceAzureDevOps'
-
-  - name: serviceTargetPathValue
-    value: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps'
-
-  - name: healthCheckUrlValue
-    value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
-
-  - name: backupRoot
-    value: 'C:\DeployBackups\SIT\LOGGER'
-
-# UAT
-- ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-  - group: UAT_VARIABLE_GROUP   # TODO verify actual group name
-
-  - name: environmentName
-    value: 'UAT'
-
-  - name: servicePipelineName
-    value: 'BUILD - SERVICE - Alterna Logger'
-
-  - name: resolveAgentName
-    value: 'UAT-ALTERNA-BN1'   # TODO verify
-
-  - name: serviceAgentName
-    value: 'UAT-ALTERNA-BN1'   # TODO verify
-
-  - name: approvalNotifyUsers
-    value: 'SGBL\pabouserhal'
-
-  - name: approvalInstructions
-    value: 'Approve UAT Alterna Logger deployment.'
-
-  - name: managementApprovalNotifyUsers
-    value: 'SGBL\kabbas'
-
-  - name: serviceNameValue
-    value: 'LoggerServiceAzureDevOps'   # TODO verify
-
-  - name: serviceTargetPathValue
-    value: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps-UAT'   # TODO verify
-
-  - name: healthCheckUrlValue
-    value: 'http://UAT-LOGGER-URL/health'   # TODO replace
-
-  - name: backupRoot
-    value: 'C:\DeployBackups\UAT\LOGGER'
-
-# PROD
-- ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-  - group: PROD_VARIABLE_GROUP   # TODO verify actual group name
-
-  - name: environmentName
-    value: 'PROD'
-
-  - name: servicePipelineName
-    value: 'BUILD - SERVICE - Alterna Logger'
-
-  - name: resolveAgentName
-    value: 'PROD-ALTERNA-BN1'   # TODO verify
-
-  - name: serviceAgentName
-    value: 'PROD-ALTERNA-BN1'   # TODO verify
-
-  - name: approvalNotifyUsers
-    value: 'SGBL\pabouserhal'
-
-  - name: approvalInstructions
-    value: 'Approve PROD Alterna Logger deployment.'
-
-  - name: managementApprovalNotifyUsers
-    value: 'SGBL\kabbas'
-
-  - name: serviceNameValue
-    value: 'LoggerServiceAzureDevOps'   # TODO verify
-
-  - name: serviceTargetPathValue
-    value: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps-PROD'   # TODO verify
-
-  - name: healthCheckUrlValue
-    value: 'http://PROD-LOGGER-URL/health'   # TODO replace
-
-  - name: backupRoot
-    value: 'C:\DeployBackups\PROD\LOGGER'
-
-stages:
-
-- stage: Resolve_Selected_Build
-  displayName: 'Resolve selected build number'
-  jobs:
-  - job: ResolveBuildNumber
-    displayName: 'Resolve pipeline name and build number'
-    pool:
-      name: '$(deploymentPool)'
-      demands:
-      - Agent.Name -equals $(resolveAgentName)
-    steps:
-    - checkout: none
-
-    - powershell: |
-        $ErrorActionPreference = 'Stop'
-
-        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-        $apiVersion    = '7.1'
-        $allowedBranchPattern = '$(buildSourceBranchRegex)'
-
-        $headers = @{
-          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-        }
-
-        $deployService = "${{ parameters.deployService }}".ToLower() -eq 'true'
-
-        if (-not $deployService) {
-          throw 'At least one deployment target must be selected: Logger Service.'
-        }
-
-        function Normalize-BuildNumber {
-          param([string]$BuildNumber)
-
-          if ($BuildNumber -eq '__EMPTY__') {
-            return ''
-          }
-
-          return $BuildNumber
-        }
-
-        function Resolve-DefinitionIdByName {
-          param(
-            [string]$Label,
-            [string]$PipelineName
-          )
-
-          if ([string]::IsNullOrWhiteSpace($PipelineName)) {
-            throw "$Label pipeline name is empty."
-          }
-
-          $encodedName = [System.Uri]::EscapeDataString($PipelineName)
-          $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
-            $collectionUri,
-            $projectName,
-            $encodedName,
-            $apiVersion
-
-          Write-Host "Resolving $Label pipeline name [$PipelineName]"
-          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-          if (-not $response.value -or $response.count -lt 1) {
-            throw "No pipeline definition found for $Label with name [$PipelineName]."
-          }
-
-          $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
-
-          if ($exactMatches.Count -eq 0) {
-            throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
-          }
-
-          if ($exactMatches.Count -gt 1) {
-            throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
-          }
-
-          $definition = $exactMatches[0]
-
-          Write-Host "$Label definition resolved:"
-          Write-Host "  Definition ID   = $($definition.id)"
-          Write-Host "  Definition Name = $($definition.name)"
-
-          return $definition.id
-        }
-
-        function Resolve-Build {
-          param(
-            [string]$Label,
-            [string]$PipelineName,
-            [string]$BuildNumber
-          )
-
-          $BuildNumber = Normalize-BuildNumber -BuildNumber $BuildNumber
-
-          if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
-            throw "$Label build number is required because deployment of $Label was selected."
-          }
-
-          $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
-          $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
-
-          $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-            $collectionUri,
-            $projectName,
-            $definitionId,
-            $encodedBuildNumber,
-            $apiVersion
-
-          Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
-          $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-          if (-not $response.value -or $response.count -lt 1) {
-            throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
-          }
-
-          $build = $response.value[0]
-
-          if ($build.sourceBranch -notmatch $allowedBranchPattern) {
-            throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)]. Only release/* or hotfix/* builds can be deployed."
-          }
-
-          Write-Host "$Label build resolved:"
-          Write-Host "  Build ID         = $($build.id)"
-          Write-Host "  Build Number     = $($build.buildNumber)"
-          Write-Host "  Definition ID    = $definitionId"
-          Write-Host "  Definition Name  = $PipelineName"
-          Write-Host "  Branch           = $($build.sourceBranch)"
-
-          Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
-          Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
-          Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-          Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
-        }
-
-        Resolve-Build -Label 'Service' -PipelineName '$(servicePipelineName)' -BuildNumber '${{ parameters.serviceBuildNumber }}'
-      name: Resolve
-      displayName: 'Resolve pipeline name and build number'
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-- stage: Approval_Release
-  displayName: 'Approval for $(environmentName) release'
-  dependsOn:
-  - Resolve_Selected_Build
-  condition: succeeded()
-  jobs:
-  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-    - job: NoApprovalRequired
-      displayName: 'No approval required for SIT'
-      pool:
-        name: '$(deploymentPool)'
-        demands:
-        - Agent.Name -equals $(resolveAgentName)
-      steps:
-      - checkout: none
-      - powershell: |
-          Write-Host 'SIT selected. No manual approval is required.'
-        displayName: 'Skip manual approval'
-
-  - ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
-    - job: WaitForBusinessApproval
-      displayName: 'Wait for Business Approval'
-      pool: server
-      timeoutInMinutes: 1500
-      steps:
-      - task: ManualValidation@0
-        timeoutInMinutes: 1440
-        inputs:
-          notifyUsers: '$(approvalNotifyUsers)'
-          instructions: '$(approvalInstructions)'
-          onTimeout: 'reject'
-
-    - job: WaitForManagementApproval
-      displayName: 'Wait for Management Approval'
-      dependsOn: WaitForBusinessApproval
-      pool: server
-      timeoutInMinutes: 1500
-      steps:
-      - task: ManualValidation@0
-        timeoutInMinutes: 1440
-        inputs:
-          notifyUsers: '$(managementApprovalNotifyUsers)'
-          instructions: '$(approvalInstructions)'
-          onTimeout: 'reject'
-
-- stage: Deploy_Service
-  displayName: 'Deploy Logger Service to $(environmentName)'
-  dependsOn:
-  - Resolve_Selected_Build
-  - Approval_Release
-  condition: and(succeeded(), eq('${{ parameters.deployService }}', 'true'))
-  variables:
-    ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServicePipelineDefinitionId'] ]
-    ServiceBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceBuildId'] ]
-    ServiceSourceBranch: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceSourceBranch'] ]
-  jobs:
-  - template: pipelines/deploy-windows-service.yml@templates
-    parameters:
-      jobDependsOn: []
-      jobCondition: succeeded()
-      deploymentName: 'DeployLoggerService'
-      deploymentDisplayName: 'Deploy Alterna Logger Windows Service - ${{ parameters.targetEnvironment }}'
-      environmentName: '${{ parameters.targetEnvironment }}'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(serviceAgentName)'
-      ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-        variableGroup: 'SIT_VARIABLE_GROUP'
-      ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-        variableGroup: 'UAT_VARIABLE_GROUP'
-      ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-        variableGroup: 'PROD_VARIABLE_GROUP'
-      componentName: 'LOGGER'
-      artifactName: '$(serviceArtifactName)'
-      artifactBuildType: 'specific'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(ServicePipelineDefinitionId)'
-      artifactBuildId: '$(ServiceBuildId)'
-      artifactBranch: '$(ServiceSourceBranch)'
-      zipName: '$(serviceZipName)'
-      serviceName: '$(serviceNameValue)'
-      serviceTargetPath: '$(serviceTargetPathValue)'
-      cleanTargetBeforeCopy: true
-      cleanExcludeCsv: 'logs,Keys'
-      enableJsonTransform: true
-      jsonFiles: '**/appsettings.json'
-      enableXmlConfigTransform: false
-      xmlConfigFiles: []
-      xmlVariableValues: {}
-      enableCustomXmlEdits: false
-      customXmlEdits: []
-      customXmlVariableValues: {}
-      enableHealthCheck: true
-      healthCheckUrl: '$(healthCheckUrlValue)'
-      healthCheckExpectedStatusCode: '200'
-      healthCheckRetries: 6
-      healthCheckDelaySeconds: 10
-      enableLocalBackup: true
-      backupRoot: 'C:\DeployBackups'
-      backupPath: '$(backupRoot)\$(Build.BuildId)'
-
-- stage: Tag_SERVICE_LKG
-  displayName: 'Tag successful service build as LKG'
-  dependsOn:
-  - Resolve_Selected_Build
-  - Deploy_Service
-  condition: and(succeeded('Deploy_Service'), eq('${{ parameters.deployService }}', 'true'))
-  variables:
-    ServiceBuildId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServiceBuildId'] ]
-    ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Build.ResolveBuildNumber.outputs['Resolve.ServicePipelineDefinitionId'] ]
-  jobs:
-  - job: TagServiceBuild
-    displayName: 'Tag service build'
-    pool:
-      name: '$(deploymentPool)'
-      demands:
-      - Agent.Name -equals $(resolveAgentName)
-    steps:
-    - checkout: none
-
-    - template: pipelines/tag-builds.yml@templates
-      parameters:
-        tagTargets:
-        - name: 'Alterna Logger Service'
-          buildId: '$(ServiceBuildId)'
-          definitionId: '$(ServicePipelineDefinitionId)'
-          deployedTag: 'DEPLOYED-$(environmentName)-LOGGER-SVC'
-          lkgTag: 'LKG-$(environmentName)-LOGGER-SVC'
-          makeLkgUnique: true
-
-As you can see, the release pipeline does not deploy the database yet
-
-I want to make it similar to DataExport where the release pipeline can deploy API or Database or both at the same time
-
-For reference, this is my Alterna DataExport release pipeline:
-
-name: DTE_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
-
-parameters:
-- name: targetEnvironment
-  type: string
-  default: SIT
-  values:
-  - SIT
-  - UAT
-  - PROD
-  displayName: 'Target Environment'
-
-- name: deployApi
-  type: boolean
-  default: false
-  displayName: 'Deploy API'
-
-- name: deployDatabase
-  type: boolean
-  default: false
-  displayName: 'Deploy Database'
-
-- name: apiBuildNumber
-  type: string
-  default: '__EMPTY__'
-  displayName: 'API Build Number'
 
 - name: dbBuildNumber
   type: string
@@ -569,23 +47,17 @@ variables:
 - name: buildSourceBranchRegex
   value: '^refs/heads/(release|hotfix)/'
 
-- name: apiArtifactName
-  value: 'data-export-api-drop'
+- name: serviceArtifactName
+  value: 'logger-service-drop'
 
 - name: dbArtifactName
-  value: 'data-export-db-drop'
+  value: 'alterna-logger-db-drop'
 
-- name: apiZipName
-  value: 'Alterna-DataExport.zip'
+- name: serviceZipName
+  value: 'Alterna-Logger-drop.zip'
 
-- name: apiSiteName
-  value: 'AlternaDataExportServiceAzureDevOps'
-
-- name: apiAppPoolName
-  value: 'AlternaDataExportServiceAzureDevOps'
-
-- name: apiTargetPath
-  value: 'C:\inetpub\wwwroot\AlternaDataExportService-AzureDevOps-BN1'
+- name: dbDacpacFileName
+  value: 'DatabaseProjectAlterna.Logger.dacpac'
 
 # SIT
 - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
@@ -594,16 +66,16 @@ variables:
   - name: environmentName
     value: 'SIT'
 
-  - name: apiPipelineName
-    value: 'BUILD - API - Alterna-DataExport'
+  - name: servicePipelineName
+    value: 'BUILD - SERVICE - Alterna Logger'
 
   - name: dbPipelineName
-    value: 'BUILD - DB - Alterna-DataExport'
+    value: 'BUILD - DB - Alterna Logger'
 
   - name: resolveAgentName
     value: 'SIT-ALTERNA-BN1'
 
-  - name: apiAgentName
+  - name: serviceAgentName
     value: 'SIT-ALTERNA-BN1'
 
   - name: dbAgentName
@@ -613,7 +85,7 @@ variables:
     value: 'SGBL\pabouserhal'
 
   - name: approvalInstructions
-    value: 'Approve SIT DataExport deployment.'
+    value: 'Approve SIT Alterna Logger deployment.'
 
   - name: managementApprovalNotifyUsers
     value: 'SGBL\kabbas'
@@ -621,29 +93,35 @@ variables:
   - name: dbaApprovalNotifyUsers
     value: 'SGBL\hkassab'
 
-  - name: apiHealthCheckUrl
+  - name: serviceNameValue
+    value: 'LoggerServiceAzureDevOps'
+
+  - name: serviceTargetPathValue
+    value: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps'
+
+  - name: healthCheckUrlValue
     value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
 
   - name: backupRoot
-    value: 'C:\DeployBackups\SIT\DataExport'
+    value: 'C:\DeployBackups\SIT\LOGGER'
 
 # UAT
 - ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-  - group: UAT_VARIABLE_GROUP   # TODO verify
+  - group: UAT_VARIABLE_GROUP   # TODO verify actual group name
 
   - name: environmentName
     value: 'UAT'
 
-  - name: apiPipelineName
-    value: 'BUILD - API - Alterna-DataExport'
+  - name: servicePipelineName
+    value: 'BUILD - SERVICE - Alterna Logger'
 
   - name: dbPipelineName
-    value: 'BUILD - DB - Alterna-DataExport'
+    value: 'BUILD - DB - Alterna Logger'
 
   - name: resolveAgentName
     value: 'UAT-ALTERNA-BN1'   # TODO verify
 
-  - name: apiAgentName
+  - name: serviceAgentName
     value: 'UAT-ALTERNA-BN1'   # TODO verify
 
   - name: dbAgentName
@@ -653,7 +131,7 @@ variables:
     value: 'SGBL\pabouserhal'
 
   - name: approvalInstructions
-    value: 'Approve UAT DataExport deployment.'
+    value: 'Approve UAT Alterna Logger deployment.'
 
   - name: managementApprovalNotifyUsers
     value: 'SGBL\kabbas'
@@ -661,29 +139,35 @@ variables:
   - name: dbaApprovalNotifyUsers
     value: 'SGBL\hkassab'
 
-  - name: apiHealthCheckUrl
-    value: 'http://UAT-DTE-API-URL/health'   # TODO replace
+  - name: serviceNameValue
+    value: 'LoggerServiceAzureDevOps'   # TODO verify
+
+  - name: serviceTargetPathValue
+    value: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps-UAT'   # TODO verify
+
+  - name: healthCheckUrlValue
+    value: 'http://UAT-LOGGER-URL/health'   # TODO replace
 
   - name: backupRoot
-    value: 'C:\DeployBackups\UAT\DataExport'
+    value: 'C:\DeployBackups\UAT\LOGGER'
 
 # PROD
 - ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-  - group: PROD_VARIABLE_GROUP  # TODO verify
+  - group: PROD_VARIABLE_GROUP   # TODO verify actual group name
 
   - name: environmentName
     value: 'PROD'
 
-  - name: apiPipelineName
-    value: 'BUILD - API - Alterna-DataExport'
+  - name: servicePipelineName
+    value: 'BUILD - SERVICE - Alterna Logger'
 
   - name: dbPipelineName
-    value: 'BUILD - DB - Alterna-DataExport'
+    value: 'BUILD - DB - Alterna Logger'
 
   - name: resolveAgentName
     value: 'PROD-ALTERNA-BN1'   # TODO verify
 
-  - name: apiAgentName
+  - name: serviceAgentName
     value: 'PROD-ALTERNA-BN1'   # TODO verify
 
   - name: dbAgentName
@@ -693,7 +177,7 @@ variables:
     value: 'SGBL\pabouserhal'
 
   - name: approvalInstructions
-    value: 'Approve PROD DataExport deployment.'
+    value: 'Approve PROD Alterna Logger deployment.'
 
   - name: managementApprovalNotifyUsers
     value: 'SGBL\kabbas'
@@ -701,11 +185,17 @@ variables:
   - name: dbaApprovalNotifyUsers
     value: 'SGBL\hkassab'
 
-  - name: apiHealthCheckUrl
-    value: 'http://PROD-DTE-API-URL/health'   # TODO replace
+  - name: serviceNameValue
+    value: 'LoggerServiceAzureDevOps'   # TODO verify
+
+  - name: serviceTargetPathValue
+    value: 'C:\Alterna-Backend-Services\AlternaLoggerAzureDevOps-PROD'   # TODO verify
+
+  - name: healthCheckUrlValue
+    value: 'http://PROD-LOGGER-URL/health'   # TODO replace
 
   - name: backupRoot
-    value: 'C:\DeployBackups\PROD\DataExport'
+    value: 'C:\DeployBackups\PROD\LOGGER'
 
 stages:
 
@@ -733,11 +223,11 @@ stages:
           Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
         }
 
-        $deployApi = "${{ parameters.deployApi }}".ToLower() -eq 'true'
-        $deployDb  = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
+        $deployService = "${{ parameters.deployService }}".ToLower() -eq 'true'
+        $deployDb      = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
 
-        if (-not ($deployApi -or $deployDb)) {
-          throw 'At least one deployment target must be selected: API or Database.'
+        if (-not ($deployService -or $deployDb)) {
+          throw 'At least one deployment target must be selected: Logger Service or Database.'
         }
 
         function Normalize-BuildNumber {
@@ -842,13 +332,13 @@ stages:
           Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
         }
 
-        if ($deployApi) {
-          Resolve-Build -Label 'Api' -PipelineName '$(apiPipelineName)' -BuildNumber '${{ parameters.apiBuildNumber }}'
+        if ($deployService) {
+          Resolve-Build -Label 'Service' -PipelineName '$(servicePipelineName)' -BuildNumber '${{ parameters.serviceBuildNumber }}'
         } else {
-          Write-Host '##vso[task.setvariable variable=ApiPipelineDefinitionId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=ApiBuildId;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=ApiResolvedBuildNumber;isOutput=true]'
-          Write-Host '##vso[task.setvariable variable=ApiSourceBranch;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ServicePipelineDefinitionId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ServiceBuildId;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ServiceResolvedBuildNumber;isOutput=true]'
+          Write-Host '##vso[task.setvariable variable=ServiceSourceBranch;isOutput=true]'
         }
 
         if ($deployDb) {
@@ -884,7 +374,7 @@ stages:
       artifactBuildId: '$(DbBuildId)'
       artifactName: '$(dbArtifactName)'
       previewArtifactName: 'db-preview-$(environmentName)'
-      targetConnectionString: '$(AppSettings.DataExportConnectionString)'
+      targetConnectionString: '$(AppSettings.LoggerConnectionString)'   # TODO replace with your real Logger DB variable if different
 
 - stage: Approval_Release
   displayName: 'Approval for $(environmentName) release'
@@ -944,49 +434,48 @@ stages:
         timeoutInMinutes: 1440
         inputs:
           notifyUsers: '$(dbaApprovalNotifyUsers)'
-          instructions: 'Approve $(environmentName) DataExport database deployment.'
+          instructions: 'Approve $(environmentName) Alterna Logger database deployment.'
           onTimeout: 'reject'
 
-- ${{ if eq(parameters.deployApi, true) }}:
-  - stage: Deploy_API
-    displayName: 'Deploy API to $(environmentName)'
+- ${{ if eq(parameters.deployService, true) }}:
+  - stage: Deploy_Service
+    displayName: 'Deploy Logger Service to $(environmentName)'
     dependsOn:
     - Resolve_Selected_Builds
     - Approval_Release
-    condition: succeeded()
+    condition: succeeded('Approval_Release')
     variables:
-      ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
-      ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
-      ApiSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiSourceBranch'] ]
+      ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ServicePipelineDefinitionId'] ]
+      ServiceBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ServiceBuildId'] ]
+      ServiceSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ServiceSourceBranch'] ]
     jobs:
-    - template: pipelines/deploy-iis.yml@templates
+    - template: pipelines/deploy-windows-service.yml@templates
       parameters:
         jobDependsOn: []
         jobCondition: succeeded()
-        deploymentName: 'DeployAPI'
-        deploymentDisplayName: 'Deploy DataExport API to ${{ parameters.targetEnvironment }} (IIS)'
+        deploymentName: 'DeployLoggerService'
+        deploymentDisplayName: 'Deploy Alterna Logger Windows Service - ${{ parameters.targetEnvironment }}'
         environmentName: '${{ parameters.targetEnvironment }}'
         deployPool: '$(deploymentPool)'
-        deployAgentName: '$(apiAgentName)'
+        deployAgentName: '$(serviceAgentName)'
         ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
           variableGroup: 'SIT_VARIABLE_GROUP'
         ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
           variableGroup: 'UAT_VARIABLE_GROUP'
         ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
           variableGroup: 'PROD_VARIABLE_GROUP'
-        componentName: 'API'
-        artifactName: '$(apiArtifactName)'
+        componentName: 'LOGGER'
+        artifactName: '$(serviceArtifactName)'
         artifactBuildType: 'specific'
         artifactProject: '$(System.TeamProject)'
-        artifactDefinitionId: '$(ApiPipelineDefinitionId)'
-        artifactBuildId: '$(ApiBuildId)'
-        artifactBranch: '$(ApiSourceBranch)'
-        zipName: '$(apiZipName)'
-        siteName: '$(apiSiteName)'
-        appPoolName: '$(apiAppPoolName)'
-        iisTargetPath: '$(apiTargetPath)'
+        artifactDefinitionId: '$(ServicePipelineDefinitionId)'
+        artifactBuildId: '$(ServiceBuildId)'
+        artifactBranch: '$(ServiceSourceBranch)'
+        zipName: '$(serviceZipName)'
+        serviceName: '$(serviceNameValue)'
+        serviceTargetPath: '$(serviceTargetPathValue)'
         cleanTargetBeforeCopy: true
-        cleanExcludeCsv: ''
+        cleanExcludeCsv: 'logs,Keys'
         enableJsonTransform: true
         jsonFiles: '**/appsettings.json'
         enableXmlConfigTransform: false
@@ -996,28 +485,27 @@ stages:
         customXmlEdits: []
         customXmlVariableValues: {}
         enableHealthCheck: true
-        healthCheckUrl: '$(apiHealthCheckUrl)'
+        healthCheckUrl: '$(healthCheckUrlValue)'
         healthCheckExpectedStatusCode: '200'
         healthCheckRetries: 6
         healthCheckDelaySeconds: 10
-        enableRollbackOnHealthCheckFailure: true
         enableLocalBackup: true
-        backupRoot: 'C:\DeployBackups'
-        backupPath: '$(backupRoot)\API\$(Build.BuildId)'
+        backupRoot: '$(backupRoot)'
+        backupPath: '$(backupRoot)\$(Build.BuildId)'
 
-- ${{ if eq(parameters.deployApi, true) }}:
-  - stage: Tag_API_LKG
-    displayName: 'Tag successful API build as LKG'
+- ${{ if eq(parameters.deployService, true) }}:
+  - stage: Tag_SERVICE_LKG
+    displayName: 'Tag successful service build as LKG'
     dependsOn:
     - Resolve_Selected_Builds
-    - Deploy_API
-    condition: succeeded('Deploy_API')
+    - Deploy_Service
+    condition: succeeded('Deploy_Service')
     variables:
-      ApiBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiBuildId'] ]
-      ApiPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ApiPipelineDefinitionId'] ]
+      ServiceBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ServiceBuildId'] ]
+      ServicePipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.ServicePipelineDefinitionId'] ]
     jobs:
-    - job: TagApiBuild
-      displayName: 'Tag API build'
+    - job: TagServiceBuild
+      displayName: 'Tag service build'
       pool:
         name: '$(deploymentPool)'
         demands:
@@ -1028,20 +516,20 @@ stages:
       - template: pipelines/tag-builds.yml@templates
         parameters:
           tagTargets:
-          - name: 'Alterna-DataExport API'
-            buildId: '$(ApiBuildId)'
-            definitionId: '$(ApiPipelineDefinitionId)'
-            deployedTag: 'DEPLOYED-$(environmentName)-DTE-API'
-            lkgTag: 'LKG-$(environmentName)-DTE-API'
+          - name: 'Alterna Logger Service'
+            buildId: '$(ServiceBuildId)'
+            definitionId: '$(ServicePipelineDefinitionId)'
+            deployedTag: 'DEPLOYED-$(environmentName)-LOGGER-SVC'
+            lkgTag: 'LKG-$(environmentName)-LOGGER-SVC'
             makeLkgUnique: true
 
-- ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployApi, true)) }}:
-  - stage: Deploy_DB_After_API
-    displayName: 'Deploy DB to $(environmentName) after API'
+- ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployService, true)) }}:
+  - stage: Deploy_DB_After_Service
+    displayName: 'Deploy Logger DB to $(environmentName) after Service'
     dependsOn:
     - Resolve_Selected_Builds
-    - Tag_API_LKG
-    condition: succeeded('Tag_API_LKG')
+    - Tag_SERVICE_LKG
+    condition: succeeded('Tag_SERVICE_LKG')
     variables:
       DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
       DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
@@ -1052,7 +540,7 @@ stages:
         jobDependsOn: []
         jobCondition: succeeded()
         deploymentName: 'DeployDb'
-        deploymentDisplayName: 'Deploy DataExport database'
+        deploymentDisplayName: 'Deploy Alterna Logger database'
         environmentName: '${{ parameters.targetEnvironment }}'
         deployPool: '$(deploymentPool)'
         deployAgentName: '$(dbAgentName)'
@@ -1062,13 +550,13 @@ stages:
         artifactDefinitionId: '$(DbPipelineDefinitionId)'
         artifactBuildId: '$(DbBuildId)'
         artifactBranch: '$(DbSourceBranch)'
-        targetConnectionString: '$(AppSettings.DataExportConnectionString)'
-        dacpacFileName: 'DatabaseProjectAlterna_DataExport.dacpac'
+        targetConnectionString: '$(AppSettings.LoggerConnectionString)'   # TODO replace with your real Logger DB variable if different
+        dacpacFileName: '$(dbDacpacFileName)'
         artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
 
-- ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployApi, false)) }}:
+- ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployService, false)) }}:
   - stage: Deploy_DB_Only
-    displayName: 'Deploy DB to $(environmentName)'
+    displayName: 'Deploy Logger DB to $(environmentName)'
     dependsOn:
     - Resolve_Selected_Builds
     - Approval_Release
@@ -1083,7 +571,7 @@ stages:
         jobDependsOn: []
         jobCondition: succeeded()
         deploymentName: 'DeployDb'
-        deploymentDisplayName: 'Deploy DataExport database'
+        deploymentDisplayName: 'Deploy Alterna Logger database'
         environmentName: '${{ parameters.targetEnvironment }}'
         deployPool: '$(deploymentPool)'
         deployAgentName: '$(dbAgentName)'
@@ -1093,8 +581,8 @@ stages:
         artifactDefinitionId: '$(DbPipelineDefinitionId)'
         artifactBuildId: '$(DbBuildId)'
         artifactBranch: '$(DbSourceBranch)'
-        targetConnectionString: '$(AppSettings.DataExportConnectionString)'
-        dacpacFileName: 'DatabaseProjectAlterna_DataExport.dacpac'
+        targetConnectionString: '$(AppSettings.LoggerConnectionString)'   # TODO replace with your real Logger DB variable if different
+        dacpacFileName: '$(dbDacpacFileName)'
         artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
 
 - ${{ if eq(parameters.deployDatabase, true) }}:
@@ -1102,9 +590,9 @@ stages:
     displayName: 'Tag deployed database build'
     dependsOn:
     - Resolve_Selected_Builds
-    - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployApi, true)) }}:
-      - Deploy_DB_After_API
-    - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployApi, false)) }}:
+    - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployService, true)) }}:
+      - Deploy_DB_After_Service
+    - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployService, false)) }}:
       - Deploy_DB_Only
     condition: succeeded()
     variables:
@@ -1123,9 +611,9 @@ stages:
       - template: pipelines/tag-builds.yml@templates
         parameters:
           tagTargets:
-          - name: 'Alterna-DataExport DB'
+          - name: 'Alterna Logger DB'
             buildId: '$(DbBuildId)'
             definitionId: '$(DbPipelineDefinitionId)'
-            deployedTag: 'DEPLOYED-$(environmentName)-DTE-DB'
-            lkgTag: 'LKG-$(environmentName)-DTE-DB'
+            deployedTag: 'DEPLOYED-$(environmentName)-LOGGER-DB'
+            lkgTag: 'LKG-$(environmentName)-LOGGER-DB'
             makeLkgUnique: true
