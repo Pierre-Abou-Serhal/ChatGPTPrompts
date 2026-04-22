@@ -1,108 +1,56 @@
-2026-04-22 14:50:08.465 [error] [Window] Extension 'ms-vsliveshare.vsliveshare' wants API proposal 'notebookCellExecutionState' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
-2026-04-22 14:50:08.487 [info] [Window] [wso2.micro-integrator]: Command `MI.openWelcome` already registered by WSO2 Integrator: MI (wso2.micro-integrator)
-2026-04-22 14:50:08.500 [warning] [Window] [redhat.vscode-yaml]: Cannot register 'redhat.telemetry.enabled'. This property is already registered.
-2026-04-22 14:50:08.854 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: blade
-2026-04-22 14:50:08.854 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: ejs
-2026-04-22 14:50:08.855 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: latte
-2026-04-22 14:50:08.855 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: tpl
-2026-04-22 14:50:08.855 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: twig
-2026-04-22 14:50:08.855 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: vue
-2026-04-22 14:50:08.855 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: vue-html
-2026-04-22 14:50:08.856 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: django-html
-2026-04-22 14:50:08.856 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: jinja-html
-2026-04-22 14:50:08.856 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: erb
-2026-04-22 14:50:08.856 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: HTML (Eex)
-2026-04-22 14:50:08.856 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: volt
-2026-04-22 14:50:08.856 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: nunjucks
-2026-04-22 14:50:08.856 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: sass
-2026-04-22 14:50:08.857 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: svelte
-2026-04-22 14:50:08.857 [error] [Window] [AnbuselvanRocky.bootstrap5-vscode]: Unknown language in `contributes.bootstrap5-vscode.language`. Provided value: njk
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: blade
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: ejs
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: latte
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: tpl
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: twig
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: vue
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: vue-html
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: django-html
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: jinja-html
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: erb
-2026-04-22 14:50:08.857 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: HTML (Eex)
-2026-04-22 14:50:08.858 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: volt
-2026-04-22 14:50:08.858 [error] [Window] [thekalinga.bootstrap4-vscode]: Unknown language in `contributes.bootstrap4-vscode.language`. Provided value: nunjucks
-2026-04-22 14:50:08.898 [info] [Window] MCP Registry configured: https://api.mcp.github.com
-2026-04-22 14:50:08.956 [info] [Cloud Changes] Prompting to enable cloud changes, has application previously launched from Continue On flow: false
-2026-04-22 14:50:09.276 [info] [Window] Started local extension host with pid 26456.
-2026-04-22 14:50:09.893 [error] [Window] [Extension Host] (node:26456) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
-(Use `Code --trace-deprecation ...` to show where the warning was created)
-2026-04-22 14:50:10.298 [info] [Window] Settings Sync: Account status changed from uninitialized to unavailable
-2026-04-22 14:50:12.650 [warning] [Window] Authentication provider wso2-platform was not declared in the Extension Manifest.
-2026-04-22 14:50:12.820 [info] [Window] [perf] Render performance baseline is 12ms
-2026-04-22 14:50:14.510 [error] [Window] [Extension Host] (node:26456) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
-2026-04-22 14:50:14.842 [error] [Network] #2: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/aaron-bond/better-comments/latest - error GET Failed to fetch
-2026-04-22 14:50:14.842 [error] [Window] Error while getting the latest version for the extension aaron-bond.better-comments from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:15.502 [error] [Network] #13: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/csharpier/csharpier-vscode/latest - error GET Failed to fetch
-2026-04-22 14:50:15.502 [error] [Window] Error while getting the latest version for the extension csharpier.csharpier-vscode from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:15.808 [error] [Network] #17: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/dotjoshjohnson/xml/latest - error GET Failed to fetch
-2026-04-22 14:50:15.808 [error] [Window] Error while getting the latest version for the extension dotjoshjohnson.xml from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:16.027 [error] [Network] #24: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/janisdd/vscode-edit-csv/latest - error GET Failed to fetch
-2026-04-22 14:50:16.027 [error] [Window] Error while getting the latest version for the extension janisdd.vscode-edit-csv from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:16.562 [error] [Network] #32: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/ms-dotnettools/csharp/latest - error GET Failed to fetch
-2026-04-22 14:50:16.563 [error] [Window] Error while getting the latest version for the extension ms-dotnettools.csharp from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:16.612 [error] [Network] #34: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/ms-mssql/data-workspace-vscode/latest - error GET Failed to fetch
-2026-04-22 14:50:16.612 [error] [Window] Error while getting the latest version for the extension ms-mssql.data-workspace-vscode from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:16.616 [error] [Network] #33: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/ms-dotnettools/vscode-dotnet-runtime/latest - error GET Failed to fetch
-2026-04-22 14:50:16.617 [error] [Window] Error while getting the latest version for the extension ms-dotnettools.vscode-dotnet-runtime from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:16.763 [error] [Network] #35: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/ms-mssql/mssql/latest - error GET Failed to fetch
-2026-04-22 14:50:16.763 [error] [Window] Error while getting the latest version for the extension ms-mssql.mssql from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:17.029 [error] [Network] #43: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/quicktype/quicktype/latest - error GET Failed to fetch
-2026-04-22 14:50:17.030 [error] [Window] Error while getting the latest version for the extension quicktype.quicktype from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:17.330 [error] [Network] #48: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/ritwickdey/liveserver/latest - error GET Failed to fetch
-2026-04-22 14:50:17.330 [error] [Window] Error while getting the latest version for the extension ritwickdey.liveserver from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:17.517 [error] [Network] #53: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/wix/vscode-import-cost/latest - error GET Failed to fetch
-2026-04-22 14:50:17.517 [error] [Window] Error while getting the latest version for the extension wix.vscode-import-cost from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:18.341 [error] [Window] Unable to write to Folder Settings because no resource is provided.
-2026-04-22 14:50:19.989 [info] [Window] Auto updating outdated extensions. alefragnani.bookmarks, anbuselvanrocky.bootstrap5-vscode, angular.ng-template, bierner.markdown-mermaid, bpruitt-goddard.mermaid-markdown-syntax-highlighting, chakrounanas.turbo-console-log, christian-kohler.path-intellisense, csharpier.csharpier-vscode, cyrilletuzi.angular-schematics, dbaeumer.vscode-eslint, eamodio.gitlens, equinusocio.vsc-material-theme, esbenp.prettier-vscode, firefox-devtools.vscode-firefox-debug, janisdd.vscode-edit-csv, letmaik.git-tree-compare, mechatroner.rainbow-csv, ms-dotnettools.csharp, ms-dotnettools.vscode-dotnet-runtime, ms-mssql.data-workspace-vscode, ms-mssql.mssql, ms-mssql.sql-bindings-vscode, ms-mssql.sql-database-projects-vscode, ms-vscode.powershell, ms-vsliveshare.vsliveshare, pflannery.vscode-versionlens, pkief.material-icon-theme, qwtel.sqlite-viewer, rangav.vscode-thunder-client, redhat.vscode-xml, redhat.vscode-yaml, ritwickdey.liveserver, tldraw-org.tldraw-vscode, wso2.micro-integrator
-2026-04-22 14:50:23.417 [error] [Window] End of central directory record signature not found. Either not a zip file, or file is truncated.: Error: End of central directory record signature not found. Either not a zip file, or file is truncated.
-    at Nb (file:///d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/code/electron-utility/sharedProcess/sharedProcessMain.js:450:28625)
-    at file:///d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/code/electron-utility/sharedProcess/sharedProcessMain.js:450:29929
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:40:7
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:190:5
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:712:5
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\fd-slicer.js:33:7
-    at FSReqCallback.wrapper [as oncomplete] (node:fs:671:5)
-2026-04-22 14:50:24.669 [error] [Window] End of central directory record signature not found. Either not a zip file, or file is truncated.: Error: End of central directory record signature not found. Either not a zip file, or file is truncated.
-    at Nb (file:///d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/code/electron-utility/sharedProcess/sharedProcessMain.js:450:28625)
-    at file:///d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/code/electron-utility/sharedProcess/sharedProcessMain.js:450:29929
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:40:7
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:190:5
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:712:5
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\fd-slicer.js:33:7
-    at FSReqCallback.wrapper [as oncomplete] (node:fs:671:5)
-2026-04-22 14:50:37.088 [error] [Network] #73: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/aaron-bond/better-comments/latest - error GET Failed to fetch
-2026-04-22 14:50:37.088 [error] [Window] Error while getting the latest version for the extension aaron-bond.better-comments from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:37.114 [error] [Network] #95: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/janisdd/vscode-edit-csv/latest - error GET Failed to fetch
-2026-04-22 14:50:37.115 [error] [Window] Error while getting the latest version for the extension janisdd.vscode-edit-csv from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:37.116 [error] [Network] #103: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/ms-dotnettools/csharp/latest - error GET Failed to fetch
-2026-04-22 14:50:37.116 [error] [Window] Error while getting the latest version for the extension ms-dotnettools.csharp from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:37.307 [error] [Network] #105: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/ms-mssql/data-workspace-vscode/latest - error GET Failed to fetch
-2026-04-22 14:50:37.308 [error] [Window] Error while getting the latest version for the extension ms-mssql.data-workspace-vscode from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:37.459 [error] [Network] #114: https://marketplace.visualstudio.com/_apis/public/gallery/vscode/quicktype/quicktype/latest - error GET Failed to fetch
-2026-04-22 14:50:37.460 [error] [Window] Error while getting the latest version for the extension quicktype.quicktype from https://marketplace.visualstudio.com/_apis/public/gallery/vscode/{publisher}/{name}/latest. Trying the fallback https://www.vscode-unpkg.net/_gallery/{publisher}/{name}/latest Failed
-2026-04-22 14:50:38.658 [info] [Window] Auto updating outdated extensions. alefragnani.bookmarks, anbuselvanrocky.bootstrap5-vscode, angular.ng-template, bierner.markdown-mermaid, bpruitt-goddard.mermaid-markdown-syntax-highlighting, chakrounanas.turbo-console-log, christian-kohler.path-intellisense, csharpier.csharpier-vscode, cyrilletuzi.angular-schematics, dbaeumer.vscode-eslint, eamodio.gitlens, equinusocio.vsc-material-theme, esbenp.prettier-vscode, firefox-devtools.vscode-firefox-debug, janisdd.vscode-edit-csv, letmaik.git-tree-compare, mechatroner.rainbow-csv, ms-dotnettools.csharp, ms-dotnettools.vscode-dotnet-runtime, ms-mssql.data-workspace-vscode, ms-mssql.mssql, ms-mssql.sql-bindings-vscode, ms-mssql.sql-database-projects-vscode, ms-vscode.powershell, ms-vsliveshare.vsliveshare, pflannery.vscode-versionlens, pkief.material-icon-theme, qwtel.sqlite-viewer, rangav.vscode-thunder-client, redhat.vscode-xml, redhat.vscode-yaml, ritwickdey.liveserver, tldraw-org.tldraw-vscode, wso2.micro-integrator
-2026-04-22 14:50:41.603 [error] [Window] End of central directory record signature not found. Either not a zip file, or file is truncated.: Error: End of central directory record signature not found. Either not a zip file, or file is truncated.
-    at Nb (file:///d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/code/electron-utility/sharedProcess/sharedProcessMain.js:450:28625)
-    at file:///d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/code/electron-utility/sharedProcess/sharedProcessMain.js:450:29929
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:40:7
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:190:5
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:712:5
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\fd-slicer.js:33:7
-    at FSReqCallback.wrapper [as oncomplete] (node:fs:671:5)
-2026-04-22 14:50:43.511 [error] [Window] End of central directory record signature not found. Either not a zip file, or file is truncated.: Error: End of central directory record signature not found. Either not a zip file, or file is truncated.
-    at Nb (file:///d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/code/electron-utility/sharedProcess/sharedProcessMain.js:450:28625)
-    at file:///d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/code/electron-utility/sharedProcess/sharedProcessMain.js:450:29929
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:40:7
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:190:5
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\index.js:712:5
-    at d:\VSCode SGBL\07ff9d6178\resources\app\node_modules\yauzl\fd-slicer.js:33:7
-    at FSReqCallback.wrapper [as oncomplete] (node:fs:671:5)
+2026-04-22 14:50:09.652 [info] Extension host with pid 26456 started
+2026-04-22 14:50:09.652 [info] Skipping acquiring lock for d:\VSCode SGBL\data\user-data\User\workspaceStorage\53865391aa1710fb6f83cce8b930753d.
+2026-04-22 14:50:09.659 [info] ExtensionService#_doActivateExtension vscode.github-authentication, startup: false, activationEvent: 'onAuthenticationRequest:github'
+2026-04-22 14:50:09.677 [info] ExtensionService#_doActivateExtension mechatroner.rainbow-csv, startup: false, activationEvent: 'onLanguage:plaintext'
+2026-04-22 14:50:09.680 [info] ExtensionService#_doActivateExtension vscode.emmet, startup: false, activationEvent: 'onLanguage'
+2026-04-22 14:50:09.691 [info] ExtensionService#_doActivateExtension redhat.vscode-yaml, startup: false, activationEvent: 'onLanguage:SynapseXml', root cause: wso2.micro-integrator
+2026-04-22 14:50:10.808 [info] ExtensionService#_doActivateExtension wso2.wso2-platform, startup: false, activationEvent: 'onLanguage:SynapseXml', root cause: wso2.micro-integrator
+2026-04-22 14:50:10.858 [info] ExtensionService#_doActivateExtension vscode.git-base, startup: true, activationEvent: '*', root cause: vscode.git
+2026-04-22 14:50:10.861 [info] ExtensionService#_doActivateExtension christian-kohler.path-intellisense, startup: true, activationEvent: '*'
+2026-04-22 14:50:10.875 [info] ExtensionService#_doActivateExtension kevin-chatham.aspnetcorerazor-html-css-class-completion, startup: true, activationEvent: '*'
+2026-04-22 14:50:10.926 [info] ExtensionService#_doActivateExtension mhutchie.git-graph, startup: true, activationEvent: '*'
+2026-04-22 14:50:10.945 [info] ExtensionService#_doActivateExtension ms-dotnettools.vscode-dotnet-runtime, startup: true, activationEvent: '*', root cause: Oracle.oracledevtools
+2026-04-22 14:50:11.075 [info] ExtensionService#_doActivateExtension wayou.vscode-todo-highlight, startup: true, activationEvent: '*'
+2026-04-22 14:50:11.259 [info] ExtensionService#_doActivateExtension vscode.git, startup: true, activationEvent: '*'
+2026-04-22 14:50:11.287 [info] ExtensionService#_doActivateExtension vscode.github, startup: true, activationEvent: '*'
+2026-04-22 14:50:11.358 [info] ExtensionService#_doActivateExtension Oracle.oracledevtools, startup: true, activationEvent: '*'
+2026-04-22 14:50:12.662 [info] ExtensionService#_doActivateExtension vscode.terminal-suggest, startup: false, activationEvent: 'onTerminalShellIntegration:*'
+2026-04-22 14:50:13.308 [info] ExtensionService#_doActivateExtension wso2.micro-integrator, startup: false, activationEvent: 'onLanguage:SynapseXml'
+2026-04-22 14:50:13.854 [info] Eager extensions activated
+2026-04-22 14:50:13.864 [info] ExtensionService#_doActivateExtension vscode.debug-auto-launch, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:13.866 [info] ExtensionService#_doActivateExtension vscode.merge-conflict, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:13.876 [info] ExtensionService#_doActivateExtension aaron-bond.better-comments, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:13.881 [info] ExtensionService#_doActivateExtension alefragnani.Bookmarks, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:13.888 [info] ExtensionService#_doActivateExtension cyrilletuzi.angular-schematics, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:14.101 [info] ExtensionService#_doActivateExtension dbaeumer.vscode-eslint, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:14.118 [info] ExtensionService#_doActivateExtension eamodio.gitlens, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:14.187 [info] ExtensionService#_doActivateExtension Equinusocio.vsc-material-theme, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:14.198 [info] ExtensionService#_doActivateExtension PKief.material-icon-theme, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:14.209 [info] ExtensionService#_doActivateExtension ritwickdey.LiveServer, startup: false, activationEvent: 'onStartupFinished'
+2026-04-22 14:50:14.362 [info] ExtensionService#_doActivateExtension ms-vsliveshare.vsliveshare, startup: false, activationEvent: 'api', root cause: eamodio.gitlens
+2026-04-22 14:50:14.864 [info] ExtensionService#_doActivateExtension DotJoshJohnson.xml, startup: false, activationEvent: 'onLanguage:xml'
+2026-04-22 14:50:14.925 [info] ExtensionService#_doActivateExtension pflannery.vscode-versionlens, startup: false, activationEvent: 'onLanguage:xml'
+2026-04-22 14:50:14.960 [info] ExtensionService#_doActivateExtension redhat.vscode-xml, startup: false, activationEvent: 'onLanguage:xml'
+2026-04-22 14:50:15.493 [info] ExtensionService#_doActivateExtension vscode.microsoft-authentication, startup: false, activationEvent: 'onAuthenticationRequest:microsoft'
+2026-04-22 14:50:16.720 [info] ExtensionService#_doActivateExtension vscode.configuration-editing, startup: false, activationEvent: 'onLanguage:jsonc'
+2026-04-22 14:50:16.725 [info] ExtensionService#_doActivateExtension vscode.json-language-features, startup: false, activationEvent: 'onLanguage:jsonc'
+2026-04-22 14:50:16.771 [info] ExtensionService#_doActivateExtension vscode.typescript-language-features, startup: false, activationEvent: 'onLanguage:jsonc'
+2026-04-22 14:50:18.341 [error] CodeExpectedError: Unable to write to Folder Settings because no resource is provided.
+    at SKe.toConfigurationEditingError (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:4970:7060)
+    at SKe.validate (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:4970:10390)
+    at SKe.doWriteConfiguration (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:4970:3453)
+    at Object.factory (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:4970:3309)
+    at th.consume (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:406:77104)
+    at vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:406:76923
+    at new Promise (<anonymous>)
+    at th.queue (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:406:76847)
+    at SKe.writeConfiguration (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:4970:3278)
+    at e6t.writeConfigurationValue (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:4970:60035)
+    at async Promise.all (index 0)
+    at async Object.a [as settled] (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:406:84224)
+    at async e6t.updateValue (vscode-file://vscode-app/d:/VSCode%20SGBL/07ff9d6178/resources/app/out/vs/workbench/workbench.desktop.main.js:4970:43127)
+2026-04-22 14:50:19.066 [warning] [redhat.vscode-xml] Accessing a resource scoped configuration without providing a resource is not expected. To get the effective value for '[xml]', provide the URI of a resource or 'null' for any resource.
+2026-04-22 14:50:19.641 [warning] [wso2.micro-integrator] Accessing a resource scoped configuration without providing a resource is not expected. To get the effective value for '[SynapseXml]', provide the URI of a resource or 'null' for any resource.
+2026-04-22 14:51:06.521 [info] ExtensionService#_doActivateExtension vscode.simple-browser, startup: false, activationEvent: 'onOpenExternalUri:https'
+2026-04-22 15:07:41.890 [info] ExtensionService#_doActivateExtension vscode.extension-editing, startup: false, activationEvent: 'onLanguage:json'
+2026-04-22 15:07:41.902 [info] ExtensionService#_doActivateExtension vscode.npm, startup: false, activationEvent: 'onLanguage:json'
