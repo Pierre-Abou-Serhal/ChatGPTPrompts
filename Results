@@ -1,143 +1,7 @@
-I want to create the release pipeline of my project PaymentServices just like I did with Alterna Telecom.
+Below is the cloned **Payment Services release pipeline**, keeping the same architecture as Alterna Telecom and replacing values based on your PaymentServices build pipelines. 
 
-These are the build pipelinese so far:
-
-BUILD - FRONT - PaymentServices
-name: APS_FRONT_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-    - release/*
-  paths:
-    exclude:
-      - '*.yml'
-
-pr: none
-
-variables:
-- group: OWASP_SECRETS
-
-stages:
-- stage: Build_Frontend
-  displayName: 'Build Angular & Publish Artifact'
-  jobs:
-  - template: pipelines/build-angular-webapp.yml@templates
-    parameters:
-      jobName: 'BuildFrontend'
-      jobDisplayName: 'Build Alterna Payment Services Frontend'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      workingDirectory: '.'
-      nodeVersion: '22.x'
-      installCommand: 'ci'
-      runTests: false
-      buildCommand: 'npx ng build'
-      distFolder: 'dist/PaymentServices/browser'
-      zipName: 'Alterna-PaymentServices-Frontend.zip'
-      artifactName: 'alterna-payment-services-front-drop'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish'
-      runDependencyCheck: false
-      dependencyCheckProjectName: 'Alterna-PaymentServices-Frontend'
-      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-      dependencyCheckAdditionalArguments: ''
-
-
-BUILD - API - PaymentServices
-name: APS_API_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-      - release/*
-  paths:
-    exclude:
-      - '*.yml'
-      - global.json
-      - nuget.config
-
-pr: none
-
-variables:
-  - group: OWASP_SECRETS
-
-stages:
-  - stage: Build_API
-    displayName: 'Build API & Publish Artifact'
-    jobs:
-      - template: pipelines/build-dotnet-core-webapi.yml@templates
-        parameters:
-          jobName: 'BuildBackend'
-          jobDisplayName: 'Build Alterna Payment Services Backend'
-          buildPool: 'Build Pool'
-          buildAgentName: 'UAT-ALTERNA-DK1'
-          buildConfiguration: 'Release'
-          restoreProjects: '**/*.csproj'
-          runTests: false
-          testProjects: ''
-          publishProject: 'Alterna-PaymentServices-Backend/Alterna-PaymentServices-Backend.csproj'
-          nugetConfigPath: 'nuget.config'
-          zipName: 'Alterna-PaymentServices-Backend.zip'
-          artifactName: 'alterna-payment-services-api-drop'
-          publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-PaymentServices-Backend'
-          runDependencyCheck: false
-          dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-          dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-          dependencyCheckProjectName: 'Alterna-PaymentServices-Backend'
-          dependencyCheckAdditionalArguments: ''
-
-BUILD - DB - PaymentServices
-name: APS_DB_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-    - release/*
-  paths:
-    include:
-    - DatabaseProjectAlterna_PaymentServices/**
-
-pr: none
-
-stages:
-- stage: Build_DB
-  displayName: 'Build DB'
-  jobs:
-  - template: pipelines/build-database-project.yml@templates
-    parameters:
-      jobName: 'BuildDb'
-      jobDisplayName: 'Build database project'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      sqlProjectPath: 'DatabaseProjectAlterna_PaymentServices/DatabaseProjectAlterna_PaymentServices.sqlproj'
-      artifactName: 'alterna-payment-services-db-drop'
-      dacpacFileName: 'DatabaseProjectAlterna_PaymentServices.dacpac'
-
-For reference this is my release pipeline for my Alterna Telecom project:
-
-name: ATC_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
+```yaml
+name: APS_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
   - name: targetEnvironment
@@ -197,37 +61,37 @@ variables:
     value: '^refs/heads/(release|hotfix)/'
 
   - name: backendArtifactName
-    value: 'alterna-telecom-api-drop'
+    value: 'alterna-payment-services-api-drop'
 
   - name: frontendArtifactName
-    value: 'alterna-telecom-front-drop'
+    value: 'alterna-payment-services-front-drop'
 
   - name: dbArtifactName
-    value: 'alterna-telecom-db-drop'
+    value: 'alterna-payment-services-db-drop'
 
   - name: backendZipName
-    value: 'Alterna-Telecom-Backend.zip'
+    value: 'Alterna-PaymentServices-Backend.zip'
 
   - name: frontendZipName
-    value: 'Alterna-Telecom-Frontend.zip'
+    value: 'Alterna-PaymentServices-Frontend.zip'
 
   - name: backendSiteName
-    value: 'Alterna.Telecom'
+    value: 'Alterna.PaymentServices'
 
   - name: backendAppPoolName
-    value: 'Alterna.Telecom'
+    value: 'Alterna.PaymentServices'
 
   - name: backendTargetPath
-    value: 'C:\inetpub\wwwroot\Alterna.Telecom'
+    value: 'C:\inetpub\wwwroot\Alterna.PaymentServices'
 
   - name: frontendSiteName
-    value: 'AlternaTelecom'
+    value: 'AlternaPaymentServices'
 
   - name: frontendAppPoolName
-    value: 'AlternaTelecom'
+    value: 'AlternaPaymentServices'
 
   - name: frontendTargetPath
-    value: 'C:\inetpub\wwwroot\AlternaTelecom'
+    value: 'C:\inetpub\wwwroot\AlternaPaymentServices'
 
   # SIT
   - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
@@ -237,13 +101,13 @@ variables:
         value: 'SIT'
 
       - name: backendPipelineName
-        value: 'BUILD - API - Alterna Telecom'
+        value: 'BUILD - API - PaymentServices'
 
       - name: frontendPipelineName
-        value: 'BUILD - FRONT - Alterna Telecom'
+        value: 'BUILD - FRONT - PaymentServices'
 
       - name: dbPipelineName
-        value: 'BUILD - DB - Alterna Telecom'
+        value: 'BUILD - DB - PaymentServices'
 
       - name: resolveAgentName
         value: 'SIT-ALTERNA-BN1'
@@ -261,16 +125,16 @@ variables:
         value: 'SGBL\pabouserhal'
 
       - name: approvalInstructions
-        value: 'Approve SIT Alterna Telecom deployment.'
+        value: 'Approve SIT Payment Services deployment.'
 
       - name: backendHealthCheckUrl
-        value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+        value: 'http://SIT-PAYMENT-SERVICES-API-URL/health' # TODO replace
 
       - name: frontendHealthCheckUrl
-        value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+        value: 'http://SIT-PAYMENT-SERVICES-FRONT-URL' # TODO replace
 
       - name: backupRoot
-        value: 'C:\DeployBackups\SIT\AlternaTelecom'
+        value: 'C:\DeployBackups\SIT\PaymentServices'
 
   # UAT
   - ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
@@ -280,40 +144,40 @@ variables:
         value: 'UAT'
 
       - name: backendPipelineName
-        value: 'BUILD - API - Alterna Telecom'
+        value: 'BUILD - API - PaymentServices'
 
       - name: frontendPipelineName
-        value: 'BUILD - FRONT - Alterna Telecom'
+        value: 'BUILD - FRONT - PaymentServices'
 
       - name: dbPipelineName
-        value: 'BUILD - DB - Alterna Telecom'
+        value: 'BUILD - DB - PaymentServices'
 
       - name: resolveAgentName
-        value: 'UAT-ALTERNA-BN1' # TODO verify
+        value: 'UAT-ALTERNA-BN1'
 
       - name: backendAgentName
-        value: 'UAT-ALTERNA-BN1' # TODO verify
+        value: 'UAT-ALTERNA-BN1'
 
       - name: frontendAgentName
-        value: 'UAT-ALTERNA-FN1' # TODO verify
+        value: 'UAT-ALTERNA-FN1'
 
       - name: dbAgentName
-        value: 'UAT-ALTERNA-BN1' # TODO verify
+        value: 'UAT-ALTERNA-BN1'
 
       - name: approvalNotifyUsers
-        value: 'SGBL\pabouserhal' # TODO adjust if different
+        value: 'SGBL\pabouserhal'
 
       - name: approvalInstructions
-        value: 'Approve UAT Alterna Telecom deployment.'
+        value: 'Approve UAT Payment Services deployment.'
 
       - name: backendHealthCheckUrl
-        value: 'http://UAT-ALTERNA-API-URL/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1' # TODO replace
+        value: 'http://UAT-PAYMENT-SERVICES-API-URL/health' # TODO replace
 
       - name: frontendHealthCheckUrl
-        value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1' # TODO replace
+        value: 'http://UAT-PAYMENT-SERVICES-FRONT-URL' # TODO replace
 
       - name: backupRoot
-        value: 'C:\DeployBackups\UAT\AlternaTelecom'
+        value: 'C:\DeployBackups\UAT\PaymentServices'
 
   # PROD
   - ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
@@ -323,40 +187,40 @@ variables:
         value: 'PROD'
 
       - name: backendPipelineName
-        value: 'BUILD - API - Alterna Telecom'
+        value: 'BUILD - API - PaymentServices'
 
       - name: frontendPipelineName
-        value: 'BUILD - FRONT - Alterna Telecom'
+        value: 'BUILD - FRONT - PaymentServices'
 
       - name: dbPipelineName
-        value: 'BUILD - DB - Alterna Telecom'
+        value: 'BUILD - DB - PaymentServices'
 
       - name: resolveAgentName
-        value: 'PROD-ALTERNA-BN1' # TODO verify
+        value: 'PROD-ALTERNA-BN1'
 
       - name: backendAgentName
-        value: 'PROD-ALTERNA-BN1' # TODO verify
+        value: 'PROD-ALTERNA-BN1'
 
       - name: frontendAgentName
-        value: 'PROD-ALTERNA-FN1' # TODO verify
+        value: 'PROD-ALTERNA-FN1'
 
       - name: dbAgentName
-        value: 'PROD-ALTERNA-BN1' # TODO verify
+        value: 'PROD-ALTERNA-BN1'
 
       - name: approvalNotifyUsers
-        value: 'SGBL\pabouserhal' # TODO adjust if different
+        value: 'SGBL\pabouserhal'
 
       - name: approvalInstructions
-        value: 'Approve PROD Alterna Telecom deployment.'
+        value: 'Approve PROD Payment Services deployment.'
 
       - name: backendHealthCheckUrl
-        value: 'http://PROD-ALTERNA-API-URL/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1' # TODO replace
+        value: 'http://PROD-PAYMENT-SERVICES-API-URL/health' # TODO replace
 
       - name: frontendHealthCheckUrl
-        value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1' # TODO replace
+        value: 'http://PROD-PAYMENT-SERVICES-FRONT-URL' # TODO replace
 
       - name: backupRoot
-        value: 'C:\DeployBackups\PROD\AlternaTelecom'
+        value: 'C:\DeployBackups\PROD\PaymentServices'
 
 stages:
 
@@ -741,22 +605,22 @@ stages:
                   - template: pipelines/tag-builds.yml@templates
                     parameters:
                       tagTargets:
-                        - name: 'Alterna Telecom Backend'
+                        - name: 'Payment Services Backend'
                           buildId: '$(BackendBuildId)'
                           definitionId: '$(BackendPipelineDefinitionId)'
-                          deployedTag: 'DEPLOYED-$(environmentName)-ATC-BACKEND'
-                          lkgTag: 'LKG-$(environmentName)-ATC-BACKEND'
+                          deployedTag: 'DEPLOYED-$(environmentName)-APS-BACKEND'
+                          lkgTag: 'LKG-$(environmentName)-APS-BACKEND'
                           makeLkgUnique: true
 
               - ${{ if eq(parameters.deployFrontend, true) }}:
                   - template: pipelines/tag-builds.yml@templates
                     parameters:
                       tagTargets:
-                        - name: 'Alterna Telecom Frontend'
+                        - name: 'Payment Services Frontend'
                           buildId: '$(FrontendBuildId)'
                           definitionId: '$(FrontendPipelineDefinitionId)'
-                          deployedTag: 'DEPLOYED-$(environmentName)-ATC-FRONTEND'
-                          lkgTag: 'LKG-$(environmentName)-ATC-FRONTEND'
+                          deployedTag: 'DEPLOYED-$(environmentName)-APS-FRONTEND'
+                          lkgTag: 'LKG-$(environmentName)-APS-FRONTEND'
                           makeLkgUnique: true
 
   - ${{ if and(eq(parameters.deployDatabase, true), or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true))) }}:
@@ -775,7 +639,7 @@ stages:
           - template: pipelines/deploy-database.yml@templates
             parameters:
               deploymentName: 'DeployDb'
-              deploymentDisplayName: 'Deploy Alterna Telecom database'
+              deploymentDisplayName: 'Deploy Payment Services database'
               environmentName: '${{ parameters.targetEnvironment }}'
               deployPool: '$(deploymentPool)'
               deployAgentName: '$(dbAgentName)'
@@ -786,7 +650,7 @@ stages:
               artifactBuildId: '$(DbBuildId)'
               artifactBranch: '$(DbSourceBranch)'
               targetConnectionString: '$(GlobalSettings.ConnString)'
-              dacpacFileName: 'DatabaseProjectAlterna_Telecom.dacpac'
+              dacpacFileName: 'DatabaseProjectAlterna_PaymentServices.dacpac'
               artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
 
   - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployBackend, false), eq(parameters.deployFrontend, false)) }}:
@@ -804,7 +668,7 @@ stages:
           - template: pipelines/deploy-database.yml@templates
             parameters:
               deploymentName: 'DeployDb'
-              deploymentDisplayName: 'Deploy Alterna Telecom database'
+              deploymentDisplayName: 'Deploy Payment Services database'
               environmentName: '${{ parameters.targetEnvironment }}'
               deployPool: '$(deploymentPool)'
               deployAgentName: '$(dbAgentName)'
@@ -815,7 +679,7 @@ stages:
               artifactBuildId: '$(DbBuildId)'
               artifactBranch: '$(DbSourceBranch)'
               targetConnectionString: '$(GlobalSettings.ConnString)'
-              dacpacFileName: 'DatabaseProjectAlterna_Telecom.dacpac'
+              dacpacFileName: 'DatabaseProjectAlterna_PaymentServices.dacpac'
               artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
 
   - ${{ if eq(parameters.deployDatabase, true) }}:
@@ -844,9 +708,12 @@ stages:
               - template: pipelines/tag-builds.yml@templates
                 parameters:
                   tagTargets:
-                    - name: 'Alterna Telecom DB'
+                    - name: 'Payment Services DB'
                       buildId: '$(DbBuildId)'
                       definitionId: '$(DbPipelineDefinitionId)'
-                      deployedTag: 'DEPLOYED-$(environmentName)-ATC-DB'
-                      lkgTag: 'LKG-$(environmentName)-ATC-DB'
+                      deployedTag: 'DEPLOYED-$(environmentName)-APS-DB'
+                      lkgTag: 'LKG-$(environmentName)-APS-DB'
                       makeLkgUnique: true
+```
+
+You mainly need to verify the IIS site names, target paths, and health check URLs before running it.
