@@ -1,53 +1,9 @@
-using System.Net;
-using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
-using ReverseProxy.Common;
-
-namespace ReverseProxy.Extensions;
-
-public static class ReverseProxyExtensions
-{
-    public static void AddConfiguredReverseProxy(this IServiceCollection services, IConfiguration configuration)
-    {
-        Certificate certificates = configuration.GetSection("Certificates").Get<Certificate>() ?? new();
-
-        services.AddReverseProxy()
-            .LoadFromConfig(configuration.GetSection("ReverseProxy"))
-            .ConfigureHttpClient((context, handler) =>
-            {
-                String clusterId = context.ClusterId;
-
-                ClientCertificate? clientCertificate = certificates.ClientCertificates
-                    .FirstOrDefault(i => i.ClusterId.Equals(clusterId, StringComparison.OrdinalIgnoreCase));
-
-                if (clientCertificate is not null)
-                {
-                    String certPath = Path.Combine(AppContext.BaseDirectory, clientCertificate.Path);
-
-                    if (File.Exists(certPath))
-                    {
-                        String certPassword = clientCertificate.Password;
-
-                        X509Certificate2 clientCert = new X509Certificate2(
-                            certPath,
-                            certPassword,
-                            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
-
-                        if (!clientCert.HasPrivateKey)
-                            throw new InvalidOperationException("Client certificate is missing a private key");
-
-                        handler.SslOptions = new SslClientAuthenticationOptions
-                        {
-                            ClientCertificates = new X509CertificateCollection { clientCert },
-                        };
-                    }
-                }
-
-                WebProxy webProxy = new WebProxy(configuration["WebProxyAddress"]);
-                handler.Proxy = webProxy;
-                handler.UseProxy = true;
-                
-                handler.AutomaticDecompression = DecompressionMethods.All;
-            });
-    }
-}
+openssl pkcs12 -export \
+  -in cert.pem \
+  -inkey privateKey.pem \
+  -certfile visa-chain.pem \
+  -out Sandbox_SGBL_MTLS_Keystore_With_Private_Key.p12 \
+  -name "visa-mtls" \
+  -keypbe PBE-SHA1-3DES \
+  -certpbe PBE-SHA1-3DES \
+  -macalg sha1
