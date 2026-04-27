@@ -1,1 +1,90 @@
-openssl pkcs12 -export -in cert.pem -inkey privateKey.pem -certfile SBX-2024-Prod-Inter.pem -out Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unecrypted.p12
+Create **one chain file** that contains the extra certificates, then use that file in `-certfile`.
+
+## 1. Create a combined chain file
+
+### Linux / macOS / Git Bash
+
+```bash id="3wix8o"
+cat SBX-2024-Prod-Inter.pem DigiCertGlobalRootG2.crt.pem SBX-Prod-Root.pem > visa-chain.pem
+```
+
+### Windows CMD
+
+```cmd id="72rfub"
+copy /b SBX-2024-Prod-Inter.pem+DigiCertGlobalRootG2.crt.pem+SBX-Prod-Root.pem visa-chain.pem
+```
+
+The order should be:
+
+```text id="flthn0"
+Intermediate certificate
+Root certificate 1
+Root certificate 2
+```
+
+So in your case:
+
+```text id="2nuhgc"
+SBX-2024-Prod-Inter.pem
+DigiCertGlobalRootG2.crt.pem
+SBX-Prod-Root.pem
+```
+
+## 2. Generate the `.p12`
+
+```bash id="d2u4gj"
+openssl pkcs12 -export \
+  -in cert.pem \
+  -inkey privateKey.pem \
+  -certfile visa-chain.pem \
+  -out Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12
+```
+
+On one line:
+
+```bash id="l97hgd"
+openssl pkcs12 -export -in cert.pem -inkey privateKey.pem -certfile visa-chain.pem -out Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12
+```
+
+OpenSSL will ask you for an export password. Usually Java / Postman / API clients expect the `.p12` to have a password, even if simple.
+
+## 3. To use an empty password
+
+Only do this if Visa or your client specifically requires no password:
+
+```bash id="nlfhus"
+openssl pkcs12 -export \
+  -in cert.pem \
+  -inkey privateKey.pem \
+  -certfile visa-chain.pem \
+  -out Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12 \
+  -passout pass:
+```
+
+## 4. Verify the `.p12`
+
+```bash id="cm13ae"
+openssl pkcs12 -info -in Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12 -noout
+```
+
+If you used an empty password:
+
+```bash id="knscsi"
+openssl pkcs12 -info -in Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12 -noout -passin pass:
+```
+
+You should see your client certificate plus the extra certificates from the chain.
+
+Important: `privateKey.pem` can start with either:
+
+```text id="2a581i"
+-----BEGIN PRIVATE KEY-----
+```
+
+or:
+
+```text id="wq8qq7"
+-----BEGIN RSA PRIVATE KEY-----
+```
+
+Both are accepted by `openssl pkcs12` as long as the private key matches `cert.pem`.
