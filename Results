@@ -1,2 +1,58 @@
-$ openssl req -new -sha256 -key privatekey.pem -out csrreq.csr -subj "/CN=services.company.com/OU=DEVE/O=AFVL/L=Baabdat/ST=Matn/C=LB/UID=2ce4293f-5cdf-4215-afd8-ef045f2025b2"
-req: subject name is expected to be in the format /type0=value0/type1=value1/type2=... where characters may be escaped by \. This name is not in that forma
+Your `-subj` value is valid OpenSSL syntax:
+
+```bash
+-subj "/CN=services.company.com/OU=DEVE/O=AFVL/L=Baabdat/ST=Matn/C=LB/UID=2ce4293f-5cdf-4215-afd8-ef045f2025b2"
+```
+
+So the error usually means OpenSSL is **not receiving the subject exactly like that**.
+
+The most common reason is: **you are running this in Git Bash / MSYS / MinGW on Windows**. Git Bash automatically converts paths that start with `/`, so:
+
+```bash
+/CN=services.company.com/OU=DEVE/...
+```
+
+may be transformed into something like:
+
+```bash
+C:/Program Files/Git/CN=services.company.com/OU=DEVE/...
+```
+
+Then OpenSSL says:
+
+```text
+subject name is expected to be in the format /type=value/...
+```
+
+because the string no longer starts correctly with `/CN=...`.
+
+Use this:
+
+```bash
+MSYS_NO_PATHCONV=1 openssl req -new -sha256 \
+  -key privatekey.pem \
+  -out csrreq.csr \
+  -subj "/CN=services.company.com/OU=DEVE/O=AFVL/L=Baabdat/ST=Matn/C=LB/UID=2ce4293f-5cdf-4215-afd8-ef045f2025b2"
+```
+
+Or in Git Bash:
+
+```bash
+export MSYS_NO_PATHCONV=1
+
+openssl req -new -sha256 \
+  -key privatekey.pem \
+  -out csrreq.csr \
+  -subj "/CN=services.company.com/OU=DEVE/O=AFVL/L=Baabdat/ST=Matn/C=LB/UID=2ce4293f-5cdf-4215-afd8-ef045f2025b2"
+```
+
+If you are using Windows PowerShell or CMD, the command should usually work as-is, but you can also try single quotes in PowerShell:
+
+```powershell
+openssl req -new -sha256 `
+  -key privatekey.pem `
+  -out csrreq.csr `
+  -subj '/CN=services.company.com/OU=DEVE/O=AFVL/L=Baabdat/ST=Matn/C=LB/UID=2ce4293f-5cdf-4215-afd8-ef045f2025b2'
+```
+
+Also make sure you are not copying the `$` symbol. The `$` is just the terminal prompt, not part of the command.
