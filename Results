@@ -1,58 +1,60 @@
-Your `-subj` value is valid OpenSSL syntax:
+When uplaoding my csrreq for MLE encryption, I am getting thsi from Visa Direct:
 
-```bash
--subj "/CN=services.company.com/OU=DEVE/O=AFVL/L=Baabdat/ST=Matn/C=LB/UID=2ce4293f-5cdf-4215-afd8-ef045f2025b2"
-```
+Error occurred while generating certificate
 
-So the error usually means OpenSSL is **not receiving the subject exactly like that**.
+Correlation Id: 1_1777292515_630_26118_l73p014_VDP_ARM
 
-The most common reason is: **you are running this in Git Bash / MSYS / MinGW on Windows**. Git Bash automatically converts paths that start with `/`, so:
+csrreq.csr:
+-----BEGIN CERTIFICATE REQUEST-----
+MIIC5zCCAc8CAQAwgaExHTAbBgNVBAMMFHNlcnZpY2VzLmNvbXBhbnkuY29tMQ0w
+CwYDVQQLDARERVZFMQ0wCwYDVQQKDARBRlZMMRAwDgYDVQQHDAdCYWFiZGF0MQ0w
+CwYDVQQIDARNYXRuMQswCQYDVQQGEwJMQjE0MDIGCgmSJomT8ixkAQEMJDJjZTQy
+OTNmLTVjZGYtNDIxNS1hZmQ4LWVmMDQ1ZjIwMjViMjCCASIwDQYJKoZIhvcNAQEB
+BQADggEPADCCAQoCggEBALSTWcnEjJOWZAu8Xw8k38/9HZ55Gw9eoPAod7F7wuSX
+Jzi4ToDY6dpmSbnjakvvL6lfImqk1ZnJbp5RHGB7PojoXPGuU1cXAlXLi6tENqcF
+mEU2Wsl0gGjMHfeOi3CW/tTvgMoceZM3RSMKDf7y86Cyfp5YCLvWlKq8yP6NqTxE
+ava80oQ7+9jZnghYrCSrp3p4OfkttzE6LwCe36efH1bkAJrnRtxruT/HlMN0vB96
+EW1W0rS2J6UYFeQdL4scup4cNXbKoQ9GBcFVYxK2xP2ppcW2c2T4H5Qwod4E4Bhy
+yMQkddx6cCMK4xNGkD5UPt3hQ3uDODAo7lpi7k7IZ2MCAwEAAaAAMA0GCSqGSIb3
+DQEBCwUAA4IBAQBo+qfKkXn07adWCzVqFEg0litv5NMxTzVyTp3PoV3rcpu+FBi1
+E4HbB/7I8x8LAPvlgy0QEiWT8u9paf2S+Gg0YS93NoTvmcoEm8EXubGWXGZHwprf
+83Q/kiOE2wOxzqTcz75o+AazZToS4Es1zevlFrHY3VQfyrwkP7f4WQeGXs4C/UDs
+adychGdAXxqiDxiUr7CHQdcdkRlcwm2QpijmeLWXJTbICaVL21nQq4+GFbfb3Owg
+ctV3TZ5FiKjBKjB4YvfV3xYnsURl4IW99+gwsHq4muxGutsKsRzASY2SGEPNeCfN
+k6W3GyB6Zmgfj7aMFlfgzBVP6kK+i3QpTxMZ
+-----END CERTIFICATE REQUEST-----
 
-```bash
-/CN=services.company.com/OU=DEVE/...
-```
+KeyID:
+2ce4293f-5cdf-4215-afd8-ef045f2025b2
 
-may be transformed into something like:
+privatekey.pem:
+-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQC0k1nJxIyTlmQL
+vF8PJN/P/R2eeRsPXqDwKHexe8Lklyc4uE6A2OnaZkm542pL7y+pXyJqpNWZyW6e
+URxgez6I6FzxrlNXFwJVy4urRDanBZhFNlrJdIBozB33jotwlv7U74DKHHmTN0Uj
+Cg3+8vOgsn6eWAi71pSqvMj+jak8RGr2vNKEO/vY2Z4IWKwkq6d6eDn5LbcxOi8A
+nt+nnx9W5ACa50bca7k/x5TDdLwfehFtVtK0tielGBXkHS+LHLqeHDV2yqEPRgXB
+VWMStsT9qaXFtnNk+B+UMKHeBOAYcsjEJHXcenAjCuMTRpA+VD7d4UN7gzgwKO5a
+Yu5OyGdjAgMBAAECggEACBeIUQSH9inUSZBYmYGiA/Hdohc0PA/rWge+NrZgk+96
+wvhuECkS8FtgF2lA/1kfGNHEuuRbFr1SQdxJpMCGcLUqS8GaRiSnpqJB8TFT2k/j
+tHT3RDV+dvPFWK11wzGzsWVwLzPFIPCQ870vcQrVxGWV9fuPnKHviefUK/q7fZH8
+mrC6qAGCA+ZO3Y3UClqDAr64SjHmo1P/WJmR1ueLLOwPiiC4Zr15e9X3o/7p4Unx
+4Tm7xKkBZFR/xvzpvLBRu5zqFeVvsZpiBEg52LOeb13hkinyxD1LV8UXI9ESLC6X
+c9C5qCTeUjmIGjFKmSHq7lBQhIYKz/2DncOkHnkL5QKBgQDvdq9X7ZGjx9U/rzZ7
+QIgl2p+fraGL2axP69Jx8FMtlGtbBaBYBAC32O8r7otpKGhKPetnPQLS07kJ7pUC
+0nkHXQx6/MsXe1g0W0ARmpt197rXL87eoIZWe1X9++f+oOhHuODqflt1hEI+wovr
+uCPujSYVesZd2k/CRbVCPth1twKBgQDBC5/Rx8VKtWsLcr6IzKvV5Og/GFG8u+cS
+yvlXHMzf3S6zt5HhioO2e3NTLGjZJMpI9vBd/qhMyJsVAuGXFldGTJV8bc6kd0mR
+L0MVy0EOK8BDqew1BnR3UA1dnmwlp4iPZDCD1sZcSOCVse50Izx/TuTNjN7oE3wF
+65IJCEQ7tQKBgQDvVBNTMeEJa8O57ofpD0oDa0l18bcvatJI3kxqC+NV/qx9QFZN
+IVMGbA4+Ph+fbf8tlE0d1WBpDao2Pvk25NyJe3npwZXJVkGFsl2KOpd9g6Z9Qw7i
+elVJQeNkAMyRNIhyhlhkhP0rqo/64b2uTU+8L94MQbTYQETOyZSrLNxyaQKBgQCW
+q4r2wfQjpktBKTK7NPvdOwdlz4ZkR0hIK7HGowzooQqFbH5oyaKZt+q//QZsjMFx
+h4L96ffTzjL0iEYolWBS1w1Ji67gQNZjgb7bcMN62vz6EtLwY/Rc91cnPbHtBcCZ
+IjqXe/dgKeVYEQMrFCFwv9Pm9s831ZVUTZOyhwgyjQKBgQDCuW7H8mjP/o0VgcR6
+oL5b/jruMdXiGPdL1plVESPtdGSDxzHXcC38FwFbF4epJm26b6uQXI18fq7DSX1x
+JV9C/mmM3Qp6RVj7r/v+oFr+NYGFBQIU29aSwM6AFoTlUirZM1LBeUyRecuAj10k
+/IHeMd4v4mHMixFqgF9UR96qZQ==
+-----END PRIVATE KEY-----
 
-```bash
-C:/Program Files/Git/CN=services.company.com/OU=DEVE/...
-```
-
-Then OpenSSL says:
-
-```text
-subject name is expected to be in the format /type=value/...
-```
-
-because the string no longer starts correctly with `/CN=...`.
-
-Use this:
-
-```bash
-MSYS_NO_PATHCONV=1 openssl req -new -sha256 \
-  -key privatekey.pem \
-  -out csrreq.csr \
-  -subj "/CN=services.company.com/OU=DEVE/O=AFVL/L=Baabdat/ST=Matn/C=LB/UID=2ce4293f-5cdf-4215-afd8-ef045f2025b2"
-```
-
-Or in Git Bash:
-
-```bash
-export MSYS_NO_PATHCONV=1
-
-openssl req -new -sha256 \
-  -key privatekey.pem \
-  -out csrreq.csr \
-  -subj "/CN=services.company.com/OU=DEVE/O=AFVL/L=Baabdat/ST=Matn/C=LB/UID=2ce4293f-5cdf-4215-afd8-ef045f2025b2"
-```
-
-If you are using Windows PowerShell or CMD, the command should usually work as-is, but you can also try single quotes in PowerShell:
-
-```powershell
-openssl req -new -sha256 `
-  -key privatekey.pem `
-  -out csrreq.csr `
-  -subj '/CN=services.company.com/OU=DEVE/O=AFVL/L=Baabdat/ST=Matn/C=LB/UID=2ce4293f-5cdf-4215-afd8-ef045f2025b2'
-```
-
-Also make sure you are not copying the `$` symbol. The `$` is just the terminal prompt, not part of the command.
+Why ?
