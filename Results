@@ -1,17 +1,53 @@
-Unhandled exception. System.InvalidOperationException: Unable to load or apply the proxy configuration.
- ---> System.Security.Cryptography.CryptographicException: The specified network password is not correct.
-   at System.Security.Cryptography.X509Certificates.CertificatePal.FilterPFXStore(ReadOnlySpan`1 rawData, SafePasswordHandle password, PfxCertStoreFlags pfxCertStoreFlags)
-   at System.Security.Cryptography.X509Certificates.CertificatePal.FromBlobOrFile(ReadOnlySpan`1 rawData, String fileName, SafePasswordHandle password, X509KeyStorageFlags keyStorageFlags)
-   at System.Security.Cryptography.X509Certificates.X509Certificate..ctor(String fileName, String password, X509KeyStorageFlags keyStorageFlags)
-   at ReverseProxy.Extensions.ReverseProxyExtensions.<>c__DisplayClass0_0.<AddConfiguredReverseProxy>b__0(ForwarderHttpClientContext context, SocketsHttpHandler handler) in D:\@Workspace\deve-repo\alterna-reverse-proxy\ReverseProxy\Extensions\ReverseProxyExtensions.cs:line 28
-   at Yarp.ReverseProxy.Forwarder.CallbackHttpClientFactory.ConfigureHandler(ForwarderHttpClientContext context, SocketsHttpHandler handler)
-   at Yarp.ReverseProxy.Forwarder.ForwarderHttpClientFactory.CreateClient(ForwarderHttpClientContext context)
-   at Yarp.ReverseProxy.Management.ProxyConfigManager.UpdateRuntimeClusters(IEnumerable`1 incomingClusters)
-   at Yarp.ReverseProxy.Management.ProxyConfigManager.ApplyConfigAsync(IReadOnlyList`1 routes, IReadOnlyList`1 clusters)
-   at Yarp.ReverseProxy.Management.ProxyConfigManager.InitialLoadAsync()
-   --- End of inner exception stack trace ---
-   at Yarp.ReverseProxy.Management.ProxyConfigManager.InitialLoadAsync()
-   at Microsoft.AspNetCore.Builder.ReverseProxyIEndpointRouteBuilderExtensions.GetOrCreateDataSource(IEndpointRouteBuilder endpoints)
-   at Microsoft.AspNetCore.Builder.ReverseProxyIEndpointRouteBuilderExtensions.MapReverseProxy(IEndpointRouteBuilder endpoints, Action`1 configureApp)
-   at Microsoft.AspNetCore.Builder.ReverseProxyIEndpointRouteBuilderExtensions.MapReverseProxy(IEndpointRouteBuilder endpoints)
-   at Program.<Main>$(String[] args) in D:\@Workspace\deve-repo\alterna-reverse-proxy\ReverseProxy\Program.cs:line 41
+using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+using ReverseProxy.Common;
+
+namespace ReverseProxy.Extensions;
+
+public static class ReverseProxyExtensions
+{
+    public static void AddConfiguredReverseProxy(this IServiceCollection services, IConfiguration configuration)
+    {
+        Certificate certificates = configuration.GetSection("Certificates").Get<Certificate>() ?? new();
+
+        services.AddReverseProxy()
+            .LoadFromConfig(configuration.GetSection("ReverseProxy"))
+            .ConfigureHttpClient((context, handler) =>
+            {
+                String clusterId = context.ClusterId;
+
+                ClientCertificate? clientCertificate = certificates.ClientCertificates
+                    .FirstOrDefault(i => i.ClusterId.Equals(clusterId, StringComparison.OrdinalIgnoreCase));
+
+                if (clientCertificate is not null)
+                {
+                    String certPath = Path.Combine(AppContext.BaseDirectory, clientCertificate.Path);
+
+                    if (File.Exists(certPath))
+                    {
+                        String certPassword = clientCertificate.Password;
+
+                        X509Certificate2 clientCert = new X509Certificate2(
+                            certPath,
+                            certPassword,
+                            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
+
+                        if (!clientCert.HasPrivateKey)
+                            throw new InvalidOperationException("Client certificate is missing a private key");
+
+                        handler.SslOptions = new SslClientAuthenticationOptions
+                        {
+                            ClientCertificates = new X509CertificateCollection { clientCert },
+                        };
+                    }
+                }
+
+                WebProxy webProxy = new WebProxy(configuration["WebProxyAddress"]);
+                handler.Proxy = webProxy;
+                handler.UseProxy = true;
+                
+                handler.AutomaticDecompression = DecompressionMethods.All;
+            });
+    }
+}
