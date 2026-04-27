@@ -1,90 +1,17 @@
-Create **one chain file** that contains the extra certificates, then use that file in `-certfile`.
-
-## 1. Create a combined chain file
-
-### Linux / macOS / Git Bash
-
-```bash id="3wix8o"
-cat SBX-2024-Prod-Inter.pem DigiCertGlobalRootG2.crt.pem SBX-Prod-Root.pem > visa-chain.pem
-```
-
-### Windows CMD
-
-```cmd id="72rfub"
-copy /b SBX-2024-Prod-Inter.pem+DigiCertGlobalRootG2.crt.pem+SBX-Prod-Root.pem visa-chain.pem
-```
-
-The order should be:
-
-```text id="flthn0"
-Intermediate certificate
-Root certificate 1
-Root certificate 2
-```
-
-So in your case:
-
-```text id="2nuhgc"
-SBX-2024-Prod-Inter.pem
-DigiCertGlobalRootG2.crt.pem
-SBX-Prod-Root.pem
-```
-
-## 2. Generate the `.p12`
-
-```bash id="d2u4gj"
-openssl pkcs12 -export \
-  -in cert.pem \
-  -inkey privateKey.pem \
-  -certfile visa-chain.pem \
-  -out Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12
-```
-
-On one line:
-
-```bash id="l97hgd"
-openssl pkcs12 -export -in cert.pem -inkey privateKey.pem -certfile visa-chain.pem -out Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12
-```
-
-OpenSSL will ask you for an export password. Usually Java / Postman / API clients expect the `.p12` to have a password, even if simple.
-
-## 3. To use an empty password
-
-Only do this if Visa or your client specifically requires no password:
-
-```bash id="nlfhus"
-openssl pkcs12 -export \
-  -in cert.pem \
-  -inkey privateKey.pem \
-  -certfile visa-chain.pem \
-  -out Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12 \
-  -passout pass:
-```
-
-## 4. Verify the `.p12`
-
-```bash id="cm13ae"
-openssl pkcs12 -info -in Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12 -noout
-```
-
-If you used an empty password:
-
-```bash id="knscsi"
-openssl pkcs12 -info -in Sandbox_SGBL_MTLS_Keystore_With_Private_Key_Unencrypted.p12 -noout -passin pass:
-```
-
-You should see your client certificate plus the extra certificates from the chain.
-
-Important: `privateKey.pem` can start with either:
-
-```text id="2a581i"
------BEGIN PRIVATE KEY-----
-```
-
-or:
-
-```text id="wq8qq7"
------BEGIN RSA PRIVATE KEY-----
-```
-
-Both are accepted by `openssl pkcs12` as long as the private key matches `cert.pem`.
+Unhandled exception. System.InvalidOperationException: Unable to load or apply the proxy configuration.
+ ---> System.Security.Cryptography.CryptographicException: The specified network password is not correct.
+   at System.Security.Cryptography.X509Certificates.CertificatePal.FilterPFXStore(ReadOnlySpan`1 rawData, SafePasswordHandle password, PfxCertStoreFlags pfxCertStoreFlags)
+   at System.Security.Cryptography.X509Certificates.CertificatePal.FromBlobOrFile(ReadOnlySpan`1 rawData, String fileName, SafePasswordHandle password, X509KeyStorageFlags keyStorageFlags)
+   at System.Security.Cryptography.X509Certificates.X509Certificate..ctor(String fileName, String password, X509KeyStorageFlags keyStorageFlags)
+   at ReverseProxy.Extensions.ReverseProxyExtensions.<>c__DisplayClass0_0.<AddConfiguredReverseProxy>b__0(ForwarderHttpClientContext context, SocketsHttpHandler handler) in D:\@Workspace\deve-repo\alterna-reverse-proxy\ReverseProxy\Extensions\ReverseProxyExtensions.cs:line 28
+   at Yarp.ReverseProxy.Forwarder.CallbackHttpClientFactory.ConfigureHandler(ForwarderHttpClientContext context, SocketsHttpHandler handler)
+   at Yarp.ReverseProxy.Forwarder.ForwarderHttpClientFactory.CreateClient(ForwarderHttpClientContext context)
+   at Yarp.ReverseProxy.Management.ProxyConfigManager.UpdateRuntimeClusters(IEnumerable`1 incomingClusters)
+   at Yarp.ReverseProxy.Management.ProxyConfigManager.ApplyConfigAsync(IReadOnlyList`1 routes, IReadOnlyList`1 clusters)
+   at Yarp.ReverseProxy.Management.ProxyConfigManager.InitialLoadAsync()
+   --- End of inner exception stack trace ---
+   at Yarp.ReverseProxy.Management.ProxyConfigManager.InitialLoadAsync()
+   at Microsoft.AspNetCore.Builder.ReverseProxyIEndpointRouteBuilderExtensions.GetOrCreateDataSource(IEndpointRouteBuilder endpoints)
+   at Microsoft.AspNetCore.Builder.ReverseProxyIEndpointRouteBuilderExtensions.MapReverseProxy(IEndpointRouteBuilder endpoints, Action`1 configureApp)
+   at Microsoft.AspNetCore.Builder.ReverseProxyIEndpointRouteBuilderExtensions.MapReverseProxy(IEndpointRouteBuilder endpoints)
+   at Program.<Main>$(String[] args) in D:\@Workspace\deve-repo\alterna-reverse-proxy\ReverseProxy\Program.cs:line 41
