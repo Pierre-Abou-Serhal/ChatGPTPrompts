@@ -1,630 +1,90 @@
-I have this component:
+Below is a clean rewrite that keeps your current behavior, but generalizes the modal from **duplicate accounts only** to **validation issues**.
 
-import {
-  Component,
-  computed,
-  OnDestroy,
-  OnInit,
-  ViewChild,
-} from '@angular/core';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { FileImportService } from '../../../../Services/file-import.service';
-import {
-  FileImport,
-  FileImportContent,
-  Status,
-} from '../../../../Services/Models/model';
-import {
-  GetAllStatusesRequest,
-  GetFileImportByIdRequest,
-  UpdateFileStatusRequest,
-  ValidateFileRequest,
-} from '../../../../Services/Models/request';
-import { v7 as uuidV7 } from 'uuid';
-import { AuthService } from '../../../../Services/auth.service';
-import { Config } from 'datatables.net';
-import { Subject } from 'rxjs';
-import { DataTablesModule } from 'angular-datatables';
-import { CommonModule } from '@angular/common';
-import {DuplicateAccNbr, FileStatus} from '../../../../Services/Models/custom-models';
-import { HttpStatusCode } from '@angular/common/http';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { EditDataComponent } from '../edit-data/edit-data.component';
-import { ToastrService } from 'ngx-toastr';
-import { DataTableDirective } from 'angular-datatables';
-import { CommonService } from '../../../../Services/common.service';
-import Swal from 'sweetalert2';
-import { LoadingService } from '../../../../Services/loading.service';
-import { SharedService } from '../../../../Services/shared.service';
-import {DuplicateAccountsModalComponent} from './duplicate-accounts-modal/duplicate-accounts-modal.component';
+Your current flow detects duplicate proposed account numbers, opens `DuplicateAccountsModalComponent`, lets the user edit a row, then re-checks duplicates again before validation. The new version keeps the same pattern but checks both duplicate account numbers and invalid debit-account currency issues. 
 
-@Component({
-  selector: 'app-file-data-dashboard',
-  standalone: true,
-  imports: [DataTablesModule, RouterModule, CommonModule],
-  templateUrl: './file-data-dashboard.component.html',
-  styleUrl: './file-data-dashboard.component.scss',
-})
-export class FileDataDashboardComponent implements OnInit, OnDestroy {
-  fileImportId?: number;
-  fileImport?: FileImport;
-  fileImportContents: FileImportContent[] = [];
-  statuses: Status[] = [];
-  productDescriptions: string = '';
+---
 
-  authData = computed(() => this.authService.authData());
-  dtOptions: Config = {
-    pagingType: 'full_numbers',
-    pageLength: 10,
-    responsive: true,
-    order: [],
-    dom: 'Blfrtip',
-    buttons: [
-      {
-        extend: 'excelHtml5',
-        text: 'Excel',
-        filename: `${new Date().toDateString()}`,
-      },
-    ],
-    columnDefs: [
-      {
-        targets: [8],
-        visible: false,
-        searchable: true,
-      },
-    ],
-    drawCallback: () => {
-      this.loadingService.hide();
-    },
-  };
+## 1. Add/replace models in `custom-models.ts`
 
-  @ViewChild(DataTableDirective, { static: false }) dtElement:
-    | DataTableDirective
-    | undefined;
+Add these beside your existing `FileStatus`, `Currency`, etc.
 
-  FileStatus = FileStatus;
-  ReceivedFileStatus: number = FileStatus.Received;
-  RejectedFileStatus: number = FileStatus.Rejected;
-  dtTrigger: Subject<any> = new Subject<any>();
-
-  constructor(
-    private route: ActivatedRoute,
-    private fileImportService: FileImportService,
-    private authService: AuthService,
-    private router: Router,
-    private modalService: NgbModal,
-    private toastr: ToastrService,
-    private commonService: CommonService,
-    private loadingService: LoadingService,
-    private sharedService: SharedService
-  ) {}
-
-  ngOnDestroy(): void {
-    this.dtTrigger.unsubscribe();
-  }
-
-  ngOnInit(): void {
-    this.fileImportId = +this.route.snapshot.paramMap.get('fileImportId')!;
-    this.getFileImportById(this.fileImportId);
-    this.getStatuses();
-  }
-
-  updateRowData(index: number, newData: any): void {
-    this.dtElement?.dtInstance?.then((dtInstance) => {
-      Object.entries(newData).forEach(([key, value]) => {
-        dtInstance.cell(index, key).data(value).draw();
-      });
-    });
-  }
-
-  getStatuses(): void {
-    const getStatusesRequest: GetAllStatusesRequest = {
-      baseReq: {
-        correlationId: uuidV7(),
-        UserData: this.authData()!,
-      },
-    };
-
-    this.commonService.GetAllStatuses(getStatusesRequest, true).subscribe({
-      next: (response) => {
-        if (response.baseResp.statusCode === HttpStatusCode.Ok) {
-          this.statuses = response.statuses;
-        }
-      },
-    });
-  }
-
-  getFileImportById(id: number) {
-    const request: GetFileImportByIdRequest = {
-      baseReq: {
-        correlationId: uuidV7(),
-        UserData: this.authData()!,
-      },
-      fileImportId: id,
-    };
-
-    this.loadingService.show();
-    this.fileImportService.GetFileImportById(request).subscribe({
-      next: (response) => {
-        if (response.baseResp.statusCode === HttpStatusCode.Ok) {
-          this.fileImport = response.fileImport;
-          this.productDescriptions = this.sharedService.joinProductCodes(
-            this.fileImport?.fileProducts!
-          );
-
-          this.dtTrigger.next(null);
-        }
-      },
-    });
-  }
-
-  async openEditDataModal(index: number, id: number): Promise<FileImportContent | undefined> {
-    const modalRef = this.modalService.open(EditDataComponent, {
-      size: 'lg',
-      backdrop: 'static',
-    });
-
-    const current: FileImportContent =
-      this.fileImport?.fileImportContents?.find((i) => i.id === id)!;
-
-    modalRef.componentInstance.fileImport = this.fileImport;
-    modalRef.componentInstance.fileImportContent = {
-      id: current.id,
-      fileImportId: current.fileImportId,
-      altAccNbr: current.altAccNbr,
-      accNbr: current.accNbr,
-      amount: current.amount,
-      statusId: current.statusId,
-      validationRejectReason: current.validationRejectReason,
-      productCode: current.productCode,
-      productDescription: current.productDescription,
-      sourceAccountNumber: current.sourceAccountNumber,
-      customerName: current.customerName,
-      other: current.other,
-    };
-
-    try {
-      let updatedRecord = await modalRef.result;
-      this.toastr.success(`Data Updated Successfully`, `Data Updated`, {
-        closeButton: true,
-        enableHtml: true,
-        progressBar: true,
-        timeOut: 800,
-        easing: 'ease-in',
-        easeTime: 200,
-      });
-
-      const updateData = {
-        1: updatedRecord.accNbr ? updatedRecord.accNbr : '',
-        3: updatedRecord.productDescription ? updatedRecord.productDescription : '',
-        4: updatedRecord.customerName ? updatedRecord.customerName : '',
-        8: updatedRecord.statusId,
-      };
-
-      const found = this.fileImport?.fileImportContents?.find(
-        (item) => item.id == updatedRecord.id
-      );
-
-      if (found) Object.assign(found, updatedRecord);
-
-      this.updateRowData(index, updateData);
-
-      return updatedRecord;
-    } catch (e) {
-      return undefined;
-    }
-  }
-
-  get getTotalAmount(): number {
-    let total: number | undefined = this.fileImport?.fileImportContents?.reduce(
-      function (a, b) {
-        return a + b.amount;
-      },
-      0
-    );
-
-    return total!;
-  }
-
-  validateFile() {
-
-    const [check, reason] = this.customeValidation();
-
-    if (!check) {
-      this.toastr.error(reason, 'Invalid Data', {
-        closeButton: true,
-        enableHtml: true,
-        progressBar: false,
-        tapToDismiss: false,
-        timeOut: 0,
-        extendedTimeOut: 0,
-        easing: 'ease-in',
-        easeTime: 300,
-        positionClass: 'toast-center-center',
-      });
-
-      return;
-    }
-
-    const fileId: number = this.fileImportId!;
-
-    const request: ValidateFileRequest = {
-      baseReq: {
-        correlationId: uuidV7(),
-        UserData: this.authData()!,
-      },
-      fileId: fileId,
-      currencyCode: this.fileImport?.fileCurrencyCode!,
-    };
-
-    // Checking for T24 Account duplicates
-    this.handleDuplicateAccountsBeforeValidation(request);
-  }
-
-  private validateFileApiCall(request: ValidateFileRequest) {
-    this.fileImportService.ValidateFile(request).subscribe({
-      next: (response) => {
-        if (response.baseResp.statusCode === HttpStatusCode.Ok) {
-          this.toastr
-            .success(`File was successfully VALIDATED`, `File validated`, {
-              closeButton: true,
-              enableHtml: true,
-              progressBar: true,
-              timeOut: 1000,
-              easing: 'ease-in',
-              easeTime: 200,
-              positionClass: 'toast-center-center',
-            })
-            .onHidden.subscribe({
-            next: () => {
-              this.router.navigate(['/file-manager/files-dashboard']);
-            },
-          });
-        }
-      },
-    });
-  }
-
-  applyFilter(event: any) {
-    this.dtElement?.dtInstance.then((dtInstance) => {
-      dtInstance.column(8).search(event.target.value.trim()).draw();
-    });
-  }
-
-  customeValidation(): [boolean, string] {
-    return [true, ''];
-  }
-
-  discardFile() {
-    Swal.fire({
-      title: 'Are you sure you want to discard file',
-      text: '',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes',
-      cancelButtonText: 'No',
-      customClass: {
-        confirmButton: 'btn btn-success',
-        cancelButton: 'btn btn-danger',
-      },
-    }).then((result) => {
-      if (result.isConfirmed) {
-        const fileId: number = this.fileImportId!;
-
-        const request: UpdateFileStatusRequest = {
-          baseReq: {
-            correlationId: uuidV7(),
-            UserData: this.authData()!,
-          },
-          id: fileId,
-          statusCode: FileStatus.Discarded.toString(),
-        };
-
-        this.fileImportService.UpdateFileStatusById(request).subscribe({
-          next: (response) => {
-            if (response.baseResp.statusCode === HttpStatusCode.Ok) {
-              this.toastr
-                .success(`File was successfully DISCARDED`, `File discarded`, {
-                  closeButton: true,
-                  enableHtml: true,
-                  progressBar: true,
-                  timeOut: 1000,
-                  easing: 'ease-in',
-                  easeTime: 200,
-                  positionClass: 'toast-center-center',
-                })
-                .onHidden.subscribe({
-                  next: () => {
-                    this.router.navigate(['/file-manager/files-dashboard']);
-                  },
-                });
-            }
-          },
-        });
-      }
-    });
-  }
-
-  private getDuplicatedAccNbrs(items: FileImportContent[]): DuplicateAccNbr[] {
-    const counts = new Map<string, number>();
-
-    for (const item of items) {
-      const acc = item.accNbr?.trim();
-      if (!acc) continue;
-      counts.set(acc, (counts.get(acc) ?? 0) + 1);
-    }
-
-    return items
-      .map((item): DuplicateAccNbr => ({
-        id: item.id,
-        accNbr: item.accNbr?.trim() ?? '',
-        amount: item.amount,
-        other: item.other,
-      }))
-      .filter((item) => !!item.accNbr && (counts.get(item.accNbr) ?? 0) > 1)
-      .sort((a, b) => a.accNbr.localeCompare(b.accNbr) || b.amount - a.amount);
-  }
-
-  private handleDuplicateAccountsBeforeValidation(request: ValidateFileRequest): void {
-    const dupes = this.getDuplicatedAccNbrs(this.fileImport?.fileImportContents ?? []);
-
-    if (dupes.length === 0) {
-      this.validateFileApiCall(request);
-      return;
-    }
-
-    const modalRef = this.modalService.open(DuplicateAccountsModalComponent, {
-      size: 'lg',
-      backdrop: 'static',
-      centered: true,
-      keyboard: false,
-    });
-
-    modalRef.componentInstance.duplicates = dupes;
-
-    modalRef.result
-      .then(async (result) => {
-        if (result === 'continue') {
-          this.validateFileApiCall(request);
-          return;
-        }
-
-        if (result?.action === 'edit' && result?.id) {
-          const rowIndex =
-            this.fileImport?.fileImportContents?.findIndex((x) => x.id === result.id) ?? -1;
-
-          if (rowIndex >= 0) {
-            await this.openEditDataModal(rowIndex, result.id);
-          }
-
-          // Re-check duplicates after edit and show modal again if needed
-          this.handleDuplicateAccountsBeforeValidation(request);
-        }
-      })
-      .catch(() => {
-        // No / dismissed => do nothing
-      });
-  }
+```ts
+export enum ValidationIssueType {
+  DuplicateAccount = 'DuplicateAccount',
+  InvalidCurrency = 'InvalidCurrency',
 }
 
-<div class="container-fluid router-content">
-  <div class="row">
-    <nav class="col">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item">
-          <a class="text-decoration-none" [routerLink]="['']">home</a>
-        </li>
-        <li class="breadcrumb-item">
-          <a
-            class="text-decoration-none"
-            [routerLink]="['/file-manager/files-dashboard']"
-            >In Progress Files Data Dashboard</a
-          >
-        </li>
-        <li class="breadcrumb-item active">
-          {{ fileImport?.institutionDescription }} : {{ fileImport?.name }}
-        </li>
-      </ol>
-    </nav>
-  </div>
-  <div class="row">
-    <div class="col-12">
-      <div class="card sgbl-card shadow rounded">
-        <div
-          class="card-header d-flex justify-content-between align-items-center px-4"
-        >
-          <h5
-            class="card-title mb-0 d-flex flex-column justify-content-between"
-          >
-            <span>
-              Total Records:
-              {{ fileImport?.fileImportContents?.length }}
-            </span>
-            <span class="mt-2">
-              Total Amount: {{ getTotalAmount | number : "1.0-20" }}
-              {{ fileImport?.fileCurrencyDescription }}</span
-            >
-            <span class="mt-2">
-              Product:
-              {{ productDescriptions }}</span
-            >
-          </h5>
+export interface FileValidationIssue {
+  id: number;
 
-          <div class="mb-3">
-            <label class="form-label" for="filter-by-select"> Filter By </label>
-            <select
-              (change)="applyFilter($event)"
-              class="form-select"
-              id="filter-by-select"
-            >
-              <option value=" ">All</option>
-              @for(status of statuses; track $index){
-              <option
-                [value]="status.id"
-                [ngStyle]="{ 'background-color': status.color }"
-              >
-                {{ status.description }}
-              </option>
-              }
-            </select>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="table-responsive with-excel-button">
-            <table
-              class="table table-bordered"
-              datatable
-              [dtOptions]="dtOptions"
-              [dtTrigger]="dtTrigger"
-            >
-              <thead>
-                <tr>
-                  <th class="text-start">Received Account Number</th>
-                  <th class="text-start">Proposed Account Number</th>
-                  <th class="text-start">Debit Account</th>
-                  <th class="text-start">Product</th>
-                  <th class="text-start">Account Name</th>
-                  <th class="text-start">Other</th>
-                  <th class="text-start">Amount</th>
-                  <th class="text-start">Validation Result</th>
-                  <th class="text-start">Status Description</th>
-                  <th class="text-start">Last Modified By</th>
-                  <th class="text-start">Last Modified Date</th>
-                  <th class="text-start">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for(item of fileImport?.fileImportContents; track $index){
-                <tr>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.altAccNbr }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.accNbr }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.sourceAccountNumber }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.productDescription }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.customerName }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.other }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.amount | number : "1.0-20" }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.validationRejectReason }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.statusId }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.lastModifiedBy }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    {{ item.lastModifiedDate | date : "dd/MM/yyyy hh:mm a" }}
-                  </td>
-                  <td
-                    class="text-start"
-                    [ngStyle]="{ 'background-color': item.statusColor }"
-                  >
-                    <div class="d-flex justify-content-between table-actions">
-                      <a
-                        class="btn btn-sm edit-btn mx-1"
-                        title="Edit"
-                        (click)="openEditDataModal($index, item.id)"
-                      >
-                        <i class="bi bi-pencil-square"></i>
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-          <div class="d-flex justify-content-end align-items-center mt-3 gap-2">
-            @if(fileImport?.statusCode === ReceivedFileStatus.toString() ||
-            fileImport?.statusCode === RejectedFileStatus.toString()){
-            <button
-              type="button"
-              class="btn btn-success"
-              (click)="validateFile()"
-            >
-              <i class="bi bi-check2-circle"></i> Validate File
-            </button>
+  accNbr: string;
+  sourceAccountNumber: string;
+  amount: number;
+  other?: string;
 
-            <button
-              type="button"
-              class="btn btn-warning"
-              (click)="discardFile()"
-            >
-              <i class="bi bi-x-circle"></i> Discard File
-            </button>
-            }
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+  issueTypes: ValidationIssueType[];
 
-And this is the modal that I currently have:
+  fileCurrencyCode?: string;
+  fileCurrencyDescription?: string;
 
+  debitAccountCurrencyCode?: string;
+  debitAccountCurrencyDescription?: string;
+}
+```
+
+This lets one row have both:
+
+```ts
+issueTypes: [
+  ValidationIssueType.DuplicateAccount,
+  ValidationIssueType.InvalidCurrency
+]
+```
+
+---
+
+## 2. Rename your modal
+
+For example:
+
+```txt
+duplicate-accounts-modal
+```
+
+to:
+
+```txt
+file-validation-issues-modal
+```
+
+Then create/update:
+
+```ts
+file-validation-issues-modal.component.ts
+```
+
+```ts
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import {DuplicateAccNbr} from '../../../../../Services/Models/custom-models';
-import {DataTablesModule} from 'angular-datatables';
-import {Config} from 'datatables.net';
+import { DataTablesModule } from 'angular-datatables';
+import { Config } from 'datatables.net';
+import {
+  FileValidationIssue,
+  ValidationIssueType,
+} from '../../../../../Services/Models/custom-models';
 
 @Component({
-  selector: 'app-duplicate-accounts-modal',
+  selector: 'app-file-validation-issues-modal',
   standalone: true,
   imports: [CommonModule, DataTablesModule],
-  templateUrl: './duplicate-accounts-modal.component.html',
-  styleUrl: './duplicate-accounts-modal.component.scss',
+  templateUrl: './file-validation-issues-modal.component.html',
+  styleUrl: './file-validation-issues-modal.component.scss',
 })
-export class DuplicateAccountsModalComponent {
-  @Input() duplicates: DuplicateAccNbr[] = [];
+export class FileValidationIssuesModalComponent {
+  @Input() issues: FileValidationIssue[] = [];
+
+  ValidationIssueType = ValidationIssueType;
 
   constructor(public activeModal: NgbActiveModal) {}
 
@@ -643,14 +103,6 @@ export class DuplicateAccountsModalComponent {
     ],
   };
 
-  dismissModal(): void {
-    this.activeModal.dismiss();
-  }
-
-  closeModal(): void {
-    this.activeModal.close();
-  }
-
   onNo(): void {
     this.activeModal.dismiss('cancel');
   }
@@ -659,62 +111,138 @@ export class DuplicateAccountsModalComponent {
     this.activeModal.close('continue');
   }
 
-  onEdit(item: DuplicateAccNbr): void {
+  onEdit(item: FileValidationIssue): void {
     this.activeModal.close({
       action: 'edit',
       id: item.id,
     });
   }
-}
 
+  getIssueLabel(issueType: ValidationIssueType): string {
+    switch (issueType) {
+      case ValidationIssueType.DuplicateAccount:
+        return 'Duplicate Account';
+
+      case ValidationIssueType.InvalidCurrency:
+        return 'Invalid Currency';
+
+      default:
+        return 'Unknown Issue';
+    }
+  }
+
+  getIssueBadgeClass(issueType: ValidationIssueType): string {
+    switch (issueType) {
+      case ValidationIssueType.DuplicateAccount:
+        return 'bg-warning text-dark';
+
+      case ValidationIssueType.InvalidCurrency:
+        return 'bg-danger';
+
+      default:
+        return 'bg-secondary';
+    }
+  }
+
+  hasInvalidCurrency(item: FileValidationIssue): boolean {
+    return item.issueTypes.includes(ValidationIssueType.InvalidCurrency);
+  }
+}
+```
+
+---
+
+## 3. Modal HTML
+
+```html
 <div class="modal-header">
-  <h4 class="modal-title">Duplicate Proposed Account Numbers Found</h4>
+  <h4 class="modal-title">File Validation Issues Found</h4>
   <button type="button" class="btn-close" (click)="onNo()"></button>
 </div>
 
 <div class="modal-body">
   <div class="alert alert-warning">
-    Duplicate proposed account numbers were found. Do you want to continue?
+    Some records have validation issues. You can edit them now or continue validation anyway.
   </div>
 
-  <div *ngIf="!duplicates || duplicates.length === 0" class="alert alert-info mb-0">
-    No duplicate account numbers found.
+  <div *ngIf="!issues || issues.length === 0" class="alert alert-info mb-0">
+    No validation issues found.
   </div>
 
-  <div *ngIf="duplicates && duplicates.length > 0" class="table-responsive with-excel-button">
+  <div *ngIf="issues && issues.length > 0" class="table-responsive with-excel-button">
     <table
       datatable
       [dtOptions]="dtOptions"
-      class="table table-bordered table-striped mb-0">
+      class="table table-bordered table-striped mb-0"
+    >
       <thead>
-      <tr>
-        <th class="text-start">Duplicate Account Number</th>
-        <th class="text-start">Other</th>
-        <th class="text-start">Amount</th>
-        <th class="text-start">Actions</th>
-      </tr>
+        <tr>
+          <th class="text-start">Issues</th>
+          <th class="text-start">Proposed Account Number</th>
+          <th class="text-start">Debit Account</th>
+          <th class="text-start">File Currency</th>
+          <th class="text-start">Debit Account Currency</th>
+          <th class="text-start">Other</th>
+          <th class="text-start">Amount</th>
+          <th class="text-start">Actions</th>
+        </tr>
       </thead>
+
       <tbody>
-      <tr *ngFor="let item of duplicates">
-        <td class="text-start">{{ item.accNbr }}</td>
-        <td class="text-start">{{ item.other || '-' }}</td>
-        <td class="text-start">{{ item.amount | number : '1.0-20' }}</td>
-
-        <td
-          class="text-start"
-        >
-          <div class="d-flex justify-content-between table-actions">
-            <a
-              class="btn btn-sm edit-btn mx-1"
-              title="Edit"
-              (click)="onEdit(item)"
+        <tr *ngFor="let item of issues">
+          <td class="text-start">
+            <span
+              *ngFor="let issueType of item.issueTypes"
+              class="badge me-1"
+              [ngClass]="getIssueBadgeClass(issueType)"
             >
-              <i class="bi bi-pencil-square"></i>
-            </a>
-          </div>
-        </td>
+              {{ getIssueLabel(issueType) }}
+            </span>
+          </td>
 
-      </tr>
+          <td class="text-start">
+            {{ item.accNbr || '-' }}
+          </td>
+
+          <td class="text-start">
+            {{ item.sourceAccountNumber || '-' }}
+          </td>
+
+          <td class="text-start">
+            {{ item.fileCurrencyDescription || item.fileCurrencyCode || '-' }}
+          </td>
+
+          <td
+            class="text-start"
+            [ngClass]="{ 'text-danger fw-bold': hasInvalidCurrency(item) }"
+          >
+            {{
+              item.debitAccountCurrencyDescription ||
+              item.debitAccountCurrencyCode ||
+              'Unknown'
+            }}
+          </td>
+
+          <td class="text-start">
+            {{ item.other || '-' }}
+          </td>
+
+          <td class="text-start">
+            {{ item.amount | number : '1.0-20' }}
+          </td>
+
+          <td class="text-start">
+            <div class="d-flex justify-content-between table-actions">
+              <a
+                class="btn btn-sm edit-btn mx-1"
+                title="Edit"
+                (click)="onEdit(item)"
+              >
+                <i class="bi bi-pencil-square"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -729,40 +257,368 @@ export class DuplicateAccountsModalComponent {
     Yes
   </button>
 </div>
+```
 
+---
 
-Now in addition of having duplicate accounts, we can have accounts having a different currency then the debit account, I want to use the modal to also display these accounts having invalid currencies
+## 4. Update your main component imports
 
-The logic is similar to this:
-        let debitAccountCurrency: string = '';
+Replace this:
 
-        // Currency[Currency.LBP] = "LBP" | Currency.LBP.toString() = "422"
-        if(debitAccountNumber.includes(Currency[Currency.LBP]) || debitAccountNumber.slice(-3) === Currency.LBP.toString()) {
-          debitAccountCurrency = Currency.LBP.toString();
+```ts
+import {DuplicateAccNbr, FileStatus} from '../../../../Services/Models/custom-models';
+import {DuplicateAccountsModalComponent} from './duplicate-accounts-modal/duplicate-accounts-modal.component';
+```
+
+with this:
+
+```ts
+import {
+  Currency,
+  FileStatus,
+  FileValidationIssue,
+  ValidationIssueType,
+} from '../../../../Services/Models/custom-models';
+
+import { FileValidationIssuesModalComponent } from './file-validation-issues-modal/file-validation-issues-modal.component';
+```
+
+If your `Currency` enum is not inside `custom-models.ts`, import it from wherever it currently exists.
+
+---
+
+## 5. Update `openEditDataModal`
+
+Add `sourceAccountNumber` to `updateData`, because fixing the invalid currency issue probably means editing the debit account number.
+
+```ts
+const updateData = {
+  1: updatedRecord.accNbr ? updatedRecord.accNbr : '',
+  2: updatedRecord.sourceAccountNumber ? updatedRecord.sourceAccountNumber : '',
+  3: updatedRecord.productDescription ? updatedRecord.productDescription : '',
+  4: updatedRecord.customerName ? updatedRecord.customerName : '',
+  8: updatedRecord.statusId,
+};
+```
+
+So this section becomes:
+
+```ts
+const updateData = {
+  1: updatedRecord.accNbr ? updatedRecord.accNbr : '',
+  2: updatedRecord.sourceAccountNumber ? updatedRecord.sourceAccountNumber : '',
+  3: updatedRecord.productDescription ? updatedRecord.productDescription : '',
+  4: updatedRecord.customerName ? updatedRecord.customerName : '',
+  8: updatedRecord.statusId,
+};
+
+const found = this.fileImport?.fileImportContents?.find(
+  (item) => item.id == updatedRecord.id
+);
+
+if (found) Object.assign(found, updatedRecord);
+
+this.updateRowData(index, updateData);
+```
+
+---
+
+## 6. Replace duplicate validation logic in main component
+
+Replace this method:
+
+```ts
+private handleDuplicateAccountsBeforeValidation(request: ValidateFileRequest): void
+```
+
+with this new version:
+
+```ts
+private handleValidationIssuesBeforeValidation(request: ValidateFileRequest): void {
+  const issues = this.getFileValidationIssues(
+    this.fileImport?.fileImportContents ?? []
+  );
+
+  if (issues.length === 0) {
+    this.validateFileApiCall(request);
+    return;
+  }
+
+  const modalRef = this.modalService.open(FileValidationIssuesModalComponent, {
+    size: 'xl',
+    backdrop: 'static',
+    centered: true,
+    keyboard: false,
+  });
+
+  modalRef.componentInstance.issues = issues;
+
+  modalRef.result
+    .then(async (result) => {
+      if (result === 'continue') {
+        this.validateFileApiCall(request);
+        return;
+      }
+
+      if (result?.action === 'edit' && result?.id) {
+        const rowIndex =
+          this.fileImport?.fileImportContents?.findIndex(
+            (x) => x.id === result.id
+          ) ?? -1;
+
+        if (rowIndex >= 0) {
+          await this.openEditDataModal(rowIndex, result.id);
         }
 
-        if(debitAccountNumber.includes(Currency[Currency.USD]) || debitAccountNumber.slice(-3) === Currency.USD.toString()) {
-          debitAccountCurrency = Currency.USD.toString();
-        }
+        /**
+         * Re-check everything after edit.
+         * 
+         * This is important because:
+         * - The user may fix the duplicate but not the currency issue.
+         * - The user may fix the currency but not the duplicate issue.
+         * - The user may create another duplicate while editing.
+         */
+        this.handleValidationIssuesBeforeValidation(request);
+      }
+    })
+    .catch(() => {
+      // No / dismissed => do nothing
+    });
+}
+```
 
-        if(debitAccountNumber.includes(Currency[Currency.EUR]) || debitAccountNumber.slice(-3) === Currency.EUR.toString()) {
-          debitAccountCurrency = Currency.EUR.toString();
-        }
+---
 
-        if(currency !== debitAccountCurrency) {
-          return [
-            false,
-            'account number should match the same currency as the debit account',
-          ];
-        }
+## 7. Add these helper methods in the main component
 
-the debitAccountNumber is equivalent to the fileImportContent.sourceAccountNumber
+```ts
+private getFileValidationIssues(
+  items: FileImportContent[]
+): FileValidationIssue[] {
+  const counts = new Map<string, number>();
+  const issuesMap = new Map<number, FileValidationIssue>();
 
-I want to display in the same model both types of erronus accounts so that the user can directly take action on them
+  for (const item of items) {
+    const accNbr = item.accNbr?.trim();
 
-an account can be incalid curreny and duplicate 
-a user can fix the duplicate issue but the curreny problem could remain 
+    if (!accNbr) continue;
 
-Rewrite me the components so that it will fit my current scenario
+    counts.set(accNbr, (counts.get(accNbr) ?? 0) + 1);
+  }
 
-I can rename the modal that's not a problem
+  for (const item of items) {
+    const accNbr = item.accNbr?.trim() ?? '';
+    const sourceAccountNumber = item.sourceAccountNumber?.trim() ?? '';
+
+    const isDuplicate =
+      !!accNbr && (counts.get(accNbr) ?? 0) > 1;
+
+    const fileCurrencyCode = this.normalizeCurrencyCode(
+      this.fileImport?.fileCurrencyCode
+    );
+
+    const debitAccountCurrencyCode =
+      this.getDebitAccountCurrencyCode(sourceAccountNumber);
+
+    const hasInvalidCurrency =
+      !!fileCurrencyCode && fileCurrencyCode !== debitAccountCurrencyCode;
+
+    if (!isDuplicate && !hasInvalidCurrency) {
+      continue;
+    }
+
+    const issue: FileValidationIssue = {
+      id: item.id,
+      accNbr,
+      sourceAccountNumber,
+      amount: item.amount,
+      other: item.other,
+
+      issueTypes: [],
+
+      fileCurrencyCode,
+      fileCurrencyDescription: this.getCurrencyDescription(fileCurrencyCode),
+
+      debitAccountCurrencyCode,
+      debitAccountCurrencyDescription:
+        this.getCurrencyDescription(debitAccountCurrencyCode),
+    };
+
+    if (isDuplicate) {
+      issue.issueTypes.push(ValidationIssueType.DuplicateAccount);
+    }
+
+    if (hasInvalidCurrency) {
+      issue.issueTypes.push(ValidationIssueType.InvalidCurrency);
+    }
+
+    issuesMap.set(item.id, issue);
+  }
+
+  return Array.from(issuesMap.values()).sort((a, b) => {
+    return (
+      a.accNbr.localeCompare(b.accNbr) ||
+      b.amount - a.amount
+    );
+  });
+}
+
+private getDebitAccountCurrencyCode(
+  debitAccountNumber?: string | null
+): string {
+  const accountNumber = debitAccountNumber?.trim().toUpperCase() ?? '';
+
+  if (!accountNumber) {
+    return '';
+  }
+
+  if (
+    accountNumber.includes(Currency[Currency.LBP]) ||
+    accountNumber.slice(-3) === Currency.LBP.toString()
+  ) {
+    return Currency.LBP.toString();
+  }
+
+  if (
+    accountNumber.includes(Currency[Currency.USD]) ||
+    accountNumber.slice(-3) === Currency.USD.toString()
+  ) {
+    return Currency.USD.toString();
+  }
+
+  if (
+    accountNumber.includes(Currency[Currency.EUR]) ||
+    accountNumber.slice(-3) === Currency.EUR.toString()
+  ) {
+    return Currency.EUR.toString();
+  }
+
+  return '';
+}
+
+private normalizeCurrencyCode(
+  currency?: string | number | null
+): string {
+  const value = currency?.toString().trim().toUpperCase() ?? '';
+
+  if (!value) {
+    return '';
+  }
+
+  if (
+    value === Currency.LBP.toString() ||
+    value === Currency[Currency.LBP]
+  ) {
+    return Currency.LBP.toString();
+  }
+
+  if (
+    value === Currency.USD.toString() ||
+    value === Currency[Currency.USD]
+  ) {
+    return Currency.USD.toString();
+  }
+
+  if (
+    value === Currency.EUR.toString() ||
+    value === Currency[Currency.EUR]
+  ) {
+    return Currency.EUR.toString();
+  }
+
+  return value;
+}
+
+private getCurrencyDescription(
+  currencyCode?: string | number | null
+): string {
+  const normalized = this.normalizeCurrencyCode(currencyCode);
+
+  if (!normalized) {
+    return '';
+  }
+
+  if (normalized === Currency.LBP.toString()) {
+    return Currency[Currency.LBP];
+  }
+
+  if (normalized === Currency.USD.toString()) {
+    return Currency[Currency.USD];
+  }
+
+  if (normalized === Currency.EUR.toString()) {
+    return Currency[Currency.EUR];
+  }
+
+  return normalized;
+}
+```
+
+---
+
+## 8. Update `validateFile()`
+
+Replace this:
+
+```ts
+this.handleDuplicateAccountsBeforeValidation(request);
+```
+
+with:
+
+```ts
+this.handleValidationIssuesBeforeValidation(request);
+```
+
+So the final part of `validateFile()` becomes:
+
+```ts
+const request: ValidateFileRequest = {
+  baseReq: {
+    correlationId: uuidV7(),
+    UserData: this.authData()!,
+  },
+  fileId: fileId,
+  currencyCode: this.fileImport?.fileCurrencyCode!,
+};
+
+this.handleValidationIssuesBeforeValidation(request);
+```
+
+---
+
+## Important note
+
+I assumed that this part:
+
+```ts
+if (currency !== debitAccountCurrency)
+```
+
+means:
+
+```ts
+this.fileImport?.fileCurrencyCode !== item.sourceAccountNumber currency
+```
+
+because your validation request already uses:
+
+```ts
+currencyCode: this.fileImport?.fileCurrencyCode!
+```
+
+If the currency should instead come from each `FileImportContent` row, replace this line:
+
+```ts
+const fileCurrencyCode = this.normalizeCurrencyCode(
+  this.fileImport?.fileCurrencyCode
+);
+```
+
+with something like:
+
+```ts
+const fileCurrencyCode = this.normalizeCurrencyCode(item.currencyCode);
+```
+
+depending on your actual model property name.
