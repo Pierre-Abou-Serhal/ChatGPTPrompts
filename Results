@@ -1,119 +1,241 @@
-I have a list of public List<FileImportContent>? FileImportContents { get; set; } = [];
+Use this structure:
 
-public class FileImportContent
+1. Split `FileImportContents` by:
+
+```csharp
+SourceAccountNumber + BeneficiaryIndicator
+```
+
+2. For each group, call:
+
+```csharp
+GetT24FileContentRecordsV2(...)
+```
+
+3. Generate one T24 file per group.
+
+Your `FileImportContent` already has `SourceAccountNumber`, `AltAccNbr`, and `AccNbr`, so this fits your current model directly. 
+
+---
+
+## 1. Add this helper class
+
+```csharp
+private sealed class T24FileContentGroup
+{
+    public string DebitAccount { get; init; } = string.Empty;
+    public string BeneficiaryIndicator { get; init; } = string.Empty;
+    public List<FileImportContent> FileImportContents { get; init; } = [];
+}
+```
+
+---
+
+## 2. Add this grouping method
+
+```csharp
+private List<T24FileContentGroup> SplitT24ContentsByDebitAccountAndBeneficiaryIndicator(
+    List<FileImportContent>? fileImportContents,
+    bool isPrivate)
+{
+    return (fileImportContents ?? [])
+        .GroupBy(fileImportContent => new
         {
-            public long Id { get; set; }
-            public string? CustomerName { get; set; } = string.Empty;
-            public long FileImportId { get; set; }
-            public string? FileImportDescription { get; set; }
-            public string AltAccNbr { get; set; } = string.Empty;
-            public string? AccNbr { get; set; } = string.Empty;
-            public string? ProductCode { get; set; } = string.Empty;
-            public string? ProductDescription { get; set; } = string.Empty;
-            public decimal Amount { get; set; }
-            public string? Other { get; set; }
-            public int StatusId { get; set; }
-            public string? ValidationRejectReason { get; set; } = string.Empty;
-            public string? StatusDescription { get; set; }
-            public string? StatusColor { get; set; }
-            public string SourceAccountNumber { get; set; } = string.Empty;
+            DebitAccount = NormalizeGroupingValue(fileImportContent.SourceAccountNumber),
 
-            public DateTime? LastModifiedDate { get; set; }
-            public string? LastModifiedBy { get; set; }
-        }
-
-I want to divide the list into many other lists depending on
-1- DebitAccount <=> SourceAccountNumber
-2- BeneficiaryIndicator (NSG or SG)
-
-The Debit account is the field SourceAccountNumber
-
-The BeneficiaryIndicator can be calculated using the following:
-Note that the isPrivate boolean is a configuration on the file level so I have access to it
-
-String beneficiaryIndicator = isPrivate ? Utilities.GetBeneficiaryIndicatorForT24File(fileImportContent.AltAccNbr, fileImportContent.AccNbr) : "1";
-public static String GetBeneficiaryIndicatorForT24File(String altAccount, String? t24Account)
+            BeneficiaryIndicator = isPrivate
+                ? Utilities.GetBeneficiaryIndicatorForT24File(
+                    fileImportContent.AltAccNbr,
+                    fileImportContent.AccNbr)
+                : "1"
+        })
+        .Select(group => new T24FileContentGroup
         {
-            if (!String.IsNullOrWhiteSpace(t24Account))
-            {
-                return "1";
-            }
-            
-            if (IsValidNonSgblIban(altAccount))
-            {
-                return "0";
-            }
-            
-            return "1";
-        }
+            DebitAccount = group.Key.DebitAccount,
+            BeneficiaryIndicator = group.Key.BeneficiaryIndicator,
+            FileImportContents = group.ToList()
+        })
+        .ToList();
+}
 
-        public static Boolean IsValidNonSgblIban(String altAccount)
-        {
-            String acc = altAccount.Replace(" ", "");
+private static string NormalizeGroupingValue(string? value)
+{
+    return value?.Trim() ?? string.Empty;
+}
+```
 
-            if (acc.Length != 28)
-            {
-                return false;
-            }
+This means records like this:
 
-            return acc[..2] == "LB" && acc.Substring(4, 4) != "0019";
-        }
+```txt
+Debit Account: 123
+BeneficiaryIndicator: 1
+```
 
-And When dividing, I want each array to call the 
-private List<Dictionary<String, String>> GetT24FileContentRecordsV2(
-            List<FileImportContent> fileImportContents,
-            string fileCurrencyCode,
-            string paymentDescription,
-            string valueDate,
-            string transactionDate,
-            bool isPrivate)
+go into one list, while:
 
-List<Dictionary<String, String>> bodyRecords = GetT24FileContentRecordsV2(
-                the filtered arrays,
-                getFileByIdResponse.File.CurrencyCode,
-                request.PaymentDescription,
-                request.ValueDate,
-                transactionDate,
-                getFileByIdResponse.File.IsPrivateSector);
+```txt
+Debit Account: 123
+BeneficiaryIndicator: 0
+```
 
- // Calling the Data Export API to Generate the actual T24 file
-            String dataExportGenerateFileContentUrl = $"{_globalSettings.DataExportUrl}GenerateFileContent";
+go into another list.
 
-            DataExportGenerateFileContentRequest dataExportGenerateFileContentRequest = new()
-            {
-                CorrelationId = request.BaseReq.CorrelationId,
-                FileCode = _globalSettings.GenerateT24FileCode,
-                BodyRecords = bodyRecords
-            };
+And:
 
-            DataExportGenerateFileContentResponse responseData =
-                Post<DataExportGenerateFileContentResponse>(dataExportGenerateFileContentRequest,
-                    dataExportGenerateFileContentUrl);
+```txt
+Debit Account: 456
+BeneficiaryIndicator: 1
+```
 
-            if (responseData is not { WebResp.StatusCode: HttpStatusCode.OK })
-            {
-                throw new CustomExceptions.SGBLBadRequestException(String.Join(',', responseData.WebResp.Errors));
-            }
+goes into a third list.
 
-            List<Dictionary<String, String>> totalBodyRecords = GetT24TotalFileContentRecords(
-                getFileByIdResponse.File.InstitutionDescription!,
-                getFileImportByIdRes.FileImport.FileImportContents
-                );
+---
 
-            // Calling the Data Export API to Generate the Total T24 file (That serves as validation for the first file)
-            DataExportGenerateFileContentRequest dataExportGenerateTotalFileContentRequest = new()
-            {
-                CorrelationId = request.BaseReq.CorrelationId,
-                FileCode = _globalSettings.GenerateT24TotalFileCode,
-                BodyRecords = totalBodyRecords
-            };
+## 3. Create a reusable Data Export call method
 
-            DataExportGenerateFileContentResponse totalResponseData =
-                Post<DataExportGenerateFileContentResponse>(dataExportGenerateTotalFileContentRequest,
-                    dataExportGenerateFileContentUrl);
+This avoids duplicating the same `Post` logic inside the loop.
 
-            if (totalResponseData is not { WebResp.StatusCode: HttpStatusCode.OK })
-            {
-                throw new CustomExceptions.SGBLBadRequestException(String.Join(',',
-                    totalResponseData.WebResp.Errors));
-            }
+```csharp
+private DataExportGenerateFileContentResponse GenerateDataExportFileContent(
+    string correlationId,
+    string fileCode,
+    List<Dictionary<string, string>> bodyRecords)
+{
+    string dataExportGenerateFileContentUrl =
+        $"{_globalSettings.DataExportUrl}GenerateFileContent";
+
+    DataExportGenerateFileContentRequest dataExportGenerateFileContentRequest = new()
+    {
+        CorrelationId = correlationId,
+        FileCode = fileCode,
+        BodyRecords = bodyRecords
+    };
+
+    DataExportGenerateFileContentResponse responseData =
+        Post<DataExportGenerateFileContentResponse>(
+            dataExportGenerateFileContentRequest,
+            dataExportGenerateFileContentUrl);
+
+    if (responseData is not { WebResp.StatusCode: HttpStatusCode.OK })
+    {
+        throw new CustomExceptions.SGBLBadRequestException(
+            string.Join(',', responseData.WebResp.Errors));
+    }
+
+    return responseData;
+}
+```
+
+---
+
+## 4. Replace your current single call with this grouped version
+
+Instead of calling `GetT24FileContentRecordsV2` once for the full list, do this:
+
+```csharp
+List<T24FileContentGroup> t24FileContentGroups =
+    SplitT24ContentsByDebitAccountAndBeneficiaryIndicator(
+        getFileImportByIdRes.FileImport.FileImportContents,
+        getFileByIdResponse.File.IsPrivateSector);
+```
+
+Then loop over each group:
+
+```csharp
+foreach (T24FileContentGroup group in t24FileContentGroups)
+{
+    List<Dictionary<string, string>> bodyRecords = GetT24FileContentRecordsV2(
+        group.FileImportContents,
+        getFileByIdResponse.File.CurrencyCode,
+        request.PaymentDescription,
+        request.ValueDate,
+        transactionDate,
+        getFileByIdResponse.File.IsPrivateSector);
+
+    DataExportGenerateFileContentResponse responseData =
+        GenerateDataExportFileContent(
+            request.BaseReq.CorrelationId,
+            _globalSettings.GenerateT24FileCode,
+            bodyRecords);
+
+    List<Dictionary<string, string>> totalBodyRecords =
+        GetT24TotalFileContentRecords(
+            getFileByIdResponse.File.InstitutionDescription!,
+            group.FileImportContents);
+
+    DataExportGenerateFileContentResponse totalResponseData =
+        GenerateDataExportFileContent(
+            request.BaseReq.CorrelationId,
+            _globalSettings.GenerateT24TotalFileCode,
+            totalBodyRecords);
+}
+```
+
+---
+
+## 5. Full rewritten block
+
+```csharp
+List<T24FileContentGroup> t24FileContentGroups =
+    SplitT24ContentsByDebitAccountAndBeneficiaryIndicator(
+        getFileImportByIdRes.FileImport.FileImportContents,
+        getFileByIdResponse.File.IsPrivateSector);
+
+foreach (T24FileContentGroup group in t24FileContentGroups)
+{
+    List<Dictionary<string, string>> bodyRecords = GetT24FileContentRecordsV2(
+        group.FileImportContents,
+        getFileByIdResponse.File.CurrencyCode,
+        request.PaymentDescription,
+        request.ValueDate,
+        transactionDate,
+        getFileByIdResponse.File.IsPrivateSector);
+
+    DataExportGenerateFileContentResponse responseData =
+        GenerateDataExportFileContent(
+            request.BaseReq.CorrelationId,
+            _globalSettings.GenerateT24FileCode,
+            bodyRecords);
+
+    List<Dictionary<string, string>> totalBodyRecords =
+        GetT24TotalFileContentRecords(
+            getFileByIdResponse.File.InstitutionDescription!,
+            group.FileImportContents);
+
+    DataExportGenerateFileContentResponse totalResponseData =
+        GenerateDataExportFileContent(
+            request.BaseReq.CorrelationId,
+            _globalSettings.GenerateT24TotalFileCode,
+            totalBodyRecords);
+}
+```
+
+---
+
+## Important note about the total file
+
+In the code above, the **total file is generated per group**.
+
+That means:
+
+```txt
+Main T24 file group 1
+Total T24 file group 1
+
+Main T24 file group 2
+Total T24 file group 2
+
+Main T24 file group 3
+Total T24 file group 3
+```
+
+This is usually the correct approach because each generated T24 file should have its own matching total validation file.
+
+If instead you want **one global total file for all records**, keep this outside the loop:
+
+```csharp
+List<Dictionary<string, string>> totalBodyRecords = GetT24TotalFileContentRecords(
+    getFileByIdResponse.File.InstitutionDescription!,
+    getFileImportByIdRes.FileImport.FileImportContents
+);
+```
