@@ -1,241 +1,283 @@
-Use this structure:
+import {
+  AfterViewInit,
+  Component,
+  computed,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
+import { Config } from 'datatables.net';
+import { Subject } from 'rxjs';
+import { AuthService } from '../../../../Services/auth.service';
+import { FileImportService } from '../../../../Services/file-import.service';
+import {
+  AccessPermissions,
+  FileStatus,
+} from '../../../../Services/Models/custom-models';
+import {DownloadT24FileRequest, GetFilesImportByWhereRequest} from '../../../../Services/Models/request';
+import { v7 as uuidV7 } from 'uuid';
+import { DataTableDirective, DataTablesModule } from 'angular-datatables';
+import { RouterModule } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { DateFormatterService } from '../../../../Services/date-formatter.service';
 
-1. Split `FileImportContents` by:
+import {
+  NgbDateParserFormatter,
+  NgbDatepickerModule,
+  NgbDateStruct,
+} from '@ng-bootstrap/ng-bootstrap';
+import { FormsModule } from '@angular/forms';
+import { ToastrService } from 'ngx-toastr';
+import { DatePipe } from '@angular/common';
 
-```csharp
-SourceAccountNumber + BeneficiaryIndicator
-```
-
-2. For each group, call:
-
-```csharp
-GetT24FileContentRecordsV2(...)
-```
-
-3. Generate one T24 file per group.
-
-Your `FileImportContent` already has `SourceAccountNumber`, `AltAccNbr`, and `AccNbr`, so this fits your current model directly. 
-
----
-
-## 1. Add this helper class
-
-```csharp
-private sealed class T24FileContentGroup
+@Component({
+  selector: 'app-completed-files-dashboard',
+  standalone: true,
+  imports: [
+    CommonModule,
+    RouterModule,
+    DataTablesModule,
+    FormsModule,
+    NgbDatepickerModule,
+  ],
+  templateUrl: './completed-files-dashboard.component.html',
+  styleUrl: './completed-files-dashboard.component.scss',
+  providers: [
+    { provide: NgbDateParserFormatter, useClass: DateFormatterService },
+    DatePipe,
+  ],
+})
+export class CompletedFilesDashboardComponent
+  implements OnInit, AfterViewInit, OnDestroy
 {
-    public string DebitAccount { get; init; } = string.Empty;
-    public string BeneficiaryIndicator { get; init; } = string.Empty;
-    public List<FileImportContent> FileImportContents { get; init; } = [];
-}
-```
+  authData = computed(() => this.authService.authData());
+  filesList: any[] = [];
 
----
+  showRejectReason = false;
+  rejectReason: string = '';
+  fromDate!: NgbDateStruct;
+  toDate!: NgbDateStruct;
 
-## 2. Add this grouping method
+  minFromDate!: NgbDateStruct;
 
-```csharp
-private List<T24FileContentGroup> SplitT24ContentsByDebitAccountAndBeneficiaryIndicator(
-    List<FileImportContent>? fileImportContents,
-    bool isPrivate)
-{
-    return (fileImportContents ?? [])
-        .GroupBy(fileImportContent => new
-        {
-            DebitAccount = NormalizeGroupingValue(fileImportContent.SourceAccountNumber),
+  dtOptions: Config = {
+    pagingType: 'full_numbers',
+    pageLength: 10,
+    responsive: true,
+  };
 
-            BeneficiaryIndicator = isPrivate
-                ? Utilities.GetBeneficiaryIndicatorForT24File(
-                    fileImportContent.AltAccNbr,
-                    fileImportContent.AccNbr)
-                : "1"
-        })
-        .Select(group => new T24FileContentGroup
-        {
-            DebitAccount = group.Key.DebitAccount,
-            BeneficiaryIndicator = group.Key.BeneficiaryIndicator,
-            FileImportContents = group.ToList()
-        })
-        .ToList();
-}
+  dtTrigger: Subject<any> = new Subject<any>();
 
-private static string NormalizeGroupingValue(string? value)
-{
-    return value?.Trim() ?? string.Empty;
-}
-```
+  @ViewChild(DataTableDirective, { static: false }) dtElement:
+    | DataTableDirective
+    | undefined;
 
-This means records like this:
+  isDownloadingT24Files: boolean = false;
 
-```txt
-Debit Account: 123
-BeneficiaryIndicator: 1
-```
+  constructor(
+    private authService: AuthService,
+    private fileImportService: FileImportService,
+    private dateFormatService: DateFormatterService,
+    private toastr: ToastrService,
+    private datePipe: DatePipe,
+  ) {}
 
-go into one list, while:
+  ngAfterViewInit(): void {
+    this.dtTrigger.next(null);
+  }
 
-```txt
-Debit Account: 123
-BeneficiaryIndicator: 0
-```
+  ngOnDestroy(): void {
+    this.dtTrigger.unsubscribe();
+  }
 
-go into another list.
+  ngOnInit(): void {
+    this.initializeFilter();
+  }
 
-And:
+  filterFiles(): void {
+    const fileCode: string = FileStatus.Completed.toString();
+    const [validationResult, reason]: [boolean, string] = this.validateFilter();
 
-```txt
-Debit Account: 456
-BeneficiaryIndicator: 1
-```
-
-goes into a third list.
-
----
-
-## 3. Create a reusable Data Export call method
-
-This avoids duplicating the same `Post` logic inside the loop.
-
-```csharp
-private DataExportGenerateFileContentResponse GenerateDataExportFileContent(
-    string correlationId,
-    string fileCode,
-    List<Dictionary<string, string>> bodyRecords)
-{
-    string dataExportGenerateFileContentUrl =
-        $"{_globalSettings.DataExportUrl}GenerateFileContent";
-
-    DataExportGenerateFileContentRequest dataExportGenerateFileContentRequest = new()
-    {
-        CorrelationId = correlationId,
-        FileCode = fileCode,
-        BodyRecords = bodyRecords
-    };
-
-    DataExportGenerateFileContentResponse responseData =
-        Post<DataExportGenerateFileContentResponse>(
-            dataExportGenerateFileContentRequest,
-            dataExportGenerateFileContentUrl);
-
-    if (responseData is not { WebResp.StatusCode: HttpStatusCode.OK })
-    {
-        throw new CustomExceptions.SGBLBadRequestException(
-            string.Join(',', responseData.WebResp.Errors));
+    if (!validationResult) {
+      this.toastr.error(reason, 'Invalid Form', {
+        closeButton: true,
+        enableHtml: true,
+        progressBar: true,
+        tapToDismiss: true,
+        timeOut: 1000,
+        extendedTimeOut: 0,
+        easing: 'ease-in',
+        easeTime: 300,
+        positionClass: 'toast-center-center',
+      });
+      return;
     }
 
-    return responseData;
+    const request: GetFilesImportByWhereRequest = {
+      baseReq: {
+        correlationId: uuidV7(),
+        UserData: this.authData()!,
+      },
+      fromDate: this.dateFormatService.toDate(this.fromDate),
+      toDate: this.dateFormatService.toDate(this.toDate),
+      statusCode: fileCode,
+    };
+
+    this.getImportedFilesByWhere(request);
+  }
+
+  getImportedFilesByWhere(request: GetFilesImportByWhereRequest): void {
+    this.fileImportService.GetFilesImportByWhere(request).subscribe({
+      next: (response) => {
+        this.filesList = response.importedFiles.map((item) => {
+          let actionButtons = '';
+
+          if (this.authService.canUserAccess(AccessPermissions.FilesManagement_Audit_Completed_View)) {
+            actionButtons = `
+                      <div class="d-flex gap-2">
+                        <div class="d-flex gap-2">
+                        <a title="details" class="btn btn-sm btn-outline-primary" ng-reflect-router-link="/file-manager/completed-files-data-dashboard,${item.id}" href="/file-manager/completed-files-data-dashboard/${item.id}"><i class="bi bi-eye"></i></a>
+                        <!--container--></div>
+
+                        <div class="d-flex gap-2" *ngIf="false">
+                        <a title="File audit" class="btn btn-sm btn-outline-secondary" ng-reflect-router-link="/file-manager/completed-files-audit-dashboard,${item.id}" href="/file-manager/completed-files-audit-dashboard/${item.id}"><i class="bi bi-clipboard-check"></i></a>
+                        <!--container--></div>
+
+                        <div class="d-flex gap-2">
+                        <a title="File audit" class="btn btn-sm btn-outline-secondary" onclick="this.downloadT24Files(${item.id})"><i class="bi bi-clipboard-check"></i></a>
+                        <!--container--></div>
+                      </div>
+                      `;
+          } else {
+            actionButtons = `
+              <div class="d-flex gap-2">
+                <div class="d-flex gap-2">
+                <a title="details" class="btn btn-sm btn-outline-primary" ng-reflect-router-link="/file-manager/completed-files-data-dashboard,${item.id}" href="/file-manager/completed-files-data-dashboard/${item.id}"><i class="bi bi-eye"></i></a>
+                <!--container--></div>
+              `;
+          }
+          return [
+            item.name,
+            item.fileDescription,
+            item.institutionDescription,
+            item.statusDescription,
+            this.datePipe.transform(
+              item.lastModifiedDate,
+              'dd/MM/yyyy hh:mm a'
+            ),
+            item.lastModifiedBy ?? null,
+            actionButtons,
+          ];
+        });
+
+        this.dtElement?.dtInstance.then((dtInstance) => {
+          dtInstance.clear();
+          dtInstance.rows.add(this.filesList).draw();
+        });
+      },
+    });
+  }
+
+  validateFilter(): [boolean, string] {
+    if (!this.fromDate || !this.toDate) {
+      return [false, 'both from and to date are required'];
+    }
+
+    const from = new Date(
+      this.fromDate.year,
+      this.fromDate.month - 1,
+      this.fromDate.day
+    );
+
+    const to = new Date(
+      this.toDate.year,
+      this.toDate.month - 1,
+      this.toDate.day
+    );
+
+    if (from > to) {
+      return [false, 'from date should be less than to date'];
+    }
+
+    return [true, ''];
+  }
+  initializeFilter(): void {
+    const today = new Date();
+    const oneYearAgo = new Date(
+      today.getFullYear() - 1,
+      today.getMonth(),
+      today.getDate()
+    );
+
+    this.minFromDate = {
+      year: oneYearAgo.getFullYear(),
+      month: oneYearAgo.getMonth() + 1,
+      day: oneYearAgo.getDate(),
+    };
+
+    this.fromDate = {
+      day: today.getDate(),
+      month: today.getMonth() + 1,
+      year: today.getFullYear(),
+    };
+
+    this.toDate = {
+      day: today.getDate(),
+      month: today.getMonth() + 1,
+      year: today.getFullYear(),
+    };
+  }
+
+  downloadT24Files(fileImportId: number): void {
+
+    this.isDownloadingT24Files = true;
+
+    const downloadT24FileRequest: DownloadT24FileRequest = {
+      baseReq: {
+        correlationId: uuidV7(),
+        UserData: this.authData()!,
+      },
+      fileImportId: fileImportId,
+    };
+
+    this.fileImportService.DownloadT24File(downloadT24FileRequest).subscribe({
+      next: (response: Blob) => {
+        const url = window.URL.createObjectURL(response);
+        const a = document.createElement('a');
+        a.href = url;
+
+        // Provide a default file name (or get it from Content-Disposition header)
+        a.download = `Generated-Files-${this.getFormattedCurrentDateTime()}`;
+
+        a.click();
+        window.URL.revokeObjectURL(url); // Clean up the URL
+
+        this.isDownloadingT24Files = false;
+
+        this.toastr
+          .success(`T24 files where successfully generated`, `Success`, {
+            closeButton: true,
+            enableHtml: true,
+            progressBar: true,
+            timeOut: 1000,
+            easing: 'ease-in',
+            easeTime: 200,
+            positionClass: 'toast-center-center',
+          });
+      },
+    });
+  }
+
+  getFormattedCurrentDateTime(): string {
+    const now = new Date();
+
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours() % 12 || 12).padStart(2, '0'); // Convert to 12-hour clock
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  }
 }
-```
-
----
-
-## 4. Replace your current single call with this grouped version
-
-Instead of calling `GetT24FileContentRecordsV2` once for the full list, do this:
-
-```csharp
-List<T24FileContentGroup> t24FileContentGroups =
-    SplitT24ContentsByDebitAccountAndBeneficiaryIndicator(
-        getFileImportByIdRes.FileImport.FileImportContents,
-        getFileByIdResponse.File.IsPrivateSector);
-```
-
-Then loop over each group:
-
-```csharp
-foreach (T24FileContentGroup group in t24FileContentGroups)
-{
-    List<Dictionary<string, string>> bodyRecords = GetT24FileContentRecordsV2(
-        group.FileImportContents,
-        getFileByIdResponse.File.CurrencyCode,
-        request.PaymentDescription,
-        request.ValueDate,
-        transactionDate,
-        getFileByIdResponse.File.IsPrivateSector);
-
-    DataExportGenerateFileContentResponse responseData =
-        GenerateDataExportFileContent(
-            request.BaseReq.CorrelationId,
-            _globalSettings.GenerateT24FileCode,
-            bodyRecords);
-
-    List<Dictionary<string, string>> totalBodyRecords =
-        GetT24TotalFileContentRecords(
-            getFileByIdResponse.File.InstitutionDescription!,
-            group.FileImportContents);
-
-    DataExportGenerateFileContentResponse totalResponseData =
-        GenerateDataExportFileContent(
-            request.BaseReq.CorrelationId,
-            _globalSettings.GenerateT24TotalFileCode,
-            totalBodyRecords);
-}
-```
-
----
-
-## 5. Full rewritten block
-
-```csharp
-List<T24FileContentGroup> t24FileContentGroups =
-    SplitT24ContentsByDebitAccountAndBeneficiaryIndicator(
-        getFileImportByIdRes.FileImport.FileImportContents,
-        getFileByIdResponse.File.IsPrivateSector);
-
-foreach (T24FileContentGroup group in t24FileContentGroups)
-{
-    List<Dictionary<string, string>> bodyRecords = GetT24FileContentRecordsV2(
-        group.FileImportContents,
-        getFileByIdResponse.File.CurrencyCode,
-        request.PaymentDescription,
-        request.ValueDate,
-        transactionDate,
-        getFileByIdResponse.File.IsPrivateSector);
-
-    DataExportGenerateFileContentResponse responseData =
-        GenerateDataExportFileContent(
-            request.BaseReq.CorrelationId,
-            _globalSettings.GenerateT24FileCode,
-            bodyRecords);
-
-    List<Dictionary<string, string>> totalBodyRecords =
-        GetT24TotalFileContentRecords(
-            getFileByIdResponse.File.InstitutionDescription!,
-            group.FileImportContents);
-
-    DataExportGenerateFileContentResponse totalResponseData =
-        GenerateDataExportFileContent(
-            request.BaseReq.CorrelationId,
-            _globalSettings.GenerateT24TotalFileCode,
-            totalBodyRecords);
-}
-```
-
----
-
-## Important note about the total file
-
-In the code above, the **total file is generated per group**.
-
-That means:
-
-```txt
-Main T24 file group 1
-Total T24 file group 1
-
-Main T24 file group 2
-Total T24 file group 2
-
-Main T24 file group 3
-Total T24 file group 3
-```
-
-This is usually the correct approach because each generated T24 file should have its own matching total validation file.
-
-If instead you want **one global total file for all records**, keep this outside the loop:
-
-```csharp
-List<Dictionary<string, string>> totalBodyRecords = GetT24TotalFileContentRecords(
-    getFileByIdResponse.File.InstitutionDescription!,
-    getFileImportByIdRes.FileImport.FileImportContents
-);
-```
