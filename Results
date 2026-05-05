@@ -1,9 +1,21 @@
+Based on your current `CompletedFilesDashboardComponent`, the main fix is to remove this raw inline handler:
+
+```html
+onclick="this.downloadT24Files(...)"
+```
+
+because inside generated DataTables HTML, `this` is not the Angular component. Your component already has `downloadT24Files`, but DataTables is rendering the button as plain HTML. 
+
+Here is the rewritten full component:
+
+```ts
 import {
   AfterViewInit,
   Component,
   computed,
   OnDestroy,
   OnInit,
+  Renderer2,
   ViewChild,
 } from '@angular/core';
 import { Config } from 'datatables.net';
@@ -14,13 +26,15 @@ import {
   AccessPermissions,
   FileStatus,
 } from '../../../../Services/Models/custom-models';
-import {DownloadT24FileRequest, GetFilesImportByWhereRequest} from '../../../../Services/Models/request';
+import {
+  DownloadT24FileRequest,
+  GetFilesImportByWhereRequest,
+} from '../../../../Services/Models/request';
 import { v7 as uuidV7 } from 'uuid';
 import { DataTableDirective, DataTablesModule } from 'angular-datatables';
 import { RouterModule } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { DateFormatterService } from '../../../../Services/date-formatter.service';
-
 import {
   NgbDateParserFormatter,
   NgbDatepickerModule,
@@ -28,7 +42,6 @@ import {
 } from '@ng-bootstrap/ng-bootstrap';
 import { FormsModule } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
-import { DatePipe } from '@angular/common';
 
 @Component({
   selector: 'app-completed-files-dashboard',
@@ -51,14 +64,19 @@ export class CompletedFilesDashboardComponent
   implements OnInit, AfterViewInit, OnDestroy
 {
   authData = computed(() => this.authService.authData());
+
   filesList: any[] = [];
 
   showRejectReason = false;
   rejectReason: string = '';
+
   fromDate!: NgbDateStruct;
   toDate!: NgbDateStruct;
-
   minFromDate!: NgbDateStruct;
+
+  isDownloadingT24Files = false;
+
+  private removeDownloadT24Listener?: () => void;
 
   dtOptions: Config = {
     pagingType: 'full_numbers',
@@ -68,11 +86,8 @@ export class CompletedFilesDashboardComponent
 
   dtTrigger: Subject<any> = new Subject<any>();
 
-  @ViewChild(DataTableDirective, { static: false }) dtElement:
-    | DataTableDirective
-    | undefined;
-
-  isDownloadingT24Files: boolean = false;
+  @ViewChild(DataTableDirective, { static: false })
+  dtElement: DataTableDirective | undefined;
 
   constructor(
     private authService: AuthService,
@@ -80,23 +95,66 @@ export class CompletedFilesDashboardComponent
     private dateFormatService: DateFormatterService,
     private toastr: ToastrService,
     private datePipe: DatePipe,
+    private renderer: Renderer2
   ) {}
-
-  ngAfterViewInit(): void {
-    this.dtTrigger.next(null);
-  }
-
-  ngOnDestroy(): void {
-    this.dtTrigger.unsubscribe();
-  }
 
   ngOnInit(): void {
     this.initializeFilter();
   }
 
+  ngAfterViewInit(): void {
+    this.dtTrigger.next(null);
+    this.registerDownloadT24ButtonListener();
+  }
+
+  ngOnDestroy(): void {
+    this.dtTrigger.unsubscribe();
+
+    if (this.removeDownloadT24Listener) {
+      this.removeDownloadT24Listener();
+    }
+  }
+
+  private registerDownloadT24ButtonListener(): void {
+    this.removeDownloadT24Listener = this.renderer.listen(
+      'document',
+      'click',
+      (event: Event) => {
+        const target = event.target as HTMLElement;
+
+        const button = target.closest(
+          '.download-t24-file-btn'
+        ) as HTMLElement | null;
+
+        if (!button) {
+          return;
+        }
+
+        event.preventDefault();
+
+        const fileImportId = Number(button.dataset['fileImportId']);
+
+        if (!fileImportId) {
+          this.toastr.error('Invalid file id', 'Error', {
+            closeButton: true,
+            progressBar: true,
+            timeOut: 1500,
+            positionClass: 'toast-center-center',
+          });
+
+          return;
+        }
+
+        this.downloadT24Files(fileImportId);
+      }
+    );
+  }
+
   filterFiles(): void {
     const fileCode: string = FileStatus.Completed.toString();
-    const [validationResult, reason]: [boolean, string] = this.validateFilter();
+
+    const [validationResult, reason]: [boolean, string] =
+      this.validateFilter();
 
     if (!validationResult) {
       this.toastr.error(reason, 'Invalid Form', {
@@ -110,6 +168,7 @@ export class CompletedFilesDashboardComponent
         easeTime: 300,
         positionClass: 'toast-center-center',
       });
+
       return;
     }
 
@@ -130,32 +189,6 @@ export class CompletedFilesDashboardComponent
     this.fileImportService.GetFilesImportByWhere(request).subscribe({
       next: (response) => {
         this.filesList = response.importedFiles.map((item) => {
-          let actionButtons = '';
-
-          if (this.authService.canUserAccess(AccessPermissions.FilesManagement_Audit_Completed_View)) {
-            actionButtons = `
-                      <div class="d-flex gap-2">
-                        <div class="d-flex gap-2">
-                        <a title="details" class="btn btn-sm btn-outline-primary" ng-reflect-router-link="/file-manager/completed-files-data-dashboard,${item.id}" href="/file-manager/completed-files-data-dashboard/${item.id}"><i class="bi bi-eye"></i></a>
-                        <!--container--></div>
-
-                        <div class="d-flex gap-2" *ngIf="false">
-                        <a title="File audit" class="btn btn-sm btn-outline-secondary" ng-reflect-router-link="/file-manager/completed-files-audit-dashboard,${item.id}" href="/file-manager/completed-files-audit-dashboard/${item.id}"><i class="bi bi-clipboard-check"></i></a>
-                        <!--container--></div>
-
-                        <div class="d-flex gap-2">
-                        <a title="File audit" class="btn btn-sm btn-outline-secondary" onclick="this.downloadT24Files(${item.id})"><i class="bi bi-clipboard-check"></i></a>
-                        <!--container--></div>
-                      </div>
-                      `;
-          } else {
-            actionButtons = `
-              <div class="d-flex gap-2">
-                <div class="d-flex gap-2">
-                <a title="details" class="btn btn-sm btn-outline-primary" ng-reflect-router-link="/file-manager/completed-files-data-dashboard,${item.id}" href="/file-manager/completed-files-data-dashboard/${item.id}"><i class="bi bi-eye"></i></a>
-                <!--container--></div>
-              `;
-          }
           return [
             item.name,
             item.fileDescription,
@@ -166,15 +199,87 @@ export class CompletedFilesDashboardComponent
               'dd/MM/yyyy hh:mm a'
             ),
             item.lastModifiedBy ?? null,
-            actionButtons,
+            this.buildActionButtons(item),
           ];
         });
 
-        this.dtElement?.dtInstance.then((dtInstance) => {
-          dtInstance.clear();
-          dtInstance.rows.add(this.filesList).draw();
+        this.refreshDataTable();
+      },
+      error: () => {
+        this.toastr.error('Failed to load completed files', 'Error', {
+          closeButton: true,
+          progressBar: true,
+          timeOut: 1500,
+          positionClass: 'toast-center-center',
         });
       },
+    });
+  }
+
+  private buildActionButtons(item: any): string {
+    const detailsButton = `
+      <div class="d-flex gap-2">
+        <a
+          title="Details"
+          class="btn btn-sm btn-outline-primary"
+          href="/file-manager/completed-files-data-dashboard/${item.id}"
+        >
+          <i class="bi bi-eye"></i>
+        </a>
+      </div>
+    `;
+
+    const auditButton = `
+      <div class="d-flex gap-2 d-none">
+        <a
+          title="File audit"
+          class="btn btn-sm btn-outline-secondary"
+          href="/file-manager/completed-files-audit-dashboard/${item.id}"
+        >
+          <i class="bi bi-clipboard-check"></i>
+        </a>
+      </div>
+    `;
+
+    const downloadT24Button = `
+      <div class="d-flex gap-2">
+        <a
+          title="Download T24 file"
+          class="btn btn-sm btn-outline-success download-t24-file-btn"
+          href="#"
+          data-file-import-id="${item.id}"
+        >
+          <i class="bi bi-download"></i>
+        </a>
+      </div>
+    `;
+
+    if (
+      this.authService.canUserAccess(
+        AccessPermissions.FilesManagement_Audit_Completed_View
+      )
+    ) {
+      return `
+        <div class="d-flex gap-2">
+          ${detailsButton}
+          ${auditButton}
+          ${downloadT24Button}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="d-flex gap-2">
+        ${detailsButton}
+      </div>
+    `;
+  }
+
+  private refreshDataTable(): void {
+    this.dtElement?.dtInstance.then((dtInstance) => {
+      dtInstance.clear();
+      dtInstance.rows.add(this.filesList);
+      dtInstance.draw();
     });
   }
 
@@ -201,8 +306,10 @@ export class CompletedFilesDashboardComponent
 
     return [true, ''];
   }
+
   initializeFilter(): void {
     const today = new Date();
+
     const oneYearAgo = new Date(
       today.getFullYear() - 1,
       today.getMonth(),
@@ -229,6 +336,9 @@ export class CompletedFilesDashboardComponent
   }
 
   downloadT24Files(fileImportId: number): void {
+    if (this.isDownloadingT24Files) {
+      return;
+    }
 
     this.isDownloadingT24Files = true;
 
@@ -242,20 +352,17 @@ export class CompletedFilesDashboardComponent
 
     this.fileImportService.DownloadT24File(downloadT24FileRequest).subscribe({
       next: (response: Blob) => {
-        const url = window.URL.createObjectURL(response);
-        const a = document.createElement('a');
-        a.href = url;
-
-        // Provide a default file name (or get it from Content-Disposition header)
-        a.download = `Generated-Files-${this.getFormattedCurrentDateTime()}`;
-
-        a.click();
-        window.URL.revokeObjectURL(url); // Clean up the URL
+        this.downloadBlob(
+          response,
+          `Generated-Files-${this.getFormattedCurrentDateTime()}.zip`
+        );
 
         this.isDownloadingT24Files = false;
 
-        this.toastr
-          .success(`T24 files where successfully generated`, `Success`, {
+        this.toastr.success(
+          `T24 files were successfully generated`,
+          `Success`,
+          {
             closeButton: true,
             enableHtml: true,
             progressBar: true,
@@ -263,21 +370,79 @@ export class CompletedFilesDashboardComponent
             easing: 'ease-in',
             easeTime: 200,
             positionClass: 'toast-center-center',
-          });
+          }
+        );
+      },
+      error: () => {
+        this.isDownloadingT24Files = false;
+
+        this.toastr.error(
+          'Failed to generate T24 files',
+          'Error',
+          {
+            closeButton: true,
+            enableHtml: true,
+            progressBar: true,
+            timeOut: 1500,
+            easing: 'ease-in',
+            easeTime: 200,
+            positionClass: 'toast-center-center',
+          }
+        );
       },
     });
+  }
+
+  private downloadBlob(blob: Blob, fileName: string): void {
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    window.URL.revokeObjectURL(url);
   }
 
   getFormattedCurrentDateTime(): string {
     const now = new Date();
 
     const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+    const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours() % 12 || 12).padStart(2, '0'); // Convert to 12-hour clock
+    const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
 
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
   }
 }
+```
+
+The important part is this generated button:
+
+```html
+<a
+  title="Download T24 file"
+  class="btn btn-sm btn-outline-success download-t24-file-btn"
+  href="#"
+  data-file-import-id="${item.id}"
+>
+  <i class="bi bi-download"></i>
+</a>
+```
+
+And this Angular listener catches the click:
+
+```ts
+const button = target.closest('.download-t24-file-btn') as HTMLElement | null;
+```
+
+Then it calls the real component method:
+
+```ts
+this.downloadT24Files(fileImportId);
+```
