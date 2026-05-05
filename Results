@@ -1,826 +1,119 @@
-Yes — since the user will **not edit the debit account**, the validation should compare:
+I have a list of public List<FileImportContent>? FileImportContents { get; set; } = [];
 
-```ts
-T24 / proposed account = item.accNbr
-Debit account = item.sourceAccountNumber
-```
+public class FileImportContent
+        {
+            public long Id { get; set; }
+            public string? CustomerName { get; set; } = string.Empty;
+            public long FileImportId { get; set; }
+            public string? FileImportDescription { get; set; }
+            public string AltAccNbr { get; set; } = string.Empty;
+            public string? AccNbr { get; set; } = string.Empty;
+            public string? ProductCode { get; set; } = string.Empty;
+            public string? ProductDescription { get; set; } = string.Empty;
+            public decimal Amount { get; set; }
+            public string? Other { get; set; }
+            public int StatusId { get; set; }
+            public string? ValidationRejectReason { get; set; } = string.Empty;
+            public string? StatusDescription { get; set; }
+            public string? StatusColor { get; set; }
+            public string SourceAccountNumber { get; set; } = string.Empty;
 
-If their currencies are different, the row appears in the modal. The edit button still edits only the T24/proposed account number. Your original parent component already uses `accNbr` as the editable proposed account and `sourceAccountNumber` as the debit account, so the rewritten version keeps that structure. 
-
----
-
-# Parent component TypeScript
-
-```ts
-import {
-  Component,
-  computed,
-  OnDestroy,
-  OnInit,
-  ViewChild,
-} from '@angular/core';
-import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { FileImportService } from '../../../../Services/file-import.service';
-import {
-  FileImport,
-  FileImportContent,
-  Status,
-} from '../../../../Services/Models/model';
-import {
-  GetAllStatusesRequest,
-  GetFileImportByIdRequest,
-  UpdateFileStatusRequest,
-  ValidateFileRequest,
-} from '../../../../Services/Models/request';
-import { v7 as uuidV7 } from 'uuid';
-import { AuthService } from '../../../../Services/auth.service';
-import { Config } from 'datatables.net';
-import { Subject } from 'rxjs';
-import { DataTablesModule } from 'angular-datatables';
-import { CommonModule } from '@angular/common';
-import {
-  Currency,
-  FileStatus,
-  FileValidationIssue,
-  ValidationIssueType,
-} from '../../../../Services/Models/custom-models';
-import { HttpStatusCode } from '@angular/common/http';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { EditDataComponent } from '../edit-data/edit-data.component';
-import { ToastrService } from 'ngx-toastr';
-import { DataTableDirective } from 'angular-datatables';
-import { CommonService } from '../../../../Services/common.service';
-import Swal from 'sweetalert2';
-import { LoadingService } from '../../../../Services/loading.service';
-import { SharedService } from '../../../../Services/shared.service';
-import { FileValidationIssuesModalComponent } from './file-validation-issues-modal/file-validation-issues-modal.component';
-
-@Component({
-  selector: 'app-file-data-dashboard',
-  standalone: true,
-  imports: [DataTablesModule, RouterModule, CommonModule],
-  templateUrl: './file-data-dashboard.component.html',
-  styleUrl: './file-data-dashboard.component.scss',
-})
-export class FileDataDashboardComponent implements OnInit, OnDestroy {
-  fileImportId?: number;
-  fileImport?: FileImport;
-  fileImportContents: FileImportContent[] = [];
-  statuses: Status[] = [];
-  productDescriptions: string = '';
-
-  authData = computed(() => this.authService.authData());
-
-  FileStatus = FileStatus;
-  ReceivedFileStatus: number = FileStatus.Received;
-  RejectedFileStatus: number = FileStatus.Rejected;
-
-  dtTrigger: Subject<any> = new Subject<any>();
-
-  @ViewChild(DataTableDirective, { static: false })
-  dtElement: DataTableDirective | undefined;
-
-  dtOptions: Config = {
-    pagingType: 'full_numbers',
-    pageLength: 10,
-    responsive: true,
-    order: [],
-    dom: 'Blfrtip',
-    buttons: [
-      {
-        extend: 'excelHtml5',
-        text: 'Excel',
-        filename: `${new Date().toDateString()}`,
-      },
-    ],
-    columnDefs: [
-      {
-        targets: [8],
-        visible: false,
-        searchable: true,
-      },
-    ],
-    drawCallback: () => {
-      this.loadingService.hide();
-    },
-  };
-
-  constructor(
-    private route: ActivatedRoute,
-    private fileImportService: FileImportService,
-    private authService: AuthService,
-    private router: Router,
-    private modalService: NgbModal,
-    private toastr: ToastrService,
-    private commonService: CommonService,
-    private loadingService: LoadingService,
-    private sharedService: SharedService
-  ) {}
-
-  ngOnInit(): void {
-    this.fileImportId = +this.route.snapshot.paramMap.get('fileImportId')!;
-    this.getFileImportById(this.fileImportId);
-    this.getStatuses();
-  }
-
-  ngOnDestroy(): void {
-    this.dtTrigger.unsubscribe();
-  }
-
-  getStatuses(): void {
-    const getStatusesRequest: GetAllStatusesRequest = {
-      baseReq: {
-        correlationId: uuidV7(),
-        UserData: this.authData()!,
-      },
-    };
-
-    this.commonService.GetAllStatuses(getStatusesRequest, true).subscribe({
-      next: (response) => {
-        if (response.baseResp.statusCode === HttpStatusCode.Ok) {
-          this.statuses = response.statuses;
+            public DateTime? LastModifiedDate { get; set; }
+            public string? LastModifiedBy { get; set; }
         }
-      },
-    });
-  }
 
-  getFileImportById(id: number): void {
-    const request: GetFileImportByIdRequest = {
-      baseReq: {
-        correlationId: uuidV7(),
-        UserData: this.authData()!,
-      },
-      fileImportId: id,
-    };
+I want to divide the list into many other lists depending on
+1- DebitAccount <=> SourceAccountNumber
+2- BeneficiaryIndicator (NSG or SG)
 
-    this.loadingService.show();
+The Debit account is the field SourceAccountNumber
 
-    this.fileImportService.GetFileImportById(request).subscribe({
-      next: (response) => {
-        if (response.baseResp.statusCode === HttpStatusCode.Ok) {
-          this.fileImport = response.fileImport;
+The BeneficiaryIndicator can be calculated using the following:
+Note that the isPrivate boolean is a configuration on the file level so I have access to it
 
-          this.productDescriptions = this.sharedService.joinProductCodes(
-            this.fileImport?.fileProducts!
-          );
-
-          this.dtTrigger.next(null);
-        }
-      },
-    });
-  }
-
-  async openEditDataModal(
-    index: number,
-    id: number
-  ): Promise<FileImportContent | undefined> {
-    const modalRef = this.modalService.open(EditDataComponent, {
-      size: 'lg',
-      backdrop: 'static',
-    });
-
-    const current: FileImportContent =
-      this.fileImport?.fileImportContents?.find((i) => i.id === id)!;
-
-    modalRef.componentInstance.fileImport = this.fileImport;
-
-    /**
-     * The debit account is passed for display/reference only.
-     * The user should edit the T24/proposed account number: accNbr.
-     */
-    modalRef.componentInstance.fileImportContent = {
-      id: current.id,
-      fileImportId: current.fileImportId,
-      altAccNbr: current.altAccNbr,
-      accNbr: current.accNbr,
-      amount: current.amount,
-      statusId: current.statusId,
-      validationRejectReason: current.validationRejectReason,
-      productCode: current.productCode,
-      productDescription: current.productDescription,
-      sourceAccountNumber: current.sourceAccountNumber,
-      customerName: current.customerName,
-      other: current.other,
-    };
-
-    try {
-      const updatedRecord = await modalRef.result;
-
-      this.toastr.success(`Data Updated Successfully`, `Data Updated`, {
-        closeButton: true,
-        enableHtml: true,
-        progressBar: true,
-        timeOut: 800,
-        easing: 'ease-in',
-        easeTime: 200,
-      });
-
-      const found = this.fileImport?.fileImportContents?.find(
-        (item) => item.id === updatedRecord.id
-      );
-
-      if (found) {
-        /**
-         * Do not overwrite sourceAccountNumber from here if your edit modal
-         * should not allow debit account editing.
-         */
-        found.accNbr = updatedRecord.accNbr;
-        found.productDescription = updatedRecord.productDescription;
-        found.customerName = updatedRecord.customerName;
-        found.statusId = updatedRecord.statusId;
-        found.validationRejectReason = updatedRecord.validationRejectReason;
-        found.productCode = updatedRecord.productCode;
-        found.other = updatedRecord.other;
-        found.amount = updatedRecord.amount;
-        found.lastModifiedBy = updatedRecord.lastModifiedBy;
-        found.lastModifiedDate = updatedRecord.lastModifiedDate;
-        found.statusColor = updatedRecord.statusColor;
-      }
-
-      const updateData = {
-        1: updatedRecord.accNbr ? updatedRecord.accNbr : '',
-        3: updatedRecord.productDescription
-          ? updatedRecord.productDescription
-          : '',
-        4: updatedRecord.customerName ? updatedRecord.customerName : '',
-        5: updatedRecord.other ? updatedRecord.other : '',
-        6: updatedRecord.amount,
-        7: updatedRecord.validationRejectReason
-          ? updatedRecord.validationRejectReason
-          : '',
-        8: updatedRecord.statusId,
-        9: updatedRecord.lastModifiedBy ? updatedRecord.lastModifiedBy : '',
-        10: updatedRecord.lastModifiedDate
-          ? updatedRecord.lastModifiedDate
-          : '',
-      };
-
-      this.updateRowData(index, updateData);
-
-      return updatedRecord;
-    } catch (e) {
-      return undefined;
-    }
-  }
-
-  updateRowData(index: number, newData: any): void {
-    this.dtElement?.dtInstance?.then((dtInstance) => {
-      Object.entries(newData).forEach(([key, value]) => {
-        dtInstance.cell(index, Number(key)).data(value);
-      });
-
-      dtInstance.draw(false);
-    });
-  }
-
-  get getTotalAmount(): number {
-    const total: number | undefined =
-      this.fileImport?.fileImportContents?.reduce((a, b) => {
-        return a + b.amount;
-      }, 0);
-
-    return total ?? 0;
-  }
-
-  validateFile(): void {
-    const [check, reason] = this.customeValidation();
-
-    if (!check) {
-      this.toastr.error(reason, 'Invalid Data', {
-        closeButton: true,
-        enableHtml: true,
-        progressBar: false,
-        tapToDismiss: false,
-        timeOut: 0,
-        extendedTimeOut: 0,
-        easing: 'ease-in',
-        easeTime: 300,
-        positionClass: 'toast-center-center',
-      });
-
-      return;
-    }
-
-    const fileId: number = this.fileImportId!;
-
-    const request: ValidateFileRequest = {
-      baseReq: {
-        correlationId: uuidV7(),
-        UserData: this.authData()!,
-      },
-      fileId: fileId,
-      currencyCode: this.fileImport?.fileCurrencyCode!,
-    };
-
-    this.handleValidationIssuesBeforeValidation(request);
-  }
-
-  private validateFileApiCall(request: ValidateFileRequest): void {
-    this.fileImportService.ValidateFile(request).subscribe({
-      next: (response) => {
-        if (response.baseResp.statusCode === HttpStatusCode.Ok) {
-          this.toastr
-            .success(`File was successfully VALIDATED`, `File validated`, {
-              closeButton: true,
-              enableHtml: true,
-              progressBar: true,
-              timeOut: 1000,
-              easing: 'ease-in',
-              easeTime: 200,
-              positionClass: 'toast-center-center',
-            })
-            .onHidden.subscribe({
-              next: () => {
-                this.router.navigate(['/file-manager/files-dashboard']);
-              },
-            });
-        }
-      },
-    });
-  }
-
-  applyFilter(event: any): void {
-    this.dtElement?.dtInstance.then((dtInstance) => {
-      dtInstance.column(8).search(event.target.value.trim()).draw();
-    });
-  }
-
-  customeValidation(): [boolean, string] {
-    return [true, ''];
-  }
-
-  discardFile(): void {
-    Swal.fire({
-      title: 'Are you sure you want to discard file',
-      text: '',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes',
-      cancelButtonText: 'No',
-      customClass: {
-        confirmButton: 'btn btn-success',
-        cancelButton: 'btn btn-danger',
-      },
-    }).then((result) => {
-      if (result.isConfirmed) {
-        const fileId: number = this.fileImportId!;
-
-        const request: UpdateFileStatusRequest = {
-          baseReq: {
-            correlationId: uuidV7(),
-            UserData: this.authData()!,
-          },
-          id: fileId,
-          statusCode: FileStatus.Discarded.toString(),
-        };
-
-        this.fileImportService.UpdateFileStatusById(request).subscribe({
-          next: (response) => {
-            if (response.baseResp.statusCode === HttpStatusCode.Ok) {
-              this.toastr
-                .success(`File was successfully DISCARDED`, `File discarded`, {
-                  closeButton: true,
-                  enableHtml: true,
-                  progressBar: true,
-                  timeOut: 1000,
-                  easing: 'ease-in',
-                  easeTime: 200,
-                  positionClass: 'toast-center-center',
-                })
-                .onHidden.subscribe({
-                  next: () => {
-                    this.router.navigate(['/file-manager/files-dashboard']);
-                  },
-                });
+String beneficiaryIndicator = isPrivate ? Utilities.GetBeneficiaryIndicatorForT24File(fileImportContent.AltAccNbr, fileImportContent.AccNbr) : "1";
+public static String GetBeneficiaryIndicatorForT24File(String altAccount, String? t24Account)
+        {
+            if (!String.IsNullOrWhiteSpace(t24Account))
+            {
+                return "1";
             }
-          },
-        });
-      }
-    });
-  }
-
-  private handleValidationIssuesBeforeValidation(
-    request: ValidateFileRequest
-  ): void {
-    const issues = this.getFileValidationIssues(
-      this.fileImport?.fileImportContents ?? []
-    );
-
-    if (issues.length === 0) {
-      this.validateFileApiCall(request);
-      return;
-    }
-
-    const modalRef = this.modalService.open(FileValidationIssuesModalComponent, {
-      size: 'xl',
-      backdrop: 'static',
-      centered: true,
-      keyboard: false,
-    });
-
-    modalRef.componentInstance.issues = issues;
-
-    modalRef.result
-      .then(async (result) => {
-        if (result === 'continue') {
-          this.validateFileApiCall(request);
-          return;
-        }
-
-        if (result?.action === 'edit' && result?.id) {
-          const rowIndex =
-            this.fileImport?.fileImportContents?.findIndex(
-              (x) => x.id === result.id
-            ) ?? -1;
-
-          if (rowIndex >= 0) {
-            await this.openEditDataModal(rowIndex, result.id);
-          }
-
-          /**
-           * Re-check after edit.
-           *
-           * Example:
-           * - User fixes duplicate issue.
-           * - Same account may still have invalid currency.
-           * - Modal opens again with remaining issue.
-           */
-          this.handleValidationIssuesBeforeValidation(request);
-        }
-      })
-      .catch(() => {
-        // No / dismissed => do nothing
-      });
-  }
-
-  private getFileValidationIssues(
-    items: FileImportContent[]
-  ): FileValidationIssue[] {
-    const accountCounts = new Map<string, number>();
-    const issues: FileValidationIssue[] = [];
-
-    for (const item of items) {
-      const proposedAccount = item.accNbr?.trim();
-
-      if (!proposedAccount) {
-        continue;
-      }
-
-      accountCounts.set(
-        proposedAccount,
-        (accountCounts.get(proposedAccount) ?? 0) + 1
-      );
-    }
-
-    for (const item of items) {
-      const proposedAccount = item.accNbr?.trim() ?? '';
-      const debitAccount = item.sourceAccountNumber?.trim() ?? '';
-
-      const issueTypes: ValidationIssueType[] = [];
-
-      const isDuplicate =
-        !!proposedAccount &&
-        (accountCounts.get(proposedAccount) ?? 0) > 1;
-
-      if (isDuplicate) {
-        issueTypes.push(ValidationIssueType.DuplicateAccount);
-      }
-
-      const proposedAccountCurrencyCode =
-        this.getAccountCurrencyCode(proposedAccount);
-
-      const debitAccountCurrencyCode =
-        this.getAccountCurrencyCode(debitAccount);
-
-      const hasInvalidCurrency =
-        !!proposedAccount &&
-        !!debitAccount &&
-        !!proposedAccountCurrencyCode &&
-        !!debitAccountCurrencyCode &&
-        proposedAccountCurrencyCode !== debitAccountCurrencyCode;
-
-      if (hasInvalidCurrency) {
-        issueTypes.push(ValidationIssueType.InvalidCurrency);
-      }
-
-      if (issueTypes.length === 0) {
-        continue;
-      }
-
-      issues.push({
-        id: item.id,
-        accNbr: proposedAccount,
-        sourceAccountNumber: debitAccount,
-        amount: item.amount,
-        other: item.other,
-
-        issueTypes,
-
-        t24AccountCurrencyCode: proposedAccountCurrencyCode,
-        t24AccountCurrencyDescription: this.getCurrencyDescription(
-          proposedAccountCurrencyCode
-        ),
-
-        debitAccountCurrencyCode: debitAccountCurrencyCode,
-        debitAccountCurrencyDescription: this.getCurrencyDescription(
-          debitAccountCurrencyCode
-        ),
-      } as FileValidationIssue);
-    }
-
-    return issues.sort((a, b) => {
-      return a.accNbr.localeCompare(b.accNbr) || b.amount - a.amount;
-    });
-  }
-
-  private getAccountCurrencyCode(accountNumber?: string | null): string {
-    const account = accountNumber?.trim().toUpperCase() ?? '';
-
-    if (!account) {
-      return '';
-    }
-
-    if (
-      account.includes(Currency[Currency.LBP]) ||
-      account.slice(-3) === Currency.LBP.toString()
-    ) {
-      return Currency.LBP.toString();
-    }
-
-    if (
-      account.includes(Currency[Currency.USD]) ||
-      account.slice(-3) === Currency.USD.toString()
-    ) {
-      return Currency.USD.toString();
-    }
-
-    if (
-      account.includes(Currency[Currency.EUR]) ||
-      account.slice(-3) === Currency.EUR.toString()
-    ) {
-      return Currency.EUR.toString();
-    }
-
-    return '';
-  }
-
-  private getCurrencyDescription(currencyCode?: string | number | null): string {
-    const code = currencyCode?.toString().trim() ?? '';
-
-    if (!code) {
-      return '';
-    }
-
-    if (code === Currency.LBP.toString()) {
-      return Currency[Currency.LBP];
-    }
-
-    if (code === Currency.USD.toString()) {
-      return Currency[Currency.USD];
-    }
-
-    if (code === Currency.EUR.toString()) {
-      return Currency[Currency.EUR];
-    }
-
-    return code;
-  }
-}
-```
-
----
-
-# Parent component HTML
-
-```html
-<div class="container-fluid router-content">
-  <div class="row">
-    <nav class="col">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item">
-          <a class="text-decoration-none" [routerLink]="['']">home</a>
-        </li>
-
-        <li class="breadcrumb-item">
-          <a
-            class="text-decoration-none"
-            [routerLink]="['/file-manager/files-dashboard']"
-          >
-            In Progress Files Data Dashboard
-          </a>
-        </li>
-
-        <li class="breadcrumb-item active">
-          {{ fileImport?.institutionDescription }} : {{ fileImport?.name }}
-        </li>
-      </ol>
-    </nav>
-  </div>
-
-  <div class="row">
-    <div class="col-12">
-      <div class="card sgbl-card shadow rounded">
-        <div
-          class="card-header d-flex justify-content-between align-items-center px-4"
-        >
-          <h5 class="card-title mb-0 d-flex flex-column justify-content-between">
-            <span>
-              Total Records:
-              {{ fileImport?.fileImportContents?.length }}
-            </span>
-
-            <span class="mt-2">
-              Total Amount:
-              {{ getTotalAmount | number : "1.0-20" }}
-              {{ fileImport?.fileCurrencyDescription }}
-            </span>
-
-            <span class="mt-2">
-              Product:
-              {{ productDescriptions }}
-            </span>
-          </h5>
-
-          <div class="mb-3">
-            <label class="form-label" for="filter-by-select">
-              Filter By
-            </label>
-
-            <select
-              id="filter-by-select"
-              class="form-select"
-              (change)="applyFilter($event)"
-            >
-              <option value=" ">All</option>
-
-              @for (status of statuses; track $index) {
-                <option
-                  [value]="status.id"
-                  [ngStyle]="{ 'background-color': status.color }"
-                >
-                  {{ status.description }}
-                </option>
-              }
-            </select>
-          </div>
-        </div>
-
-        <div class="card-body">
-          <div class="table-responsive with-excel-button">
-            <table
-              class="table table-bordered"
-              datatable
-              [dtOptions]="dtOptions"
-              [dtTrigger]="dtTrigger"
-            >
-              <thead>
-                <tr>
-                  <th class="text-start">Received Account Number</th>
-                  <th class="text-start">Proposed T24 Account Number</th>
-                  <th class="text-start">Debit Account</th>
-                  <th class="text-start">Product</th>
-                  <th class="text-start">Account Name</th>
-                  <th class="text-start">Other</th>
-                  <th class="text-start">Amount</th>
-                  <th class="text-start">Validation Result</th>
-                  <th class="text-start">Status Description</th>
-                  <th class="text-start">Last Modified By</th>
-                  <th class="text-start">Last Modified Date</th>
-                  <th class="text-start">Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                @for (item of fileImport?.fileImportContents; track $index) {
-                  <tr>
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.altAccNbr }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.accNbr }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.sourceAccountNumber }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.productDescription }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.customerName }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.other }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.amount | number : "1.0-20" }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.validationRejectReason }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.statusId }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.lastModifiedBy }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      {{ item.lastModifiedDate | date : "dd/MM/yyyy hh:mm a" }}
-                    </td>
-
-                    <td
-                      class="text-start"
-                      [ngStyle]="{ 'background-color': item.statusColor }"
-                    >
-                      <div class="d-flex justify-content-between table-actions">
-                        <a
-                          class="btn btn-sm edit-btn mx-1"
-                          title="Edit T24 Account"
-                          (click)="openEditDataModal($index, item.id)"
-                        >
-                          <i class="bi bi-pencil-square"></i>
-                        </a>
-                      </div>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-
-          <div class="d-flex justify-content-end align-items-center mt-3 gap-2">
-            @if (
-              fileImport?.statusCode === ReceivedFileStatus.toString() ||
-              fileImport?.statusCode === RejectedFileStatus.toString()
-            ) {
-              <button
-                type="button"
-                class="btn btn-success"
-                (click)="validateFile()"
-              >
-                <i class="bi bi-check2-circle"></i>
-                Validate File
-              </button>
-
-              <button
-                type="button"
-                class="btn btn-warning"
-                (click)="discardFile()"
-              >
-                <i class="bi bi-x-circle"></i>
-                Discard File
-              </button>
+            
+            if (IsValidNonSgblIban(altAccount))
+            {
+                return "0";
             }
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-```
+            
+            return "1";
+        }
 
----
+        public static Boolean IsValidNonSgblIban(String altAccount)
+        {
+            String acc = altAccount.Replace(" ", "");
 
-One important change from my previous answer: the invalid currency check is now comparing **`item.accNbr` against `item.sourceAccountNumber`**, not `fileImport.fileCurrencyCode` against the debit account. This matches your clarification that the user only fixes the T24/proposed account.
+            if (acc.Length != 28)
+            {
+                return false;
+            }
+
+            return acc[..2] == "LB" && acc.Substring(4, 4) != "0019";
+        }
+
+And When dividing, I want each array to call the 
+private List<Dictionary<String, String>> GetT24FileContentRecordsV2(
+            List<FileImportContent> fileImportContents,
+            string fileCurrencyCode,
+            string paymentDescription,
+            string valueDate,
+            string transactionDate,
+            bool isPrivate)
+
+List<Dictionary<String, String>> bodyRecords = GetT24FileContentRecordsV2(
+                the filtered arrays,
+                getFileByIdResponse.File.CurrencyCode,
+                request.PaymentDescription,
+                request.ValueDate,
+                transactionDate,
+                getFileByIdResponse.File.IsPrivateSector);
+
+ // Calling the Data Export API to Generate the actual T24 file
+            String dataExportGenerateFileContentUrl = $"{_globalSettings.DataExportUrl}GenerateFileContent";
+
+            DataExportGenerateFileContentRequest dataExportGenerateFileContentRequest = new()
+            {
+                CorrelationId = request.BaseReq.CorrelationId,
+                FileCode = _globalSettings.GenerateT24FileCode,
+                BodyRecords = bodyRecords
+            };
+
+            DataExportGenerateFileContentResponse responseData =
+                Post<DataExportGenerateFileContentResponse>(dataExportGenerateFileContentRequest,
+                    dataExportGenerateFileContentUrl);
+
+            if (responseData is not { WebResp.StatusCode: HttpStatusCode.OK })
+            {
+                throw new CustomExceptions.SGBLBadRequestException(String.Join(',', responseData.WebResp.Errors));
+            }
+
+            List<Dictionary<String, String>> totalBodyRecords = GetT24TotalFileContentRecords(
+                getFileByIdResponse.File.InstitutionDescription!,
+                getFileImportByIdRes.FileImport.FileImportContents
+                );
+
+            // Calling the Data Export API to Generate the Total T24 file (That serves as validation for the first file)
+            DataExportGenerateFileContentRequest dataExportGenerateTotalFileContentRequest = new()
+            {
+                CorrelationId = request.BaseReq.CorrelationId,
+                FileCode = _globalSettings.GenerateT24TotalFileCode,
+                BodyRecords = totalBodyRecords
+            };
+
+            DataExportGenerateFileContentResponse totalResponseData =
+                Post<DataExportGenerateFileContentResponse>(dataExportGenerateTotalFileContentRequest,
+                    dataExportGenerateFileContentUrl);
+
+            if (totalResponseData is not { WebResp.StatusCode: HttpStatusCode.OK })
+            {
+                throw new CustomExceptions.SGBLBadRequestException(String.Join(',',
+                    totalResponseData.WebResp.Errors));
+            }
