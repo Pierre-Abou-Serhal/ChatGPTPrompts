@@ -1,7 +1,173 @@
-{
-  "sdk": {
-    "version": "8.0.0",
-    "rollForward": "latestMinor",
-    "allowPrerelease": false
-  }
-}
+I am getting this error when I call my endoint to send sms
+
+Server Error in '/' Application.
+Could not load file or assembly 'System.Web.Http, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35' or one of its dependencies. The located assembly's manifest definition does not match the assembly reference. (Exception from HRESULT: 0x80131040)
+Description: An unhandled exception occurred during the execution of the current web request. Please review the stack trace for more information about the error and where it originated in the code.
+
+Exception Details: System.IO.FileLoadException: Could not load file or assembly 'System.Web.Http, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35' or one of its dependencies. The located assembly's manifest definition does not match the assembly reference. (Exception from HRESULT: 0x80131040)
+
+Source Error:
+
+An unhandled exception was generated during the execution of the current web request. Information regarding the origin and location of the exception can be identified using the exception stack trace below.
+
+Assembly Load Trace: The following information can be helpful to determine why the assembly 'System.Web.Http, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35' could not be loaded.
+
+
+WRN: Assembly binding logging is turned OFF.
+To enable assembly bind failure logging, set the registry value [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD) to 1.
+Note: There is some performance penalty associated with assembly bind failure logging.
+To turn this feature off, remove the registry value [HKLM\Software\Microsoft\Fusion!EnableLog].
+
+Stack Trace:
+
+
+[FileLoadException: Could not load file or assembly 'System.Web.Http, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35' or one of its dependencies. The located assembly's manifest definition does not match the assembly reference. (Exception from HRESULT: 0x80131040)]
+   SGBL.AlternaSms.Host.SwaggerConfig.Register() in D:\@Workspace\deve-repo\alterna-sms-api\AlternaSms\SGBL.AlternaSms.Host\App_Start\SwaggerConfig.cs:253
+
+[TargetInvocationException: Exception has been thrown by the target of an invocation.]
+   System.RuntimeMethodHandle.InvokeMethod(Object target, Object[] arguments, Signature sig, Boolean constructor) +0
+   System.Reflection.RuntimeMethodInfo.UnsafeInvokeInternal(Object obj, Object[] parameters, Object[] arguments) +122
+   System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) +231
+   System.Reflection.MethodBase.Invoke(Object obj, Object[] parameters) +34
+   WebActivatorEx.BaseActivationMethodAttribute.InvokeMethod() +280
+   WebActivatorEx.ActivationManager.RunActivationMethods(Boolean designerMode) +759
+   WebActivatorEx.ActivationManager.RunPreStartMethods(Boolean designerMode) +49
+   WebActivatorEx.ActivationManager.Run() +75
+
+[InvalidOperationException: The pre-application start initialization method Run on type WebActivatorEx.ActivationManager threw an exception with the following error message: Exception has been thrown by the target of an invocation..]
+   System.Web.Compilation.BuildManager.InvokePreStartInitMethodsCore(ICollection`1 methods, Func`1 setHostingEnvironmentCultures) +919
+   System.Web.Compilation.BuildManager.InvokePreStartInitMethods(ICollection`1 methods) +169
+   System.Web.Compilation.BuildManager.CallPreStartInitMethods(String preStartInitListPath, Boolean& isRefAssemblyLoaded) +172
+   System.Web.Compilation.BuildManager.ExecutePreAppStart() +172
+   System.Web.Hosting.HostingEnvironment.Initialize(ApplicationManager appManager, IApplicationHost appHost, IConfigMapPathFactory configMapPathFactory, HostingEnvironmentParameters hostingParameters, PolicyLevel policyLevel, Exception appDomainCreationException) +854
+
+[HttpException (0x80004005): The pre-application start initialization method Run on type WebActivatorEx.ActivationManager threw an exception with the following error message: Exception has been thrown by the target of an invocation..]
+   System.Web.HttpRuntime.FirstRequestInit(HttpContext context) +532
+   System.Web.HttpRuntime.EnsureFirstRequestInit(HttpContext context) +114
+   System.Web.HttpRuntime.ProcessRequestNotificationPrivate(IIS7WorkerRequest wr, HttpContext context) +724
+
+
+This is my Web.config
+
+<?xml version="1.0"?>
+<!--
+  For more information on how to configure your ASP.NET application, please visit http://go.microsoft.com/fwlink/?LinkId=301879
+  -->
+<configuration>
+  <configSections>
+    <!-- For more information on Entity Framework configuration, visit http://go.microsoft.com/fwlink/?LinkID=237468 -->
+    <section name="entityFramework" type="System.Data.Entity.Internal.ConfigFile.EntityFrameworkSection, EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" requirePermission="false"/>
+  </configSections>
+  <connectionStrings>
+    <add name="DefaultConnection" connectionString="Data Source=(LocalDb)\MSSQLLocalDB;AttachDbFilename=|DataDirectory|\aspnet-SGBL.AlternaSms.Host-20181002102347.mdf;Initial Catalog=aspnet-SGBL.AlternaSms.Host-20181002102347;Integrated Security=True" providerName="System.Data.SqlClient"/>
+  </connectionStrings>
+  <appSettings>
+    <add key="owin:AutomaticAppStartup" value="false"/>
+    <add key="CONN_STRING" value=""/>
+    <add key="PROVIDER_NAME" value="Dapper"/>
+    <add key="BaseUrl" value=""/>
+    <add key="SmsApiUri" value=""/>
+    <add key="User" value=""/>
+    <add key="Password" value=""/>
+    <add key="SourceNumber" value=""/>
+  </appSettings>
+  <system.web>
+    <authentication mode="None"/>
+    <compilation targetFramework="4.5.2" debug="true"/>
+    <httpRuntime targetFramework="4.5.2"/>
+    <httpModules>
+      <add name="ApplicationInsightsWebTracking" type="Microsoft.ApplicationInsights.Web.ApplicationInsightsHttpModule, Microsoft.AI.Web"/>
+    </httpModules>
+  </system.web>
+  <system.webServer>
+    <modules>
+      <remove name="FormsAuthentication"/>
+      <remove name="ApplicationInsightsWebTracking"/>
+      <add name="ApplicationInsightsWebTracking" type="Microsoft.ApplicationInsights.Web.ApplicationInsightsHttpModule, Microsoft.AI.Web" preCondition="managedHandler"/>
+    </modules>
+    <handlers>
+      <remove name="ExtensionlessUrlHandler-Integrated-4.0"/>
+      <remove name="OPTIONSVerbHandler"/>
+      <remove name="TRACEVerbHandler"/>
+      <add name="ExtensionlessUrlHandler-Integrated-4.0" path="*." verb="*" type="System.Web.Handlers.TransferRequestHandler" preCondition="integratedMode,runtimeVersionv4.0"/>
+    </handlers>
+    <validation validateIntegratedModeConfiguration="false"/>
+  </system.webServer>
+  <runtime>
+    <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
+      <dependentAssembly>
+        <assemblyIdentity name="Microsoft.Owin" publicKeyToken="31BF3856AD364E35" culture="neutral"/>
+        <bindingRedirect oldVersion="0.0.0.0-2.1.0.0" newVersion="2.1.0.0"/>
+      </dependentAssembly>
+      <dependentAssembly>
+        <assemblyIdentity name="Newtonsoft.Json" culture="neutral" publicKeyToken="30ad4fe6b2a6aeed"/>
+        <bindingRedirect oldVersion="0.0.0.0-12.0.0.0" newVersion="12.0.0.0"/>
+      </dependentAssembly>
+      <dependentAssembly>
+        <assemblyIdentity name="System.Web.Optimization" publicKeyToken="31bf3856ad364e35"/>
+        <bindingRedirect oldVersion="1.0.0.0-1.1.0.0" newVersion="1.1.0.0"/>
+      </dependentAssembly>
+      <dependentAssembly>
+        <assemblyIdentity name="WebGrease" publicKeyToken="31bf3856ad364e35"/>
+        <bindingRedirect oldVersion="0.0.0.0-1.5.2.14234" newVersion="1.5.2.14234"/>
+      </dependentAssembly>
+      <dependentAssembly>
+        <assemblyIdentity name="System.Web.Helpers" publicKeyToken="31bf3856ad364e35"/>
+        <bindingRedirect oldVersion="1.0.0.0-3.0.0.0" newVersion="3.0.0.0"/>
+      </dependentAssembly>
+      <dependentAssembly>
+        <assemblyIdentity name="System.Web.Mvc" publicKeyToken="31bf3856ad364e35"/>
+        <bindingRedirect oldVersion="1.0.0.0-5.2.3.0" newVersion="5.2.3.0"/>
+      </dependentAssembly>
+      <dependentAssembly>
+        <assemblyIdentity name="System.Web.WebPages" publicKeyToken="31bf3856ad364e35"/>
+        <bindingRedirect oldVersion="1.0.0.0-3.0.0.0" newVersion="3.0.0.0"/>
+      </dependentAssembly>
+      <dependentAssembly>
+        <assemblyIdentity name="DocumentFormat.OpenXml" publicKeyToken="8fb06cb64d019a17" culture="neutral"/>
+        <bindingRedirect oldVersion="0.0.0.0-2.8.1.0" newVersion="2.8.1.0"/>
+      </dependentAssembly>
+      <dependentAssembly>
+        <assemblyIdentity name="System.Web.Http" publicKeyToken="31bf3856ad364e35" culture="neutral"/>
+        <bindingRedirect oldVersion="0.0.0.0-5.2.3.0" newVersion="5.2.3.0"/>
+      </dependentAssembly>
+      <dependentAssembly>
+        <assemblyIdentity name="System.Net.Http.Formatting" publicKeyToken="31bf3856ad364e35" culture="neutral"/>
+        <bindingRedirect oldVersion="0.0.0.0-5.2.3.0" newVersion="5.2.3.0"/>
+      </dependentAssembly>
+    </assemblyBinding>
+  </runtime>
+  <entityFramework>
+    <defaultConnectionFactory type="System.Data.Entity.Infrastructure.LocalDbConnectionFactory, EntityFramework">
+      <parameters>
+        <parameter value="mssqllocaldb"/>
+      </parameters>
+    </defaultConnectionFactory>
+    <providers>
+      <provider invariantName="System.Data.SqlClient" type="System.Data.Entity.SqlServer.SqlProviderServices, EntityFramework.SqlServer"/>
+    </providers>
+  </entityFramework>
+  <system.codedom>
+    <compilers>
+      <compiler language="c#;cs;csharp" extension=".cs" type="Microsoft.CodeDom.Providers.DotNetCompilerPlatform.CSharpCodeProvider, Microsoft.CodeDom.Providers.DotNetCompilerPlatform, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35" warningLevel="4" compilerOptions="/langversion:6 /nowarn:1659;1699;1701"/>
+      <compiler language="vb;vbs;visualbasic;vbscript" extension=".vb" type="Microsoft.CodeDom.Providers.DotNetCompilerPlatform.VBCodeProvider, Microsoft.CodeDom.Providers.DotNetCompilerPlatform, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35" warningLevel="4" compilerOptions="/langversion:14 /nowarn:41008 /define:_MYTYPE=\&quot;Web\&quot; /optionInfer+"/>
+    </compilers>
+  </system.codedom>
+  <system.net>
+    <defaultProxy>
+      <proxy proxyaddress="" bypassonlocal="True"/>
+    </defaultProxy>
+  </system.net>
+</configuration>
+<!--ProjectGuid: {ADE94C38-3FBB-4705-97A6-7D1B1AF1063C}-->
+
+And this is my View Web.config
+<?xml version="1.0"?>
+
+<configuration>
+	
+</configuration>
+
+
+Why I am getting thsi error 
+The app  is deployed on IIS
