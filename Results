@@ -1,173 +1,87 @@
-I am getting this error when I call my endoint to send sms
 
-Server Error in '/' Application.
-Could not load file or assembly 'System.Web.Http, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35' or one of its dependencies. The located assembly's manifest definition does not match the assembly reference. (Exception from HRESULT: 0x80131040)
-Description: An unhandled exception occurred during the execution of the current web request. Please review the stack trace for more information about the error and where it originated in the code.
+Distribution Instructions: Copy and paste the text below and complete the highlighted yellow elements and issue to impacted merchants.
+Notification to be issued by: Mastercard Partner
+Issue date: ASAP.
+Email Subject Line: Important connectivity update - action required.
 
-Exception Details: System.IO.FileLoadException: Could not load file or assembly 'System.Web.Http, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35' or one of its dependencies. The located assembly's manifest definition does not match the assembly reference. (Exception from HRESULT: 0x80131040)
+-----------------------------------------------------------------------------------------------------------------
+MERCHANT COMM TEMPLATE
+This communication and its subject matter are confidential. You must not in any way, other than to comply with this communication, disclose the contents or the subject matter of this communication.
 
-Source Error:
+Dear [INSERT MERCHANT NAME],
+What is Happening?
+As part of a combination of both industry changes and our focus on providing highly reliable, performant and secure solutions there are several important changes planned in 2026 that may affect your current integration.
 
-An unhandled exception was generated during the execution of the current web request. Information regarding the origin and location of the exception can be identified using the exception stack trace below.
+DNS Changes
+The DNS changes will move from static records that map IP addresses to hostnames on a one-to-one basis to rotating DNS records across multiple IP addresses to enable greater flexibility in traffic routing for availability and performance optimization.
 
-Assembly Load Trace: The following information can be helpful to determine why the assembly 'System.Web.Http, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35' could not be loaded.
+Beginning July 1, 2026, our Payment Gateway services will commence a series of updates to the Domain Name System (DNS) configuration strategy for internet-facing endpoints and the currently supported Transport Layer Security (TLS) cipher lists. These enhancements are part of our ongoing efforts to improve security and resiliency in accordance with current industry best practices.
 
+PKI Root Certificate Authority Changes
+From 30 June 2026, major browsers will enforce changes to TLS certificate issuing practices which will result in certificates currently used for authentication to be unable to be renewed as the authorities are mandating separation between client authentication and service identification issuing chains. As a result, all current Root Certificate Authorities for client certificates used to authenticate to the PKI interface will stop supporting the signing of the Client Authentication “Extended Key Usage” attribute and alternative issuing roots will need to be adopted.
+Certificate providers have already stopped adding this flag to new certificates or renewals by default and plan to cease signing entirely by Q2 2026. You should check with your chosen certificate provider for specific timelines.
+To maintain support for the current authentication mechanism, we have reviewed available public issuing options and approved the following certificate authorities who are offering client authentication as an ongoing solution to be trusted issuers for merchants to transition to.
+•	Digicert - DigiCert Assured ID Client CA G2
+•	GlobalSign - GlobalSign Client Authentication Root R45
+•	SSL.COM - SSL.com Client RSA Root CA 2022 & SSL.com Client ECC Root CA 2022
+Please be advised that we will continue to assess additional emerging options and will communicate further details when they become available.
 
-WRN: Assembly binding logging is turned OFF.
-To enable assembly bind failure logging, set the registry value [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD) to 1.
-Note: There is some performance penalty associated with assembly bind failure logging.
-To turn this feature off, remove the registry value [HKLM\Software\Microsoft\Fusion!EnableLog].
+You should check the expiry dates of your current certificates and either arrange an early renewal with the client authentication flag enabled through your supplier or start planning a move to one of the listed alternate Root Certificate Authorities before the certificate expires.
+If your certificates expire after 30 June 2026, we will support those certificates until their expiry date or 30 June 2027, whichever comes first. After that, you must transition to one of the nominated alternate issuing authorities listed above.
+Transport Layer Security Cipher Changes
+In alignment with current best practice security standards, supported cipher lists are regularly reviewed to remove weaker ciphers from service whenever possible when not constrained by widespread customer or consumer usage.
 
-Stack Trace:
+Please note that the exact TLS ciphers negotiable will vary depending on whether TLSv1.2 or TLSv1.3 protocol is used on the connection.
 
+What do you need to do?
+It is strongly recommended that you promptly engage your system administrator or network team, as they possess the necessary expertise to make the required changes below to your system configuration. Their involvement will ensure that any updates to DNS settings, firewall rules, access control lists, or TLS cipher suites are implemented correctly and securely. Collaborating with your IT specialists will also help minimise downtime and prevent any inadvertent disruption to your services during this process. It is recommended not to make these changes independently unless you have the relevant technical knowledge and authorisation, as improper configuration could compromise the security or accessibility of your systems.
 
-[FileLoadException: Could not load file or assembly 'System.Web.Http, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35' or one of its dependencies. The located assembly's manifest definition does not match the assembly reference. (Exception from HRESULT: 0x80131040)]
-   SGBL.AlternaSms.Host.SwaggerConfig.Register() in D:\@Workspace\deve-repo\alterna-sms-api\AlternaSms\SGBL.AlternaSms.Host\App_Start\SwaggerConfig.cs:253
+For DNS Changes:
+Review any firewall rules or other IP address access control lists to ensure that the address ranges in the table below are permitted on tcp/443 (standard HTTPS).
+Validate that any DNS caching mechanisms in your integration are set to honour the Time to Live Values (TTLs) of the DNS records as these will be decreased from the current one-hour default to sixty seconds.
+Region	Current Default IP Range(s)	Additional IP Ranges
+Asia Pacific	103.55.149.0/24	103.55.148.0/24
+103.55.150.0/24
+Kingdom of Saudi Arabia	185.199.60.0/24
+185.199.61.0/24	No changes required.
+North America
+Production & Mastercard Test Facilities	216.119.218.0/24	216.119.222.0/24
+216.119.223.0/24
+Europe	185.175.205.0/24	185.96.136.0/24
+185.175.204.0/24
+216.119.222.0/24
+216.119.223.0/24
+India	45.115.129.0/24	45.115.128.0/24
+45.115.130.0/24
 
-[TargetInvocationException: Exception has been thrown by the target of an invocation.]
-   System.RuntimeMethodHandle.InvokeMethod(Object target, Object[] arguments, Signature sig, Boolean constructor) +0
-   System.Reflection.RuntimeMethodInfo.UnsafeInvokeInternal(Object obj, Object[] parameters, Object[] arguments) +122
-   System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture) +231
-   System.Reflection.MethodBase.Invoke(Object obj, Object[] parameters) +34
-   WebActivatorEx.BaseActivationMethodAttribute.InvokeMethod() +280
-   WebActivatorEx.ActivationManager.RunActivationMethods(Boolean designerMode) +759
-   WebActivatorEx.ActivationManager.RunPreStartMethods(Boolean designerMode) +49
-   WebActivatorEx.ActivationManager.Run() +75
+For TLS Cipher Changes:
+Review your integration’s TLS software library’s configuration to confirm a compatible cipher from the list below is available on TLS version 1.2 or TLS version 1.3, if no compatible cipher is available software updates may be required.
+TLS13-AES256-GCM-SHA384
+TLS13-AES128-GCM-SHA256
+TLS13-CHACHA20-POLY1305-SHA256
+ECDHE-ECDSA-AES256-GCM-SHA384
+ECDHE-ECDSA-AES128-GCM-SHA256
+ECDHE-ECDSA-CHACHA20-POLY1305-SHA256
+ECDHE-RSA-AES128-GCM-SHA256
+ECDHE-RSA-AES256-GCM-SHA384
+ECDHE-RSA-CHACHA20-POLY1305-SHA256
+Note: For internet browser or mobile device integrations the above cipher list has widespread compatibility with currently supported Operating Systems, major internet browsers and mobile devices but may not be compatible with unpatched systems or devices beyond normal service life.
+Please ensure the above DNS and TLS Cipher changes are completed by June 30, 2026.
 
-[InvalidOperationException: The pre-application start initialization method Run on type WebActivatorEx.ActivationManager threw an exception with the following error message: Exception has been thrown by the target of an invocation..]
-   System.Web.Compilation.BuildManager.InvokePreStartInitMethodsCore(ICollection`1 methods, Func`1 setHostingEnvironmentCultures) +919
-   System.Web.Compilation.BuildManager.InvokePreStartInitMethods(ICollection`1 methods) +169
-   System.Web.Compilation.BuildManager.CallPreStartInitMethods(String preStartInitListPath, Boolean& isRefAssemblyLoaded) +172
-   System.Web.Compilation.BuildManager.ExecutePreAppStart() +172
-   System.Web.Hosting.HostingEnvironment.Initialize(ApplicationManager appManager, IApplicationHost appHost, IConfigMapPathFactory configMapPathFactory, HostingEnvironmentParameters hostingParameters, PolicyLevel policyLevel, Exception appDomainCreationException) +854
+For PKI Root Certificate Authority Changes
 
-[HttpException (0x80004005): The pre-application start initialization method Run on type WebActivatorEx.ActivationManager threw an exception with the following error message: Exception has been thrown by the target of an invocation..]
-   System.Web.HttpRuntime.FirstRequestInit(HttpContext context) +532
-   System.Web.HttpRuntime.EnsureFirstRequestInit(HttpContext context) +114
-   System.Web.HttpRuntime.ProcessRequestNotificationPrivate(IIS7WorkerRequest wr, HttpContext context) +724
+If your integration uses TLS client certificate authentication, also known as Mutual TLS authentication:
 
+1.	Review your current certificates expiry date and root issuing authority.
+2.	If you can’t get a new certificate from the listed authorities before expiry, ask your current certificate provider for an early renewal with the client authentication key enabled. This gives you extra time to plan your transition.
 
-This is my Web.config
+Further Information
+Our team will be available to assist you should you have any questions or require further clarification. Please do not hesitate to email [INSERT EMAIL ADDRESS] or call [INSERT CONTACT NAME & CONTACT NUMBER].
 
-<?xml version="1.0"?>
-<!--
-  For more information on how to configure your ASP.NET application, please visit http://go.microsoft.com/fwlink/?LinkId=301879
-  -->
-<configuration>
-  <configSections>
-    <!-- For more information on Entity Framework configuration, visit http://go.microsoft.com/fwlink/?LinkID=237468 -->
-    <section name="entityFramework" type="System.Data.Entity.Internal.ConfigFile.EntityFrameworkSection, EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" requirePermission="false"/>
-  </configSections>
-  <connectionStrings>
-    <add name="DefaultConnection" connectionString="Data Source=(LocalDb)\MSSQLLocalDB;AttachDbFilename=|DataDirectory|\aspnet-SGBL.AlternaSms.Host-20181002102347.mdf;Initial Catalog=aspnet-SGBL.AlternaSms.Host-20181002102347;Integrated Security=True" providerName="System.Data.SqlClient"/>
-  </connectionStrings>
-  <appSettings>
-    <add key="owin:AutomaticAppStartup" value="false"/>
-    <add key="CONN_STRING" value=""/>
-    <add key="PROVIDER_NAME" value="Dapper"/>
-    <add key="BaseUrl" value=""/>
-    <add key="SmsApiUri" value=""/>
-    <add key="User" value=""/>
-    <add key="Password" value=""/>
-    <add key="SourceNumber" value=""/>
-  </appSettings>
-  <system.web>
-    <authentication mode="None"/>
-    <compilation targetFramework="4.5.2" debug="true"/>
-    <httpRuntime targetFramework="4.5.2"/>
-    <httpModules>
-      <add name="ApplicationInsightsWebTracking" type="Microsoft.ApplicationInsights.Web.ApplicationInsightsHttpModule, Microsoft.AI.Web"/>
-    </httpModules>
-  </system.web>
-  <system.webServer>
-    <modules>
-      <remove name="FormsAuthentication"/>
-      <remove name="ApplicationInsightsWebTracking"/>
-      <add name="ApplicationInsightsWebTracking" type="Microsoft.ApplicationInsights.Web.ApplicationInsightsHttpModule, Microsoft.AI.Web" preCondition="managedHandler"/>
-    </modules>
-    <handlers>
-      <remove name="ExtensionlessUrlHandler-Integrated-4.0"/>
-      <remove name="OPTIONSVerbHandler"/>
-      <remove name="TRACEVerbHandler"/>
-      <add name="ExtensionlessUrlHandler-Integrated-4.0" path="*." verb="*" type="System.Web.Handlers.TransferRequestHandler" preCondition="integratedMode,runtimeVersionv4.0"/>
-    </handlers>
-    <validation validateIntegratedModeConfiguration="false"/>
-  </system.webServer>
-  <runtime>
-    <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
-      <dependentAssembly>
-        <assemblyIdentity name="Microsoft.Owin" publicKeyToken="31BF3856AD364E35" culture="neutral"/>
-        <bindingRedirect oldVersion="0.0.0.0-2.1.0.0" newVersion="2.1.0.0"/>
-      </dependentAssembly>
-      <dependentAssembly>
-        <assemblyIdentity name="Newtonsoft.Json" culture="neutral" publicKeyToken="30ad4fe6b2a6aeed"/>
-        <bindingRedirect oldVersion="0.0.0.0-12.0.0.0" newVersion="12.0.0.0"/>
-      </dependentAssembly>
-      <dependentAssembly>
-        <assemblyIdentity name="System.Web.Optimization" publicKeyToken="31bf3856ad364e35"/>
-        <bindingRedirect oldVersion="1.0.0.0-1.1.0.0" newVersion="1.1.0.0"/>
-      </dependentAssembly>
-      <dependentAssembly>
-        <assemblyIdentity name="WebGrease" publicKeyToken="31bf3856ad364e35"/>
-        <bindingRedirect oldVersion="0.0.0.0-1.5.2.14234" newVersion="1.5.2.14234"/>
-      </dependentAssembly>
-      <dependentAssembly>
-        <assemblyIdentity name="System.Web.Helpers" publicKeyToken="31bf3856ad364e35"/>
-        <bindingRedirect oldVersion="1.0.0.0-3.0.0.0" newVersion="3.0.0.0"/>
-      </dependentAssembly>
-      <dependentAssembly>
-        <assemblyIdentity name="System.Web.Mvc" publicKeyToken="31bf3856ad364e35"/>
-        <bindingRedirect oldVersion="1.0.0.0-5.2.3.0" newVersion="5.2.3.0"/>
-      </dependentAssembly>
-      <dependentAssembly>
-        <assemblyIdentity name="System.Web.WebPages" publicKeyToken="31bf3856ad364e35"/>
-        <bindingRedirect oldVersion="1.0.0.0-3.0.0.0" newVersion="3.0.0.0"/>
-      </dependentAssembly>
-      <dependentAssembly>
-        <assemblyIdentity name="DocumentFormat.OpenXml" publicKeyToken="8fb06cb64d019a17" culture="neutral"/>
-        <bindingRedirect oldVersion="0.0.0.0-2.8.1.0" newVersion="2.8.1.0"/>
-      </dependentAssembly>
-      <dependentAssembly>
-        <assemblyIdentity name="System.Web.Http" publicKeyToken="31bf3856ad364e35" culture="neutral"/>
-        <bindingRedirect oldVersion="0.0.0.0-5.2.3.0" newVersion="5.2.3.0"/>
-      </dependentAssembly>
-      <dependentAssembly>
-        <assemblyIdentity name="System.Net.Http.Formatting" publicKeyToken="31bf3856ad364e35" culture="neutral"/>
-        <bindingRedirect oldVersion="0.0.0.0-5.2.3.0" newVersion="5.2.3.0"/>
-      </dependentAssembly>
-    </assemblyBinding>
-  </runtime>
-  <entityFramework>
-    <defaultConnectionFactory type="System.Data.Entity.Infrastructure.LocalDbConnectionFactory, EntityFramework">
-      <parameters>
-        <parameter value="mssqllocaldb"/>
-      </parameters>
-    </defaultConnectionFactory>
-    <providers>
-      <provider invariantName="System.Data.SqlClient" type="System.Data.Entity.SqlServer.SqlProviderServices, EntityFramework.SqlServer"/>
-    </providers>
-  </entityFramework>
-  <system.codedom>
-    <compilers>
-      <compiler language="c#;cs;csharp" extension=".cs" type="Microsoft.CodeDom.Providers.DotNetCompilerPlatform.CSharpCodeProvider, Microsoft.CodeDom.Providers.DotNetCompilerPlatform, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35" warningLevel="4" compilerOptions="/langversion:6 /nowarn:1659;1699;1701"/>
-      <compiler language="vb;vbs;visualbasic;vbscript" extension=".vb" type="Microsoft.CodeDom.Providers.DotNetCompilerPlatform.VBCodeProvider, Microsoft.CodeDom.Providers.DotNetCompilerPlatform, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35" warningLevel="4" compilerOptions="/langversion:14 /nowarn:41008 /define:_MYTYPE=\&quot;Web\&quot; /optionInfer+"/>
-    </compilers>
-  </system.codedom>
-  <system.net>
-    <defaultProxy>
-      <proxy proxyaddress="" bypassonlocal="True"/>
-    </defaultProxy>
-  </system.net>
-</configuration>
-<!--ProjectGuid: {ADE94C38-3FBB-4705-97A6-7D1B1AF1063C}-->
+Thank you for your cooperation regarding this matter.
 
-And this is my View Web.config
-<?xml version="1.0"?>
+Kind regards,
 
-<configuration>
-	
-</configuration>
+[INSERT SENDERS NAME]
+[INSERT MSO/RESELLER NAME]
 
-
-Why I am getting thsi error 
-The app  is deployed on IIS
