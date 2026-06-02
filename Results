@@ -1,751 +1,1201 @@
-Below is a ready-to-use **RELEASE - Alterna Demo** pipeline adapted from your Alterna Telecom release pipeline, using your existing Alterna Demo build pipelines, artifacts, zip names, and DACPAC name. I kept `TODO` comments where you still need to confirm IIS names, paths, and health-check URLs. 
-
-```yaml
-name: ADM_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
-
-parameters:
-  - name: targetEnvironment
-    type: string
-    default: SIT
-    values:
-      - SIT
-      - UAT
-      - PROD
-    displayName: 'Target Environment'
-
-  - name: deployBackend
-    type: boolean
-    default: false
-    displayName: 'Deploy Backend'
-
-  - name: deployFrontend
-    type: boolean
-    default: false
-    displayName: 'Deploy Frontend'
-
-  - name: deployDatabase
-    type: boolean
-    default: false
-    displayName: 'Deploy Database'
-
-  - name: backendBuildNumber
-    type: string
-    default: '__EMPTY__'
-    displayName: 'Backend Build Number'
-
-  - name: frontendBuildNumber
-    type: string
-    default: '__EMPTY__'
-    displayName: 'Frontend Build Number'
-
-  - name: dbBuildNumber
-    type: string
-    default: '__EMPTY__'
-    displayName: 'Database Build Number'
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger: none
-pr: none
-
-variables:
-  - name: deploymentPool
-    value: 'Deployment Pool'
-
-  # Your build pipelines currently trigger release/*.
-  # Keep hotfix here only if you also support hotfix/* build branches.
-  - name: buildSourceBranchRegex
-    value: '^refs/heads/(release|hotfix)/'
-
-  - name: backendArtifactName
-    value: 'alterna-demo-api-drop'
-
-  - name: frontendArtifactName
-    value: 'alterna-demo-front-drop'
-
-  - name: dbArtifactName
-    value: 'alterna-demo-db-drop'
-
-  - name: backendZipName
-    value: 'Alterna-Demo-Backend.zip'
-
-  - name: frontendZipName
-    value: 'Alterna-Demo-Frontend.zip'
-
-  # TODO: verify IIS backend site/app pool/path
-  - name: backendSiteName
-    value: 'Alterna.Demo'
-
-  - name: backendAppPoolName
-    value: 'Alterna.Demo'
-
-  - name: backendTargetPath
-    value: 'C:\inetpub\wwwroot\Alterna.Demo'
-
-  # TODO: verify IIS frontend site/app pool/path
-  - name: frontendSiteName
-    value: 'AlternaDemo'
-
-  - name: frontendAppPoolName
-    value: 'AlternaDemo'
-
-  - name: frontendTargetPath
-    value: 'C:\inetpub\wwwroot\AlternaDemo'
-
-  # SIT
-  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-      - group: SIT_BACK_END_VARIABLE_GROUP
-
-      - name: environmentName
-        value: 'SIT'
-
-      - name: backendPipelineName
-        value: 'BUILD - API - Alterna Demo'
-
-      - name: frontendPipelineName
-        value: 'BUILD - FRONT - Alterna Demo'
-
-      - name: dbPipelineName
-        value: 'BUILD - DB - Alterna Demo'
-
-      - name: resolveAgentName
-        value: 'SIT-ALTERNA-BN1'
-
-      - name: backendAgentName
-        value: 'SIT-ALTERNA-BN1'
-
-      - name: frontendAgentName
-        value: 'SIT-ALTERNA-FN1'
-
-      - name: dbAgentName
-        value: 'SIT-ALTERNA-BN1'
-
-      - name: approvalNotifyUsers
-        value: 'SGBL\pabouserhal'
-
-      - name: approvalInstructions
-        value: 'Approve SIT Alterna Demo deployment.'
-
-      # TODO: replace with real SIT backend health-check URL
-      - name: backendHealthCheckUrl
-        value: 'http://SIT-ALTERNA-DEMO-API-URL/health'
-
-      # TODO: replace with real SIT frontend health-check URL
-      - name: frontendHealthCheckUrl
-        value: 'http://SIT-ALTERNA-DEMO-FRONT-URL'
-
-      - name: backupRoot
-        value: 'C:\DeployBackups\SIT\AlternaDemo'
-
-  # UAT
-  - ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-      - group: UAT_BACK_END_VARIABLE_GROUP
-
-      - name: environmentName
-        value: 'UAT'
-
-      - name: backendPipelineName
-        value: 'BUILD - API - Alterna Demo'
-
-      - name: frontendPipelineName
-        value: 'BUILD - FRONT - Alterna Demo'
-
-      - name: dbPipelineName
-        value: 'BUILD - DB - Alterna Demo'
-
-      - name: resolveAgentName
-        value: 'UAT-ALTERNA-BN1'
-
-      - name: backendAgentName
-        value: 'UAT-ALTERNA-BN1'
-
-      - name: frontendAgentName
-        value: 'UAT-ALTERNA-FN1' # TODO verify
-
-      - name: dbAgentName
-        value: 'UAT-ALTERNA-BN1'
-
-      - name: approvalNotifyUsers
-        value: 'SGBL\pabouserhal' # TODO adjust if different
-
-      - name: approvalInstructions
-        value: 'Approve UAT Alterna Demo deployment.'
-
-      # TODO: replace with real UAT backend health-check URL
-      - name: backendHealthCheckUrl
-        value: 'http://UAT-ALTERNA-DEMO-API-URL/health'
-
-      # TODO: replace with real UAT frontend health-check URL
-      - name: frontendHealthCheckUrl
-        value: 'http://UAT-ALTERNA-DEMO-FRONT-URL'
-
-      - name: backupRoot
-        value: 'C:\DeployBackups\UAT\AlternaDemo'
-
-  # PROD
-  - ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-      - group: PROD_BACK_END_VARIABLE_GROUP
-
-      - name: environmentName
-        value: 'PROD'
-
-      - name: backendPipelineName
-        value: 'BUILD - API - Alterna Demo'
-
-      - name: frontendPipelineName
-        value: 'BUILD - FRONT - Alterna Demo'
-
-      - name: dbPipelineName
-        value: 'BUILD - DB - Alterna Demo'
-
-      - name: resolveAgentName
-        value: 'PROD-ALTERNA-BN1'
-
-      - name: backendAgentName
-        value: 'PROD-ALTERNA-BN1'
-
-      - name: frontendAgentName
-        value: 'PROD-ALTERNA-FN1' # TODO verify
-
-      - name: dbAgentName
-        value: 'PROD-ALTERNA-BN1'
-
-      - name: approvalNotifyUsers
-        value: 'SGBL\pabouserhal' # TODO adjust if different
-
-      - name: approvalInstructions
-        value: 'Approve PROD Alterna Demo deployment.'
-
-      # TODO: replace with real PROD backend health-check URL
-      - name: backendHealthCheckUrl
-        value: 'http://PROD-ALTERNA-DEMO-API-URL/health'
-
-      # TODO: replace with real PROD frontend health-check URL
-      - name: frontendHealthCheckUrl
-        value: 'http://PROD-ALTERNA-DEMO-FRONT-URL'
-
-      - name: backupRoot
-        value: 'C:\DeployBackups\PROD\AlternaDemo'
-
-stages:
-
-  - stage: Resolve_Selected_Builds
-    displayName: 'Resolve selected build numbers'
-    jobs:
-      - job: ResolveBuildNumbers
-        displayName: 'Resolve pipeline names and build numbers'
-        pool:
-          name: '$(deploymentPool)'
-          demands:
-            - Agent.Name -equals $(resolveAgentName)
-        steps:
-          - checkout: none
-
-          - powershell: |
-              $ErrorActionPreference = 'Stop'
-
-              $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-              $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-              $apiVersion    = '7.1'
-              $allowedBranchPattern = '$(buildSourceBranchRegex)'
-
-              $headers = @{
-                Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-              }
-
-              $deployBackend = "${{ parameters.deployBackend }}".ToLower() -eq 'true'
-              $deployFrontend = "${{ parameters.deployFrontend }}".ToLower() -eq 'true'
-              $deployDb = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
-
-              if (-not ($deployBackend -or $deployFrontend -or $deployDb)) {
-                throw 'At least one deployment target must be selected: Backend, Frontend, or Database.'
-              }
-
-              function Normalize-BuildNumber {
-                param([string]$BuildNumber)
-
-                if ($BuildNumber -eq '__EMPTY__') {
-                  return ''
+First:
+
+public ActionResult GetContainerForEditByEntity()
+{
+	String session =GetSession("ArchiveData");
+	ContainerForEditByEntityTableModel tableModel = new();
+
+	GetContainerForEditByEntityReq ApiReq = new()
+	{
+		BaseReq = new BaseRequest(HttpContext,session,false),
+	};
+
+	GetContainerForEditByEntityRes ApiResp = Common.ApiCall<GetContainerForEditByEntityRes>(ApiReq, "GetContainerForEditByEntity");
+
+	tableModel.ContainerForEditList = ApiResp.Resp;
+
+	return PartialView("_GetContainerForEditByEntity", tableModel);
+}
+
+
+POST https://uat-alterna.sgbl.com.lb:9044/BoxEntity/GetContainerForEditByEntity/
+
+Request: Empty
+Response:
+
+<table id="TblContainerForEditByEntityContainerTable" class="table table-striped table-bordered" style="width:100%;">
+    <thead>
+        <tr>
+            <th></th>
+            <th>Box Ref</th>
+            <th>Status Code</th>
+            <th>Last Modified By</th>
+            <th>Last Modified Date</th>
+        </tr>
+    </thead>
+    <tbody>
+                <tr>
+                    <td class="text-center">
+                        <i id="399" class="fa-regular fa-pen-to-square icon-edit" title="Edit Box Details" style="cursor: pointer;" onclick="onEdit('399', 'HRBP.2164', 'ET9900054')"></i>
+                    </td>
+                    <td>HRBP.2164</td>
+                    <td>PENDING</td>
+                    <td>NABOUSLE</td>
+                    <td>25/08/2025</td>
+                </tr>
+                <tr>
+                    <td class="text-center">
+                        <i id="397" class="fa-regular fa-pen-to-square icon-edit" title="Edit Box Details" style="cursor: pointer;" onclick="onEdit('397', 'HRBP.2163', 'ET9900054')"></i>
+                    </td>
+                    <td>HRBP.2163</td>
+                    <td>PENDING</td>
+                    <td>NABOUSLE</td>
+                    <td>19/08/2025</td>
+                </tr>
+                <tr>
+                    <td class="text-center">
+                        <i id="396" class="fa-regular fa-pen-to-square icon-edit" title="Edit Box Details" style="cursor: pointer;" onclick="onEdit('396', 'SHRI.237', 'ET9900107')"></i>
+                    </td>
+                    <td>SHRI.237</td>
+                    <td>PENDING</td>
+                    <td>laaouad</td>
+                    <td>14/08/2025</td>
+                </tr>
+                <tr>
+                    <td class="text-center">
+                        <i id="395" class="fa-regular fa-pen-to-square icon-edit" title="Edit Box Details" style="cursor: pointer;" onclick="onEdit('395', 'SHRI.236', 'ET9900107')"></i>
+                    </td>
+                    <td>SHRI.236</td>
+                    <td>PENDING</td>
+                    <td>laaouad</td>
+                    <td>14/08/2025</td>
+                </tr>
+                <tr>
+                    <td class="text-center">
+                        <i id="394" class="fa-regular fa-pen-to-square icon-edit" title="Edit Box Details" style="cursor: pointer;" onclick="onEdit('394', 'HRBP.2162', 'ET9900054')"></i>
+                    </td>
+                    <td>HRBP.2162</td>
+                    <td>PENDING</td>
+                    <td>NABOUSLE</td>
+                    <td>14/08/2025</td>
+                </tr>
+                <tr>
+                    <td class="text-center">
+                        <i id="393" class="fa-regular fa-pen-to-square icon-edit" title="Edit Box Details" style="cursor: pointer;" onclick="onEdit('393', 'SHRI.235', 'ET9900107')"></i>
+                    </td>
+                    <td>SHRI.235</td>
+                    <td>PENDING</td>
+                    <td>JKABENJI</td>
+                    <td>14/08/2025</td>
+                </tr>
+    </tbody>
+</table>
+
+<script>
+    $(document).ready(() => {
+
+        $("#TblContainerForEditByEntityContainerTable").DataTable(
+            {
+                pagingType: 'full_numbers',
+                "scrollX": true
+            });
+    })
+
+    function onEdit(containerId, boxRef, entity) {
+        window.location.href = '/BoxEntity/create?id=' + containerId + '&code=' + boxRef + '&entity=' + entity;
+    }
+
+</script>
+
+Then when the user clicks edit:
+POST https://uat-alterna.sgbl.com.lb:9044/BoxEntity/GetEntityContainerFiles/
+
+public ActionResult GetEntityContainerFilesDetails(Int32 ContainerId)
+{
+
+	String session =GetSession("ArchiveData");
+	EntityContainerFileTableModel tableModel = new();
+	GetContainerFilesRes resp = new();
+	resp = Common.ApiCall<GetContainerFilesRes>(new GetContainerFilesReq() { BaseReq = new BaseRequest(HttpContext,session,false), ContainerId = ContainerId }, "GetContainerFiles");
+	tableModel.Container = resp.Resp;
+	tableModel.IsValidationPermitted = Common.ApiCall<GetIsEntityValidationPermittedForContainerRes>(new GetIsEntityValidationPermittedForContainerReq() { BaseReq = new BaseRequest(HttpContext,session,false), ContainerId = ContainerId }, "GetIsEntityValidationPermittedForContainer").Resp;
+
+	return PartialView("_EntityContainerFilesTable", tableModel);
+}
+
+        public String GetSession(String sessionName)
+        {
+            if (HttpContext.Session.GetString(sessionName) is { } sessionV2)
+            {
+                return sessionV2 ?? throw new ArgumentNullException(nameof(sessionName),
+                    $"User Session Timed Out! Please Log In Again");
+                ;
+            }
+
+            if (Request.Cookies.TryGetValue(sessionName, out String? sessionValue))
+            {
+                return sessionValue ?? throw new ArgumentNullException(nameof(sessionName),
+                    $"User Session Timed Out! Please Log In Again");
+                ;
+            }
+
+
+            throw new ArgumentNullException(nameof(sessionName), $"User Session Timed Out! Please Log In Again");
+        }
+		
+
+
+Request: 
+	Form Data: ContainerId=396
+Response 
+<div class="panel panel-default" style="width:100%">
+    <div class="panel-heading sgbl-MH">Files</div>
+    <div class="panel-body">
+        <div class="container-fluid">
+
+            <table id="BoxFiles" class="table table-striped table-bordered" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>File Type</th>
+                        <th>File Info</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+            <hr />
+        </div>
+    </div>
+</div>
+
+<script>
+
+    function deleteRow(id) {
+        swal({
+            text: 'Are you sure you want Delete this File?',
+            icon: "warning",
+            buttons: {
+                cancel: {
+                    text: "No",
+                    value: false,
+                    visible: true,
+                    className: "",
+                    closeModal: true,
+                },
+                confirm: {
+                    text: "Yes",
+                    value: true,
+                    visible: true,
+                    className: "sgbl-Yes",
+                    closeModal: true
+                }
+            }, dangerMode: true
+        }).then((IsTrue) => {
+            if (IsTrue) {
+                var dat = {
+                    FileId: id
+                };
+                $.ajax({
+                    type: 'POST',
+                    url: '/BoxEntity/DeleteFile/',
+                    data: dat,
+                    dataType: 'html',
+                    success: function (data) {
+                        if (data === "true") {
+                            location.reload();
+                        }
+                        else {
+                            swal("Box already sent", "Cannot Delete File!", "warning");
+                        }
+                    },
+                    error: function (xhr) {
+                        $('#MainRenderLocation').html(xhr.responseText);
+                    }
+                });
+            }
+        });
+    };
+
+    $(document).ready(() => {
+        var archivingPeriod = 0;
+
+        let displayPeriod = archivingPeriod;
+
+        if (parseInt(archivingPeriod) === -1) {
+            displayPeriod = 'Unlimited';
+        }
+
+        $('#selected-file-type-indicator').val(displayPeriod);
+
+        let canSendContainer = "False";
+
+        if (canSendContainer === "True") {
+            $('#btnSend').removeClass('hidden');
+        }
+
+        //let canAddFileToContainer = "True";
+
+        // if (canAddFileToContainer === "True") {
+        //     $('#btnAdd').removeClass('hidden');
+        // } else {
+        //     swal("File Limit In Box Reached", "Please Stop Adding Files To This Box And Create A New One.", "error");
+
+        // }
+
+
+        if (archivingPeriod == 0) {
+            return;
+        }
+
+        const allOptionsArray = [];
+
+        $('#File_Type').find('option').each(function () {
+            allOptionsArray.push({
+                value: $(this).val(),
+                text: $(this).text()
+            });
+        });
+
+        for (var i = 0; i < allOptionsArray.length; i++) {
+            if (allOptionsArray[i].value != archivingPeriod) {
+                $('#File_Type option[value="' + allOptionsArray[i].value + '"]').remove();
+            }
+        }
+
+        $('#File_Type').val('');
+        
+    });
+
+    $('#File_Type').on('change', function (e) {
+        var archivingPeriod = this.value;
+
+        let displayPeriod = archivingPeriod;
+
+        if (parseInt(archivingPeriod) === -1) {
+            displayPeriod = 'Unlimited';
+        }
+
+
+        $('#selected-file-type-indicator').val(displayPeriod);
+    });
+
+</script>
+
+
+These are some functions that are used accross my project
+
+using System.Security.Cryptography;
+using System.Text;
+using System.Web;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using ConfigurationManager = System.Configuration.ConfigurationManager;
+
+namespace Alterna.Archive.Core.Global
+{
+    public static class Common
+    {
+        #region Web Variables
+
+        public static String Ldap { get; } = ConfigurationManager.AppSettings["LDAP_WEB_SERVICES_IP_ADDRESS"] ??
+                                             throw new ArgumentNullException(nameof(Ldap));
+
+        public static String UiUrl { get; } = ConfigurationManager.AppSettings["Ui_URL"] ??
+                                              throw new ArgumentNullException(nameof(UiUrl));
+
+        public static String Dashboard { get; } = ConfigurationManager.AppSettings["DASHBOARD_LINK"] ??
+                                                  throw new ArgumentNullException(nameof(Dashboard));
+
+        public static String BaseURL { get; } = ConfigurationManager.AppSettings["BaseUrl"] ??
+                                                throw new ArgumentNullException(nameof(BaseURL));
+
+        public static String CDN { get; } = ConfigurationManager.AppSettings["CDN_IP_LINK"] ??
+                                            throw new ArgumentNullException(nameof(CDN));
+
+        public static String? UserGuide { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK"];
+
+        public static String OSB { get; } = ConfigurationManager.AppSettings["BaseUrlOsb"] ??
+                                            throw new ArgumentNullException(nameof(OSB));
+
+        public static String Bref { get; } = ConfigurationManager.AppSettings["BrefBaseUrl"] ??
+                                             throw new ArgumentNullException(nameof(Bref));
+
+        public static String ModuleName { get; } = ConfigurationManager.AppSettings["ModuleName"] ??
+                                                   throw new ArgumentNullException(nameof(ModuleName));
+
+        public static String? AppVersion { get; } = ConfigurationManager.AppSettings["AppVersion"];
+
+        public static String? UserGuideRCA { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_RCA"];
+        public static String? UserGuideDA { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_DA"];
+        public static String? UserGuideRBBN { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_RBBN"];
+
+        public static String? UserGuideWAREHOUSE { get; } =
+            ConfigurationManager.AppSettings["USER_GUIDE_LINK_WAREHOUSE"];
+
+        public static String? UserGuideMAIN { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_MAIN"];
+        public static String? UserGuideEntity { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_ENTITY"];
+
+        public static Int32 TTL { get; } = 20;
+
+        public static Dictionary<String, Boolean> CreatedSequences = [];
+
+        #endregion
+
+        #region Authorisation DTOs
+
+        public class BaseAuthRequest
+        {
+            public BaseAuthRequest(String username, String branchName)
+            {
+                this.username = username ?? throw new ArgumentNullException(nameof(username));
+                this.branchName = branchName ?? throw new ArgumentNullException(nameof(branchName));
+            }
+
+            public String username { get; set; }
+            public String correlationId { get; set; } = Guid.NewGuid().ToString();
+            public String? channelTag { get; set; } = null;
+            public String? branchName { get; set; }
+            public String? publicKey { get; set; } = null;
+            public String moduleName { get; set; } = ModuleName;
+            public String? activityName { get; set; } = null;
+            public String? controllerName { get; set; } = null;
+        }
+
+        public class LogOutClass : BaseAuthRequest
+        {
+            public LogOutClass(String username, String branchName, String sessionValue) : base(username, branchName) =>
+                this.sessionValue = sessionValue ?? throw new ArgumentNullException(nameof(sessionValue));
+
+            public String sessionValue { get; set; }
+        }
+
+        private class GetUserCollection : BaseAuthRequest
+        {
+            public GetUserCollection(String username, String branchName, String Login) : base(username, branchName) =>
+                this.Login = Login ?? throw new ArgumentNullException(nameof(Login));
+
+            public String Login { get; set; }
+        }
+
+        private class GetUserByEmail : BaseAuthRequest
+        {
+            public GetUserByEmail(String username, String branchName, String Email) : base(username, branchName) =>
+                this.Email = Email ?? throw new ArgumentNullException(nameof(Email));
+
+            public String Email { get; set; }
+        }
+
+        private class GetRoleWithActivities : BaseAuthRequest
+        {
+            public GetRoleWithActivities(String username, String branchName) : base(username, branchName)
+            {
+            }
+        }
+
+        #endregion
+
+
+        static Common()
+        {
+            if (Int32.TryParse(ConfigurationManager.AppSettings["TTL"], out int ttlData))
+            {
+                TTL = ttlData;
+            }
+        }
+
+        #region Functions
+
+        public static T ApiCall<T>(Object Request, String Endpoint)
+        {
+            String JsonRequest = JsonConvert.SerializeObject(Request, Formatting.Indented);
+            HttpContent content = new StringContent(JsonRequest, Encoding.UTF8, "application/json");
+            HttpClient client = new();
+            Task<HttpResponseMessage> HttpResp = client.PostAsync(BaseURL + Endpoint, content);
+            HttpResp.Wait();
+            Task<String> respString = HttpResp.Result.Content.ReadAsStringAsync();
+            respString.Wait();
+            T RetRes = JsonConvert.DeserializeObject<T>(respString.Result)!;
+            return RetRes;
+        }
+
+        public static T GeneralCall<T>(Object Request, String Endpoint)
+        {
+            String JsonRequest = JsonConvert.SerializeObject(Request, Formatting.Indented);
+            HttpContent content = new StringContent(JsonRequest, Encoding.UTF8, "application/json");
+            HttpClient client = new();
+            Task<HttpResponseMessage> HttpResp = client.PostAsync(Endpoint, content);
+            HttpResp.Wait();
+            Task<String> respString = HttpResp.Result.Content.ReadAsStringAsync();
+            respString.Wait();
+            T RetRes = JsonConvert.DeserializeObject<T>(respString.Result)!;
+            return RetRes;
+        }
+
+        public static String GeneralCall(Object Request, String Endpoint)
+        {
+            String JsonRequest = JsonConvert.SerializeObject(Request, Formatting.Indented);
+            HttpContent content = new StringContent(JsonRequest, Encoding.UTF8, "application/json");
+            HttpClient client = new();
+            Task<HttpResponseMessage> HttpResp = client.PostAsync(Endpoint, content);
+            HttpResp.Wait();
+            Task<String> respString = HttpResp.Result.Content.ReadAsStringAsync();
+            respString.Wait();
+            String RetRes = respString.Result;
+            return RetRes;
+        }
+
+        public static void LogOut(LogOutClass logOutClass)
+        {
+            logOutClass.publicKey = generatePublicKey(logOutClass.correlationId, logOutClass.username);
+            String JsonRequest = JsonConvert.SerializeObject(logOutClass, Formatting.Indented);
+            HttpContent content = new StringContent(JsonRequest, Encoding.UTF8, "application/json");
+            HttpClient client = new();
+            Task<HttpResponseMessage> HttpResp =
+                client.PostAsync($"{OSB}/Rest/Authorization/UserSessionByValue", content);
+        }
+
+        public static (String, String) Init(String Ticket)
+        {
+            String user;
+            List<String> Role = [];
+            String Company;
+            String Departement;
+            String Email;
+            String FullName;
+            List<String> Activities = [];
+
+            Byte[] SessionBytes = Convert.FromBase64String(Ticket);
+            String DecodedUser = Encoding.UTF8.GetString(SessionBytes);
+            user = DecodedUser.Split('|')[0];
+            GetUserCollection getUserCollection = new(user, "", user);
+
+            String User = GeneralCall(getUserCollection, $"{Ldap}/api/ActiveDirectoryHost/GetUserCollection");
+            JToken GetUserInfo = JObject.Parse(User)["UserInfo"]!;
+            Email = GetUserInfo["Email"]!.ToString();
+            Departement = GetUserInfo["Department"]!.ToString();
+            FullName = GetUserInfo["FullName"]!.ToString();
+            GetUserByEmail getUserByEmail = new(user, "", Email);
+            String Branches = GeneralCall(getUserByEmail, $"{Bref}/api/Authorization/GetUserBranchesByEmail");
+            JToken BranchesData = JObject.Parse(Branches)["Branches"]!;
+            StringBuilder branchesString = new();
+            foreach (JToken Data in BranchesData)
+            {
+                if (Data["AccessAllowedInT24"]!.ToString().ToLower() == "true" ||
+                    Data["AccessAllowedInModule"]!.ToString().ToLower() == "true")
+                {
+                    branchesString.Append(Data["BranchCode"] + ",");
+                }
+            }
+
+            if (branchesString.Length != 0)
+            {
+                branchesString.Remove(branchesString.Length - 1, 1);
+            }
+
+            Company = branchesString.ToString();
+
+            GetRoleWithActivities getRoleWithActivities = new(user, Company);
+            String RoleByUserName = GeneralCall(getRoleWithActivities, $"{OSB}/Rest/Authorization/RoleByUserName");
+            JToken RoleByUserNameObject = JObject.Parse(RoleByUserName)["userRoles"]!;
+            RoleByUserNameObject = RoleByUserNameObject["userRole"]!;
+
+            foreach (JToken Data in RoleByUserNameObject)
+            {
+                if (!Role.Contains(Data["roleCode"]!.ToString()))
+                {
+                    Role.Add(Data["roleCode"]!.ToString());
+                }
+            }
+
+            String RoleWithActivitiesByModuleName = GeneralCall(getRoleWithActivities,
+                $"{OSB}/Rest/Authorization/RoleWithActivitiesByModuleName");
+            JToken RoleWithActivitiesByModuleNameObject =
+                JObject.Parse(RoleWithActivitiesByModuleName)["roleActivities"]!;
+            RoleWithActivitiesByModuleNameObject = RoleWithActivitiesByModuleNameObject["roleActivity"]!;
+
+            foreach (JToken Data in RoleWithActivitiesByModuleNameObject)
+            {
+                if (Role.Contains(Data["roleCode"]!.ToString()))
+                {
+                    Activities.Add(Data["actionName"]!.ToString());
+                }
+            }
+
+            Dictionary<String, Object> dict = new()
+            {
+                ["Ticket"] = Ticket,
+                ["user"] = user,
+                ["Role"] = Role,
+                ["Activities"] = Activities,
+                ["Company"] = Company,
+                ["Departement"] = Departement,
+                ["Email"] = Email,
+                ["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60),
+                ["FullName"] = FullName
+            };
+
+            return (GenerateSetionVariable(dict), FullName);
+        }
+
+        public static String EncryptString(String plainText)
+        {
+            String key = "(╯°□°）╯︵ ┻━┻";
+            Byte[] iv = new Byte[16];
+            Byte[] array;
+
+            using (Aes aes = Aes.Create())
+            {
+                aes.Key = Encoding.Unicode.GetBytes(key);
+                aes.IV = iv;
+
+                ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
+
+                using (MemoryStream memoryStream = new())
+                {
+                    using (CryptoStream cryptoStream = new(memoryStream, encryptor, CryptoStreamMode.Write))
+                    {
+                        using (StreamWriter streamWriter = new(cryptoStream))
+                        {
+                            streamWriter.Write(plainText);
+                        }
+
+                        array = memoryStream.ToArray();
+                    }
+                }
+            }
+
+            return Convert.ToBase64String(array);
+        }
+
+        public static String DecryptString(String cipherText)
+        {
+            String key = "(╯°□°）╯︵ ┻━┻";
+            Byte[] iv = new Byte[16];
+            Byte[] buffer = Convert.FromBase64String(cipherText);
+
+            using (Aes aes = Aes.Create())
+            {
+                aes.Key = Encoding.Unicode.GetBytes(key);
+                aes.IV = iv;
+                ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+
+                using (MemoryStream memoryStream = new(buffer))
+                {
+                    using (CryptoStream cryptoStream = new(memoryStream, decryptor, CryptoStreamMode.Read))
+                    {
+                        using (StreamReader streamReader = new(cryptoStream))
+                        {
+                            return streamReader.ReadToEnd();
+                        }
+                    }
+                }
+            }
+        }
+
+        public static String GenerateSetionVariable(Dictionary<String, Object> variables)
+        {
+            StringBuilder sb = new();
+            foreach (KeyValuePair<String, Object> Variable in variables)
+            {
+                sb.Append(Variable.Key);
+                sb.Append("[==]");
+                sb.Append(JsonConvert.SerializeObject(Variable.Value));
+                sb.Append("ᓚᘏᗢ");
+            }
+
+            if (sb.Length != 0)
+            {
+                sb.Remove(sb.Length - 3, 3);
+            }
+
+            return EncryptString(sb.ToString());
+        }
+
+        public static Dictionary<String, Object> GenerateVariables(HttpContext Context, String Session)
+        {
+            Dictionary<String, Object> RetDict = [];
+            Session = DecryptString(Session);
+            String[] Items = Session.Split(new String[] { "ᓚᘏᗢ" }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (String Item in Items)
+            {
+                String[] Data = Item.Split(new String[] { "[==]" }, StringSplitOptions.RemoveEmptyEntries);
+                RetDict[Data[0]] = JsonConvert.DeserializeObject(Data[1])!;
+            }
+
+            Int64 exp = -1;
+            if (RetDict.TryGetValue("Exp", out var value))
+            {
+                exp = (Int64)value;
+            }
+
+            if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            {
+                throw new Exception("Session expired");
+            }
+
+            RetDict["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60);
+            String FN = "Invalid User";
+            if (RetDict.TryGetValue("FullName", out var value2))
+            {
+                FN = value2.ToString() ?? "Invalid User";
+            }
+
+            Context.Response.Cookies.Append("ArchiveData", GenerateSetionVariable(RetDict));
+            Context.Session.SetString("ArchiveData", GenerateSetionVariable(RetDict));
+            Context.Session.SetString("User", FN);
+            Context.Response.Headers["Origin"] = Context.Request.Headers.Origin;
+            return RetDict;
+        }
+
+        public static string GetLoggedInUserEmail(HttpContext httpContext, string session) 
+        {
+            Dictionary<String, Object> dic = [];
+            dic = Common.GenerateVariables(httpContext, session);
+
+            string loggedInUserEmail = dic["Email"].ToString() ?? 
+                throw new ArgumentNullException("logged in user email is missing");
+
+            return loggedInUserEmail;
+        }
+
+        public static void SaveVariables(HttpContext Context, String Session)
+        {
+            Dictionary<String, Object> RetDict = [];
+            Session = DecryptString(Session);
+            String[] Items = Session.Split(new String[] { "ᓚᘏᗢ" }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (String Item in Items)
+            {
+                String[] Data = Item.Split(new String[] { "[==]" }, StringSplitOptions.RemoveEmptyEntries);
+                RetDict[Data[0]] = JsonConvert.DeserializeObject(Data[1])!;
+            }
+
+            Int64 exp = -1;
+            if (RetDict.TryGetValue("Exp", out var value))
+            {
+                exp = (Int64)value;
+            }
+
+            if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            {
+                throw new Exception("Session expired");
+            }
+
+            RetDict["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60);
+            String FN = "Invalid User";
+            if (RetDict.TryGetValue("FullName", out var value2))
+            {
+                FN = value2.ToString() ?? "Invalid User";
+            }
+
+            Context.Response.Cookies.Append("ArchiveData", GenerateSetionVariable(RetDict));
+            Context.Session.SetString("ArchiveData", GenerateSetionVariable(RetDict));
+            Context.Session.SetString("User", FN);
+            Context.Response.Headers["Origin"] = Context.Request.Headers.Origin;
+        }
+        public static (Boolean, Dictionary<String, Object>) GenerateVariablesLkp(HttpContext Context, String Session)
+        {
+            Dictionary<String, Object> RetDict = [];
+            bool Expired = false;
+            Session = DecryptString(Session);
+            String[] Items = Session.Split(new String[] { "ᓚᘏᗢ" }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (String Item in Items)
+            {
+                String[] Data = Item.Split(new String[] { "[==]" }, StringSplitOptions.RemoveEmptyEntries);
+                RetDict[Data[0]] = JsonConvert.DeserializeObject(Data[1])!;
+            }
+
+            Int64 exp = -1;
+            if (RetDict.TryGetValue("Exp", out var value))
+            {
+                exp = (Int64)value;
+            }
+
+            if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            {
+                Expired = true;
+            }
+
+            RetDict["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60);
+            String FN = "Invalid User";
+            if (RetDict.TryGetValue("FullName", out var value2))
+            {
+                FN = value2.ToString() ?? "Invalid User";
+            }
+
+            if (!Expired)
+            {
+                Context.Response.Cookies.Append("ArchiveData", GenerateSetionVariable(RetDict));
+                Context.Session.SetString("ArchiveData", GenerateSetionVariable(RetDict));
+                Context.Session.SetString("User", FN);
+                Context.Response.Headers["Origin"] = Context.Request.Headers.Origin;
+            }
+
+            return (Expired, RetDict);
+        }
+
+        public static String generatePublicKey(String CorrelationID, String Username)
+        {
+            String RetRes = String.Empty;
+            RetRes = CorrelationID + "|" + Username + "|ProfessionalStackOverFlowSearcher";
+            Byte[] bytes;
+
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(RetRes));
+
+                StringBuilder sb = new();
+                foreach (Byte b in bytes)
+                {
+                    sb.Append(b.ToString("x2"));
                 }
 
-                return $BuildNumber
-              }
+                RetRes = sb.ToString();
+            }
 
-              function Resolve-DefinitionIdByName {
-                param(
-                  [string]$Label,
-                  [string]$PipelineName
-                )
+            return RetRes;
+        }
 
-                if ([string]::IsNullOrWhiteSpace($PipelineName)) {
-                  throw "$Label pipeline name is empty."
+        public static Boolean HasUserRole(String Role, HttpContext httpContext)
+        {
+
+            String cookieContent = String.Empty;
+            if (httpContext.Session.GetString("ArchiveData") != null)
+            {
+                cookieContent = httpContext.Session.GetString("ArchiveData") ?? string.Empty;
+            }
+            else
+            {
+                if (httpContext.Request.Cookies.Count == 0)
+                {
+                    if (httpContext.Response.Headers.TryGetValue("Set-Cookie", out var Data))
+                    {
+                        foreach (string? cookie in Data)
+                        {
+                            if (cookie != null && cookie.Contains("ArchiveData"))
+                            {
+                                cookieContent = cookie.Substring(cookie.IndexOf("=") + 1, cookie.IndexOf(";") - 12);
+                            }
+                        }
+
+                        if (String.IsNullOrEmpty(cookieContent))
+                        {
+
+                            return false;
+                        }
+
+                        cookieContent = HttpUtility.UrlDecode(cookieContent);
+                    }
+                    else
+                    {
+
+                        return false;
+                    }
+                }
+            }
+
+
+            Dictionary<String, Object> dict = [];
+            Boolean Expired = true;
+            (Expired, dict) = GenerateVariablesLkp(httpContext,
+                httpContext.Request.Cookies["ArchiveData"] ?? cookieContent);
+            if (Expired)
+            {
+                return false;
+            }
+
+            List<String>? Roles = [];
+            Roles = JsonConvert.DeserializeObject<List<String>>(dict["Role"].ToString()!);
+            try
+            {
+                if (Roles!.Contains(Role))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
+        }
+
+        public static DateTime FormatDate(String dateString)
+        {
+            String[] parts = dateString.Replace(",", String.Empty).Split(' ');
+
+            Int32 day = Int32.Parse(parts[0]);
+            Int32 month = GetMonthIndex(parts[1]);
+            Int32 year = Int32.Parse(parts[2]);
+
+            return new DateTime(year, month, day);
+        }
+
+        public static Int32 GetMonthIndex(String monthName)
+        {
+            Int32 RetRes = -1;
+            Month.TryGetValue(monthName, out RetRes);
+            return RetRes;
+        }
+
+        public static Dictionary<String, Int32> Month { get; } = new Dictionary<String, Int32>()
+        {
+            { "January", 1 },
+            { "February", 2 },
+            { "March", 3 },
+            { "April", 4 },
+            { "May", 5 },
+            { "June", 6 },
+            { "July", 7 },
+            { "August", 8 },
+            { "September", 9 },
+            { "October", 10 },
+            { "November", 11 },
+            { "December", 12 }
+        };
+
+        public static Boolean HasUserAccessToActivity(String actionName, HttpContext Context)
+        {
+
+            String CookieContent = String.Empty;
+            if (Context.Session.GetString("ArchiveData") != null)
+            {
+                CookieContent = Context.Session.GetString("ArchiveData") ?? string.Empty;
+            }
+            else
+            {
+                if (Context.Request.Cookies.Count == 0)
+                {
+                    if (Context.Response.Headers.TryGetValue("Set-Cookie", out var Data))
+                    {
+                        foreach (string? cookie in Data)
+                        {
+                            if (cookie != null && cookie.Contains("ArchiveData"))
+                            {
+                                CookieContent = cookie.Substring(cookie.IndexOf("=") + 1, cookie.IndexOf(";") - 12);
+                            }
+                        }
+
+                        if (String.IsNullOrEmpty(CookieContent))
+                        {
+
+                            return false;
+                        }
+
+                        CookieContent = HttpUtility.UrlDecode(CookieContent);
+                    }
+                    else
+                    {
+
+                        return false;
+                    }
+                }
+            }
+
+            Dictionary<String, Object> dict = [];
+            Object? dicRetVal = new();
+            Boolean Expired = true;
+            (Expired, dict) = GenerateVariablesLkp(Context,
+                Context.Request.Cookies["ArchiveData"] ?? CookieContent);
+            if (Expired)
+            {
+                return false;
+            }
+
+            List<String>? Activties = [];
+
+            if (dict.TryGetValue("Activities", out dicRetVal))
+            {
+                Activties = JsonConvert.DeserializeObject<List<String>>(dicRetVal.ToString()!);
+            }
+            else
+            {
+                throw new UnauthorizedAccessException("You Have No Permitions in This Application");
+            }
+
+
+            if (Activties!.Contains(actionName))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static String GetBranchCodesFromUserCompnay(String userCompanies)
+        {
+            String filteredCodes = String.Empty;
+
+            try
+            {
+                List<String> comapanyList = userCompanies.Split(",").ToList();
+
+                filteredCodes = String.Join(",", comapanyList.Where(i => i.StartsWith("LB")));
+
+                return filteredCodes;
+            }
+            catch
+            {
+                return String.Empty;
+            }
+        }
+
+        public static String GetEntityCodesFromUserCompnay(String userCompanies)
+        {
+            String filteredCodes = String.Empty;
+
+            try
+            {
+                List<String> comapanyList = userCompanies.Split(",").ToList();
+
+                filteredCodes = String.Join(",", comapanyList.Where(i => i.StartsWith("ET")));
+
+                return filteredCodes;
+            }
+            catch
+            {
+                return String.Empty;
+            }
+        }
+
+        #endregion
+    }
+}
+
+
+using System.Net;
+using Alterna.Archive.Core.Global;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+using static NLog.NLogUtil;
+
+namespace Alterna.Archive.Core.Controllers
+{
+    public class HomeController : BaseController
+    {
+        public IActionResult Index(String Param1)
+        {
+#if DEBUG
+            if (Param1 is null)
+            {
+                // Param1 = "cHNhbW1pYXw0MzRkNmJkZC1hYjkxLTQ5M2UtYTViYS05OGY0ZTQ2ZGM3NTU="; // psammia
+                Param1 = "cGFib3VzZXJoYWx8MzYwMjZkZGQtNWIyYS00MTgwLTk5YmEtNTVjZDE1MTZiMjE3"; // Pierre
+                // Param1 = "Y2xhYmFiaWRpfDQ2NjVkMjFhLTY2ZjItNGNhNS1hZDMxLWRkYjg0OTMyNzM3MQ=="; // Christina
+            }
+            else
+            {
+                if (!Param1.Equals("Redirect"))
+                {
+                    // Param1 = "Y2xhYmFiaWRpfDQ2NjVkMjFhLTY2ZjItNGNhNS1hZDMxLWRkYjg0OTMyNzM3MQ==";
+                }
+            }
+
+
+#endif
+            try
+            {
+                if (String.IsNullOrEmpty(Param1))
+                {
+                    throw new ArgumentNullException(nameof(Param1));
                 }
 
-                $encodedName = [System.Uri]::EscapeDataString($PipelineName)
+                if (Param1.Equals("Redirect"))
+                {
+                    try
+                    {
+                        GetSession("ArchiveData");
+                    }
+                    catch (Exception)
+                    {
+                        return RedirectDashboard();
+                    }
+                }
+                else
+                {
+                    if (Request.Cookies.ContainsKey("ArchiveData"))
+                    {
+                        Request.Cookies.Append((new("ArchiveData", "")));
+                    }
 
-                $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
-                  $collectionUri,
-                  $projectName,
-                  $encodedName,
-                  $apiVersion
+                    HttpContext.Session.Clear();
 
-                Write-Host "Resolving $Label pipeline name [$PipelineName]"
-                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-                if (-not $response.value -or $response.count -lt 1) {
-                  throw "No pipeline definition found for $Label with name [$PipelineName]."
+                    (String data, String user) InitVals = Common.Init(Param1);
+                    Response.Headers["Origin"] = Request.Headers.Origin;
+                    Request.Cookies.Append(new("ArchiveData", InitVals.data));
+                    Response.Cookies.Append("ArchiveData", InitVals.data);
+                    HttpContext.Session.SetString("Data", InitVals.data);
+                    HttpContext.Session.SetString("User", InitVals.user);
                 }
 
-                $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
+                return View();
+            }
+            catch (Exception ex)
+            {
+                LogError(ex.Message, new CorrelationInfo()
+                {
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    UserName = $"Not Logged In Ticket: {Param1}",
+                    RequestURL = "FrontEndHomeController",
+                    StatusCode = HttpStatusCode.InternalServerError,
+                    RDirection = RequestDirection.Processing,
+                    RType = RequestType.POST
+                }, ex);
+                return RedirectDashboard();
+            }
+        }
 
-                if ($exactMatches.Count -eq 0) {
-                  throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
+        public IActionResult LogOut()
+        {
+            String Data = String.Empty;
+
+            Data = GetSessionLogOut("ArchiveData");
+            if (String.IsNullOrEmpty(Data))
+            {
+                return RedirectDashboard();
+            }
+
+            try
+            {
+                Dictionary<String, Object> dic = [];
+                dic = Common.GenerateVariables(HttpContext, Data);
+
+                Common.LogOut(new Common.LogOutClass(
+                    dic["user"].ToString() ?? String.Empty,
+                    dic["Company"].ToString() ?? String.Empty,
+                    dic["Ticket"].ToString() ?? String.Empty
+                ));
+            }
+            catch (Exception ex)
+            {
+                LogError(ex.Message, new CorrelationInfo()
+                {
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    UserName = "No User",
+                    RequestURL = "FrontEndErrorHandler",
+                    StatusCode = HttpStatusCode.InternalServerError,
+                    RDirection = RequestDirection.Processing,
+                    RType = RequestType.POST
+                }, ex);
+            }
+
+            HttpContext.Session.Clear();
+            Response.Cookies.Delete("ArchiveData");
+            return RedirectDashboard();
+        }
+
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error()
+        {
+            try
+            {
+                String Data = String.Empty;
+                ErrorModel Em = new()
+                {
+                    ErrorCorrelationId = String.IsNullOrEmpty(GetErrorSession("CorrelationId"))
+                        ? Guid.NewGuid().ToString()
+                        : GetErrorSession("CorrelationId"),
+                    ErrorMessage = GetErrorSession("ErrorMessage")
+                };
+                IExceptionHandlerPathFeature? execeptionHandlerPathFeture =
+                    HttpContext.Features.Get<IExceptionHandlerPathFeature>();
+                if (String.IsNullOrEmpty(Em.ErrorMessage))
+                {
+                    Em.ErrorMessage = execeptionHandlerPathFeture?.Error.Message + Environment.NewLine +
+                                      execeptionHandlerPathFeture?.Error.StackTrace;
                 }
 
-                if ($exactMatches.Count -gt 1) {
-                  throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
+                try
+                {
+                    Data = GetSession("ArchiveData");
+                }
+                catch
+                {
+                    LogError("Session Timed Out", new CorrelationInfo()
+                    {
+                        CorrelationId = Em.ErrorCorrelationId,
+                        UserName = "No User",
+                        RequestURL = "FrontEndErrorHandler",
+                        StatusCode = HttpStatusCode.InternalServerError,
+                        RDirection = RequestDirection.Processing,
+                        RType = RequestType.POST
+                    }, execeptionHandlerPathFeture?.Error);
+                    return RedirectDashboard();
                 }
 
-                $definition = $exactMatches[0]
+                Dictionary<String, Object> dic = [];
+                dic = Common.GenerateVariables(HttpContext, Data);
 
-                Write-Host "$Label definition resolved:"
-                Write-Host "  Definition ID   = $($definition.id)"
-                Write-Host "  Definition Name = $($definition.name)"
-
-                return $definition.id
-              }
-
-              function Resolve-Build {
-                param(
-                  [string]$Label,
-                  [string]$PipelineName,
-                  [string]$BuildNumber
-                )
-
-                $BuildNumber = Normalize-BuildNumber -BuildNumber $BuildNumber
-
-                if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
-                  throw "$Label build number is required because deployment of $Label was selected."
+                Int64 exp = -1;
+                if (dic.TryGetValue("Exp", out var value))
+                {
+                    exp = (Int64)value;
                 }
 
-                $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
-                $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
-
-                $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-                  $collectionUri,
-                  $projectName,
-                  $definitionId,
-                  $encodedBuildNumber,
-                  $apiVersion
-
-                Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
-                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-                if (-not $response.value -or $response.count -lt 1) {
-                  throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
+                if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                {
+                    LogError("Session Timed Out", new CorrelationInfo()
+                    {
+                        CorrelationId = Em.ErrorCorrelationId,
+                        UserName = "No User",
+                        RequestURL = "FrontEndErrorHandler",
+                        StatusCode = HttpStatusCode.InternalServerError,
+                        RDirection = RequestDirection.Processing,
+                        RType = RequestType.POST
+                    }, execeptionHandlerPathFeture?.Error);
+                    return RedirectDashboard();
                 }
 
-                $build = $response.value[0]
+                LogError(execeptionHandlerPathFeture?.Error.Message, new CorrelationInfo()
+                {
+                    CorrelationId = Em.ErrorCorrelationId,
+                    UserName = dic["user"].ToString() ?? "No User",
+                    RequestURL = "FrontEndErrorHandler",
+                    StatusCode = HttpStatusCode.InternalServerError,
+                    RDirection = RequestDirection.Processing,
+                    RType = RequestType.POST
+                }, execeptionHandlerPathFeture?.Error);
+                return View(Em);
+            }
+            catch (Exception ex)
+            {
+                LogError(ex.Message, new CorrelationInfo()
+                {
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    UserName = "No User",
+                    RequestURL = "FrontEndErrorHandler",
+                    StatusCode = HttpStatusCode.InternalServerError,
+                    RDirection = RequestDirection.Processing,
+                    RType = RequestType.POST
+                }, ex);
+                return RedirectDashboard();
+            }
+        }
 
-                if ($build.sourceBranch -notmatch $allowedBranchPattern) {
-                  throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)]. Only release/* or hotfix/* builds can be deployed."
-                }
 
-                Write-Host "$Label build resolved:"
-                Write-Host "  Build ID         = $($build.id)"
-                Write-Host "  Build Number     = $($build.buildNumber)"
-                Write-Host "  Definition ID    = $definitionId"
-                Write-Host "  Definition Name  = $PipelineName"
-                Write-Host "  Branch           = $($build.sourceBranch)"
+        public IActionResult RedirectDashboard()
+        {
+            HttpContext.Session.Clear();
+            Response.Cookies.Delete("ArchiveData");
+            return View("RedirectDashboard");
+        }
+    }
+}
 
-                Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
-                Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
-                Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-                Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
-              }
+The app is hosted as MVC front that is accessed through a VIP.
+The app has also a dedicated API that is on a separate server.
 
-              if ($deployBackend) {
-                Resolve-Build -Label 'Backend' -PipelineName '$(backendPipelineName)' -BuildNumber '${{ parameters.backendBuildNumber }}'
-              } else {
-                Write-Host '##vso[task.setvariable variable=BackendPipelineDefinitionId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=BackendBuildId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=BackendResolvedBuildNumber;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=BackendSourceBranch;isOutput=true]'
-              }
+The problem is that for one of the users,
+When he clicked the edit container button in the network tab he gets:
+GET https://uat-alterna.sgbl.com.lb:9044/BoxEntity/create?id=399&code=HRBP.2164&entity=ET9900054
+Response:
+<html><body><h1>
+502 Bad Gateway</h1>
+The server returned an invalid or incomplete response.
+</body></html>
 
-              if ($deployFrontend) {
-                Resolve-Build -Label 'Frontend' -PipelineName '$(frontendPipelineName)' -BuildNumber '${{ parameters.frontendBuildNumber }}'
-              } else {
-                Write-Host '##vso[task.setvariable variable=FrontendPipelineDefinitionId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=FrontendBuildId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=FrontendResolvedBuildNumber;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=FrontendSourceBranch;isOutput=true]'
-              }
-
-              if ($deployDb) {
-                Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
-              } else {
-                Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=DbSourceBranch;isOutput=true]'
-              }
-            name: Resolve
-            displayName: 'Resolve pipeline names and build numbers'
-            env:
-              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-  - stage: Generate_DB_Preview
-    displayName: 'Generate DB preview for $(environmentName)'
-    dependsOn:
-      - Resolve_Selected_Builds
-    condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployDatabase }}', 'true'))
-    variables:
-      DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-      DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-      DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
-    jobs:
-      - template: pipelines/generate-db-preview.yml@templates
-        parameters:
-          jobName: 'GenerateDbPreview'
-          jobDisplayName: 'Generate preview SQL and deploy report'
-          deployPool: '$(deploymentPool)'
-          deployAgentName: '$(dbAgentName)'
-          artifactProject: '$(System.TeamProject)'
-          artifactDefinitionId: '$(DbPipelineDefinitionId)'
-          artifactBuildId: '$(DbBuildId)'
-          artifactName: '$(dbArtifactName)'
-          previewArtifactName: 'db-preview-$(environmentName)'
-          targetConnectionString: '$(GlobalSettings.ConnString)'
-
-  - stage: Approval_Release
-    displayName: 'Approval for $(environmentName) release'
-    dependsOn:
-      - Resolve_Selected_Builds
-      - ${{ if eq(parameters.deployDatabase, true) }}:
-          - Generate_DB_Preview
-    condition: succeeded()
-    jobs:
-      - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-          - job: NoApprovalRequired
-            displayName: 'No approval required for SIT'
-            pool:
-              name: '$(deploymentPool)'
-              demands:
-                - Agent.Name -equals $(resolveAgentName)
-            steps:
-              - checkout: none
-              - powershell: |
-                  Write-Host 'SIT selected. No manual approval is required.'
-                displayName: 'Skip manual approval'
-
-      - ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
-          - job: WaitForBusinessApproval
-            displayName: 'Wait for Business Approval'
-            pool: server
-            timeoutInMinutes: 1500
-            steps:
-              - task: ManualValidation@0
-                timeoutInMinutes: 1440
-                inputs:
-                  notifyUsers: '$(approvalNotifyUsers)'
-                  instructions: '$(approvalInstructions)'
-                  onTimeout: 'reject'
-
-  - ${{ if or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true)) }}:
-      - stage: Deploy_Applications
-        displayName: 'Deploy applications to $(environmentName)'
-        dependsOn:
-          - Resolve_Selected_Builds
-          - Approval_Release
-        condition: succeeded()
-        variables:
-          BackendPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendPipelineDefinitionId'] ]
-          BackendBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendBuildId'] ]
-          BackendSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendSourceBranch'] ]
-
-          FrontendPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendPipelineDefinitionId'] ]
-          FrontendBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendBuildId'] ]
-          FrontendSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendSourceBranch'] ]
-        jobs:
-          - ${{ if eq(parameters.deployBackend, true) }}:
-              - template: pipelines/deploy-iis.yml@templates
-                parameters:
-                  jobDependsOn: []
-                  jobCondition: succeeded()
-                  deploymentName: 'DeployBackend'
-                  deploymentDisplayName: 'Deploy Backend to ${{ parameters.targetEnvironment }} (IIS)'
-                  environmentName: '${{ parameters.targetEnvironment }}'
-                  deployPool: '$(deploymentPool)'
-                  deployAgentName: '$(backendAgentName)'
-
-                  ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-                    variableGroup: 'SIT_BACK_END_VARIABLE_GROUP'
-                  ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-                    variableGroup: 'UAT_BACK_END_VARIABLE_GROUP'
-                  ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-                    variableGroup: 'PROD_BACK_END_VARIABLE_GROUP'
-
-                  componentName: 'BACKEND'
-                  artifactName: '$(backendArtifactName)'
-                  artifactBuildType: 'specific'
-                  artifactProject: '$(System.TeamProject)'
-                  artifactDefinitionId: '$(BackendPipelineDefinitionId)'
-                  artifactBuildId: '$(BackendBuildId)'
-                  artifactBranch: '$(BackendSourceBranch)'
-                  zipName: '$(backendZipName)'
-                  siteName: '$(backendSiteName)'
-                  appPoolName: '$(backendAppPoolName)'
-                  iisTargetPath: '$(backendTargetPath)'
-                  cleanTargetBeforeCopy: true
-                  cleanExcludeCsv: ''
-                  enableJsonTransform: true
-                  jsonFiles: '**/appsettings.json'
-                  enableXmlConfigTransform: false
-                  xmlConfigFiles: []
-                  xmlVariableValues: {}
-                  enableCustomXmlEdits: false
-                  customXmlEdits: []
-                  customXmlVariableValues: {}
-                  enableHealthCheck: true
-                  healthCheckUrl: '$(backendHealthCheckUrl)'
-                  healthCheckExpectedStatusCode: '200'
-                  healthCheckRetries: 6
-                  healthCheckDelaySeconds: 10
-                  enableRollbackOnHealthCheckFailure: true
-                  enableLocalBackup: true
-                  backupRoot: '$(backupRoot)'
-                  backupPath: '$(backupRoot)\BACKEND\$(Build.BuildId)'
-
-          - ${{ if eq(parameters.deployFrontend, true) }}:
-              - template: pipelines/deploy-iis.yml@templates
-                parameters:
-                  ${{ if eq(parameters.deployBackend, true) }}:
-                    jobDependsOn:
-                      - DeployBackend
-                  ${{ if eq(parameters.deployBackend, false) }}:
-                    jobDependsOn: []
-
-                  jobCondition: succeeded()
-                  deploymentName: 'DeployFrontend'
-                  deploymentDisplayName: 'Deploy Frontend to ${{ parameters.targetEnvironment }} (IIS)'
-                  environmentName: '${{ parameters.targetEnvironment }}'
-                  deployPool: '$(deploymentPool)'
-                  deployAgentName: '$(frontendAgentName)'
-
-                  ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-                    variableGroup: 'SIT_FRONT_END_VARIABLE_GROUP'
-                  ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-                    variableGroup: 'UAT_FRONT_END_VARIABLE_GROUP'
-                  ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-                    variableGroup: 'PROD_FRONT_END_VARIABLE_GROUP'
-
-                  componentName: 'FRONTEND'
-                  artifactName: '$(frontendArtifactName)'
-                  artifactBuildType: 'specific'
-                  artifactProject: '$(System.TeamProject)'
-                  artifactDefinitionId: '$(FrontendPipelineDefinitionId)'
-                  artifactBuildId: '$(FrontendBuildId)'
-                  artifactBranch: '$(FrontendSourceBranch)'
-                  zipName: '$(frontendZipName)'
-                  siteName: '$(frontendSiteName)'
-                  appPoolName: '$(frontendAppPoolName)'
-                  iisTargetPath: '$(frontendTargetPath)'
-                  cleanTargetBeforeCopy: true
-                  cleanExcludeCsv: ''
-                  enableJsonTransform: true
-                  jsonFiles: '**/appsettings.json'
-                  enableXmlConfigTransform: false
-                  xmlConfigFiles: []
-                  xmlVariableValues: {}
-                  enableCustomXmlEdits: false
-                  customXmlEdits: []
-                  customXmlVariableValues: {}
-                  enableHealthCheck: true
-                  healthCheckUrl: '$(frontendHealthCheckUrl)'
-                  healthCheckExpectedStatusCode: '200'
-                  healthCheckRetries: 6
-                  healthCheckDelaySeconds: 10
-                  enableRollbackOnHealthCheckFailure: true
-                  enableLocalBackup: true
-                  backupRoot: '$(backupRoot)'
-                  backupPath: '$(backupRoot)\FRONTEND\$(Build.BuildId)'
-
-  - ${{ if and(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true)) }}:
-      - stage: Rollback_Backend_After_Frontend_Failure
-        displayName: 'Rollback Backend because Frontend failed'
-        dependsOn:
-          - Deploy_Applications
-        condition: and(always(), eq(dependencies.Deploy_Applications.outputs['DeployBackend.DeployBackend.publishSuccessOutcome.DeploymentHealthy'], 'true'), ne(dependencies.Deploy_Applications.outputs['DeployFrontend.DeployFrontend.publishSuccessOutcome.DeploymentHealthy'], 'true'))
-        jobs:
-          - template: pipelines/rollback-iis.yml@templates
-            parameters:
-              deploymentName: 'RollbackBackendAfterFrontendFailure'
-              deploymentDisplayName: 'Rollback Backend from local backup because Frontend failed'
-              environmentName: '${{ parameters.targetEnvironment }}'
-              deployPool: '$(deploymentPool)'
-              deployAgentName: '$(backendAgentName)'
-              siteName: '$(backendSiteName)'
-              appPoolName: '$(backendAppPoolName)'
-              iisTargetPath: '$(backendTargetPath)'
-              backupPath: '$(backupRoot)\BACKEND\$(Build.BuildId)'
-              cleanExcludeCsv: ''
-
-  - ${{ if or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true)) }}:
-      - stage: Tag_APP_LKG
-        displayName: 'Tag successful application builds as LKG'
-        dependsOn:
-          - Resolve_Selected_Builds
-          - Deploy_Applications
-        condition: succeeded('Deploy_Applications')
-        variables:
-          BackendBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendBuildId'] ]
-          BackendPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendPipelineDefinitionId'] ]
-
-          FrontendBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendBuildId'] ]
-          FrontendPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendPipelineDefinitionId'] ]
-        jobs:
-          - job: TagApplicationBuilds
-            displayName: 'Tag Frontend / Backend builds'
-            pool:
-              name: '$(deploymentPool)'
-              demands:
-                - Agent.Name -equals $(resolveAgentName)
-            steps:
-              - checkout: none
-
-              - ${{ if eq(parameters.deployBackend, true) }}:
-                  - template: pipelines/tag-builds.yml@templates
-                    parameters:
-                      tagTargets:
-                        - name: 'Alterna Demo Backend'
-                          buildId: '$(BackendBuildId)'
-                          definitionId: '$(BackendPipelineDefinitionId)'
-                          deployedTag: 'DEPLOYED-$(environmentName)-ADM-BACKEND'
-                          lkgTag: 'LKG-$(environmentName)-ADM-BACKEND'
-                          makeLkgUnique: true
-
-              - ${{ if eq(parameters.deployFrontend, true) }}:
-                  - template: pipelines/tag-builds.yml@templates
-                    parameters:
-                      tagTargets:
-                        - name: 'Alterna Demo Frontend'
-                          buildId: '$(FrontendBuildId)'
-                          definitionId: '$(FrontendPipelineDefinitionId)'
-                          deployedTag: 'DEPLOYED-$(environmentName)-ADM-FRONTEND'
-                          lkgTag: 'LKG-$(environmentName)-ADM-FRONTEND'
-                          makeLkgUnique: true
-
-  - ${{ if and(eq(parameters.deployDatabase, true), or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true))) }}:
-      - stage: Deploy_DB_After_Apps
-        displayName: 'Deploy DB to $(environmentName) after applications'
-        dependsOn:
-          - Resolve_Selected_Builds
-          - Approval_Release
-          - Tag_APP_LKG
-        condition: and(succeeded('Approval_Release'), succeeded('Tag_APP_LKG'))
-        variables:
-          DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-          DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-          DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
-        jobs:
-          - template: pipelines/deploy-database.yml@templates
-            parameters:
-              deploymentName: 'DeployDb'
-              deploymentDisplayName: 'Deploy Alterna Demo database'
-              environmentName: '${{ parameters.targetEnvironment }}'
-              deployPool: '$(deploymentPool)'
-              deployAgentName: '$(dbAgentName)'
-              artifactName: '$(dbArtifactName)'
-              artifactBuildType: 'specific'
-              artifactProject: '$(System.TeamProject)'
-              artifactDefinitionId: '$(DbPipelineDefinitionId)'
-              artifactBuildId: '$(DbBuildId)'
-              artifactBranch: '$(DbSourceBranch)'
-              targetConnectionString: '$(GlobalSettings.ConnString)'
-              dacpacFileName: 'DatabaseProjectAlternaDemo.dacpac'
-              artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
-
-  - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployBackend, false), eq(parameters.deployFrontend, false)) }}:
-      - stage: Deploy_DB_Only
-        displayName: 'Deploy DB to $(environmentName)'
-        dependsOn:
-          - Resolve_Selected_Builds
-          - Approval_Release
-        condition: succeeded('Approval_Release')
-        variables:
-          DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-          DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-          DbSourceBranch: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch'] ]
-        jobs:
-          - template: pipelines/deploy-database.yml@templates
-            parameters:
-              deploymentName: 'DeployDb'
-              deploymentDisplayName: 'Deploy Alterna Demo database'
-              environmentName: '${{ parameters.targetEnvironment }}'
-              deployPool: '$(deploymentPool)'
-              deployAgentName: '$(dbAgentName)'
-              artifactName: '$(dbArtifactName)'
-              artifactBuildType: 'specific'
-              artifactProject: '$(System.TeamProject)'
-              artifactDefinitionId: '$(DbPipelineDefinitionId)'
-              artifactBuildId: '$(DbBuildId)'
-              artifactBranch: '$(DbSourceBranch)'
-              targetConnectionString: '$(GlobalSettings.ConnString)'
-              dacpacFileName: 'DatabaseProjectAlternaDemo.dacpac'
-              artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
-
-  - ${{ if eq(parameters.deployDatabase, true) }}:
-      - stage: Tag_DB_DEPLOYED
-        displayName: 'Tag deployed database build'
-        dependsOn:
-          - Resolve_Selected_Builds
-          - ${{ if and(eq(parameters.deployDatabase, true), or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true))) }}:
-              - Deploy_DB_After_Apps
-          - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployBackend, false), eq(parameters.deployFrontend, false)) }}:
-              - Deploy_DB_Only
-        condition: succeeded()
-        variables:
-          DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
-          DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
-        jobs:
-          - job: TagDatabaseBuild
-            displayName: 'Tag DB build'
-            pool:
-              name: '$(deploymentPool)'
-              demands:
-                - Agent.Name -equals $(resolveAgentName)
-            steps:
-              - checkout: none
-
-              - template: pipelines/tag-builds.yml@templates
-                parameters:
-                  tagTargets:
-                    - name: 'Alterna Demo DB'
-                      buildId: '$(DbBuildId)'
-                      definitionId: '$(DbPipelineDefinitionId)'
-                      deployedTag: 'DEPLOYED-$(environmentName)-ADM-DB'
-                      lkgTag: 'LKG-$(environmentName)-ADM-DB'
-                      makeLkgUnique: true
-```
-
-Before running it, verify these values:
-
-```yaml
-backendSiteName
-backendAppPoolName
-backendTargetPath
-frontendSiteName
-frontendAppPoolName
-frontendTargetPath
-backendHealthCheckUrl
-frontendHealthCheckUrl
-frontendAgentName for UAT/PROD
-```
-
-Also make sure the pipeline has access to `$(System.AccessToken)`, usually by enabling **Allow scripts to access the OAuth token** in the pipeline settings.
+When the user login to the app by typing the server IP without going through the VIP, it works just fine.
+This problem is only occuring for this user only until now, other users are working fine even when logging is using the IP of the VIP
