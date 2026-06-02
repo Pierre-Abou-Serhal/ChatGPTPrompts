@@ -252,61 +252,6 @@ namespace Alterna.Archive.Core.Global
             return (GenerateSetionVariable(dict), FullName);
         }
 
-        public static String EncryptString(String plainText)
-        {
-            String key = "(╯°□°）╯︵ ┻━┻";
-            Byte[] iv = new Byte[16];
-            Byte[] array;
-
-            using (Aes aes = Aes.Create())
-            {
-                aes.Key = Encoding.Unicode.GetBytes(key);
-                aes.IV = iv;
-
-                ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
-
-                using (MemoryStream memoryStream = new())
-                {
-                    using (CryptoStream cryptoStream = new(memoryStream, encryptor, CryptoStreamMode.Write))
-                    {
-                        using (StreamWriter streamWriter = new(cryptoStream))
-                        {
-                            streamWriter.Write(plainText);
-                        }
-
-                        array = memoryStream.ToArray();
-                    }
-                }
-            }
-
-            return Convert.ToBase64String(array);
-        }
-
-        public static String DecryptString(String cipherText)
-        {
-            String key = "(╯°□°）╯︵ ┻━┻";
-            Byte[] iv = new Byte[16];
-            Byte[] buffer = Convert.FromBase64String(cipherText);
-
-            using (Aes aes = Aes.Create())
-            {
-                aes.Key = Encoding.Unicode.GetBytes(key);
-                aes.IV = iv;
-                ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
-
-                using (MemoryStream memoryStream = new(buffer))
-                {
-                    using (CryptoStream cryptoStream = new(memoryStream, decryptor, CryptoStreamMode.Read))
-                    {
-                        using (StreamReader streamReader = new(cryptoStream))
-                        {
-                            return streamReader.ReadToEnd();
-                        }
-                    }
-                }
-            }
-        }
-
         public static String GenerateSetionVariable(Dictionary<String, Object> variables)
         {
             StringBuilder sb = new();
@@ -323,7 +268,7 @@ namespace Alterna.Archive.Core.Global
                 sb.Remove(sb.Length - 3, 3);
             }
             
-            return CompressString(EncryptString(sb.ToString()));
+            return CompressString(sb.ToString());
         }
         public static string CompressString(string uncompressedString)
         {
@@ -360,12 +305,12 @@ namespace Alterna.Archive.Core.Global
           }
         }
 
-    public static Dictionary<String, Object> GenerateVariables(HttpContext Context, String Session)
+        public static Dictionary<String, Object> GenerateVariables(HttpContext Context, String Session)
         {
 
             Dictionary<String, Object> RetDict = [];
+            //Session = DecryptString(Session);
             Session = DecompressString(Session);
-            Session = DecryptString(Session);
 
             String[] Items = Session.Split(new String[] { "ᓚᘏᗢ" }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -417,8 +362,8 @@ namespace Alterna.Archive.Core.Global
             Dictionary<String, Object> RetDict = [];
             bool Expired = false;
 
+            //Session = DecryptString(Session);
             Session = DecompressString(Session);
-            Session = DecryptString(Session);
 
             String[] Items = Session.Split(new String[] { "ᓚᘏᗢ" }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -686,55 +631,7 @@ namespace Alterna.Archive.Core.Global
     }
 }
 
+This is my new code, I got rid of the encrypt, decrypt
+Only compress and decompress
 
-InvalidDataException: The archive entry was compressed using an unsupported compression method.
-
-    System.IO.Compression.Inflater.Inflate(FlushCode flushCode)
-    System.IO.Compression.Inflater.ReadInflateOutput(Byte* bufPtr, int length, FlushCode flushCode, out int bytesRead)
-    System.IO.Compression.Inflater.ReadOutput(Byte* bufPtr, int length, out int bytesRead)
-    System.IO.Compression.Inflater.InflateVerified(Byte* bufPtr, int length)
-    System.IO.Compression.DeflateStream+CopyToStream.Write(byte[] buffer, int offset, int count)
-    System.IO.Compression.DeflateStream+CopyToStream.CopyFromSourceToDestination()
-    Alterna.Archive.Core.Global.Common.DecompressString(string compressedString) in Common.cs
-
-                gZipStream.CopyTo(outputStream);
-
-Alterna.Archive.Core.Global.Common.GenerateVariablesLkp(HttpContext Context, string Session) in Common.cs
-
-                Session = DecompressString(Session);
-
-Alterna.Archive.Core.Global.Common.HasUserAccessToActivity(string actionName, HttpContext Context) in Common.cs
-
-                (Expired, dict) = GenerateVariablesLkp(Context,
-
-AspNetCoreGeneratedDocument.Views_Shared__Layout.<ExecuteAsync>b__34_1() in _Layout.cshtml
-
-                        @if (Common.HasUserAccessToActivity(
-
-Microsoft.AspNetCore.Razor.Runtime.TagHelpers.TagHelperExecutionContext.SetOutputContentAsync()
-AspNetCoreGeneratedDocument.Views_Shared__Layout.ExecuteAsync()
-Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageCoreAsync(IRazorPage page, ViewContext context)
-Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageAsync(IRazorPage page, ViewContext context, bool invokeViewStarts)
-Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderLayoutAsync(ViewContext context, ViewBufferTextWriter bodyWriter)
-Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderAsync(ViewContext context)
-Microsoft.AspNetCore.Mvc.ViewFeatures.ViewExecutor.ExecuteAsync(ViewContext viewContext, string contentType, Nullable<int> statusCode)
-Microsoft.AspNetCore.Mvc.ViewFeatures.ViewExecutor.ExecuteAsync(ViewContext viewContext, string contentType, Nullable<int> statusCode)
-Microsoft.AspNetCore.Mvc.ViewFeatures.ViewExecutor.ExecuteAsync(ActionContext actionContext, IView view, ViewDataDictionary viewData, ITempDataDictionary tempData, string contentType, Nullable<int> statusCode)
-Microsoft.AspNetCore.Mvc.ViewFeatures.ViewResultExecutor.ExecuteAsync(ActionContext context, ViewResult result)
-Microsoft.AspNetCore.Mvc.ViewResult.ExecuteResultAsync(ActionContext context)
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeResultAsync>g__Logged|22_0(ResourceInvoker invoker, IActionResult result)
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResultFilterAsync>g__Awaited|30_0<TFilter, TFilterAsync>(ResourceInvoker invoker, Task lastTask, State next, Scope scope, object state, bool isCompleted)
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResultExecutedContextSealed context)
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.ResultNext<TFilter, TFilterAsync>(ref State next, ref Scope scope, ref object state, ref bool isCompleted)
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.InvokeResultFilters()
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResourceFilter>g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, object state, bool isCompleted)
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(ref State next, ref Scope scope, ref object state, ref bool isCompleted)
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.InvokeFilterPipelineAsync()
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
-Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
-Microsoft.AspNetCore.Diagnostics.StatusCodePagesMiddleware.Invoke(HttpContext context)
-Microsoft.AspNetCore.Session.SessionMiddleware.Invoke(HttpContext context)
-Microsoft.AspNetCore.Session.SessionMiddleware.Invoke(HttpContext context)
-Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
-Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+Dix my code so that I can safely remove the old cookie and depend on the current version
