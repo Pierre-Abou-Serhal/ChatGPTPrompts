@@ -1,637 +1,481 @@
-using System.IO.Compression;
-using System.Security.Cryptography;
-using System.Text;
-using System.Web;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using ConfigurationManager = System.Configuration.ConfigurationManager;
+Yes. Your new code should **accept only the current compressed format**, and when it receives an old encrypted cookie, it should **delete it and clear the session instead of throwing**.
 
-namespace Alterna.Archive.Core.Global
+Right now, your new code does:
+
+```csharp
+Session = DecompressString(Session);
+```
+
+So any old encrypted `ArchiveData` cookie will crash with a decompression error because it is not GZip data. Your uploaded code now removed `EncryptString` / `DecryptString` and only uses `CompressString` / `DecompressString`, so you need a safe detection layer before decompressing. 
+
+Below is a safer version.
+
+## 1. Add a version prefix for the new cookie
+
+Use this:
+
+```csharp
+private const string ArchiveCookieName = "ArchiveData";
+private const string CurrentArchiveVersion = "v3:";
+```
+
+Why `v3:`? Because you already had:
+
+```text
+old version = encrypted only
+temporary version = compressed + encrypted
+current version = compressed only
+```
+
+So using `v3:` makes the new format clear.
+
+---
+
+## 2. Replace `GenerateSetionVariable`
+
+Use this version:
+
+```csharp
+public static string GenerateSetionVariable(Dictionary<string, object> variables)
 {
-    public static class Common
+    StringBuilder sb = new();
+
+    foreach (KeyValuePair<string, object> variable in variables)
     {
-        #region Web Variables
+        sb.Append(variable.Key);
+        sb.Append("[==]");
+        sb.Append(JsonConvert.SerializeObject(variable.Value));
+        sb.Append("ᓚᘏᗢ");
+    }
 
-        public static String Ldap { get; } = ConfigurationManager.AppSettings["LDAP_WEB_SERVICES_IP_ADDRESS"] ??
-                                             throw new ArgumentNullException(nameof(Ldap));
+    if (sb.Length != 0)
+    {
+        sb.Remove(sb.Length - 3, 3);
+    }
 
-        public static String UiUrl { get; } = ConfigurationManager.AppSettings["Ui_URL"] ??
-                                              throw new ArgumentNullException(nameof(UiUrl));
+    return CurrentArchiveVersion + CompressString(sb.ToString());
+}
+```
 
-        public static String Dashboard { get; } = ConfigurationManager.AppSettings["DASHBOARD_LINK"] ??
-                                                  throw new ArgumentNullException(nameof(Dashboard));
+Now all new cookies will look like:
 
-        public static String BaseURL { get; } = ConfigurationManager.AppSettings["BaseUrl"] ??
-                                                throw new ArgumentNullException(nameof(BaseURL));
+```text
+v3:H4sIAAAAA...
+```
 
-        public static String CDN { get; } = ConfigurationManager.AppSettings["CDN_IP_LINK"] ??
-                                            throw new ArgumentNullException(nameof(CDN));
+---
 
-        public static String? UserGuide { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK"];
+## 3. Add safe decode logic
 
-        public static String OSB { get; } = ConfigurationManager.AppSettings["BaseUrlOsb"] ??
-                                            throw new ArgumentNullException(nameof(OSB));
+Add this inside `Common`:
 
-        public static String Bref { get; } = ConfigurationManager.AppSettings["BrefBaseUrl"] ??
-                                             throw new ArgumentNullException(nameof(Bref));
+```csharp
+private static bool TryDecodeCurrentSession(string? session, out string plainSession, out bool shouldRewriteCookie)
+{
+    plainSession = string.Empty;
+    shouldRewriteCookie = false;
 
-        public static String ModuleName { get; } = ConfigurationManager.AppSettings["ModuleName"] ??
-                                                   throw new ArgumentNullException(nameof(ModuleName));
+    if (string.IsNullOrWhiteSpace(session))
+    {
+        return false;
+    }
 
-        public static String? AppVersion { get; } = ConfigurationManager.AppSettings["AppVersion"];
-
-        public static String? UserGuideRCA { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_RCA"];
-        public static String? UserGuideDA { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_DA"];
-        public static String? UserGuideRBBN { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_RBBN"];
-
-        public static String? UserGuideWAREHOUSE { get; } =
-            ConfigurationManager.AppSettings["USER_GUIDE_LINK_WAREHOUSE"];
-
-        public static String? UserGuideMAIN { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_MAIN"];
-        public static String? UserGuideEntity { get; } = ConfigurationManager.AppSettings["USER_GUIDE_LINK_ENTITY"];
-
-        public static Int32 TTL { get; } = 20;
-
-        public static Dictionary<String, Boolean> CreatedSequences = [];
-
-        #endregion
-
-        #region Authorisation DTOs
-
-        public class BaseAuthRequest
+    try
+    {
+        // New current format: v3:Compress(plainSession)
+        if (session.StartsWith(CurrentArchiveVersion))
         {
-            public BaseAuthRequest(String username, String branchName)
-            {
-                this.username = username ?? throw new ArgumentNullException(nameof(username));
-                this.branchName = branchName ?? throw new ArgumentNullException(nameof(branchName));
-            }
-
-            public String username { get; set; }
-            public String correlationId { get; set; } = Guid.NewGuid().ToString();
-            public String? channelTag { get; set; } = null;
-            public String? branchName { get; set; }
-            public String? publicKey { get; set; } = null;
-            public String moduleName { get; set; } = ModuleName;
-            public String? activityName { get; set; } = null;
-            public String? controllerName { get; set; } = null;
+            string compressedPart = session.Substring(CurrentArchiveVersion.Length);
+            plainSession = DecompressString(compressedPart);
+            return true;
         }
 
-        public class LogOutClass : BaseAuthRequest
-        {
-            public LogOutClass(String username, String branchName, String sessionValue) : base(username, branchName) =>
-                this.sessionValue = sessionValue ?? throw new ArgumentNullException(nameof(sessionValue));
-
-            public String sessionValue { get; set; }
-        }
-
-        private class GetUserCollection : BaseAuthRequest
-        {
-            public GetUserCollection(String username, String branchName, String Login) : base(username, branchName) =>
-                this.Login = Login ?? throw new ArgumentNullException(nameof(Login));
-
-            public String Login { get; set; }
-        }
-
-        private class GetUserByEmail : BaseAuthRequest
-        {
-            public GetUserByEmail(String username, String branchName, String Email) : base(username, branchName) =>
-                this.Email = Email ?? throw new ArgumentNullException(nameof(Email));
-
-            public String Email { get; set; }
-        }
-
-        private class GetRoleWithActivities : BaseAuthRequest
-        {
-            public GetRoleWithActivities(String username, String branchName) : base(username, branchName)
-            {
-            }
-        }
-
-        #endregion
-
-
-        static Common()
-        {
-            if (Int32.TryParse(ConfigurationManager.AppSettings["TTL"], out int ttlData))
-            {
-                TTL = ttlData;
-            }
-        }
-
-        #region Functions
-
-        public static T ApiCall<T>(Object Request, String Endpoint)
-        {
-            String JsonRequest = JsonConvert.SerializeObject(Request, Formatting.Indented);
-            HttpContent content = new StringContent(JsonRequest, Encoding.UTF8, "application/json");
-            HttpClient client = new();
-            Task<HttpResponseMessage> HttpResp = client.PostAsync(BaseURL + Endpoint, content);
-            HttpResp.Wait();
-            Task<String> respString = HttpResp.Result.Content.ReadAsStringAsync();
-            respString.Wait();
-            T RetRes = JsonConvert.DeserializeObject<T>(respString.Result)!;
-            return RetRes;
-        }
-
-        public static T GeneralCall<T>(Object Request, String Endpoint)
-        {
-            String JsonRequest = JsonConvert.SerializeObject(Request, Formatting.Indented);
-            HttpContent content = new StringContent(JsonRequest, Encoding.UTF8, "application/json");
-            HttpClient client = new();
-            Task<HttpResponseMessage> HttpResp = client.PostAsync(Endpoint, content);
-            HttpResp.Wait();
-            Task<String> respString = HttpResp.Result.Content.ReadAsStringAsync();
-            respString.Wait();
-            T RetRes = JsonConvert.DeserializeObject<T>(respString.Result)!;
-            return RetRes;
-        }
-
-        public static String GeneralCall(Object Request, String Endpoint)
-        {
-            String JsonRequest = JsonConvert.SerializeObject(Request, Formatting.Indented);
-            HttpContent content = new StringContent(JsonRequest, Encoding.UTF8, "application/json");
-            HttpClient client = new();
-            Task<HttpResponseMessage> HttpResp = client.PostAsync(Endpoint, content);
-            HttpResp.Wait();
-            Task<String> respString = HttpResp.Result.Content.ReadAsStringAsync();
-            respString.Wait();
-            String RetRes = respString.Result;
-            return RetRes;
-        }
-
-        public static void LogOut(LogOutClass logOutClass)
-        {
-            logOutClass.publicKey = generatePublicKey(logOutClass.correlationId, logOutClass.username);
-            String JsonRequest = JsonConvert.SerializeObject(logOutClass, Formatting.Indented);
-            HttpContent content = new StringContent(JsonRequest, Encoding.UTF8, "application/json");
-            HttpClient client = new();
-            Task<HttpResponseMessage> HttpResp =
-                client.PostAsync($"{OSB}/Rest/Authorization/UserSessionByValue", content);
-        }
-
-        public static (String, String) Init(String Ticket)
-        {
-            String user;
-            List<String> Role = [];
-            String Company;
-            String Departement;
-            String Email;
-            String FullName;
-            List<String> Activities = [];
-
-            Byte[] SessionBytes = Convert.FromBase64String(Ticket);
-            String DecodedUser = Encoding.UTF8.GetString(SessionBytes);
-            user = DecodedUser.Split('|')[0];
-            GetUserCollection getUserCollection = new(user, "", user);
-
-            String User = GeneralCall(getUserCollection, $"{Ldap}/api/ActiveDirectoryHost/GetUserCollection");
-            JToken GetUserInfo = JObject.Parse(User)["UserInfo"]!;
-            Email = GetUserInfo["Email"]!.ToString();
-            Departement = GetUserInfo["Department"]!.ToString();
-            FullName = GetUserInfo["FullName"]!.ToString();
-            GetUserByEmail getUserByEmail = new(user, "", Email);
-            String Branches = GeneralCall(getUserByEmail, $"{Bref}/api/Authorization/GetUserBranchesByEmail");
-            JToken BranchesData = JObject.Parse(Branches)["Branches"]!;
-            StringBuilder branchesString = new();
-            foreach (JToken Data in BranchesData)
-            {
-                if (Data["AccessAllowedInT24"]!.ToString().ToLower() == "true" ||
-                    Data["AccessAllowedInModule"]!.ToString().ToLower() == "true")
-                {
-                    branchesString.Append(Data["BranchCode"] + ",");
-                }
-            }
-
-            if (branchesString.Length != 0)
-            {
-                branchesString.Remove(branchesString.Length - 1, 1);
-            }
-
-            Company = branchesString.ToString();
-
-            GetRoleWithActivities getRoleWithActivities = new(user, Company);
-            String RoleByUserName = GeneralCall(getRoleWithActivities, $"{OSB}/Rest/Authorization/RoleByUserName");
-            JToken RoleByUserNameObject = JObject.Parse(RoleByUserName)["userRoles"]!;
-            RoleByUserNameObject = RoleByUserNameObject["userRole"]!;
-
-            foreach (JToken Data in RoleByUserNameObject)
-            {
-                if (!Role.Contains(Data["roleCode"]!.ToString()))
-                {
-                    Role.Add(Data["roleCode"]!.ToString());
-                }
-            }
-
-            String RoleWithActivitiesByModuleName = GeneralCall(getRoleWithActivities,
-                $"{OSB}/Rest/Authorization/RoleWithActivitiesByModuleName");
-            JToken RoleWithActivitiesByModuleNameObject =
-                JObject.Parse(RoleWithActivitiesByModuleName)["roleActivities"]!;
-            RoleWithActivitiesByModuleNameObject = RoleWithActivitiesByModuleNameObject["roleActivity"]!;
-
-            foreach (JToken Data in RoleWithActivitiesByModuleNameObject)
-            {
-                if (Role.Contains(Data["roleCode"]!.ToString()))
-                {
-                    Activities.Add(Data["actionName"]!.ToString());
-                }
-            }
-
-            Dictionary<String, Object> dict = new()
-            {
-                ["Ticket"] = Ticket,
-                ["user"] = user,
-                ["Role"] = Role,
-                ["Activities"] = Activities,
-                ["Company"] = Company,
-                ["Departement"] = Departement,
-                ["Email"] = Email,
-                ["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60),
-                ["FullName"] = FullName
-            };
-
-            return (GenerateSetionVariable(dict), FullName);
-        }
-
-        public static String GenerateSetionVariable(Dictionary<String, Object> variables)
-        {
-            StringBuilder sb = new();
-            foreach (KeyValuePair<String, Object> Variable in variables)
-            {
-                sb.Append(Variable.Key);
-                sb.Append("[==]");
-                sb.Append(JsonConvert.SerializeObject(Variable.Value));
-                sb.Append("ᓚᘏᗢ");
-            }
-
-            if (sb.Length != 0)
-            {
-                sb.Remove(sb.Length - 3, 3);
-            }
-            
-            return CompressString(sb.ToString());
-        }
-        public static string CompressString(string uncompressedString)
-        {
-          if (string.IsNullOrEmpty(uncompressedString))
-            return uncompressedString;
-
-          byte[] buffer = Encoding.UTF8.GetBytes(uncompressedString);
-
-          using (var memoryStream = new MemoryStream())
-          {
-            // Use optimal compression level for best size reduction
-            using (var gZipStream = new GZipStream(memoryStream, CompressionLevel.Optimal))
-            {
-              gZipStream.Write(buffer, 0, buffer.Length);
-            }
-
-            return Convert.ToBase64String(memoryStream.ToArray());
-          }
-        }
-
-        public static string DecompressString(string compressedString)
-        {
-          if (string.IsNullOrEmpty(compressedString))
-            return compressedString;
-
-          byte[] gZipBuffer = Convert.FromBase64String(compressedString);
-
-          using (var memoryStream = new MemoryStream(gZipBuffer))
-          using (var gZipStream = new GZipStream(memoryStream, CompressionMode.Decompress))
-          using (var outputStream = new MemoryStream())
-          {
-            gZipStream.CopyTo(outputStream);
-            return Encoding.UTF8.GetString(outputStream.ToArray());
-          }
-        }
-
-        public static Dictionary<String, Object> GenerateVariables(HttpContext Context, String Session)
-        {
-
-            Dictionary<String, Object> RetDict = [];
-            //Session = DecryptString(Session);
-            Session = DecompressString(Session);
-
-            String[] Items = Session.Split(new String[] { "ᓚᘏᗢ" }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (String Item in Items)
-            {
-                String[] Data = Item.Split(new String[] { "[==]" }, StringSplitOptions.RemoveEmptyEntries);
-                RetDict[Data[0]] = JsonConvert.DeserializeObject(Data[1])!;
-            }
-
-            Int64 exp = -1;
-            if (RetDict.TryGetValue("Exp", out var value))
-            {
-                exp = (Int64)value;
-            }
-
-            if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
-            {
-                throw new Exception("Session expired");
-            }
-
-            RetDict["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60);
-            String FN = "Invalid User";
-            if (RetDict.TryGetValue("FullName", out var value2))
-            {
-                FN = value2.ToString() ?? "Invalid User";
-            }
-
-            Context.Response.Cookies.Append("ArchiveData", GenerateSetionVariable(RetDict));
-            Context.Session.SetString("ArchiveData", GenerateSetionVariable(RetDict));
-            Context.Session.SetString("User", FN);
-            Context.Response.Headers["Origin"] = Context.Request.Headers.Origin;
-            return RetDict;
-        }
-
-        public static string GetLoggedInUserEmail(HttpContext httpContext, string session) 
-        {
-            Dictionary<String, Object> dic = [];
-            dic = Common.GenerateVariables(httpContext, session);
-
-            string loggedInUserEmail = dic["Email"].ToString() ?? 
-                throw new ArgumentNullException("logged in user email is missing");
-
-            return loggedInUserEmail;
-        }
-
-        
-        public static (Boolean, Dictionary<String, Object>) GenerateVariablesLkp(HttpContext Context, String Session)
-        {
-            Dictionary<String, Object> RetDict = [];
-            bool Expired = false;
-
-            //Session = DecryptString(Session);
-            Session = DecompressString(Session);
-
-            String[] Items = Session.Split(new String[] { "ᓚᘏᗢ" }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (String Item in Items)
-            {
-                String[] Data = Item.Split(new String[] { "[==]" }, StringSplitOptions.RemoveEmptyEntries);
-                RetDict[Data[0]] = JsonConvert.DeserializeObject(Data[1])!;
-            }
-
-            Int64 exp = -1;
-            if (RetDict.TryGetValue("Exp", out var value))
-            {
-                exp = (Int64)value;
-            }
-
-            if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
-            {
-                Expired = true;
-            }
-
-            RetDict["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60);
-            String FN = "Invalid User";
-            if (RetDict.TryGetValue("FullName", out var value2))
-            {
-                FN = value2.ToString() ?? "Invalid User";
-            }
-
-            if (!Expired)
-            {
-                Context.Response.Cookies.Append("ArchiveData", GenerateSetionVariable(RetDict));
-                Context.Session.SetString("ArchiveData", GenerateSetionVariable(RetDict));
-                Context.Session.SetString("User", FN);
-                Context.Response.Headers["Origin"] = Context.Request.Headers.Origin;
-            }
-
-            return (Expired, RetDict);
-        }
-
-        public static String generatePublicKey(String CorrelationID, String Username)
-        {
-            String RetRes = String.Empty;
-            RetRes = CorrelationID + "|" + Username + "|ProfessionalStackOverFlowSearcher";
-            Byte[] bytes;
-
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(RetRes));
-
-                StringBuilder sb = new();
-                foreach (Byte b in bytes)
-                {
-                    sb.Append(b.ToString("x2"));
-                }
-
-                RetRes = sb.ToString();
-            }
-
-            return RetRes;
-        }
-
-        public static Boolean HasUserRole(String Role, HttpContext httpContext)
-        {
-
-            String cookieContent = String.Empty;
-            if (httpContext.Session.GetString("ArchiveData") != null)
-            {
-                cookieContent = httpContext.Session.GetString("ArchiveData") ?? string.Empty;
-            }
-            else
-            {
-                if (httpContext.Request.Cookies.Count == 0)
-                {
-                    if (httpContext.Response.Headers.TryGetValue("Set-Cookie", out var Data))
-                    {
-                        foreach (string? cookie in Data)
-                        {
-                            if (cookie != null && cookie.Contains("ArchiveData"))
-                            {
-                                cookieContent = cookie.Substring(cookie.IndexOf("=") + 1, cookie.IndexOf(";") - 12);
-                            }
-                        }
-
-                        if (String.IsNullOrEmpty(cookieContent))
-                        {
-
-                            return false;
-                        }
-
-                        cookieContent = HttpUtility.UrlDecode(cookieContent);
-                    }
-                    else
-                    {
-
-                        return false;
-                    }
-                }
-            }
-
-
-            Dictionary<String, Object> dict = [];
-            Boolean Expired = true;
-            (Expired, dict) = GenerateVariablesLkp(httpContext,
-                httpContext.Request.Cookies["ArchiveData"] ?? cookieContent);
-            if (Expired)
-            {
-                return false;
-            }
-
-            List<String>? Roles = [];
-            Roles = JsonConvert.DeserializeObject<List<String>>(dict["Role"].ToString()!);
-            try
-            {
-                if (Roles!.Contains(Role))
-                {
-                    return true;
-                }
-            }
-            catch
-            {
-                return false;
-            }
-
-            return false;
-        }
-
-        public static DateTime FormatDate(String dateString)
-        {
-            String[] parts = dateString.Replace(",", String.Empty).Split(' ');
-
-            Int32 day = Int32.Parse(parts[0]);
-            Int32 month = GetMonthIndex(parts[1]);
-            Int32 year = Int32.Parse(parts[2]);
-
-            return new DateTime(year, month, day);
-        }
-
-        public static Int32 GetMonthIndex(String monthName)
-        {
-            Int32 RetRes = -1;
-            Month.TryGetValue(monthName, out RetRes);
-            return RetRes;
-        }
-
-        public static Dictionary<String, Int32> Month { get; } = new Dictionary<String, Int32>()
-        {
-            { "January", 1 },
-            { "February", 2 },
-            { "March", 3 },
-            { "April", 4 },
-            { "May", 5 },
-            { "June", 6 },
-            { "July", 7 },
-            { "August", 8 },
-            { "September", 9 },
-            { "October", 10 },
-            { "November", 11 },
-            { "December", 12 }
-        };
-
-        public static Boolean HasUserAccessToActivity(String actionName, HttpContext Context)
-        {
-
-            String CookieContent = String.Empty;
-            if (Context.Session.GetString("ArchiveData") != null)
-            {
-                CookieContent = Context.Session.GetString("ArchiveData") ?? string.Empty;
-            }
-            else
-            {
-                if (Context.Request.Cookies.Count == 0)
-                {
-                    if (Context.Response.Headers.TryGetValue("Set-Cookie", out var Data))
-                    {
-                        foreach (string? cookie in Data)
-                        {
-                            if (cookie != null && cookie.Contains("ArchiveData"))
-                            {
-                                CookieContent = cookie.Substring(cookie.IndexOf("=") + 1, cookie.IndexOf(";") - 12);
-                            }
-                        }
-
-                        if (String.IsNullOrEmpty(CookieContent))
-                        {
-
-                            return false;
-                        }
-
-                        CookieContent = HttpUtility.UrlDecode(CookieContent);
-                    }
-                    else
-                    {
-
-                        return false;
-                    }
-                }
-            }
-
-            Dictionary<String, Object> dict = [];
-            Object? dicRetVal = new();
-            Boolean Expired = true;
-            (Expired, dict) = GenerateVariablesLkp(Context,
-                Context.Request.Cookies["ArchiveData"] ?? CookieContent);
-            if (Expired)
-            {
-                return false;
-            }
-
-            List<String>? Activties = [];
-
-            if (dict.TryGetValue("Activities", out dicRetVal))
-            {
-                Activties = JsonConvert.DeserializeObject<List<String>>(dicRetVal.ToString()!);
-            }
-            else
-            {
-                throw new UnauthorizedAccessException("You Have No Permitions in This Application");
-            }
-
-
-            if (Activties!.Contains(actionName))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        public static String GetBranchCodesFromUserCompnay(String userCompanies)
-        {
-            String filteredCodes = String.Empty;
-
-            try
-            {
-                List<String> comapanyList = userCompanies.Split(",").ToList();
-
-                filteredCodes = String.Join(",", comapanyList.Where(i => i.StartsWith("LB")));
-
-                return filteredCodes;
-            }
-            catch
-            {
-                return String.Empty;
-            }
-        }
-
-        public static String GetEntityCodesFromUserCompnay(String userCompanies)
-        {
-            String filteredCodes = String.Empty;
-
-            try
-            {
-                List<String> comapanyList = userCompanies.Split(",").ToList();
-
-                filteredCodes = String.Join(",", comapanyList.Where(i => i.StartsWith("ET")));
-
-                return filteredCodes;
-            }
-            catch
-            {
-                return String.Empty;
-            }
-        }
-
-        #endregion
+        // Support your current unversioned compressed-only cookies temporarily.
+        // These are not old encrypted cookies, but cookies created before adding v3:.
+        plainSession = DecompressString(session);
+        shouldRewriteCookie = true;
+        return true;
+    }
+    catch
+    {
+        // Old encrypted cookies or corrupted cookies will arrive here.
+        return false;
     }
 }
+```
 
-This is my new code, I got rid of the encrypt, decrypt
-Only compress and decompress
+This does 3 things:
 
-Dix my code so that I can safely remove the old cookie and depend on the current version
+```text
+v3 compressed cookie       → accepted
+unversioned compressed     → accepted, then rewritten as v3
+old encrypted cookie       → rejected and deleted
+corrupted cookie           → rejected and deleted
+```
+
+---
+
+## 4. Add cookie helpers
+
+```csharp
+private static CookieOptions GetArchiveCookieOptions()
+{
+    return new CookieOptions
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.Lax,
+        Path = "/"
+    };
+}
+
+private static void SetArchiveCookieAndSession(HttpContext context, string sessionValue, string fullName)
+{
+    context.Response.Cookies.Append(
+        ArchiveCookieName,
+        sessionValue,
+        GetArchiveCookieOptions()
+    );
+
+    context.Session.SetString(ArchiveCookieName, sessionValue);
+    context.Session.SetString("User", fullName);
+}
+
+private static void DeleteArchiveCookieAndSession(HttpContext context)
+{
+    context.Response.Cookies.Delete(
+        ArchiveCookieName,
+        new CookieOptions
+        {
+            Path = "/"
+        }
+    );
+
+    context.Session.Remove(ArchiveCookieName);
+    context.Session.Remove("User");
+}
+```
+
+If your cookie was created with a specific `Domain`, you must also include the same `Domain` when deleting it.
+
+---
+
+## 5. Add a parser helper
+
+```csharp
+private static Dictionary<string, object> ParseSessionPlainText(string plainSession)
+{
+    Dictionary<string, object> retDict = [];
+
+    string[] items = plainSession.Split(
+        new string[] { "ᓚᘏᗢ" },
+        StringSplitOptions.RemoveEmptyEntries
+    );
+
+    foreach (string item in items)
+    {
+        string[] data = item.Split(
+            new string[] { "[==]" },
+            StringSplitOptions.RemoveEmptyEntries
+        );
+
+        if (data.Length != 2)
+        {
+            continue;
+        }
+
+        retDict[data[0]] = JsonConvert.DeserializeObject(data[1])!;
+    }
+
+    return retDict;
+}
+```
+
+---
+
+## 6. Replace `GenerateVariables`
+
+```csharp
+public static Dictionary<string, object> GenerateVariables(HttpContext context, string session)
+{
+    if (!TryDecodeCurrentSession(session, out string plainSession, out bool shouldRewriteCookie))
+    {
+        DeleteArchiveCookieAndSession(context);
+        throw new UnauthorizedAccessException("Invalid or old ArchiveData cookie.");
+    }
+
+    Dictionary<string, object> retDict = ParseSessionPlainText(plainSession);
+
+    long exp = -1;
+
+    if (retDict.TryGetValue("Exp", out var value))
+    {
+        exp = Convert.ToInt64(value);
+    }
+
+    if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+    {
+        DeleteArchiveCookieAndSession(context);
+        throw new Exception("Session expired");
+    }
+
+    retDict["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60);
+
+    string fullName = "Invalid User";
+
+    if (retDict.TryGetValue("FullName", out var value2))
+    {
+        fullName = value2?.ToString() ?? "Invalid User";
+    }
+
+    string newSession = GenerateSetionVariable(retDict);
+
+    SetArchiveCookieAndSession(context, newSession, fullName);
+
+    context.Response.Headers["Origin"] = context.Request.Headers.Origin;
+
+    return retDict;
+}
+```
+
+---
+
+## 7. Replace `GenerateVariablesLkp`
+
+This one is important because it is used by `_Layout.cshtml`. It should **never crash the page** because of an old cookie.
+
+```csharp
+public static (bool, Dictionary<string, object>) GenerateVariablesLkp(HttpContext context, string session)
+{
+    Dictionary<string, object> retDict = [];
+    bool expired = false;
+
+    if (!TryDecodeCurrentSession(session, out string plainSession, out bool shouldRewriteCookie))
+    {
+        DeleteArchiveCookieAndSession(context);
+        return (true, retDict);
+    }
+
+    try
+    {
+        retDict = ParseSessionPlainText(plainSession);
+
+        long exp = -1;
+
+        if (retDict.TryGetValue("Exp", out var value))
+        {
+            exp = Convert.ToInt64(value);
+        }
+
+        if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+        {
+            expired = true;
+        }
+
+        if (expired)
+        {
+            DeleteArchiveCookieAndSession(context);
+            return (true, retDict);
+        }
+
+        retDict["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60);
+
+        string fullName = "Invalid User";
+
+        if (retDict.TryGetValue("FullName", out var value2))
+        {
+            fullName = value2?.ToString() ?? "Invalid User";
+        }
+
+        string newSession = GenerateSetionVariable(retDict);
+
+        SetArchiveCookieAndSession(context, newSession, fullName);
+
+        context.Response.Headers["Origin"] = context.Request.Headers.Origin;
+
+        return (false, retDict);
+    }
+    catch
+    {
+        DeleteArchiveCookieAndSession(context);
+        return (true, []);
+    }
+}
+```
+
+---
+
+## 8. Simplify cookie retrieval
+
+Add this helper:
+
+```csharp
+private static string? GetArchiveDataFromContext(HttpContext context)
+{
+    string? sessionValue = context.Session.GetString(ArchiveCookieName);
+
+    if (!string.IsNullOrWhiteSpace(sessionValue))
+    {
+        return sessionValue;
+    }
+
+    if (context.Request.Cookies.TryGetValue(ArchiveCookieName, out string? cookieValue))
+    {
+        if (!string.IsNullOrWhiteSpace(cookieValue))
+        {
+            return cookieValue;
+        }
+    }
+
+    return null;
+}
+```
+
+Then update `HasUserAccessToActivity`:
+
+```csharp
+public static bool HasUserAccessToActivity(string actionName, HttpContext context)
+{
+    string? archiveData = GetArchiveDataFromContext(context);
+
+    if (string.IsNullOrWhiteSpace(archiveData))
+    {
+        return false;
+    }
+
+    (bool expired, Dictionary<string, object> dict) = GenerateVariablesLkp(context, archiveData);
+
+    if (expired)
+    {
+        return false;
+    }
+
+    if (!dict.TryGetValue("Activities", out object? activitiesValue))
+    {
+        return false;
+    }
+
+    List<string>? activities = JsonConvert.DeserializeObject<List<string>>(
+        activitiesValue.ToString()!
+    );
+
+    return activities?.Contains(actionName) == true;
+}
+```
+
+And update `HasUserRole`:
+
+```csharp
+public static bool HasUserRole(string role, HttpContext context)
+{
+    string? archiveData = GetArchiveDataFromContext(context);
+
+    if (string.IsNullOrWhiteSpace(archiveData))
+    {
+        return false;
+    }
+
+    (bool expired, Dictionary<string, object> dict) = GenerateVariablesLkp(context, archiveData);
+
+    if (expired)
+    {
+        return false;
+    }
+
+    if (!dict.TryGetValue("Role", out object? rolesValue))
+    {
+        return false;
+    }
+
+    List<string>? roles = JsonConvert.DeserializeObject<List<string>>(
+        rolesValue.ToString()!
+    );
+
+    return roles?.Contains(role) == true;
+}
+```
+
+This removes the fragile logic where you were trying to read `ArchiveData` from `Response.Headers["Set-Cookie"]`.
+
+---
+
+## 9. Fix login code in `HomeController`
+
+This is very important.
+
+Change this:
+
+```csharp
+HttpContext.Session.SetString("Data", InitVals.data);
+```
+
+to this:
+
+```csharp
+HttpContext.Session.SetString("ArchiveData", InitVals.data);
+```
+
+Also, do not append cookies to `Request.Cookies`. Only write to `Response.Cookies`.
+
+Use:
+
+```csharp
+Response.Cookies.Delete("ArchiveData", new CookieOptions
+{
+    Path = "/"
+});
+
+HttpContext.Session.Clear();
+
+(string data, string user) initVals = Common.Init(Param1);
+
+Response.Cookies.Append("ArchiveData", initVals.data, new CookieOptions
+{
+    HttpOnly = true,
+    Secure = true,
+    SameSite = SameSiteMode.Lax,
+    Path = "/"
+});
+
+HttpContext.Session.SetString("ArchiveData", initVals.data);
+HttpContext.Session.SetString("User", initVals.user);
+```
+
+---
+
+## Important warning
+
+Your current version is **compressed only**, not encrypted and not signed.
+
+That means the cookie content is not truly protected. Since you store things like:
+
+```text
+Role
+Activities
+Company
+Email
+User
+Exp
+```
+
+this is risky for authorization. At minimum, the cookie should be protected using ASP.NET Core Data Protection or signed to prevent tampering.
+
+But for your immediate issue — safely removing old encrypted cookies and depending on the current compressed version — the code above will fix the crash.
+
+## Final behavior after this change
+
+```text
+User has v3 cookie
+→ app works normally
+
+User has unversioned compressed cookie
+→ app reads it and rewrites it as v3
+
+User has old encrypted cookie
+→ app deletes ArchiveData and treats user as logged out
+
+User has corrupted cookie
+→ app deletes ArchiveData and treats user as logged out
+```
+
+This prevents the `InvalidDataException` from breaking `_Layout.cshtml` and causing the VIP to show `502 Bad Gateway`.
