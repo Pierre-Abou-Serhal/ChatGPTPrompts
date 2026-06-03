@@ -8,7 +8,47 @@ namespace Alterna.Archive.Core.Controllers
 {
     public class HomeController : BaseController
     {
-        public IActionResult Index(String Param1)
+        private const string ArchiveCookieName = "ArchiveData";
+
+        private CookieOptions GetArchiveCookieOptions()
+        {
+            return new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = Request.IsHttps,
+                SameSite = SameSiteMode.Lax,
+                Path = "/"
+            };
+        }
+
+        private void SetArchiveCookie(string value)
+        {
+            Response.Cookies.Append(
+                ArchiveCookieName,
+                value,
+                GetArchiveCookieOptions()
+            );
+        }
+
+        private void DeleteArchiveCookie()
+        {
+            Response.Cookies.Delete(
+                ArchiveCookieName,
+                new CookieOptions
+                {
+                    Path = "/"
+                }
+            );
+        }
+
+        private IActionResult ClearSessionAndRedirectDashboard()
+        {
+            HttpContext.Session.Clear();
+            DeleteArchiveCookie();
+            return View("RedirectDashboard");
+        }
+
+        public IActionResult Index(string Param1)
         {
 #if DEBUG
             if (Param1 is null)
@@ -17,49 +57,46 @@ namespace Alterna.Archive.Core.Controllers
                 // Param1 = "cGFib3VzZXJoYWx8MzYwMjZkZGQtNWIyYS00MTgwLTk5YmEtNTVjZDE1MTZiMjE3"; // Pierre
                 Param1 = "Y2xhYmFiaWRpfDQ2NjVkMjFhLTY2ZjItNGNhNS1hZDMxLWRkYjg0OTMyNzM3MQ=="; // Christina
             }
-            else
-            {
-                if (!Param1.Equals("Redirect"))
-                {
-                    // Param1 = "Y2xhYmFiaWRpfDQ2NjVkMjFhLTY2ZjItNGNhNS1hZDMxLWRkYjg0OTMyNzM3MQ==";
-                }
-            }
-
-
 #endif
+
             try
             {
-                if (String.IsNullOrEmpty(Param1))
+                if (string.IsNullOrEmpty(Param1))
                 {
                     throw new ArgumentNullException(nameof(Param1));
                 }
 
-                if (Param1.Equals("Redirect"))
+                if (Param1.Equals("Redirect", StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
-                        GetSession("ArchiveData");
+                        string archiveData = GetSession(ArchiveCookieName);
+
+                        // Important:
+                        // This validates the cookie/session before the layout is rendered.
+                        // If the cookie is old/corrupted, Common.GenerateVariables should throw.
+                        Common.GenerateVariables(HttpContext, archiveData);
                     }
                     catch (Exception)
                     {
-                        return RedirectDashboard();
+                        return ClearSessionAndRedirectDashboard();
                     }
                 }
                 else
                 {
-                    if (Request.Cookies.ContainsKey("ArchiveData"))
-                    {
-                        Request.Cookies.Append((new("ArchiveData", "")));
-                    }
-
+                    // Fresh login from dashboard / SSO ticket.
+                    // Remove any old cookie/session first.
                     HttpContext.Session.Clear();
+                    DeleteArchiveCookie();
 
-                    (String data, String user) InitVals = Common.Init(Param1);
+                    (string data, string user) initVals = Common.Init(Param1);
+
                     Response.Headers["Origin"] = Request.Headers.Origin;
-                    // Request.Cookies.Append(new("ArchiveData", InitVals.data));
-                    Response.Cookies.Append("ArchiveData", InitVals.data);
-                    HttpContext.Session.SetString("ArchiveData", InitVals.data);
-                    HttpContext.Session.SetString("User", InitVals.user);
+
+                    SetArchiveCookie(initVals.data);
+
+                    HttpContext.Session.SetString(ArchiveCookieName, initVals.data);
+                    HttpContext.Session.SetString("User", initVals.user);
                 }
 
                 return View();
@@ -75,30 +112,29 @@ namespace Alterna.Archive.Core.Controllers
                     RDirection = RequestDirection.Processing,
                     RType = RequestType.POST
                 }, ex);
-                return RedirectDashboard();
+
+                return ClearSessionAndRedirectDashboard();
             }
         }
 
         public IActionResult LogOut()
         {
-            String Data = String.Empty;
-
-            Data = GetSessionLogOut("ArchiveData");
-            if (String.IsNullOrEmpty(Data))
-            {
-                return RedirectDashboard();
-            }
+            string data = string.Empty;
 
             try
             {
-                Dictionary<String, Object> dic = [];
-                dic = Common.GenerateVariables(HttpContext, Data);
+                data = GetSessionLogOut(ArchiveCookieName);
 
-                Common.LogOut(new Common.LogOutClass(
-                    dic["user"].ToString() ?? String.Empty,
-                    dic["Company"].ToString() ?? String.Empty,
-                    dic["Ticket"].ToString() ?? String.Empty
-                ));
+                if (!string.IsNullOrEmpty(data))
+                {
+                    Dictionary<string, object> dic = Common.GenerateVariables(HttpContext, data);
+
+                    Common.LogOut(new Common.LogOutClass(
+                        dic["user"].ToString() ?? string.Empty,
+                        dic["Company"].ToString() ?? string.Empty,
+                        dic["Ticket"].ToString() ?? string.Empty
+                    ));
+                }
             }
             catch (Exception ex)
             {
@@ -106,16 +142,14 @@ namespace Alterna.Archive.Core.Controllers
                 {
                     CorrelationId = Guid.NewGuid().ToString(),
                     UserName = "No User",
-                    RequestURL = "FrontEndErrorHandler",
+                    RequestURL = "FrontEndLogOut",
                     StatusCode = HttpStatusCode.InternalServerError,
                     RDirection = RequestDirection.Processing,
                     RType = RequestType.POST
                 }, ex);
             }
 
-            HttpContext.Session.Clear();
-            Response.Cookies.Delete("ArchiveData");
-            return RedirectDashboard();
+            return ClearSessionAndRedirectDashboard();
         }
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
@@ -123,73 +157,79 @@ namespace Alterna.Archive.Core.Controllers
         {
             try
             {
-                String Data = String.Empty;
-                ErrorModel Em = new()
+                ErrorModel em = new()
                 {
-                    ErrorCorrelationId = String.IsNullOrEmpty(GetErrorSession("CorrelationId"))
+                    ErrorCorrelationId = string.IsNullOrEmpty(GetErrorSession("CorrelationId"))
                         ? Guid.NewGuid().ToString()
                         : GetErrorSession("CorrelationId"),
+
                     ErrorMessage = GetErrorSession("ErrorMessage")
                 };
-                IExceptionHandlerPathFeature? execeptionHandlerPathFeture =
+
+                IExceptionHandlerPathFeature? exceptionHandlerPathFeature =
                     HttpContext.Features.Get<IExceptionHandlerPathFeature>();
-                if (String.IsNullOrEmpty(Em.ErrorMessage))
+
+                if (string.IsNullOrEmpty(em.ErrorMessage))
                 {
-                    Em.ErrorMessage = execeptionHandlerPathFeture?.Error.Message + Environment.NewLine +
-                                      execeptionHandlerPathFeture?.Error.StackTrace;
+                    em.ErrorMessage =
+                        exceptionHandlerPathFeature?.Error.Message +
+                        Environment.NewLine +
+                        exceptionHandlerPathFeature?.Error.StackTrace;
                 }
+
+                string data;
 
                 try
                 {
-                    Data = GetSession("ArchiveData");
+                    data = GetSession(ArchiveCookieName);
                 }
                 catch
                 {
                     LogError("Session Timed Out", new CorrelationInfo()
                     {
-                        CorrelationId = Em.ErrorCorrelationId,
+                        CorrelationId = em.ErrorCorrelationId,
                         UserName = "No User",
                         RequestURL = "FrontEndErrorHandler",
                         StatusCode = HttpStatusCode.InternalServerError,
                         RDirection = RequestDirection.Processing,
                         RType = RequestType.POST
-                    }, execeptionHandlerPathFeture?.Error);
-                    return RedirectDashboard();
+                    }, exceptionHandlerPathFeature?.Error);
+
+                    return ClearSessionAndRedirectDashboard();
                 }
 
-                Dictionary<String, Object> dic = [];
-                dic = Common.GenerateVariables(HttpContext, Data);
+                Dictionary<string, object> dic;
 
-                Int64 exp = -1;
-                if (dic.TryGetValue("Exp", out var value))
+                try
                 {
-                    exp = (Int64)value;
+                    dic = Common.GenerateVariables(HttpContext, data);
                 }
-
-                if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                catch
                 {
-                    LogError("Session Timed Out", new CorrelationInfo()
+                    LogError("Invalid or expired ArchiveData cookie", new CorrelationInfo()
                     {
-                        CorrelationId = Em.ErrorCorrelationId,
+                        CorrelationId = em.ErrorCorrelationId,
                         UserName = "No User",
                         RequestURL = "FrontEndErrorHandler",
                         StatusCode = HttpStatusCode.InternalServerError,
                         RDirection = RequestDirection.Processing,
                         RType = RequestType.POST
-                    }, execeptionHandlerPathFeture?.Error);
-                    return RedirectDashboard();
+                    }, exceptionHandlerPathFeature?.Error);
+
+                    return ClearSessionAndRedirectDashboard();
                 }
 
-                LogError(execeptionHandlerPathFeture?.Error.Message, new CorrelationInfo()
+                LogError(exceptionHandlerPathFeature?.Error.Message, new CorrelationInfo()
                 {
-                    CorrelationId = Em.ErrorCorrelationId,
+                    CorrelationId = em.ErrorCorrelationId,
                     UserName = dic["user"].ToString() ?? "No User",
                     RequestURL = "FrontEndErrorHandler",
                     StatusCode = HttpStatusCode.InternalServerError,
                     RDirection = RequestDirection.Processing,
                     RType = RequestType.POST
-                }, execeptionHandlerPathFeture?.Error);
-                return View(Em);
+                }, exceptionHandlerPathFeature?.Error);
+
+                return View(em);
             }
             catch (Exception ex)
             {
@@ -202,16 +242,14 @@ namespace Alterna.Archive.Core.Controllers
                     RDirection = RequestDirection.Processing,
                     RType = RequestType.POST
                 }, ex);
-                return RedirectDashboard();
+
+                return ClearSessionAndRedirectDashboard();
             }
         }
 
-
         public IActionResult RedirectDashboard()
         {
-            HttpContext.Session.Clear();
-            Response.Cookies.Delete("ArchiveData");
-            return View("RedirectDashboard");
+            return ClearSessionAndRedirectDashboard();
         }
     }
 }
