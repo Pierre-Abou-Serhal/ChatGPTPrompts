@@ -1,481 +1,217 @@
-Yes. Your new code should **accept only the current compressed format**, and when it receives an old encrypted cookie, it should **delete it and clear the session instead of throwing**.
+using System.Net;
+using Alterna.Archive.Core.Global;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+using static NLog.NLogUtil;
 
-Right now, your new code does:
-
-```csharp
-Session = DecompressString(Session);
-```
-
-So any old encrypted `ArchiveData` cookie will crash with a decompression error because it is not GZip data. Your uploaded code now removed `EncryptString` / `DecryptString` and only uses `CompressString` / `DecompressString`, so you need a safe detection layer before decompressing. 
-
-Below is a safer version.
-
-## 1. Add a version prefix for the new cookie
-
-Use this:
-
-```csharp
-private const string ArchiveCookieName = "ArchiveData";
-private const string CurrentArchiveVersion = "v3:";
-```
-
-Why `v3:`? Because you already had:
-
-```text
-old version = encrypted only
-temporary version = compressed + encrypted
-current version = compressed only
-```
-
-So using `v3:` makes the new format clear.
-
----
-
-## 2. Replace `GenerateSetionVariable`
-
-Use this version:
-
-```csharp
-public static string GenerateSetionVariable(Dictionary<string, object> variables)
+namespace Alterna.Archive.Core.Controllers
 {
-    StringBuilder sb = new();
-
-    foreach (KeyValuePair<string, object> variable in variables)
+    public class HomeController : BaseController
     {
-        sb.Append(variable.Key);
-        sb.Append("[==]");
-        sb.Append(JsonConvert.SerializeObject(variable.Value));
-        sb.Append("ᓚᘏᗢ");
-    }
-
-    if (sb.Length != 0)
-    {
-        sb.Remove(sb.Length - 3, 3);
-    }
-
-    return CurrentArchiveVersion + CompressString(sb.ToString());
-}
-```
-
-Now all new cookies will look like:
-
-```text
-v3:H4sIAAAAA...
-```
-
----
-
-## 3. Add safe decode logic
-
-Add this inside `Common`:
-
-```csharp
-private static bool TryDecodeCurrentSession(string? session, out string plainSession, out bool shouldRewriteCookie)
-{
-    plainSession = string.Empty;
-    shouldRewriteCookie = false;
-
-    if (string.IsNullOrWhiteSpace(session))
-    {
-        return false;
-    }
-
-    try
-    {
-        // New current format: v3:Compress(plainSession)
-        if (session.StartsWith(CurrentArchiveVersion))
+        public IActionResult Index(String Param1)
         {
-            string compressedPart = session.Substring(CurrentArchiveVersion.Length);
-            plainSession = DecompressString(compressedPart);
-            return true;
+#if DEBUG
+            if (Param1 is null)
+            {
+                // Param1 = "cHNhbW1pYXw0MzRkNmJkZC1hYjkxLTQ5M2UtYTViYS05OGY0ZTQ2ZGM3NTU="; // psammia
+                // Param1 = "cGFib3VzZXJoYWx8MzYwMjZkZGQtNWIyYS00MTgwLTk5YmEtNTVjZDE1MTZiMjE3"; // Pierre
+                Param1 = "Y2xhYmFiaWRpfDQ2NjVkMjFhLTY2ZjItNGNhNS1hZDMxLWRkYjg0OTMyNzM3MQ=="; // Christina
+            }
+            else
+            {
+                if (!Param1.Equals("Redirect"))
+                {
+                    // Param1 = "Y2xhYmFiaWRpfDQ2NjVkMjFhLTY2ZjItNGNhNS1hZDMxLWRkYjg0OTMyNzM3MQ==";
+                }
+            }
+
+
+#endif
+            try
+            {
+                if (String.IsNullOrEmpty(Param1))
+                {
+                    throw new ArgumentNullException(nameof(Param1));
+                }
+
+                if (Param1.Equals("Redirect"))
+                {
+                    try
+                    {
+                        GetSession("ArchiveData");
+                    }
+                    catch (Exception)
+                    {
+                        return RedirectDashboard();
+                    }
+                }
+                else
+                {
+                    if (Request.Cookies.ContainsKey("ArchiveData"))
+                    {
+                        Request.Cookies.Append((new("ArchiveData", "")));
+                    }
+
+                    HttpContext.Session.Clear();
+
+                    (String data, String user) InitVals = Common.Init(Param1);
+                    Response.Headers["Origin"] = Request.Headers.Origin;
+                    // Request.Cookies.Append(new("ArchiveData", InitVals.data));
+                    Response.Cookies.Append("ArchiveData", InitVals.data);
+                    HttpContext.Session.SetString("ArchiveData", InitVals.data);
+                    HttpContext.Session.SetString("User", InitVals.user);
+                }
+
+                return View();
+            }
+            catch (Exception ex)
+            {
+                LogError(ex.Message, new CorrelationInfo()
+                {
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    UserName = $"Not Logged In Ticket: {Param1}",
+                    RequestURL = "FrontEndHomeController",
+                    StatusCode = HttpStatusCode.InternalServerError,
+                    RDirection = RequestDirection.Processing,
+                    RType = RequestType.POST
+                }, ex);
+                return RedirectDashboard();
+            }
         }
 
-        // Support your current unversioned compressed-only cookies temporarily.
-        // These are not old encrypted cookies, but cookies created before adding v3:.
-        plainSession = DecompressString(session);
-        shouldRewriteCookie = true;
-        return true;
-    }
-    catch
-    {
-        // Old encrypted cookies or corrupted cookies will arrive here.
-        return false;
-    }
-}
-```
-
-This does 3 things:
-
-```text
-v3 compressed cookie       → accepted
-unversioned compressed     → accepted, then rewritten as v3
-old encrypted cookie       → rejected and deleted
-corrupted cookie           → rejected and deleted
-```
-
----
-
-## 4. Add cookie helpers
-
-```csharp
-private static CookieOptions GetArchiveCookieOptions()
-{
-    return new CookieOptions
-    {
-        HttpOnly = true,
-        Secure = true,
-        SameSite = SameSiteMode.Lax,
-        Path = "/"
-    };
-}
-
-private static void SetArchiveCookieAndSession(HttpContext context, string sessionValue, string fullName)
-{
-    context.Response.Cookies.Append(
-        ArchiveCookieName,
-        sessionValue,
-        GetArchiveCookieOptions()
-    );
-
-    context.Session.SetString(ArchiveCookieName, sessionValue);
-    context.Session.SetString("User", fullName);
-}
-
-private static void DeleteArchiveCookieAndSession(HttpContext context)
-{
-    context.Response.Cookies.Delete(
-        ArchiveCookieName,
-        new CookieOptions
+        public IActionResult LogOut()
         {
-            Path = "/"
-        }
-    );
+            String Data = String.Empty;
 
-    context.Session.Remove(ArchiveCookieName);
-    context.Session.Remove("User");
-}
-```
+            Data = GetSessionLogOut("ArchiveData");
+            if (String.IsNullOrEmpty(Data))
+            {
+                return RedirectDashboard();
+            }
 
-If your cookie was created with a specific `Domain`, you must also include the same `Domain` when deleting it.
+            try
+            {
+                Dictionary<String, Object> dic = [];
+                dic = Common.GenerateVariables(HttpContext, Data);
 
----
+                Common.LogOut(new Common.LogOutClass(
+                    dic["user"].ToString() ?? String.Empty,
+                    dic["Company"].ToString() ?? String.Empty,
+                    dic["Ticket"].ToString() ?? String.Empty
+                ));
+            }
+            catch (Exception ex)
+            {
+                LogError(ex.Message, new CorrelationInfo()
+                {
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    UserName = "No User",
+                    RequestURL = "FrontEndErrorHandler",
+                    StatusCode = HttpStatusCode.InternalServerError,
+                    RDirection = RequestDirection.Processing,
+                    RType = RequestType.POST
+                }, ex);
+            }
 
-## 5. Add a parser helper
-
-```csharp
-private static Dictionary<string, object> ParseSessionPlainText(string plainSession)
-{
-    Dictionary<string, object> retDict = [];
-
-    string[] items = plainSession.Split(
-        new string[] { "ᓚᘏᗢ" },
-        StringSplitOptions.RemoveEmptyEntries
-    );
-
-    foreach (string item in items)
-    {
-        string[] data = item.Split(
-            new string[] { "[==]" },
-            StringSplitOptions.RemoveEmptyEntries
-        );
-
-        if (data.Length != 2)
-        {
-            continue;
+            HttpContext.Session.Clear();
+            Response.Cookies.Delete("ArchiveData");
+            return RedirectDashboard();
         }
 
-        retDict[data[0]] = JsonConvert.DeserializeObject(data[1])!;
-    }
-
-    return retDict;
-}
-```
-
----
-
-## 6. Replace `GenerateVariables`
-
-```csharp
-public static Dictionary<string, object> GenerateVariables(HttpContext context, string session)
-{
-    if (!TryDecodeCurrentSession(session, out string plainSession, out bool shouldRewriteCookie))
-    {
-        DeleteArchiveCookieAndSession(context);
-        throw new UnauthorizedAccessException("Invalid or old ArchiveData cookie.");
-    }
-
-    Dictionary<string, object> retDict = ParseSessionPlainText(plainSession);
-
-    long exp = -1;
-
-    if (retDict.TryGetValue("Exp", out var value))
-    {
-        exp = Convert.ToInt64(value);
-    }
-
-    if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
-    {
-        DeleteArchiveCookieAndSession(context);
-        throw new Exception("Session expired");
-    }
-
-    retDict["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60);
-
-    string fullName = "Invalid User";
-
-    if (retDict.TryGetValue("FullName", out var value2))
-    {
-        fullName = value2?.ToString() ?? "Invalid User";
-    }
-
-    string newSession = GenerateSetionVariable(retDict);
-
-    SetArchiveCookieAndSession(context, newSession, fullName);
-
-    context.Response.Headers["Origin"] = context.Request.Headers.Origin;
-
-    return retDict;
-}
-```
-
----
-
-## 7. Replace `GenerateVariablesLkp`
-
-This one is important because it is used by `_Layout.cshtml`. It should **never crash the page** because of an old cookie.
-
-```csharp
-public static (bool, Dictionary<string, object>) GenerateVariablesLkp(HttpContext context, string session)
-{
-    Dictionary<string, object> retDict = [];
-    bool expired = false;
-
-    if (!TryDecodeCurrentSession(session, out string plainSession, out bool shouldRewriteCookie))
-    {
-        DeleteArchiveCookieAndSession(context);
-        return (true, retDict);
-    }
-
-    try
-    {
-        retDict = ParseSessionPlainText(plainSession);
-
-        long exp = -1;
-
-        if (retDict.TryGetValue("Exp", out var value))
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error()
         {
-            exp = Convert.ToInt64(value);
+            try
+            {
+                String Data = String.Empty;
+                ErrorModel Em = new()
+                {
+                    ErrorCorrelationId = String.IsNullOrEmpty(GetErrorSession("CorrelationId"))
+                        ? Guid.NewGuid().ToString()
+                        : GetErrorSession("CorrelationId"),
+                    ErrorMessage = GetErrorSession("ErrorMessage")
+                };
+                IExceptionHandlerPathFeature? execeptionHandlerPathFeture =
+                    HttpContext.Features.Get<IExceptionHandlerPathFeature>();
+                if (String.IsNullOrEmpty(Em.ErrorMessage))
+                {
+                    Em.ErrorMessage = execeptionHandlerPathFeture?.Error.Message + Environment.NewLine +
+                                      execeptionHandlerPathFeture?.Error.StackTrace;
+                }
+
+                try
+                {
+                    Data = GetSession("ArchiveData");
+                }
+                catch
+                {
+                    LogError("Session Timed Out", new CorrelationInfo()
+                    {
+                        CorrelationId = Em.ErrorCorrelationId,
+                        UserName = "No User",
+                        RequestURL = "FrontEndErrorHandler",
+                        StatusCode = HttpStatusCode.InternalServerError,
+                        RDirection = RequestDirection.Processing,
+                        RType = RequestType.POST
+                    }, execeptionHandlerPathFeture?.Error);
+                    return RedirectDashboard();
+                }
+
+                Dictionary<String, Object> dic = [];
+                dic = Common.GenerateVariables(HttpContext, Data);
+
+                Int64 exp = -1;
+                if (dic.TryGetValue("Exp", out var value))
+                {
+                    exp = (Int64)value;
+                }
+
+                if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                {
+                    LogError("Session Timed Out", new CorrelationInfo()
+                    {
+                        CorrelationId = Em.ErrorCorrelationId,
+                        UserName = "No User",
+                        RequestURL = "FrontEndErrorHandler",
+                        StatusCode = HttpStatusCode.InternalServerError,
+                        RDirection = RequestDirection.Processing,
+                        RType = RequestType.POST
+                    }, execeptionHandlerPathFeture?.Error);
+                    return RedirectDashboard();
+                }
+
+                LogError(execeptionHandlerPathFeture?.Error.Message, new CorrelationInfo()
+                {
+                    CorrelationId = Em.ErrorCorrelationId,
+                    UserName = dic["user"].ToString() ?? "No User",
+                    RequestURL = "FrontEndErrorHandler",
+                    StatusCode = HttpStatusCode.InternalServerError,
+                    RDirection = RequestDirection.Processing,
+                    RType = RequestType.POST
+                }, execeptionHandlerPathFeture?.Error);
+                return View(Em);
+            }
+            catch (Exception ex)
+            {
+                LogError(ex.Message, new CorrelationInfo()
+                {
+                    CorrelationId = Guid.NewGuid().ToString(),
+                    UserName = "No User",
+                    RequestURL = "FrontEndErrorHandler",
+                    StatusCode = HttpStatusCode.InternalServerError,
+                    RDirection = RequestDirection.Processing,
+                    RType = RequestType.POST
+                }, ex);
+                return RedirectDashboard();
+            }
         }
 
-        if (exp < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+
+        public IActionResult RedirectDashboard()
         {
-            expired = true;
-        }
-
-        if (expired)
-        {
-            DeleteArchiveCookieAndSession(context);
-            return (true, retDict);
-        }
-
-        retDict["Exp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TTL * 60);
-
-        string fullName = "Invalid User";
-
-        if (retDict.TryGetValue("FullName", out var value2))
-        {
-            fullName = value2?.ToString() ?? "Invalid User";
-        }
-
-        string newSession = GenerateSetionVariable(retDict);
-
-        SetArchiveCookieAndSession(context, newSession, fullName);
-
-        context.Response.Headers["Origin"] = context.Request.Headers.Origin;
-
-        return (false, retDict);
-    }
-    catch
-    {
-        DeleteArchiveCookieAndSession(context);
-        return (true, []);
-    }
-}
-```
-
----
-
-## 8. Simplify cookie retrieval
-
-Add this helper:
-
-```csharp
-private static string? GetArchiveDataFromContext(HttpContext context)
-{
-    string? sessionValue = context.Session.GetString(ArchiveCookieName);
-
-    if (!string.IsNullOrWhiteSpace(sessionValue))
-    {
-        return sessionValue;
-    }
-
-    if (context.Request.Cookies.TryGetValue(ArchiveCookieName, out string? cookieValue))
-    {
-        if (!string.IsNullOrWhiteSpace(cookieValue))
-        {
-            return cookieValue;
+            HttpContext.Session.Clear();
+            Response.Cookies.Delete("ArchiveData");
+            return View("RedirectDashboard");
         }
     }
-
-    return null;
 }
-```
-
-Then update `HasUserAccessToActivity`:
-
-```csharp
-public static bool HasUserAccessToActivity(string actionName, HttpContext context)
-{
-    string? archiveData = GetArchiveDataFromContext(context);
-
-    if (string.IsNullOrWhiteSpace(archiveData))
-    {
-        return false;
-    }
-
-    (bool expired, Dictionary<string, object> dict) = GenerateVariablesLkp(context, archiveData);
-
-    if (expired)
-    {
-        return false;
-    }
-
-    if (!dict.TryGetValue("Activities", out object? activitiesValue))
-    {
-        return false;
-    }
-
-    List<string>? activities = JsonConvert.DeserializeObject<List<string>>(
-        activitiesValue.ToString()!
-    );
-
-    return activities?.Contains(actionName) == true;
-}
-```
-
-And update `HasUserRole`:
-
-```csharp
-public static bool HasUserRole(string role, HttpContext context)
-{
-    string? archiveData = GetArchiveDataFromContext(context);
-
-    if (string.IsNullOrWhiteSpace(archiveData))
-    {
-        return false;
-    }
-
-    (bool expired, Dictionary<string, object> dict) = GenerateVariablesLkp(context, archiveData);
-
-    if (expired)
-    {
-        return false;
-    }
-
-    if (!dict.TryGetValue("Role", out object? rolesValue))
-    {
-        return false;
-    }
-
-    List<string>? roles = JsonConvert.DeserializeObject<List<string>>(
-        rolesValue.ToString()!
-    );
-
-    return roles?.Contains(role) == true;
-}
-```
-
-This removes the fragile logic where you were trying to read `ArchiveData` from `Response.Headers["Set-Cookie"]`.
-
----
-
-## 9. Fix login code in `HomeController`
-
-This is very important.
-
-Change this:
-
-```csharp
-HttpContext.Session.SetString("Data", InitVals.data);
-```
-
-to this:
-
-```csharp
-HttpContext.Session.SetString("ArchiveData", InitVals.data);
-```
-
-Also, do not append cookies to `Request.Cookies`. Only write to `Response.Cookies`.
-
-Use:
-
-```csharp
-Response.Cookies.Delete("ArchiveData", new CookieOptions
-{
-    Path = "/"
-});
-
-HttpContext.Session.Clear();
-
-(string data, string user) initVals = Common.Init(Param1);
-
-Response.Cookies.Append("ArchiveData", initVals.data, new CookieOptions
-{
-    HttpOnly = true,
-    Secure = true,
-    SameSite = SameSiteMode.Lax,
-    Path = "/"
-});
-
-HttpContext.Session.SetString("ArchiveData", initVals.data);
-HttpContext.Session.SetString("User", initVals.user);
-```
-
----
-
-## Important warning
-
-Your current version is **compressed only**, not encrypted and not signed.
-
-That means the cookie content is not truly protected. Since you store things like:
-
-```text
-Role
-Activities
-Company
-Email
-User
-Exp
-```
-
-this is risky for authorization. At minimum, the cookie should be protected using ASP.NET Core Data Protection or signed to prevent tampering.
-
-But for your immediate issue — safely removing old encrypted cookies and depending on the current compressed version — the code above will fix the crash.
-
-## Final behavior after this change
-
-```text
-User has v3 cookie
-→ app works normally
-
-User has unversioned compressed cookie
-→ app reads it and rewrites it as v3
-
-User has old encrypted cookie
-→ app deletes ArchiveData and treats user as logged out
-
-User has corrupted cookie
-→ app deletes ArchiveData and treats user as logged out
-```
-
-This prevents the `InvalidDataException` from breaking `_Layout.cshtml` and causing the VIP to show `502 Bad Gateway`.
