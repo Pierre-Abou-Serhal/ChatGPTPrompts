@@ -1,63 +1,103 @@
-Dears,
-Find bellow my current questions regarding the Visa Direct APIS:
+Here is a clearer and more professional version of your email:
 
-1-	In the Alias Inquiry API response, what does the directories and entities stand for and should we check for a certain values (eg. STANDARD VISA) ? 
+Dear Visa Team,
 
-2-	Also, if there are no preferredFor type = “RECEIVE” (Only PAY and SEND in the response), the card will not be returned to the user correct ? Since our scenario is sending money from a bank account and the destination card will receive it. So a card that does not have preferredFor type = “RECEIVE”
-Will not be able to receive money correct ?
+I hope you are doing well.
 
-Find highlighted in yellow the properties in question
-Example:
+Please find below our current questions regarding the Visa Direct APIs, specifically the **Alias Inquiry** and **Alias Resolve** APIs.
+
+**1. Directories and entities in the Alias Inquiry response**
+
+In the **Alias Inquiry API** response, could you please clarify what the `directories` and `entities` properties represent?
+
+Also, should we validate or filter based on specific `directoryName` values, such as `STANDARD_VISA`?
+
+In the example below, we would like to understand the meaning and expected usage of the highlighted properties:
+
+```json
 {
-    "summary": {
-        "aliasesTotal": 1,
-        "aliasesFound": 1,
-        "aliasesNotFound": 0,
-        "aliasesRepeated": 0
-    },
-    "details": [
+  "summary": {
+    "aliasesTotal": 1,
+    "aliasesFound": 1,
+    "aliasesNotFound": 0,
+    "aliasesRepeated": 0
+  },
+  "details": [
+    {
+      "directoriesName": [
+        "STANDARD_VISA"
+      ],
+      "directories": [
         {
-            "directoriesName": [
-                "STANDARD_VISA"
-            ],
-            "directories": [
+          "directoryName": "STANDARD_VISA",
+          "entities": [
+            {
+              "id": "b835425d-0fba-4c9b-8a81-8f217ab18786",
+              "preferredFor": []
+            },
+            {
+              "id": "16f98ee5-2614-4c32-932e-65e20194aafa",
+              "preferredFor": []
+            },
+            {
+              "id": "9a42f1ce-824b-4ddc-90a0-1a4bb33537c8",
+              "preferredFor": [
                 {
-                    "directoryName": "STANDARD_VISA",
-                    "entities": [
-                        {
-                            "id": "b835425d-0fba-4c9b-8a81-8f217ab18786",
-                            "preferredFor": []
-                        },
-                        {
-                            "id": "16f98ee5-2614-4c32-932e-65e20194aafa",
-                            "preferredFor": []
-                        },
-                        {
-                            "id": "9a42f1ce-824b-4ddc-90a0-1a4bb33537c8",
-                            "preferredFor": [
-                                {
-                                    "type": "PAY",
-                                    "date": "2025-03-13T11:03:12.719Z"
-                                },
-                                {
-                                    "type": "SEND",
-                                    "date": "2025-03-13T11:03:12.719Z"
-                                }
-                            ]
-                        }
-                    ]
+                  "type": "PAY",
+                  "date": "2025-03-13T11:03:12.719Z"
+                },
+                {
+                  "type": "SEND",
+                  "date": "2025-03-13T11:03:12.719Z"
                 }
-            ],
-            "aliasValue": "123456",
-            "aliasType": "PHONE"
+              ]
+            }
+          ]
         }
-    ]
+      ],
+      "aliasValue": "123456",
+      "aliasType": "PHONE"
+    }
+  ]
 }
-	
-	So in this example, we should not call the Alias Resolve API with aliasValue = “123456” and aliasType = “PHONE” because there are no preferredFor type = “RECEIVE”
+```
 
-3-	An alias can only have one card number per preferredFor type ? meaning in the example above, alias “123456” with type “PHONE” will only have one and only one card to receive money ? or can a user have multiple cards linked to the same alias that can receive money ?
-This is the Alias Resolve Response:
+**2. Usage of `preferredFor` for receiving money**
+
+Our use case is to send money from a bank account to a destination card. Therefore, the destination card should be able to receive funds.
+
+Could you please confirm whether an alias should be considered valid for our use case only when at least one entity has:
+
+```json
+"preferredFor": [
+  {
+    "type": "RECEIVE"
+  }
+]
+```
+
+For example, in the response above, the alias has only `PAY` and `SEND` values, and no `RECEIVE` value.
+
+Based on this, should we avoid calling the **Alias Resolve API** for:
+
+```json
+{
+  "aliasValue": "123456",
+  "aliasType": "PHONE"
+}
+```
+
+because there is no `preferredFor.type = "RECEIVE"`?
+
+**3. Multiple cards linked to the same alias**
+
+Can a single alias have more than one card linked to it for the same `preferredFor` type?
+
+For example, can the alias `123456` with alias type `PHONE` have multiple cards that are eligible to receive money?
+
+We are asking because the **Alias Resolve API** returns `paymentCredentials` as an array, as shown below:
+
+```json
 {
   "profile": {
     "firstName": "Alias Release",
@@ -97,9 +137,9 @@ This is the Alias Resolve Response:
   ],
   "directoryName": "STANDARD_VISA"
 }
-	
-	Since the payment Crendetials are returned as an array, can we have multiple card numbers having preferredFor type = “RECEIVE” ?
+```
 
-Best Regards,
-Pierre Abou Serhal.
+Could you please confirm whether `paymentCredentials` can contain multiple card numbers with `preferredFor.type = "RECEIVE"` for the same alias?
 
+Best regards,
+Pierre Abou Serhal
