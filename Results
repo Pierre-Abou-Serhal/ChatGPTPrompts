@@ -1,212 +1,73 @@
-Yes. Your code is basically a console/background worker, but the project is still initialized like a **Windows Forms app** using `Application.EnableVisualStyles()` and `Application.SetCompatibleTextRenderingDefault(false)` before the infinite loop. 
+<?xml version="1.0" encoding="utf-8" ?>
+<nlog xmlns="http://www.nlog-project.org/schemas/NLog.xsd"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.nlog-project.org/schemas/NLog.xsd NLog.xsd"
+      autoReload="true"
+      throwExceptions="false"
+      internalLogLevel="Off" internalLogFile="c:\temp\nlog-internal.log">
 
-Do this in **2 parts**:
+  <!-- optional, add some variables
+  https://github.com/nlog/NLog/wiki/Configuration-file#variables
+  -->
+  <!--<variable name="myvar" value="myvalue"/>-->
+  <variable name="logFilePath" value="C:\Logs\UTF8Encoding.log"/>
 
-## 1. Change the project to Console Application
+  <!--
+  See https://github.com/nlog/nlog/wiki/Configuration-file
+  for information on customizing logging rules and outputs.
+   -->
+  <targets>
+    <!--<target name="logfile"
+	          xsi:type="File"
+            fileName="${logFilePath}" maxArchiveFiles="4" archiveAboveSize="51200" archiveEvery="Day" 
+            layout="${longdate}|${logger}|LEVEL=${level:upperCase=true}|${exception:format=type,message,StackTrace}|${machineName}|${windows-identity}|${message}"
+            keepFileOpen="true"
+            />-->
 
-In Visual Studio:
 
-**Project → Properties → Application → Output type → Console Application**
+    <target xsi:type="Console"
+                  name="console"
+                  layout="------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------${newline}
+            DATE = ${longdate}${newline}
+            LEVEL = ${uppercase:${level}}${newline}           
+            MESSAGE = ${message}${newline}           
+            ${onexception:
+            ${newline}
+            EXCEPTION ${exception:format=tostring,message,StackTrace}}" />
 
-Or in the `.csproj`, make sure it is:
+    <target name="logfile"
+            xsi:type="File"
+            encoding="utf-8"
+            fileName="${logFilePath}" archiveEvery="Day" maxArchiveFiles="90"
+            layout="------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------${newline}
+            DATE = ${longdate}${newline}
+            LEVEL = ${uppercase:${level}}${newline}           
+            MESSAGE = ${message}${newline}           
+            ${onexception:
+            ${newline}
+            EXCEPTION ${exception:format=tostring,message,StackTrace}}"
+            keepFileOpen="true"
+    />
+    <!--
+    add your targets here
+    See https://github.com/nlog/NLog/wiki/Targets for possible targets.
+    See https://github.com/nlog/NLog/wiki/Layout-Renderers for the possible layout renderers.
+    -->
 
-```xml
-<OutputType>Exe</OutputType>
-```
+    <!--
+    Write events to a file with the date in the filename.
+    <target xsi:type="File" name="f" fileName="${basedir}/logs/${shortdate}.log"
+            layout="${longdate} ${uppercase:${level}} ${message}" />
+    -->
+  </targets>
 
-Not:
+  <rules>
+    <!-- add your logging rules here -->
 
-```xml
-<OutputType>WinExe</OutputType>
-```
-
-`WinExe` hides the console window.
-
----
-
-## 2. Remove the WinForms startup code
-
-Change your `Main()` from this:
-
-```csharp
-[STAThread]
-public static void Main()
-{
-    Application.EnableVisualStyles();
-    Application.SetCompatibleTextRenderingDefault(false);
-    LoadGlobalSettings();
-
-    string[] files = null;
-
-    while (true)
-    {
-        ...
-    }
-}
-```
-
-To this:
-
-```csharp
-public static void Main()
-{
-    Directory.CreateDirectory(@"C:\logs");
-
-    Console.Title = "UTF8 File Transformer";
-
-    LoadGlobalSettings();
-
-    logger.Info("UTF8 File Transformer started.");
-
-    string[] files = null;
-
-    while (true)
-    {
-        try
-        {
-            System.Threading.Thread.Sleep(Properties.Settings.Default.WAITVALUE);
-
-            foreach (string subFolder in Properties.Settings.Default.SUB_FOLDERS)
-            {
-                try
-                {
-                    string folderPath = inputPath + pathSeparator + subFolder;
-
-                    if (Directory.Exists(folderPath))
-                    {
-                        files = Directory.GetFiles(folderPath);
-
-                        logger.Info(files.Length == 0
-                            ? "No files found in the SubFolder: " + subFolder
-                            : "SubFolder: " + subFolder + " Files to be converted to UTF-8 are: " + files.Length);
-
-                        foreach (var file in files)
-                        {
-                            ConvertFileEncoding2Utf8(file, subFolder);
-                        }
-                    }
-                    else
-                    {
-                        logger.Warn("Folder does not exist: " + folderPath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.Error(ex, inputPath + pathSeparator + subFolder + " try");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.Error(ex, "Unhandled error in main loop");
-        }
-    }
-}
-```
-
-Also remove this using:
-
-```csharp
-using System.Windows.Forms;
-```
-
-You do not need it anymore.
-
----
-
-## 3. Add console + file logging to NLog
-
-In your `App.config`, add or update the `nlog` section like this:
-
-```xml
-<configuration>
-  <configSections>
-    <section name="nlog" type="NLog.Config.ConfigSectionHandler, NLog" />
-  </configSections>
-
-  <nlog xmlns="http://www.nlog-project.org/schemas/NLog.xsd"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        autoReload="true"
-        throwExceptions="false"
-        internalLogLevel="Trace"
-        internalLogFile="C:\logs\utf8-transformer-nlog-internal.log">
-
-    <targets>
-      <target xsi:type="Console"
-              name="console"
-              layout="${longdate} ${level:uppercase=true} ${message} ${exception:format=tostring}" />
-
-      <target xsi:type="File"
-              name="file"
-              fileName="C:\logs\utf8-transformer.log"
-              archiveFileName="C:\logs\archive\utf8-transformer.{#}.log"
-              archiveEvery="Day"
-              archiveNumbering="Rolling"
-              maxArchiveFiles="30"
-              layout="${longdate} ${level:uppercase=true} ${logger} ${message} ${exception:format=tostring}" />
-    </targets>
-
-    <rules>
-      <logger name="*" minlevel="Info" writeTo="console,file" />
-    </rules>
-  </nlog>
-
-  <!-- keep your existing appSettings / userSettings here -->
-</configuration>
-```
-
-Now every `logger.Info(...)`, `logger.Warn(...)`, and `logger.Error(...)` will appear in the console **and** in:
-
-```text
-C:\logs\utf8-transformer.log
-```
-
----
-
-## 4. Important checks if `C:\logs` is still empty
-
-Run CMD as normal user and test:
-
-```cmd
-mkdir C:\logs
-echo test > C:\logs\test.txt
-```
-
-If this fails, it is a permissions issue.
-
-Also check this file:
-
-```text
-C:\logs\utf8-transformer-nlog-internal.log
-```
-
-That file will tell you why NLog failed, for example bad config, missing target, access denied, etc.
-
----
-
-## Best final setup
-
-Use:
-
-```csharp
-private static readonly Logger logger = LogManager.GetCurrentClassLogger();
-```
-
-Instead of:
-
-```csharp
-private static readonly Logger logger = LogManager.GetCurrentClassLogger(typeof(Program));
-```
-
-Both can work, but this is cleaner:
-
-```csharp
-private static readonly Logger logger = LogManager.GetCurrentClassLogger();
-```
-
-So the main fix is:
-
-1. Change project output type to **Console Application**.
-2. Remove `Application.EnableVisualStyles()` and `System.Windows.Forms`.
-3. Add an NLog `Console` target.
-4. Add an NLog `File` target pointing to `C:\logs`.
+    <!--
+    Write all events with minimal level of Debug (So Debug, Info, Warn, Error and Fatal, but not Trace)  to "f"
+    <logger name="*" minlevel="Debug" writeTo="f" />
+    -->
+    <logger name="*" minlevel="Error" writeTo="logfile" />
+  </rules>
+</nlog>
