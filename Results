@@ -1,342 +1,212 @@
-/*
- * SonarQube, open source software quality management tool.
- * Copyright (C) 2008-2013 SonarSource
- * mailto:contact AT sonarsource DOT com
- *
- * SonarQube is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3 of the License, or (at your option) any later version.
- *
- * SonarQube is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+Yes. Your code is basically a console/background worker, but the project is still initialized like a **Windows Forms app** using `Application.EnableVisualStyles()` and `Application.SetCompatibleTextRenderingDefault(false)` before the infinite loop. 
 
-using System;
-using System.Windows.Forms;
-using System.IO;
+Do this in **2 parts**:
 
-namespace SGBL.Encoding.UTF8
+## 1. Change the project to Console Application
+
+In Visual Studio:
+
+**Project → Properties → Application → Output type → Console Application**
+
+Or in the `.csproj`, make sure it is:
+
+```xml
+<OutputType>Exe</OutputType>
+```
+
+Not:
+
+```xml
+<OutputType>WinExe</OutputType>
+```
+
+`WinExe` hides the console window.
+
+---
+
+## 2. Remove the WinForms startup code
+
+Change your `Main()` from this:
+
+```csharp
+[STAThread]
+public static void Main()
 {
-    /// <summary>
-    /// The program class.
-    /// </summary>
-    public static partial class Program
+    Application.EnableVisualStyles();
+    Application.SetCompatibleTextRenderingDefault(false);
+    LoadGlobalSettings();
+
+    string[] files = null;
+
+    while (true)
     {
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
-        [STAThread]
-
-        public static void Main()
-        {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            LoadGlobalSettings();
-            string[] files = null;
-            while (true)
-            {
-                System.Threading.Thread.Sleep(Properties.Settings.Default.WAITVALUE);
-                foreach (string subFolder in Properties.Settings.Default.SUB_FOLDERS)
-                {
-                    try
-                    {
-                        if (Directory.Exists(inputPath + pathSeparator + subFolder))
-                        {
-
-                            files = Directory.GetFiles(inputPath + pathSeparator + subFolder);
-                            logger.Info(files.Length == 0 ? " No files found in the SubFolder: " + subFolder : " SubFolder: " + subFolder + " Files to be converted 2 UTF-8 are: " + files.Length);
-                            foreach (var file in files)
-                            {
-                                ConvertFileEncoding2Utf8(file, subFolder);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        //logger.Info(" The below issue occured for the following file: " + Path.GetFileName(file));
-                        logger.Error(ex.Message + "  " + inputPath + pathSeparator + subFolder + " try");
-                    }
-                }
-            }
-            ////foreach (string subFolder in Properties.Settings.Default.SUB_FOLDERS)
-            ////{
-            ////    watch(subFolder);
-            ////}
-            ////while (true)
-            ////{
-            ////    System.Threading.Thread.Sleep(200);
-            ////    foreach (var file in files)
-            ////    {
-            ////        ConvertFileEncoding2Utf8(file);
-            ////    }
-            ////}
-        }
-
-        /// <summary>
-        /// Raises the changed event.
-        /// </summary>
-        /// <param name="source">The source.</param>
-        /// <param name="e">The file system event arguments.</param>
-        ////private static void OnChanged(object source, FileSystemEventArgs e)
-        ////{
-        ////    System.Threading.Thread.Sleep(200);
-        ////    if (!string.IsNullOrEmpty(Path.GetExtension(e.FullPath)))
-        ////        ConvertFileEncoding2Utf8(e.FullPath);
-        ////}
-
-        /// <summary>
-        /// The watch.
-        /// </summary>
-        /// <param name="watch_folder">The watch_folder.</param>
-        ////private static void watch(string watch_folder)
-        ////{
-        ////    if (Directory.Exists(inputPath + pathSeparator + watch_folder))
-        ////    {
-        ////        FileSystemWatcher watcher = new FileSystemWatcher(inputPath + pathSeparator + watch_folder);
-        ////        watcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
-        ////                     | NotifyFilters.FileName | NotifyFilters.DirectoryName;
-        ////        watcher.Created += new FileSystemEventHandler(OnChanged);
-        ////        watcher.Changed += new FileSystemEventHandler(OnChanged);
-        ////        watcher.EnableRaisingEvents = true;
-        ////        watcher.InternalBufferSize = 65536;
-        ////    }
-        ////}
+        ...
     }
 }
+```
 
+To this:
 
-
-//////////////////////////////////////////////////////
-/*
- * SonarQube, open source software quality management tool.
- * Copyright (C) 2008-2013 SonarSource
- * mailto:contact AT sonarsource DOT com
- *
- * SonarQube is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3 of the License, or (at your option) any later version.
- *
- * SonarQube is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
-
-using System;
-using System.IO;
-using System.Text;
-using NLog;
-using System.Configuration;
-
-namespace SGBL.Encoding.UTF8
+```csharp
+public static void Main()
 {
-    /// <summary>
-    /// The program class.
-    /// </summary>
-    public static partial class Program
+    Directory.CreateDirectory(@"C:\logs");
+
+    Console.Title = "UTF8 File Transformer";
+
+    LoadGlobalSettings();
+
+    logger.Info("UTF8 File Transformer started.");
+
+    string[] files = null;
+
+    while (true)
     {
-        /// <summary>
-        /// The ll (readonly). Value: LogManager.GetCurrentClassLogger().
-        /// </summary>
-        private static readonly Logger logger = LogManager.GetCurrentClassLogger(typeof(Program));
-
-        /// <summary>
-        /// The watcher.
-        /// </summary>
-       // private static FileSystemWatcher watcher;
-
-        /// <summary>
-        /// The input path.
-        /// </summary>
-        private static string inputPath;
-
-        /// <summary>
-        /// The output path.
-        /// </summary>
-        private static string outputPath;
-
-        /// <summary>
-        /// The archive path.
-        /// </summary>
-        private static string archivePath;
-
-        /// <summary>
-        /// The path separator (readonly). Value: "\\".
-        /// </summary>
-        private static string pathSeparator = "\\";
-
-        /// <summary>
-        /// The stream.
-        /// </summary>
-        private static FileStream stream;
-
-        /// <summary>
-        /// The reader.
-        /// </summary>
-        private static StreamReader reader;
-
-        /// <summary>
-        /// The is same input output path.
-        /// </summary>
-        private static bool isSameInputOutputPath = false;
-
-        /// <summary>
-        /// Dispose.
-        /// </summary>
-        private static void Dispose()
+        try
         {
-            reader.Dispose();
-            stream.Dispose();
-        }
+            System.Threading.Thread.Sleep(Properties.Settings.Default.WAITVALUE);
 
-        /// <summary>
-        /// Get the global settings.
-        /// </summary>
-        public static void LoadGlobalSettings()
-        {
-            inputPath = Properties.Settings.Default.INPUT_FOLDER_PATH;
-            outputPath = Properties.Settings.Default.OUTPUT_FOLDER_PATH;
-            archivePath = Properties.Settings.Default.ARCHIVE_FOLDER_PATH;
-            isSameInputOutputPath = inputPath == outputPath;
-        }
-
-        /// <summary>
-        /// Convert the file encoding2utf8.
-        /// </summary>
-        public static void ConvertFileEncoding2Utf8(string file, string subFolder)
-        {
-            // string[] files = null;
-            // string subFolder;
-            try
+            foreach (string subFolder in Properties.Settings.Default.SUB_FOLDERS)
             {
-                //int i = 0;
-                //int j = 1 / i;
-                logger.Info(" Start the encoding process for the files found in the InputPath directory");
-                //foreach (string subFolder in Properties.Settings.Default.SUB_FOLDERS)
-                //{
-                // files = Directory.GetFiles(inputPath + pathSeparator + subFolder);
-                // logger.Info(files.Length == 0 ? " No files found in the SubFolder: " + subFolder : " SubFolder: " + subFolder + " Files to be converted 2 UTF-8 are: " + files.Length);
-                //foreach (var file in files)
-                // {
                 try
                 {
-                    //EncodeFile2Utf8(file, subFolder);
+                    string folderPath = inputPath + pathSeparator + subFolder;
 
-                    // subFolder = Path.GetDirectoryName(file).Split('\\')[Path.GetDirectoryName(file).Split('\\').Length - 1];
-
-                    //if (!Directory.Exists(archivePath + pathSeparator + subFolder))
-                    //{
-                    //    Directory.CreateDirectory(archivePath + pathSeparator + subFolder);
-                    //}
-
-                    // File.Copy(file, archivePath + pathSeparator + subFolder + pathSeparator + Path.GetFileNameWithoutExtension(file) + "_" + DateTime.Now.ToString("yyyyMMdd_hhmmssfff") + Path.GetExtension(file), false);
-                    //File.Copy(file, archivePath + pathSeparator + subFolder + pathSeparator + Path.GetFileName(file), true);
-                    if (logger.IsInfoEnabled)
+                    if (Directory.Exists(folderPath))
                     {
-                        logger.Info(" The following file: " + Path.GetFileName(file) + " is copied to the Archive directory");
-                    }
-                    EncodeFile2Utf8(file, subFolder);
-                    if (!isSameInputOutputPath)
-                    {
-                        File.Delete(file);
-                        if (logger.IsInfoEnabled)
+                        files = Directory.GetFiles(folderPath);
+
+                        logger.Info(files.Length == 0
+                            ? "No files found in the SubFolder: " + subFolder
+                            : "SubFolder: " + subFolder + " Files to be converted to UTF-8 are: " + files.Length);
+
+                        foreach (var file in files)
                         {
-                            logger.Info(" The following file: " + Path.GetFileName(file) + " is deleted from the Input directory");
+                            ConvertFileEncoding2Utf8(file, subFolder);
                         }
                     }
+                    else
+                    {
+                        logger.Warn("Folder does not exist: " + folderPath);
+                    }
                 }
-
                 catch (Exception ex)
                 {
-                    logger.Info(" The below issue occured for the following file: " + Path.GetFileName(file));
-                    logger.Error(ex + " " + Path.GetFileName(file));
+                    logger.Error(ex, inputPath + pathSeparator + subFolder + " try");
                 }
-                //}
-                //}
             }
-            catch (Exception ex)
-            {
-                logger.Error(ex + " " + Path.GetFileName(file));
-            }
-
-            logger.Info(" The process to convert file(s) to UTF8 encoding is completed");
-            logger.Info("\n");
         }
-
-        /// <summary>
-        /// The convert2utf8.
-        /// </summary>
-        /// <param name="inputFilePath">The inputFilePath.</param>
-        /// <param name="outputFilePath">The outputFilePath.</param>
-        public static void Convert2Utf8(string inputFilePath, string outputFilePath, string subFolderName, string codePage = "Windows-1256")
+        catch (Exception ex)
         {
-            string fileContent = File.ReadAllText(inputFilePath, System.Text.Encoding.GetEncoding(codePage));
-            if (!Directory.Exists(outputPath + pathSeparator + subFolderName))
-            {
-                Directory.CreateDirectory(outputPath + pathSeparator + subFolderName);
-            }
-            File.WriteAllText(outputPath + pathSeparator + subFolderName + pathSeparator + Path.GetFileName(outputFilePath), fileContent, new System.Text.UTF8Encoding(false));
+            logger.Error(ex, "Unhandled error in main loop");
         }
+    }
+}
+```
 
-        /// <summary>
-        /// Get the file encoding.
-        /// </summary>
-        /// <param name="filePath">The path value.</param>
-        public static void EncodeFile2Utf8(string filePath, string subFolderName)
-        //  public static void EncodeFile2Utf8(string filePath)
-        {
-            stream = new FileStream(filePath, FileMode.Open);
-            reader = new StreamReader(stream, System.Text.Encoding.Default, true);
-            var codePage = string.Empty;
-            reader.Read();
-            if (reader.CurrentEncoding != System.Text.Encoding.Default)
-            {
-                // in case of BOM
-                if (reader.CurrentEncoding.HeaderName != "utf-8")
-                {
-                    codePage = reader.CurrentEncoding.HeaderName;
-                    Dispose();
-                    Convert2Utf8(filePath, outputPath + pathSeparator + Path.GetFileName(filePath), subFolderName, codePage);
-                    if (logger.IsInfoEnabled)
-                    {
-                        logger.Info(" The following file: " + Path.GetFileName(filePath) + " is successfully converted to UTF8 with the following CodePage: " + codePage);
-                    }
-                }
-                else
-                {
-                    codePage = reader.CurrentEncoding.HeaderName;
-                    Dispose();
-                    Convert2Utf8(filePath, outputPath + pathSeparator + Path.GetFileName(filePath), subFolderName, codePage);
-                    if (logger.IsInfoEnabled)
-                    {
-                        logger.Info(" The following file: " + Path.GetFileName(filePath) + " is successfully converted to UTF8 with the following CodePage: " + codePage);
-                    }
-                }
+Also remove this using:
 
-                return;
-            }
-            stream.Position = 0;
-            reader = new StreamReader(stream, new UTF8Encoding(false, true));
-            try
-            {
-                reader.ReadToEnd();
-                Dispose();
-                if (!Directory.Exists(outputPath + pathSeparator + subFolderName))
-                {
-                    Directory.CreateDirectory(outputPath + pathSeparator + subFolderName);
-                }
-                if (!isSameInputOutputPath)
-                {
-                    File.Copy(filePath, outputPath + pathSeparator + subFolderName + pathSeparator + Path.GetFileName(file
+```csharp
+using System.Windows.Forms;
+```
+
+You do not need it anymore.
+
+---
+
+## 3. Add console + file logging to NLog
+
+In your `App.config`, add or update the `nlog` section like this:
+
+```xml
+<configuration>
+  <configSections>
+    <section name="nlog" type="NLog.Config.ConfigSectionHandler, NLog" />
+  </configSections>
+
+  <nlog xmlns="http://www.nlog-project.org/schemas/NLog.xsd"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        autoReload="true"
+        throwExceptions="false"
+        internalLogLevel="Trace"
+        internalLogFile="C:\logs\utf8-transformer-nlog-internal.log">
+
+    <targets>
+      <target xsi:type="Console"
+              name="console"
+              layout="${longdate} ${level:uppercase=true} ${message} ${exception:format=tostring}" />
+
+      <target xsi:type="File"
+              name="file"
+              fileName="C:\logs\utf8-transformer.log"
+              archiveFileName="C:\logs\archive\utf8-transformer.{#}.log"
+              archiveEvery="Day"
+              archiveNumbering="Rolling"
+              maxArchiveFiles="30"
+              layout="${longdate} ${level:uppercase=true} ${logger} ${message} ${exception:format=tostring}" />
+    </targets>
+
+    <rules>
+      <logger name="*" minlevel="Info" writeTo="console,file" />
+    </rules>
+  </nlog>
+
+  <!-- keep your existing appSettings / userSettings here -->
+</configuration>
+```
+
+Now every `logger.Info(...)`, `logger.Warn(...)`, and `logger.Error(...)` will appear in the console **and** in:
+
+```text
+C:\logs\utf8-transformer.log
+```
+
+---
+
+## 4. Important checks if `C:\logs` is still empty
+
+Run CMD as normal user and test:
+
+```cmd
+mkdir C:\logs
+echo test > C:\logs\test.txt
+```
+
+If this fails, it is a permissions issue.
+
+Also check this file:
+
+```text
+C:\logs\utf8-transformer-nlog-internal.log
+```
+
+That file will tell you why NLog failed, for example bad config, missing target, access denied, etc.
+
+---
+
+## Best final setup
+
+Use:
+
+```csharp
+private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+```
+
+Instead of:
+
+```csharp
+private static readonly Logger logger = LogManager.GetCurrentClassLogger(typeof(Program));
+```
+
+Both can work, but this is cleaner:
+
+```csharp
+private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+```
+
+So the main fix is:
+
+1. Change project output type to **Console Application**.
+2. Remove `Application.EnableVisualStyles()` and `System.Windows.Forms`.
+3. Add an NLog `Console` target.
+4. Add an NLog `File` target pointing to `C:\logs`.
