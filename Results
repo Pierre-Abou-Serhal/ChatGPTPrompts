@@ -1,68 +1,38 @@
-This communication and its subject matter are confidential. You must not in any way, other than to comply with this communication, disclose the contents or the subject matter of this communication. 
-Dear Team,
-What is Happening?
-As part of a combination of both industry changes and Mastercard’s focus on providing highly reliable, performant and secure solutions there are several important changes planned in 2026 that may affect your current integration.
-DNS Changes
-The DNS changes will move from static records that map IP addresses to hostnames on a one-to-one basis to rotating DNS records across multiple IP addresses to enable greater flexibility in traffic routing for availability and performance optimization.
-Beginning July 1, 2026, our Payment Gateway services will commence a series of updates to the Domain Name System (DNS) configuration strategy for internet-facing endpoints and the currently supported Transport Layer Security (TLS) cipher lists. These enhancements are part of our ongoing efforts to improve security and resiliency in accordance with current industry best practices.
-PKI Root Certificate Authority Changes
-From 30 June 2026, major browsers will enforce changes to TLS certificate issuing practices which will result in certificates currently used for authentication to be unable to be renewed as the authorities are mandating separation between client authentication and service identification issuing chains. As a result, all current Root Certificate Authorities for client certificates used to authenticate to the PKI interface will stop supporting the signing of the Client Authentication “Extended Key Usage” attribute and alternative issuing roots will need to be adopted.
-Certificate providers have already stopped adding this flag to new certificates or renewals by default and plan to cease signing entirely by Q2 2026. Merchants should check with their chosen certificate provider for specific timelines.
-To maintain support for the current authentication mechanism, Mastercard has reviewed available public issuing options and approved the following certificate authorities who are offering client authentication as an ongoing solution to be trusted issuers for merchants to transition to.
-•	Digicert - DigiCert Assured ID Client CA G2
-•	GlobalSign - GlobalSign Client Authentication Root R45
-•	SSL.COM - SSL.com Client RSA Root CA 2022 & SSL.com Client ECC Root CA 2022
-Please be advised that Mastercard will continue to assess additional emerging options and will communicate further details when they become available.
-Merchants should check the expiry dates of their current certificates and either arrange an early renewal with the client authentication flag enabled through their supplier or start planning a move to one of the listed alternate Root Certificate Authorities before the certificate expires.
-For merchants whose certificates expire after 30 June 2026, Mastercard will support those certificates until their expiry date or 30 June 2027, whichever comes first. After that, merchants must transition to one of the nominated alternate issuing authorities listed above.
-Transport Layer Security Cipher Changes
-In alignment with current best practice security standards, supported cipher lists are regularly reviewed to remove weaker ciphers from service whenever possible when not constrained by widespread customer or consumer usage.
-Please note that the exact TLS ciphers negotiable will vary depending on whether TLSv1.2 or TLSv1.3 protocol is used on the connection.
-What do you need to do?
-It is strongly recommended that you promptly engage your system administrator or network team, as they possess the necessary expertise to make the required changes below to your system configuration. Their involvement will ensure that any updates to DNS settings, firewall rules, access control lists, or TLS cipher suites are implemented correctly and securely. Your collaboration with your IT specialists will also help minimise downtime and prevent any inadvertent disruption to your services during this process. It is recommended not to make these changes unless you have the relevant technical knowledge and authorisation, as improper configuration could compromise the security or accessibility of your systems.
-For DNS Changes:
-Review any firewall rules or other IP address access control lists to ensure that the address ranges in the table below are permitted on tcp/443 (standard HTTPS).
-Validate that any DNS caching mechanisms in your integration are set to honour the Time to Live Values (TTLs) of the DNS records as these will be decreased from the current one-hour default to sixty seconds.
-Region 	Current Default IP Range(s) 	Additional IP Ranges 
-Asia Pacific 	103.55.149.0/24 	103.55.148.0/24 
-103.55.150.0/24 
-Kingdom of Saudi Arabia 	185.199.60.0/24 
-185.199.61.0/24 	No changes required. 
-North America 
-Production & Mastercard Test Facilities 	216.119.218.0/24 	216.119.222.0/24 
-216.119.223.0/24 
-Europe 	185.175.205.0/24 	185.96.136.0/24 
-185.175.204.0/24 
-216.119.222.0/24 
-216.119.223.0/24 
-India 	45.115.129.0/24 	45.115.128.0/24 
-45.115.130.0/24 
-For TLS Cipher Changes:
-Review your integration’s TLS software library’s configuration to confirm a compatible cipher from the list below is available on TLS version 1.2 or TLS version 1.3, if no compatible cipher is available, software updates may be required.
-TLS13-AES256-GCM-SHA384
-TLS13-AES128-GCM-SHA256
-TLS13-CHACHA20-POLY1305-SHA256
-ECDHE-ECDSA-AES256-GCM-SHA384
-ECDHE-ECDSA-AES128-GCM-SHA256
-ECDHE-ECDSA-CHACHA20-POLY1305-SHA256
-ECDHE-RSA-AES128-GCM-SHA256
-ECDHE-RSA-AES256-GCM-SHA384
-ECDHE-RSA-CHACHA20-POLY1305-SHA256
-Note: For internet browser or mobile device integrations the above cipher list has widespread compatibility with currently supported Operating Systems, major internet browsers and mobile devices but may not be compatible with unpatched systems or devices beyond normal service life.
-Please ensure the above DNS and TLS Cipher changes are completed by June 30, 2026.
-For PKI Root Certificate Authority Changes
-If your integration uses TLS client certificate authentication, also known as Mutual TLS authentication:
-1.	Review your current certificates expiry date and root issuing authority.
-2.	If you can’t get a new certificate from the listed authorities before expiry, ask your current certificate provider for an early renewal with the client authentication key enabled. This gives you extra time to plan your transition.
-Action Required by Your Merchant
-Please notify your merchants that they are also required to make the above integration changes. 
-Find attached a customizable email template provided for your use in communicating clear instructions regarding the actions required by your merchants.
-Further Information
-Our team will be available to assist you should you have any questions or require further clarification. Please do not hesitate to email abdalla.attya@mastercard.com or call 
-+201140350038.
-Thank you for your cooperation regarding this matter.
-Kind regards,
+Use a professional tone and avoid saying “devs have nothing to do” too directly. Say that **no application code change is currently identified**, and that the required actions are mainly **network/security/certificate configuration**.
 
-Abdalla Attya
-Technical Account Manager
-Products and Solutions
+Dear [Name],
+
+We have received the below communication from Mastercard regarding upcoming 2026 changes that may affect the Payment Gateway integration.
+
+Based on the content of the email, the required actions appear to be mainly on the network/security/infrastructure side, specifically:
+
+1. **DNS / Firewall changes**
+
+   * Review any firewall rules, proxy rules, NAT rules, or IP-based access control lists.
+   * Ensure that the Mastercard Payment Gateway IP ranges applicable to our region are allowed on **TCP/443**.
+   * Confirm that we are not relying on static IP-to-hostname mappings, since Mastercard will move to rotating DNS records.
+   * Ensure that any DNS caching mechanism respects the DNS TTL, which will be reduced to **60 seconds**.
+
+2. **TLS cipher compatibility**
+
+   * Confirm that our network/security appliances, proxies, firewalls, and TLS inspection components support at least one of the TLS 1.2 / TLS 1.3 cipher suites listed by Mastercard.
+   * If any component uses outdated TLS libraries or restrictive cipher configurations, it may need to be updated before the deadline.
+
+3. **PKI / Mutual TLS certificate**
+
+   * If our integration with Mastercard uses client certificate authentication / Mutual TLS, please review:
+
+     * the current certificate expiry date;
+     * the current root issuing authority;
+     * whether the certificate includes the required Client Authentication usage.
+   * Mastercard mentioned that certificates expiring after **30 June 2026** will be supported until their expiry date or **30 June 2027**, whichever comes first.
+   * After that, we will need to transition to one of the approved certificate authorities mentioned in the email.
+
+From the development side, based on the information provided, we do not currently identify any required source-code changes. The main required changes are related to firewall/DNS/TLS/certificate configuration.
+
+However, we can support with application testing after the network/security changes are applied, and we can also help validate the connectivity from the application side if needed.
+
+Kindly review the required actions with your team and advise if any input is needed from our side.
+
+Best regards,
+Pierre
