@@ -1,5 +1,4 @@
-This is a sample release pipeline of my Logger Windows Service:
-name: LOGGER_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
+name: MOMA_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
 - name: targetEnvironment
@@ -14,12 +13,12 @@ parameters:
 - name: deployService
   type: boolean
   default: false
-  displayName: 'Deploy Logger Service'
+  displayName: 'Deploy Mobile Money Transfer Service'
 
 - name: deployDatabase
   type: boolean
   default: false
-  displayName: 'Deploy Logger Database'
+  displayName: 'Deploy Mobile Money Transfer Database'
 
 - name: serviceBuildNumber
   type: string
@@ -45,20 +44,22 @@ variables:
 - name: deploymentPool
   value: 'Deployment Pool'
 
+# Your current build pipelines trigger only on release/*.
+# Keep hotfix here only if you later enable hotfix/* builds as well.
 - name: buildSourceBranchRegex
   value: '^refs/heads/(release|hotfix)/'
 
 - name: serviceArtifactName
-  value: 'logger-service-drop'
+  value: 'alterna-mobile-money-transfer-service-drop'
 
 - name: dbArtifactName
-  value: 'alterna-logger-db-drop'
+  value: 'alterna-mobile-money-transfer-db-drop'
 
 - name: serviceZipName
-  value: 'Alterna-Logger-drop.zip'
+  value: 'Alterna-Mobile-Money-Transfer-drop.zip'
 
 - name: dbDacpacFileName
-  value: 'DatabaseProjectAlterna.Logger.dacpac'
+  value: 'DatabaseProjectAlterna_MobileMoneyTransfer.dacpac'
 
 # SIT
 - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
@@ -67,11 +68,12 @@ variables:
   - name: environmentName
     value: 'SIT'
 
+  # IMPORTANT: Must exactly match the Azure DevOps pipeline name.
   - name: servicePipelineName
-    value: 'BUILD - SERVICE - Alterna Logger'
+    value: 'BUILD - SERVICE - Alterna MOMA'
 
   - name: dbPipelineName
-    value: 'BUILD - DB - Alterna Logger'
+    value: 'BUILD - DB - Alterna MOMA'
 
   - name: resolveAgentName
     value: 'SIT-ALTERNA-BN1'
@@ -86,7 +88,7 @@ variables:
     value: 'SGBL\pabouserhal'
 
   - name: approvalInstructions
-    value: 'Approve SIT Alterna Logger deployment.'
+    value: 'Approve SIT Alterna Mobile Money Transfer deployment.'
 
   - name: managementApprovalNotifyUsers
     value: 'SGBL\kabbas'
@@ -94,45 +96,50 @@ variables:
   - name: dbaApprovalNotifyUsers
     value: 'SGBL\hkassab'
 
+  # TODO: Verify the real Windows service name.
   - name: serviceNameValue
-    value: 'LoggerService'
+    value: 'AlternaMobileMoneyTransfer'
 
+  # TODO: Verify the deployment folder on the SIT server.
   - name: serviceTargetPathValue
-    value: 'C:\inetpub\wwwroot\Alterna Logging Service'
+    value: 'C:\Alterna Backend Services\AlternaMobileMoneyTransfer'
 
+  # TODO: Replace with a real endpoint returning HTTP 200.
+  # Example: http://server:port/health
   - name: healthCheckUrlValue
-    value: 'http://10.0.40.41:8046/api/Host/GetIndividualCustomerRange?fromCustomerId=1&toCustomerId=1'
+    value: 'http://SIT-MOMA-URL/health'
 
   - name: backupRoot
-    value: 'C:\DeployBackups\SIT\LOGGER'
+    value: 'C:\DeployBackups\SIT\MOMA'
 
 # UAT
 - ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-  - group: UAT_VARIABLE_GROUP   # TODO verify actual group name
+  - group: UAT_VARIABLE_GROUP
 
   - name: environmentName
     value: 'UAT'
 
+  # IMPORTANT: Must exactly match the Azure DevOps pipeline name.
   - name: servicePipelineName
-    value: 'BUILD - SERVICE - Alterna Logger'
+    value: 'BUILD - SERVICE - Alterna MOMA'
 
   - name: dbPipelineName
-    value: 'BUILD - DB - Alterna Logger'
+    value: 'BUILD - DB - Alterna MOMA'
 
   - name: resolveAgentName
-    value: 'UAT-ALTERNA-BN1'   # TODO verify
+    value: 'UAT-ALTERNA-BN1'
 
   - name: serviceAgentName
-    value: 'UAT-ALTERNA-BN1'   # TODO verify
+    value: 'UAT-ALTERNA-BN1'
 
   - name: dbAgentName
-    value: 'UAT-ALTERNA-BN1'   # TODO verify
+    value: 'UAT-ALTERNA-BN1'
 
   - name: approvalNotifyUsers
     value: 'SGBL\pabouserhal'
 
   - name: approvalInstructions
-    value: 'Approve UAT Alterna Logger deployment.'
+    value: 'Approve UAT Alterna Mobile Money Transfer deployment.'
 
   - name: managementApprovalNotifyUsers
     value: 'SGBL\kabbas'
@@ -140,45 +147,49 @@ variables:
   - name: dbaApprovalNotifyUsers
     value: 'SGBL\hkassab'
 
+  # TODO: Verify the real Windows service name.
   - name: serviceNameValue
-    value: 'LoggerService'   # TODO verify
+    value: 'AlternaMobileMoneyTransfer'
 
+  # TODO: Verify the deployment folder on the UAT server.
   - name: serviceTargetPathValue
-    value: 'C:\Alterna Backend Services\AlternaLogger'   # TODO verify
+    value: 'C:\Alterna Backend Services\AlternaMobileMoneyTransfer'
 
+  # TODO: Replace with a real endpoint returning HTTP 200.
   - name: healthCheckUrlValue
-    value: 'http://UAT-LOGGER-URL/health'   # TODO replace
+    value: 'http://UAT-MOMA-URL/health'
 
   - name: backupRoot
-    value: 'C:\DeployBackups\UAT\LOGGER'
+    value: 'C:\DeployBackups\UAT\MOMA'
 
 # PROD
 - ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-  - group: PROD_VARIABLE_GROUP   # TODO verify actual group name
+  - group: PROD_VARIABLE_GROUP
 
   - name: environmentName
     value: 'PROD'
 
+  # IMPORTANT: Must exactly match the Azure DevOps pipeline name.
   - name: servicePipelineName
-    value: 'BUILD - SERVICE - Alterna Logger'
+    value: 'BUILD - SERVICE - Alterna MOMA'
 
   - name: dbPipelineName
-    value: 'BUILD - DB - Alterna Logger'
+    value: 'BUILD - DB - Alterna MOMA'
 
   - name: resolveAgentName
-    value: 'PROD-ALTERNA-BN1'   # TODO verify
+    value: 'PROD-ALTERNA-BN1'
 
   - name: serviceAgentName
-    value: 'PROD-ALTERNA-BN1'   # TODO verify
+    value: 'PROD-ALTERNA-BN1'
 
   - name: dbAgentName
-    value: 'PROD-ALTERNA-BN1'   # TODO verify
+    value: 'PROD-ALTERNA-BN1'
 
   - name: approvalNotifyUsers
     value: 'SGBL\pabouserhal'
 
   - name: approvalInstructions
-    value: 'Approve PROD Alterna Logger deployment.'
+    value: 'Approve PROD Alterna Mobile Money Transfer deployment.'
 
   - name: managementApprovalNotifyUsers
     value: 'SGBL\kabbas'
@@ -186,17 +197,20 @@ variables:
   - name: dbaApprovalNotifyUsers
     value: 'SGBL\hkassab'
 
+  # TODO: Verify the real Windows service name.
   - name: serviceNameValue
-    value: 'LoggerService'   # TODO verify
+    value: 'AlternaMobileMoneyTransfer'
 
+  # TODO: Verify the deployment folder on the PROD server.
   - name: serviceTargetPathValue
-    value: 'C:\Alterna Backend Services\AlternaLogger'   # TODO verify
+    value: 'C:\Alterna Backend Services\AlternaMobileMoneyTransfer'
 
+  # TODO: Replace with a real endpoint returning HTTP 200.
   - name: healthCheckUrlValue
-    value: 'http://PROD-LOGGER-URL/health'   # TODO replace
+    value: 'http://PROD-MOMA-URL/health'
 
   - name: backupRoot
-    value: 'C:\DeployBackups\PROD\LOGGER'
+    value: 'C:\DeployBackups\PROD\MOMA'
 
 stages:
 
@@ -228,7 +242,7 @@ stages:
         $deployDb      = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
 
         if (-not ($deployService -or $deployDb)) {
-          throw 'At least one deployment target must be selected: Logger Service or Database.'
+          throw 'At least one deployment target must be selected: Mobile Money Transfer Service or Database.'
         }
 
         function Normalize-BuildNumber {
@@ -252,6 +266,7 @@ stages:
           }
 
           $encodedName = [System.Uri]::EscapeDataString($PipelineName)
+
           $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
             $collectionUri,
             $projectName,
@@ -334,7 +349,10 @@ stages:
         }
 
         if ($deployService) {
-          Resolve-Build -Label 'Service' -PipelineName '$(servicePipelineName)' -BuildNumber '${{ parameters.serviceBuildNumber }}'
+          Resolve-Build `
+            -Label 'Service' `
+            -PipelineName '$(servicePipelineName)' `
+            -BuildNumber '${{ parameters.serviceBuildNumber }}'
         } else {
           Write-Host '##vso[task.setvariable variable=ServicePipelineDefinitionId;isOutput=true]'
           Write-Host '##vso[task.setvariable variable=ServiceBuildId;isOutput=true]'
@@ -343,7 +361,10 @@ stages:
         }
 
         if ($deployDb) {
-          Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
+          Resolve-Build `
+            -Label 'Db' `
+            -PipelineName '$(dbPipelineName)' `
+            -BuildNumber '${{ parameters.dbBuildNumber }}'
         } else {
           Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
           Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
@@ -375,7 +396,7 @@ stages:
       artifactBuildId: '$(DbBuildId)'
       artifactName: '$(dbArtifactName)'
       previewArtifactName: 'db-preview-$(environmentName)'
-      targetConnectionString: '$(AppConfig.ConnectionString)'
+      targetConnectionString: '$(GlobalSettings.ConnString)'
 
 - stage: Approval_Release
   displayName: 'Approval for $(environmentName) release'
@@ -394,6 +415,7 @@ stages:
         - Agent.Name -equals $(resolveAgentName)
       steps:
       - checkout: none
+
       - powershell: |
           Write-Host 'SIT selected. No manual approval is required.'
         displayName: 'Skip manual approval'
@@ -426,7 +448,7 @@ stages:
 
   - ${{ if and(ne(parameters.targetEnvironment, 'SIT'), eq(parameters.deployDatabase, true)) }}:
     - job: WaitForDbaApproval
-      displayName: 'Wait for DBA approval'
+      displayName: 'Wait for DBA Approval'
       dependsOn: WaitForManagementApproval
       pool: server
       timeoutInMinutes: 1500
@@ -435,12 +457,12 @@ stages:
         timeoutInMinutes: 1440
         inputs:
           notifyUsers: '$(dbaApprovalNotifyUsers)'
-          instructions: 'Approve $(environmentName) Alterna Logger database deployment.'
+          instructions: 'Approve $(environmentName) Alterna Mobile Money Transfer database deployment.'
           onTimeout: 'reject'
 
 - ${{ if eq(parameters.deployService, true) }}:
   - stage: Deploy_Service
-    displayName: 'Deploy Logger Service to $(environmentName)'
+    displayName: 'Deploy Mobile Money Transfer Service to $(environmentName)'
     dependsOn:
     - Resolve_Selected_Builds
     - Approval_Release
@@ -454,18 +476,20 @@ stages:
       parameters:
         jobDependsOn: []
         jobCondition: succeeded()
-        deploymentName: 'DeployLoggerService'
-        deploymentDisplayName: 'Deploy Alterna Logger Windows Service - ${{ parameters.targetEnvironment }}'
+        deploymentName: 'DeployMobileMoneyTransferService'
+        deploymentDisplayName: 'Deploy Alterna Mobile Money Transfer Service - ${{ parameters.targetEnvironment }}'
         environmentName: '${{ parameters.targetEnvironment }}'
         deployPool: '$(deploymentPool)'
         deployAgentName: '$(serviceAgentName)'
+
         ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
           variableGroup: 'SIT_VARIABLE_GROUP'
         ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
           variableGroup: 'UAT_VARIABLE_GROUP'
         ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
           variableGroup: 'PROD_VARIABLE_GROUP'
-        componentName: 'LOGGER'
+
+        componentName: 'MOMA'
         artifactName: '$(serviceArtifactName)'
         artifactBuildType: 'specific'
         artifactProject: '$(System.TeamProject)'
@@ -476,20 +500,27 @@ stages:
         serviceName: '$(serviceNameValue)'
         serviceTargetPath: '$(serviceTargetPathValue)'
         cleanTargetBeforeCopy: true
+
+        # Preserve any runtime-generated logs/keys during deployment.
         cleanExcludeCsv: 'logs,Keys'
+
         enableJsonTransform: true
         jsonFiles: '**/appsettings.json'
+
         enableXmlConfigTransform: false
         xmlConfigFiles: []
         xmlVariableValues: {}
+
         enableCustomXmlEdits: false
         customXmlEdits: []
         customXmlVariableValues: {}
+
         enableHealthCheck: true
         healthCheckUrl: '$(healthCheckUrlValue)'
         healthCheckExpectedStatusCode: '200'
         healthCheckRetries: 6
         healthCheckDelaySeconds: 10
+
         enableLocalBackup: true
         backupRoot: '$(backupRoot)'
         backupPath: '$(backupRoot)\$(Build.BuildId)'
@@ -517,20 +548,21 @@ stages:
       - template: pipelines/tag-builds.yml@templates
         parameters:
           tagTargets:
-          - name: 'Alterna Logger Service'
+          - name: 'Alterna Mobile Money Transfer Service'
             buildId: '$(ServiceBuildId)'
             definitionId: '$(ServicePipelineDefinitionId)'
-            deployedTag: 'DEPLOYED-$(environmentName)-LOGGER-SVC'
-            lkgTag: 'LKG-$(environmentName)-LOGGER-SVC'
+            deployedTag: 'DEPLOYED-$(environmentName)-MOMA-SVC'
+            lkgTag: 'LKG-$(environmentName)-MOMA-SVC'
             makeLkgUnique: true
 
 - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployService, true)) }}:
   - stage: Deploy_DB_After_Service
-    displayName: 'Deploy Logger DB to $(environmentName) after Service'
+    displayName: 'Deploy Mobile Money Transfer DB to $(environmentName) after Service'
     dependsOn:
     - Resolve_Selected_Builds
+    - Approval_Release
     - Tag_SERVICE_LKG
-    condition: succeeded('Tag_SERVICE_LKG')
+    condition: and(succeeded('Approval_Release'), succeeded('Tag_SERVICE_LKG'))
     variables:
       DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
       DbBuildId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId'] ]
@@ -541,7 +573,7 @@ stages:
         jobDependsOn: []
         jobCondition: succeeded()
         deploymentName: 'DeployDb'
-        deploymentDisplayName: 'Deploy Alterna Logger database'
+        deploymentDisplayName: 'Deploy Alterna Mobile Money Transfer database'
         environmentName: '${{ parameters.targetEnvironment }}'
         deployPool: '$(deploymentPool)'
         deployAgentName: '$(dbAgentName)'
@@ -551,13 +583,13 @@ stages:
         artifactDefinitionId: '$(DbPipelineDefinitionId)'
         artifactBuildId: '$(DbBuildId)'
         artifactBranch: '$(DbSourceBranch)'
-        targetConnectionString: '$(AppConfig.ConnectionString)'
+        targetConnectionString: '$(GlobalSettings.ConnString)'
         dacpacFileName: '$(dbDacpacFileName)'
         artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
 
 - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployService, false)) }}:
   - stage: Deploy_DB_Only
-    displayName: 'Deploy Logger DB to $(environmentName)'
+    displayName: 'Deploy Mobile Money Transfer DB to $(environmentName)'
     dependsOn:
     - Resolve_Selected_Builds
     - Approval_Release
@@ -572,7 +604,7 @@ stages:
         jobDependsOn: []
         jobCondition: succeeded()
         deploymentName: 'DeployDb'
-        deploymentDisplayName: 'Deploy Alterna Logger database'
+        deploymentDisplayName: 'Deploy Alterna Mobile Money Transfer database'
         environmentName: '${{ parameters.targetEnvironment }}'
         deployPool: '$(deploymentPool)'
         deployAgentName: '$(dbAgentName)'
@@ -582,7 +614,7 @@ stages:
         artifactDefinitionId: '$(DbPipelineDefinitionId)'
         artifactBuildId: '$(DbBuildId)'
         artifactBranch: '$(DbSourceBranch)'
-        targetConnectionString: '$(AppConfig.ConnectionString)'
+        targetConnectionString: '$(GlobalSettings.ConnString)'
         dacpacFileName: '$(dbDacpacFileName)'
         artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
 
@@ -601,7 +633,7 @@ stages:
       DbPipelineDefinitionId: $[ stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId'] ]
     jobs:
     - job: TagDatabaseBuild
-      displayName: 'Tag DB build'
+      displayName: 'Tag database build'
       pool:
         name: '$(deploymentPool)'
         demands:
@@ -612,250 +644,9 @@ stages:
       - template: pipelines/tag-builds.yml@templates
         parameters:
           tagTargets:
-          - name: 'Alterna Logger DB'
+          - name: 'Alterna Mobile Money Transfer DB'
             buildId: '$(DbBuildId)'
             definitionId: '$(DbPipelineDefinitionId)'
-            deployedTag: 'DEPLOYED-$(environmentName)-LOGGER-DB'
-            lkgTag: 'LKG-$(environmentName)-LOGGER-DB'
+            deployedTag: 'DEPLOYED-$(environmentName)-MOMA-DB'
+            lkgTag: 'LKG-$(environmentName)-MOMA-DB'
             makeLkgUnique: true
-
-
-I want to create the Alterna Mobile Money Transfer Release pipeline.
-These are the pipelines that I have:
-
-Build database pipeline:
-name: MOMA_DB_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-    - release/*
-  paths:
-    include:
-    - DatabaseProjectAlterna_MobileMoneyTransfer/**
-
-pr: none
-
-stages:
-- stage: Build_DB
-  displayName: 'Build DB'
-  jobs:
-  - template: pipelines/build-database-project.yml@templates
-    parameters:
-      jobName: 'BuildDb'
-      jobDisplayName: 'Build database project'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      sqlProjectPath: 'DatabaseProjectAlterna_MobileMoneyTransfer/DatabaseProjectAlterna_MobileMoneyTransfer.sqlproj'
-      artifactName: 'alterna-mobile-money-transfer-db-drop'
-      dacpacFileName: 'DatabaseProjectAlterna_MobileMoneyTransfer.dacpac'
-
-generate db preview pipleine:
-name: MOMA_DB_PREVIEW_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
-
-parameters:
-- name: targetEnvironment
-  type: string
-  default: SIT
-  values:
-  - SIT
-  - UAT
-  - PROD
-  displayName: 'Target Environment'
-
-- name: dbBuildNumber
-  type: string
-  default: ''
-  displayName: 'DB Build Number'
-
-resources:
-  repositories:
-  - repository: templates
-    type: git
-    name: 'Azure Templates/Azure Templates'
-    ref: refs/heads/main
-
-trigger: none
-pr: none
-
-variables:
-- name: deploymentPool
-  value: 'Deployment Pool'
-
-- name: dbPipelineName
-  value: 'BUILD - DB - Alterna MOMA'
-
-- name: dbArtifactName
-  value: 'alterna-mobile-money-transfer-db-drop'
-
-- ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-  - group: SIT_VARIABLE_GROUP
-  - name: environmentName
-    value: 'SIT'
-  - name: dbAgentName
-    value: 'SIT-ALTERNA-BN1'
-
-- ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-  - group: UAT_VARIABLE_GROUP
-  - name: environmentName
-    value: 'UAT'
-  - name: dbAgentName
-    value: 'UAT-ALTERNA-BN1'   # adjust if needed
-
-- ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-  - group: PROD_VARIABLE_GROUP
-  - name: environmentName
-    value: 'PROD'
-  - name: dbAgentName
-    value: 'PROD-ALTERNA-BN1'  # adjust if needed
-
-stages:
-- stage: Resolve_DB_Build
-  displayName: 'Resolve DB build'
-  jobs:
-  - job: ResolveDbBuild
-    displayName: 'Resolve DB build number'
-    pool:
-      name: '$(deploymentPool)'
-      demands:
-      - Agent.Name -equals $(dbAgentName)
-    steps:
-    - checkout: none
-
-    - powershell: |
-        $ErrorActionPreference = 'Stop'
-
-        if ([string]::IsNullOrWhiteSpace('${{ parameters.dbBuildNumber }}')) {
-          throw 'dbBuildNumber is required.'
-        }
-
-        $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-        $projectName   = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-        $apiVersion    = '7.1'
-
-        $headers = @{
-          Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-        }
-
-        $pipelineName = '$(dbPipelineName)'
-        $encodedName = [System.Uri]::EscapeDataString($pipelineName)
-
-        $definitionsUri = "{0}/{1}/_apis/build/definitions?name={2}&api-version={3}" -f `
-          $collectionUri, $projectName, $encodedName, $apiVersion
-
-        $definitions = Invoke-RestMethod -Method Get -Uri $definitionsUri -Headers $headers
-        $definition = @($definitions.value | Where-Object { $_.name -eq $pipelineName }) | Select-Object -First 1
-
-        if (-not $definition) {
-          throw "Could not resolve pipeline definition for [$pipelineName]."
-        }
-
-        $buildNumber = [System.Uri]::EscapeDataString('${{ parameters.dbBuildNumber }}')
-
-        $buildsUri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-          $collectionUri, $projectName, $definition.id, $buildNumber, $apiVersion
-
-        $builds = Invoke-RestMethod -Method Get -Uri $buildsUri -Headers $headers
-        $build = @($builds.value) | Select-Object -First 1
-
-        if (-not $build) {
-          throw "No successful DB build found for build number [${{ parameters.dbBuildNumber }}]."
-        }
-
-        Write-Host "Resolved build:"
-        Write-Host "  Definition ID = $($definition.id)"
-        Write-Host "  Build ID      = $($build.id)"
-        Write-Host "  Build Number  = $($build.buildNumber)"
-        Write-Host "  Source Branch = $($build.sourceBranch)"
-
-        Write-Host "##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]$($definition.id)"
-        Write-Host "##vso[task.setvariable variable=DbBuildId;isOutput=true]$($build.id)"
-        Write-Host "##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-      name: Resolve
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-- stage: Generate_DB_Preview
-  displayName: 'Generate DB preview for $(environmentName)'
-  dependsOn:
-  - Resolve_DB_Build
-  condition: succeeded('Resolve_DB_Build')
-  variables:
-    DbPipelineDefinitionId: $[ stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbPipelineDefinitionId'] ]
-    DbBuildId: $[ stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbBuildId'] ]
-  jobs:
-  - template: pipelines/generate-db-preview.yml@templates
-    parameters:
-      jobName: 'GeneratePreview'
-      jobDisplayName: 'Generate DB preview for $(environmentName)'
-      deployPool: '$(deploymentPool)'
-      deployAgentName: '$(dbAgentName)'
-      artifactProject: '$(System.TeamProject)'
-      artifactDefinitionId: '$(DbPipelineDefinitionId)'
-      artifactBuildId: '$(DbBuildId)'
-      artifactName: '$(dbArtifactName)'
-      previewArtifactName: 'db-preview-$(environmentName)'
-      targetConnectionString: '$(GlobalSettings.ConnString)'
-
-API build pipeline:
-name: MOMA_SVC_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-      - release/*
-  paths:
-    exclude:
-      - '*.yml'
-      - global.json
-      - nuget.config
-
-pr: none
-
-variables:
-- group: OWASP_SECRETS
-
-stages:
-- stage: Build_Service
-  displayName: 'Build & Publish Artifact'
-  jobs:
-  - template: pipelines/build-dotnet-core-webapi.yml@templates
-    parameters:
-      jobName: 'BuildAlternaMobileMoneyTransferService'
-      jobDisplayName: 'Build Alterna Mobile Money Transfer Service'
-      buildPool: 'Build Pool'
-      buildAgentName: 'UAT-ALTERNA-DK1'
-      buildConfiguration: 'Release'
-      restoreProjects: '**/*.csproj'
-      runTests: false
-      testProjects: ''
-      publishProject: 'AlternaMobileMoneyTransfer/AlternaMobileMoneyTransfer.csproj'
-      nugetConfigPath: 'nuget.config'
-      zipName: 'Alterna-Mobile-Money-Transfer-drop.zip'
-      artifactName: 'alterna-mobile-money-transfer-service-drop'
-      publishOutputFolder: '$(Build.ArtifactStagingDirectory)\Alterna-Mobile-Money-Transfer'
-      deploymentMode: 'self-contained'
-      targetRuntime: 'win-x64'
-      produceSingleFile: true
-      readyToRun: false
-      trim: false
-
-      runDependencyCheck: false
-      dependencyCheckProjectName: 'Alterna-Mobile-Money-Transfer-Service'
-      dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-      dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-      dependencyCheckAdditionalArguments: ''
