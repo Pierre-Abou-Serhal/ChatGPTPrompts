@@ -1,24 +1,13 @@
-https://ws.uat.aramex.net/ShippingAPI.V2/Location/Service_1_0.svc/json/FetchCities
+[ req ]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+prompt             = no
 
-
-{
-    "ClientInfo": {
-        "UserName": "mohammad.itani1999@hotmail.com",
-        "Password": "DcsM3iP@tpJtfdQ",
-        "AccountNumber": "61078",
-        "AccountPin": "664165",
-        "AccountEntity": "BEY",
-        "AccountCountryCode": "LB",
-        "Version": "v1"
-    },
-    "CountryCode": "LB",
-    "NameStartsWith": "",
-    "State": "",
-    "Transaction": {
-        "Reference1": "",
-        "Reference2": "",
-        "Reference3": "",
-        "Reference4": "",
-        "Reference5": ""
-    }
-}
+[ req_distinguished_name ]
+CN                 = www.sgbl.com
+OU                 = DEVE
+O                  = Societe Generale de Banque Au Liban S.A.L SGBL
+L                  = BEIRUT
+ST                 = BEIRUT
+C                  = LB
+UID                = e592c697-2c6a-4026-a953-4c19522226d1-CERT
