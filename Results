@@ -1,13 +1,1 @@
-[ req ]
-default_bits       = 2048
-distinguished_name = req_distinguished_name
-prompt             = no
-
-[ req_distinguished_name ]
-CN                 = www.sgbl.com
-OU                 = DEVE
-O                  = Societe Generale de Banque Au Liban S.A.L SGBL
-L                  = BEIRUT
-ST                 = BEIRUT
-C                  = LB
-UID                = e592c697-2c6a-4026-a953-4c19522226d1-CERT
+https://cert.api.visa.com/visadirect/v1/transactionquery?acquiringBIN=408999&transactionIdentifier=234234322342343
