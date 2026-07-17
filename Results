@@ -1,99 +1,963 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <bul:bulkOnboarding xmlns:bul="http://www.sgbl.com.lb/bulkOnboarding">
-    <!--1 or more repetitions:-->
     <bul:record>
-        <bul:oldCustomerId>string</bul:oldCustomerId>
-        <bul:oldExternalId>string</bul:oldExternalId>
-        <bul:oldCompany>string</bul:oldCompany>
-        <bul:printCard>string</bul:printCard>
-        <bul:branchCode>string</bul:branchCode>
-        <bul:branchName>string</bul:branchName>
-        <bul:GIVENNAMES>string</bul:GIVENNAMES>
-        <bul:FATHERNAME>string</bul:FATHERNAME>
-        <bul:FAMILYNAME>string</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>string</bul:DATEOFBIRTH>
-        <bul:EMAIL1>string</bul:EMAIL1>
-        <bul:MOFIRSTNAME>string</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>string</bul:MOLASTNAME>
-        <bul:BIRTHCNT>string</bul:BIRTHCNT>
-        <bul:NATIONALITY>string</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>string</bul:BIRTHREGISTER>
-        <bul:LEGALID>string</bul:LEGALID>
-        <bul:LEGALDOCNAME>string</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>string</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>string</bul:LEGALEXPDATE>
-        <bul:GENDER>string</bul:GENDER>
-        <bul:MARITALSTATUS>string</bul:MARITALSTATUS>
-        <bul:SPLASTNAME>string</bul:SPLASTNAME>
-        <bul:SPFIRSTNAME>string</bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>string</bul:HLDOTHMATH>
-        <bul:OTHRNAT>string</bul:OTHRNAT>
-        <bul:PEP>string</bul:PEP>
-        <bul:BNRGTOWNR>string</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>string</bul:MOTACOPEN>
-        <bul:SRCFUNDS>string</bul:SRCFUNDS>
-        <bul:FINDETS>string</bul:FINDETS>
-        <bul:SRCWEALTH>string</bul:SRCWEALTH>
-        <bul:ESTWEALTH>string</bul:ESTWEALTH>
-        <bul:RESIDENCE>string</bul:RESIDENCE>
-        <bul:CUSCITY>string</bul:CUSCITY>
-        <bul:CITY>string</bul:CITY>
-        <bul:STREET>string</bul:STREET>
-        <bul:CUSBUILDING>string</bul:CUSBUILDING>
-        <bul:FLOORNO>string</bul:FLOORNO>
-        <bul:DEPARTMENT>string</bul:DEPARTMENT>
-        <bul:PROVINCE>string</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>string</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>string</bul:SALARYDOM>
-        <bul:CLIENTFUNC>string</bul:CLIENTFUNC>
-        <bul:OCCUPATION>string</bul:OCCUPATION>
-        <bul:JOBTITLE>string</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>string</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>string</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>string</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>string</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>string</bul:FINTWNCTY>
-        <bul:FINLOC>string</bul:FINLOC>
-        <bul:FINCITY>string</bul:FINCITY>
-        <bul:FINSTREET>string</bul:FINSTREET>
-        <bul:FINBLD>string</bul:FINBLD>
-        <bul:FINFLRNO>string</bul:FINFLRNO>
-        <bul:FINDEPT>string</bul:FINDEPT>
-        <bul:FINPROV>string</bul:FINPROV>
-        <bul:CRSTAXRES_1>string</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2>string</bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3>string</bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4>string</bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>string</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2>string</bul:CRSTAXID_2>
-        <bul:CRSTAXID_3>string</bul:CRSTAXID_3>
-        <bul:CRSTAXID_4>string</bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>string</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2>string</bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3>string</bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4>string</bul:CRSTAXDT_4>
-        <bul:PACKAGEID>string</bul:PACKAGEID>
-        <bul:HAVETINNB_1>string</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>string</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>string</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>string</bul:HAVETINNB_4>
-        <bul:GREENCARDNB>string</bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>string</bul:GREENCARDHOLD>
-        <bul:ISOCODE>string</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>string</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>string</bul:MOBAREACODE>
-        <bul:MOBNUMBER>string</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>string</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>string</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2>string</bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3>string</bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4>string</bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>string</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2>string</bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3>string</bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4>string</bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>string</bul:landLineNumber_1>
-        <bul:landLineNumber_2>string</bul:landLineNumber_2>
-        <bul:landLineNumber_3>string</bul:landLineNumber_3>
-        <bul:landLineNumber_4>string</bul:landLineNumber_4>
+        <bul:oldCustomerId>CUST0001</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0001</bul:oldExternalId>
+        <bul:oldCompany>Test Company 01</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>101</bul:branchCode>
+        <bul:branchName>Test Branch 01</bul:branchName>
+        <bul:GIVENNAMES>TestGiven01</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather01</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily01</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1991-01-11</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user01@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother01</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily01</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1001</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000001</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-01-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-01-01</bul:LEGALEXPDATE>
+        <bul:GENDER>M</bul:GENDER>
+        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
+        <bul:SPLASTNAME></bul:SPLASTNAME>
+        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 01</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>50000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity01</bul:CUSCITY>
+        <bul:CITY>TestCity01</bul:CITY>
+        <bul:STREET>Test Street 01</bul:STREET>
+        <bul:CUSBUILDING>Test Building 01</bul:CUSBUILDING>
+        <bul:FLOORNO>2</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 01</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 01</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 01</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2015-01-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>2500</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>1200</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity01</bul:FINLOC>
+        <bul:FINCITY>TestCity01</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 01</bul:FINSTREET>
+        <bul:FINBLD>Office Building 01</bul:FINBLD>
+        <bul:FINFLRNO>2</bul:FINFLRNO>
+        <bul:FINDEPT>IT</bul:FINDEPT>
+        <bul:FINPROV>Test Province 01</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000001</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100001</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000001</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200001</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
+    </bul:record>
+    <bul:record>
+        <bul:oldCustomerId>CUST0002</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0002</bul:oldExternalId>
+        <bul:oldCompany>Test Company 02</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>102</bul:branchCode>
+        <bul:branchName>Test Branch 02</bul:branchName>
+        <bul:GIVENNAMES>TestGiven02</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather02</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily02</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1992-01-12</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user02@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother02</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily02</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1002</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000002</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-02-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-02-01</bul:LEGALEXPDATE>
+        <bul:GENDER>F</bul:GENDER>
+        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
+        <bul:SPLASTNAME>TestSpouseFamily02</bul:SPLASTNAME>
+        <bul:SPFIRSTNAME>TestSpouse02</bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 02</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>60000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity02</bul:CUSCITY>
+        <bul:CITY>TestCity02</bul:CITY>
+        <bul:STREET>Test Street 02</bul:STREET>
+        <bul:CUSBUILDING>Test Building 02</bul:CUSBUILDING>
+        <bul:FLOORNO>3</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 02</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 02</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 02</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2016-02-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>2800</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>1300</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity02</bul:FINLOC>
+        <bul:FINCITY>TestCity02</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 02</bul:FINSTREET>
+        <bul:FINBLD>Office Building 02</bul:FINBLD>
+        <bul:FINFLRNO>3</bul:FINFLRNO>
+        <bul:FINDEPT>FINANCE</bul:FINDEPT>
+        <bul:FINPROV>Test Province 02</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000002</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100002</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000002</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200002</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
+    </bul:record>
+    <bul:record>
+        <bul:oldCustomerId>CUST0003</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0003</bul:oldExternalId>
+        <bul:oldCompany>Test Company 03</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>103</bul:branchCode>
+        <bul:branchName>Test Branch 03</bul:branchName>
+        <bul:GIVENNAMES>TestGiven03</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather03</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily03</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1993-01-13</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user03@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother03</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily03</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1003</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000003</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-03-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-03-01</bul:LEGALEXPDATE>
+        <bul:GENDER>M</bul:GENDER>
+        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
+        <bul:SPLASTNAME></bul:SPLASTNAME>
+        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 03</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>70000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity03</bul:CUSCITY>
+        <bul:CITY>TestCity03</bul:CITY>
+        <bul:STREET>Test Street 03</bul:STREET>
+        <bul:CUSBUILDING>Test Building 03</bul:CUSBUILDING>
+        <bul:FLOORNO>4</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 03</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 03</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 03</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2017-03-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>3100</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>1400</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity03</bul:FINLOC>
+        <bul:FINCITY>TestCity03</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 03</bul:FINSTREET>
+        <bul:FINBLD>Office Building 03</bul:FINBLD>
+        <bul:FINFLRNO>4</bul:FINFLRNO>
+        <bul:FINDEPT>IT</bul:FINDEPT>
+        <bul:FINPROV>Test Province 03</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000003</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100003</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000003</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200003</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
+    </bul:record>
+    <bul:record>
+        <bul:oldCustomerId>CUST0004</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0004</bul:oldExternalId>
+        <bul:oldCompany>Test Company 04</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>104</bul:branchCode>
+        <bul:branchName>Test Branch 04</bul:branchName>
+        <bul:GIVENNAMES>TestGiven04</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather04</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily04</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1994-01-14</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user04@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother04</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily04</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1004</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000004</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-04-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-04-01</bul:LEGALEXPDATE>
+        <bul:GENDER>F</bul:GENDER>
+        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
+        <bul:SPLASTNAME>TestSpouseFamily04</bul:SPLASTNAME>
+        <bul:SPFIRSTNAME>TestSpouse04</bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 04</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>80000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity04</bul:CUSCITY>
+        <bul:CITY>TestCity04</bul:CITY>
+        <bul:STREET>Test Street 04</bul:STREET>
+        <bul:CUSBUILDING>Test Building 04</bul:CUSBUILDING>
+        <bul:FLOORNO>5</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 04</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 04</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 04</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2018-04-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>3400</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>1500</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity04</bul:FINLOC>
+        <bul:FINCITY>TestCity04</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 04</bul:FINSTREET>
+        <bul:FINBLD>Office Building 04</bul:FINBLD>
+        <bul:FINFLRNO>5</bul:FINFLRNO>
+        <bul:FINDEPT>FINANCE</bul:FINDEPT>
+        <bul:FINPROV>Test Province 04</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000004</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100004</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000004</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200004</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
+    </bul:record>
+    <bul:record>
+        <bul:oldCustomerId>CUST0005</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0005</bul:oldExternalId>
+        <bul:oldCompany>Test Company 05</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>105</bul:branchCode>
+        <bul:branchName>Test Branch 05</bul:branchName>
+        <bul:GIVENNAMES>TestGiven05</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather05</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily05</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1995-01-15</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user05@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother05</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily05</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1005</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000005</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-05-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-05-01</bul:LEGALEXPDATE>
+        <bul:GENDER>M</bul:GENDER>
+        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
+        <bul:SPLASTNAME>TestSpouseFamily05</bul:SPLASTNAME>
+        <bul:SPFIRSTNAME>TestSpouse05</bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 05</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>90000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity05</bul:CUSCITY>
+        <bul:CITY>TestCity05</bul:CITY>
+        <bul:STREET>Test Street 05</bul:STREET>
+        <bul:CUSBUILDING>Test Building 05</bul:CUSBUILDING>
+        <bul:FLOORNO>6</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 05</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 05</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 05</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2019-05-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>3700</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>1600</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity05</bul:FINLOC>
+        <bul:FINCITY>TestCity05</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 05</bul:FINSTREET>
+        <bul:FINBLD>Office Building 05</bul:FINBLD>
+        <bul:FINFLRNO>6</bul:FINFLRNO>
+        <bul:FINDEPT>IT</bul:FINDEPT>
+        <bul:FINPROV>Test Province 05</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000005</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100005</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000005</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200005</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
+    </bul:record>
+    <bul:record>
+        <bul:oldCustomerId>CUST0006</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0006</bul:oldExternalId>
+        <bul:oldCompany>Test Company 06</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>106</bul:branchCode>
+        <bul:branchName>Test Branch 06</bul:branchName>
+        <bul:GIVENNAMES>TestGiven06</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather06</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily06</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1996-01-16</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user06@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother06</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily06</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1006</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000006</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-06-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-06-01</bul:LEGALEXPDATE>
+        <bul:GENDER>F</bul:GENDER>
+        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
+        <bul:SPLASTNAME></bul:SPLASTNAME>
+        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 06</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>100000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity06</bul:CUSCITY>
+        <bul:CITY>TestCity06</bul:CITY>
+        <bul:STREET>Test Street 06</bul:STREET>
+        <bul:CUSBUILDING>Test Building 06</bul:CUSBUILDING>
+        <bul:FLOORNO>7</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 06</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 06</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 06</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2015-06-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>4000</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>1700</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity06</bul:FINLOC>
+        <bul:FINCITY>TestCity06</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 06</bul:FINSTREET>
+        <bul:FINBLD>Office Building 06</bul:FINBLD>
+        <bul:FINFLRNO>7</bul:FINFLRNO>
+        <bul:FINDEPT>FINANCE</bul:FINDEPT>
+        <bul:FINPROV>Test Province 06</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000006</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100006</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000006</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200006</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
+    </bul:record>
+    <bul:record>
+        <bul:oldCustomerId>CUST0007</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0007</bul:oldExternalId>
+        <bul:oldCompany>Test Company 07</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>107</bul:branchCode>
+        <bul:branchName>Test Branch 07</bul:branchName>
+        <bul:GIVENNAMES>TestGiven07</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather07</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily07</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1997-01-17</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user07@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother07</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily07</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1007</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000007</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-07-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-07-01</bul:LEGALEXPDATE>
+        <bul:GENDER>M</bul:GENDER>
+        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
+        <bul:SPLASTNAME>TestSpouseFamily07</bul:SPLASTNAME>
+        <bul:SPFIRSTNAME>TestSpouse07</bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 07</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>110000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity07</bul:CUSCITY>
+        <bul:CITY>TestCity07</bul:CITY>
+        <bul:STREET>Test Street 07</bul:STREET>
+        <bul:CUSBUILDING>Test Building 07</bul:CUSBUILDING>
+        <bul:FLOORNO>8</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 07</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 07</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 07</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2016-07-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>4300</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>1800</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity07</bul:FINLOC>
+        <bul:FINCITY>TestCity07</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 07</bul:FINSTREET>
+        <bul:FINBLD>Office Building 07</bul:FINBLD>
+        <bul:FINFLRNO>8</bul:FINFLRNO>
+        <bul:FINDEPT>IT</bul:FINDEPT>
+        <bul:FINPROV>Test Province 07</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000007</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100007</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000007</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200007</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
+    </bul:record>
+    <bul:record>
+        <bul:oldCustomerId>CUST0008</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0008</bul:oldExternalId>
+        <bul:oldCompany>Test Company 08</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>108</bul:branchCode>
+        <bul:branchName>Test Branch 08</bul:branchName>
+        <bul:GIVENNAMES>TestGiven08</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather08</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily08</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1998-01-18</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user08@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother08</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily08</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1008</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000008</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-08-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-08-01</bul:LEGALEXPDATE>
+        <bul:GENDER>F</bul:GENDER>
+        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
+        <bul:SPLASTNAME></bul:SPLASTNAME>
+        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 08</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>120000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity08</bul:CUSCITY>
+        <bul:CITY>TestCity08</bul:CITY>
+        <bul:STREET>Test Street 08</bul:STREET>
+        <bul:CUSBUILDING>Test Building 08</bul:CUSBUILDING>
+        <bul:FLOORNO>1</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 08</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 08</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 08</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2017-08-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>4600</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>1900</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity08</bul:FINLOC>
+        <bul:FINCITY>TestCity08</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 08</bul:FINSTREET>
+        <bul:FINBLD>Office Building 08</bul:FINBLD>
+        <bul:FINFLRNO>9</bul:FINFLRNO>
+        <bul:FINDEPT>FINANCE</bul:FINDEPT>
+        <bul:FINPROV>Test Province 08</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000008</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100008</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000008</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200008</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
+    </bul:record>
+    <bul:record>
+        <bul:oldCustomerId>CUST0009</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0009</bul:oldExternalId>
+        <bul:oldCompany>Test Company 09</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>109</bul:branchCode>
+        <bul:branchName>Test Branch 09</bul:branchName>
+        <bul:GIVENNAMES>TestGiven09</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather09</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily09</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1999-01-19</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user09@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother09</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily09</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1009</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000009</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-09-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-09-01</bul:LEGALEXPDATE>
+        <bul:GENDER>M</bul:GENDER>
+        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
+        <bul:SPLASTNAME></bul:SPLASTNAME>
+        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 09</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>130000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity09</bul:CUSCITY>
+        <bul:CITY>TestCity09</bul:CITY>
+        <bul:STREET>Test Street 09</bul:STREET>
+        <bul:CUSBUILDING>Test Building 09</bul:CUSBUILDING>
+        <bul:FLOORNO>2</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 09</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 09</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 09</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2018-09-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>4900</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>2000</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity09</bul:FINLOC>
+        <bul:FINCITY>TestCity09</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 09</bul:FINSTREET>
+        <bul:FINBLD>Office Building 09</bul:FINBLD>
+        <bul:FINFLRNO>10</bul:FINFLRNO>
+        <bul:FINDEPT>IT</bul:FINDEPT>
+        <bul:FINPROV>Test Province 09</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000009</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100009</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000009</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200009</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
+    </bul:record>
+    <bul:record>
+        <bul:oldCustomerId>CUST0010</bul:oldCustomerId>
+        <bul:oldExternalId>EXT0010</bul:oldExternalId>
+        <bul:oldCompany>Test Company 10</bul:oldCompany>
+        <bul:printCard>Y</bul:printCard>
+        <bul:branchCode>110</bul:branchCode>
+        <bul:branchName>Test Branch 10</bul:branchName>
+        <bul:GIVENNAMES>TestGiven10</bul:GIVENNAMES>
+        <bul:FATHERNAME>TestFather10</bul:FATHERNAME>
+        <bul:FAMILYNAME>TestFamily10</bul:FAMILYNAME>
+        <bul:DATEOFBIRTH>1990-01-20</bul:DATEOFBIRTH>
+        <bul:EMAIL1>test.user10@example.com</bul:EMAIL1>
+        <bul:MOFIRSTNAME>TestMother10</bul:MOFIRSTNAME>
+        <bul:MOLASTNAME>TestMotherFamily10</bul:MOLASTNAME>
+        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
+        <bul:NATIONALITY>LB</bul:NATIONALITY>
+        <bul:BIRTHREGISTER>REGISTER-1010</bul:BIRTHREGISTER>
+        <bul:LEGALID>TEST-ID-000010</bul:LEGALID>
+        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
+        <bul:LEGALISSDATE>2020-10-01</bul:LEGALISSDATE>
+        <bul:LEGALEXPDATE>2030-10-01</bul:LEGALEXPDATE>
+        <bul:GENDER>F</bul:GENDER>
+        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
+        <bul:SPLASTNAME>TestSpouseFamily10</bul:SPLASTNAME>
+        <bul:SPFIRSTNAME>TestSpouse10</bul:SPFIRSTNAME>
+        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
+        <bul:OTHRNAT></bul:OTHRNAT>
+        <bul:PEP>N</bul:PEP>
+        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
+        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
+        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
+        <bul:FINDETS>Monthly salary from Test Company 10</bul:FINDETS>
+        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
+        <bul:ESTWEALTH>140000</bul:ESTWEALTH>
+        <bul:RESIDENCE>LB</bul:RESIDENCE>
+        <bul:CUSCITY>TestCity10</bul:CUSCITY>
+        <bul:CITY>TestCity10</bul:CITY>
+        <bul:STREET>Test Street 10</bul:STREET>
+        <bul:CUSBUILDING>Test Building 10</bul:CUSBUILDING>
+        <bul:FLOORNO>3</bul:FLOORNO>
+        <bul:DEPARTMENT>Apartment 10</bul:DEPARTMENT>
+        <bul:PROVINCE>Test Province 10</bul:PROVINCE>
+        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
+        <bul:SALARYDOM>Y</bul:SALARYDOM>
+        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
+        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
+        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
+        <bul:EMPLOYERSNAME>Test Company 10</bul:EMPLOYERSNAME>
+        <bul:EMPLOYMENTSTART>2019-01-01</bul:EMPLOYMENTSTART>
+        <bul:NETMONTHLYIN>5200</bul:NETMONTHLYIN>
+        <bul:NETMONTHLYOUT>2100</bul:NETMONTHLYOUT>
+        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
+        <bul:FINLOC>TestCity10</bul:FINLOC>
+        <bul:FINCITY>TestCity10</bul:FINCITY>
+        <bul:FINSTREET>Financial Street 10</bul:FINSTREET>
+        <bul:FINBLD>Office Building 10</bul:FINBLD>
+        <bul:FINFLRNO>1</bul:FINFLRNO>
+        <bul:FINDEPT>FINANCE</bul:FINDEPT>
+        <bul:FINPROV>Test Province 10</bul:FINPROV>
+        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
+        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
+        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
+        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
+        <bul:CRSTAXID_1>TIN-LB-000010</bul:CRSTAXID_1>
+        <bul:CRSTAXID_2></bul:CRSTAXID_2>
+        <bul:CRSTAXID_3></bul:CRSTAXID_3>
+        <bul:CRSTAXID_4></bul:CRSTAXID_4>
+        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
+        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
+        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
+        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
+        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
+        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
+        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
+        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
+        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
+        <bul:GREENCARDNB></bul:GREENCARDNB>
+        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
+        <bul:ISOCODE>LB</bul:ISOCODE>
+        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
+        <bul:MOBAREACODE>3</bul:MOBAREACODE>
+        <bul:MOBNUMBER>100010</bul:MOBNUMBER>
+        <bul:birthRegistrationNumber>BRN-000010</bul:birthRegistrationNumber>
+        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
+        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
+        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
+        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
+        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
+        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
+        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
+        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
+        <bul:landLineNumber_1>200010</bul:landLineNumber_1>
+        <bul:landLineNumber_2></bul:landLineNumber_2>
+        <bul:landLineNumber_3></bul:landLineNumber_3>
+        <bul:landLineNumber_4></bul:landLineNumber_4>
     </bul:record>
 </bul:bulkOnboarding>
