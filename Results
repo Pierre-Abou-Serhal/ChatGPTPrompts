@@ -1,9 +1,1 @@
-1. Extract the Private Key (KEY File) 
-Run the following command to extract the private key. You will be prompted for the original .p12 password, and then you must create a new password to encrypt the extracted key. 
-bash
-openssl pkcs12 -in yourfile.p12 -nocerts -out client.key
-Use code with caution.
-2. Extract the Certificate (CRT File) 
-Run this command to extract the certificate. You will only need to enter the original .p12 password. 
-bash
-openssl pkcs12 -in yourfile.p12 -clcerts -nokeys -out client.crt
+THis is being returned from Visa Direct CPR API "errors": { "RecipientCity": [ "The RecipientCity field is required." ] },WHen calling the API from OSB, I am not getting the errorsI am gettin gthis:<soap-env:Envelope xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/"><soap-env:Body><soap-env:Fault><faultcode xmlns:vis="http://xmlns.oracle.com/SGBL-OSB-T24/Backend.svc/VisaDirect">vis:fault400</faultcode><faultstring>REST Business Service returned HTTP response with status 400</faultstring><detail><ErrorRes xmlns="http://www.sgbl.com.lb/schemas/ErrorResponse"><errors/></ErrorRes></detail></soap-env:Fault></soap-env:Body></soap-env:Envelope>This is my XSD<xsd:schema targetNamespace="http://www.sgbl.com.lb/schemas/ErrorResponse" elementFormDefault="qualified" nxsd:version="JSON" nxsd:encoding="US-ASCII" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.sgbl.com.lb/schemas/ErrorResponse" xmlns:nxsd="http://xmlns.oracle.com/pcbpel/nxsd" xmlns:dto="http://www.sgbl.com.lb/schemas/VisaDirectDTOs"> <xsd:import schemaLocation="VisaDirectDTOs.xsd" namespace="http://www.sgbl.com.lb/schemas/VisaDirectDTOs"/> <xsd:element name="ErrorRes"> <xsd:complexType> <xsd:sequence> <xsd:element name="errorResponse" type="dto:ErrorResponseDto"/> <xsd:element name="errorMessage" type="xsd:string" minOccurs="0"/> <xsd:element name="errors" type="xsd:anyType" minOccurs="0"/> </xsd:sequence> </xsd:complexType> </xsd:element></xsd:schema>And this is how I am using it in the bix <wsdl:message name="CPF_fault400Message"> <wsdl:part name="fault_fault400" element="inp3:ErrorRes"/> </wsdl:message>Why errors are not being returned
