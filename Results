@@ -1,963 +1,1458 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<bul:bulkOnboarding xmlns:bul="http://www.sgbl.com.lb/bulkOnboarding">
-    <bul:record>
-        <bul:oldCustomerId>CUST0001</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0001</bul:oldExternalId>
-        <bul:oldCompany>Test Company 01</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>101</bul:branchCode>
-        <bul:branchName>Test Branch 01</bul:branchName>
-        <bul:GIVENNAMES>TestGiven01</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather01</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily01</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1991-01-11</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user01@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother01</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily01</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1001</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000001</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-01-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-01-01</bul:LEGALEXPDATE>
-        <bul:GENDER>M</bul:GENDER>
-        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
-        <bul:SPLASTNAME></bul:SPLASTNAME>
-        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 01</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>50000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity01</bul:CUSCITY>
-        <bul:CITY>TestCity01</bul:CITY>
-        <bul:STREET>Test Street 01</bul:STREET>
-        <bul:CUSBUILDING>Test Building 01</bul:CUSBUILDING>
-        <bul:FLOORNO>2</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 01</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 01</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 01</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2015-01-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>2500</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>1200</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity01</bul:FINLOC>
-        <bul:FINCITY>TestCity01</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 01</bul:FINSTREET>
-        <bul:FINBLD>Office Building 01</bul:FINBLD>
-        <bul:FINFLRNO>2</bul:FINFLRNO>
-        <bul:FINDEPT>IT</bul:FINDEPT>
-        <bul:FINPROV>Test Province 01</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000001</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100001</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000001</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200001</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-    <bul:record>
-        <bul:oldCustomerId>CUST0002</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0002</bul:oldExternalId>
-        <bul:oldCompany>Test Company 02</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>102</bul:branchCode>
-        <bul:branchName>Test Branch 02</bul:branchName>
-        <bul:GIVENNAMES>TestGiven02</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather02</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily02</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1992-01-12</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user02@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother02</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily02</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1002</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000002</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-02-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-02-01</bul:LEGALEXPDATE>
-        <bul:GENDER>F</bul:GENDER>
-        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
-        <bul:SPLASTNAME>TestSpouseFamily02</bul:SPLASTNAME>
-        <bul:SPFIRSTNAME>TestSpouse02</bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 02</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>60000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity02</bul:CUSCITY>
-        <bul:CITY>TestCity02</bul:CITY>
-        <bul:STREET>Test Street 02</bul:STREET>
-        <bul:CUSBUILDING>Test Building 02</bul:CUSBUILDING>
-        <bul:FLOORNO>3</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 02</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 02</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 02</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2016-02-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>2800</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>1300</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity02</bul:FINLOC>
-        <bul:FINCITY>TestCity02</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 02</bul:FINSTREET>
-        <bul:FINBLD>Office Building 02</bul:FINBLD>
-        <bul:FINFLRNO>3</bul:FINFLRNO>
-        <bul:FINDEPT>FINANCE</bul:FINDEPT>
-        <bul:FINPROV>Test Province 02</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000002</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100002</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000002</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200002</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-    <bul:record>
-        <bul:oldCustomerId>CUST0003</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0003</bul:oldExternalId>
-        <bul:oldCompany>Test Company 03</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>103</bul:branchCode>
-        <bul:branchName>Test Branch 03</bul:branchName>
-        <bul:GIVENNAMES>TestGiven03</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather03</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily03</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1993-01-13</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user03@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother03</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily03</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1003</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000003</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-03-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-03-01</bul:LEGALEXPDATE>
-        <bul:GENDER>M</bul:GENDER>
-        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
-        <bul:SPLASTNAME></bul:SPLASTNAME>
-        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 03</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>70000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity03</bul:CUSCITY>
-        <bul:CITY>TestCity03</bul:CITY>
-        <bul:STREET>Test Street 03</bul:STREET>
-        <bul:CUSBUILDING>Test Building 03</bul:CUSBUILDING>
-        <bul:FLOORNO>4</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 03</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 03</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 03</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2017-03-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>3100</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>1400</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity03</bul:FINLOC>
-        <bul:FINCITY>TestCity03</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 03</bul:FINSTREET>
-        <bul:FINBLD>Office Building 03</bul:FINBLD>
-        <bul:FINFLRNO>4</bul:FINFLRNO>
-        <bul:FINDEPT>IT</bul:FINDEPT>
-        <bul:FINPROV>Test Province 03</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000003</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100003</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000003</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200003</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-    <bul:record>
-        <bul:oldCustomerId>CUST0004</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0004</bul:oldExternalId>
-        <bul:oldCompany>Test Company 04</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>104</bul:branchCode>
-        <bul:branchName>Test Branch 04</bul:branchName>
-        <bul:GIVENNAMES>TestGiven04</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather04</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily04</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1994-01-14</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user04@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother04</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily04</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1004</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000004</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-04-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-04-01</bul:LEGALEXPDATE>
-        <bul:GENDER>F</bul:GENDER>
-        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
-        <bul:SPLASTNAME>TestSpouseFamily04</bul:SPLASTNAME>
-        <bul:SPFIRSTNAME>TestSpouse04</bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 04</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>80000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity04</bul:CUSCITY>
-        <bul:CITY>TestCity04</bul:CITY>
-        <bul:STREET>Test Street 04</bul:STREET>
-        <bul:CUSBUILDING>Test Building 04</bul:CUSBUILDING>
-        <bul:FLOORNO>5</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 04</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 04</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 04</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2018-04-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>3400</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>1500</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity04</bul:FINLOC>
-        <bul:FINCITY>TestCity04</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 04</bul:FINSTREET>
-        <bul:FINBLD>Office Building 04</bul:FINBLD>
-        <bul:FINFLRNO>5</bul:FINFLRNO>
-        <bul:FINDEPT>FINANCE</bul:FINDEPT>
-        <bul:FINPROV>Test Province 04</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000004</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100004</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000004</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200004</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-    <bul:record>
-        <bul:oldCustomerId>CUST0005</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0005</bul:oldExternalId>
-        <bul:oldCompany>Test Company 05</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>105</bul:branchCode>
-        <bul:branchName>Test Branch 05</bul:branchName>
-        <bul:GIVENNAMES>TestGiven05</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather05</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily05</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1995-01-15</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user05@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother05</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily05</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1005</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000005</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-05-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-05-01</bul:LEGALEXPDATE>
-        <bul:GENDER>M</bul:GENDER>
-        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
-        <bul:SPLASTNAME>TestSpouseFamily05</bul:SPLASTNAME>
-        <bul:SPFIRSTNAME>TestSpouse05</bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 05</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>90000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity05</bul:CUSCITY>
-        <bul:CITY>TestCity05</bul:CITY>
-        <bul:STREET>Test Street 05</bul:STREET>
-        <bul:CUSBUILDING>Test Building 05</bul:CUSBUILDING>
-        <bul:FLOORNO>6</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 05</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 05</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 05</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2019-05-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>3700</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>1600</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity05</bul:FINLOC>
-        <bul:FINCITY>TestCity05</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 05</bul:FINSTREET>
-        <bul:FINBLD>Office Building 05</bul:FINBLD>
-        <bul:FINFLRNO>6</bul:FINFLRNO>
-        <bul:FINDEPT>IT</bul:FINDEPT>
-        <bul:FINPROV>Test Province 05</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000005</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100005</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000005</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200005</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-    <bul:record>
-        <bul:oldCustomerId>CUST0006</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0006</bul:oldExternalId>
-        <bul:oldCompany>Test Company 06</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>106</bul:branchCode>
-        <bul:branchName>Test Branch 06</bul:branchName>
-        <bul:GIVENNAMES>TestGiven06</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather06</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily06</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1996-01-16</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user06@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother06</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily06</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1006</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000006</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-06-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-06-01</bul:LEGALEXPDATE>
-        <bul:GENDER>F</bul:GENDER>
-        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
-        <bul:SPLASTNAME></bul:SPLASTNAME>
-        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 06</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>100000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity06</bul:CUSCITY>
-        <bul:CITY>TestCity06</bul:CITY>
-        <bul:STREET>Test Street 06</bul:STREET>
-        <bul:CUSBUILDING>Test Building 06</bul:CUSBUILDING>
-        <bul:FLOORNO>7</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 06</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 06</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 06</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2015-06-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>4000</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>1700</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity06</bul:FINLOC>
-        <bul:FINCITY>TestCity06</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 06</bul:FINSTREET>
-        <bul:FINBLD>Office Building 06</bul:FINBLD>
-        <bul:FINFLRNO>7</bul:FINFLRNO>
-        <bul:FINDEPT>FINANCE</bul:FINDEPT>
-        <bul:FINPROV>Test Province 06</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000006</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100006</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000006</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200006</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-    <bul:record>
-        <bul:oldCustomerId>CUST0007</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0007</bul:oldExternalId>
-        <bul:oldCompany>Test Company 07</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>107</bul:branchCode>
-        <bul:branchName>Test Branch 07</bul:branchName>
-        <bul:GIVENNAMES>TestGiven07</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather07</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily07</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1997-01-17</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user07@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother07</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily07</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1007</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000007</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-07-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-07-01</bul:LEGALEXPDATE>
-        <bul:GENDER>M</bul:GENDER>
-        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
-        <bul:SPLASTNAME>TestSpouseFamily07</bul:SPLASTNAME>
-        <bul:SPFIRSTNAME>TestSpouse07</bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 07</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>110000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity07</bul:CUSCITY>
-        <bul:CITY>TestCity07</bul:CITY>
-        <bul:STREET>Test Street 07</bul:STREET>
-        <bul:CUSBUILDING>Test Building 07</bul:CUSBUILDING>
-        <bul:FLOORNO>8</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 07</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 07</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 07</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2016-07-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>4300</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>1800</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity07</bul:FINLOC>
-        <bul:FINCITY>TestCity07</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 07</bul:FINSTREET>
-        <bul:FINBLD>Office Building 07</bul:FINBLD>
-        <bul:FINFLRNO>8</bul:FINFLRNO>
-        <bul:FINDEPT>IT</bul:FINDEPT>
-        <bul:FINPROV>Test Province 07</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000007</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100007</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000007</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200007</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-    <bul:record>
-        <bul:oldCustomerId>CUST0008</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0008</bul:oldExternalId>
-        <bul:oldCompany>Test Company 08</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>108</bul:branchCode>
-        <bul:branchName>Test Branch 08</bul:branchName>
-        <bul:GIVENNAMES>TestGiven08</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather08</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily08</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1998-01-18</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user08@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother08</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily08</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1008</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000008</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-08-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-08-01</bul:LEGALEXPDATE>
-        <bul:GENDER>F</bul:GENDER>
-        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
-        <bul:SPLASTNAME></bul:SPLASTNAME>
-        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 08</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>120000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity08</bul:CUSCITY>
-        <bul:CITY>TestCity08</bul:CITY>
-        <bul:STREET>Test Street 08</bul:STREET>
-        <bul:CUSBUILDING>Test Building 08</bul:CUSBUILDING>
-        <bul:FLOORNO>1</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 08</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 08</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 08</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2017-08-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>4600</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>1900</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity08</bul:FINLOC>
-        <bul:FINCITY>TestCity08</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 08</bul:FINSTREET>
-        <bul:FINBLD>Office Building 08</bul:FINBLD>
-        <bul:FINFLRNO>9</bul:FINFLRNO>
-        <bul:FINDEPT>FINANCE</bul:FINDEPT>
-        <bul:FINPROV>Test Province 08</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000008</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100008</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000008</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200008</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-    <bul:record>
-        <bul:oldCustomerId>CUST0009</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0009</bul:oldExternalId>
-        <bul:oldCompany>Test Company 09</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>109</bul:branchCode>
-        <bul:branchName>Test Branch 09</bul:branchName>
-        <bul:GIVENNAMES>TestGiven09</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather09</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily09</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1999-01-19</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user09@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother09</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily09</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1009</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000009</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-09-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-09-01</bul:LEGALEXPDATE>
-        <bul:GENDER>M</bul:GENDER>
-        <bul:MARITALSTATUS>SINGLE</bul:MARITALSTATUS>
-        <bul:SPLASTNAME></bul:SPLASTNAME>
-        <bul:SPFIRSTNAME></bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 09</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>130000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity09</bul:CUSCITY>
-        <bul:CITY>TestCity09</bul:CITY>
-        <bul:STREET>Test Street 09</bul:STREET>
-        <bul:CUSBUILDING>Test Building 09</bul:CUSBUILDING>
-        <bul:FLOORNO>2</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 09</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 09</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>SOFTWARE_ENGINEER</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 09</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2018-09-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>4900</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>2000</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity09</bul:FINLOC>
-        <bul:FINCITY>TestCity09</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 09</bul:FINSTREET>
-        <bul:FINBLD>Office Building 09</bul:FINBLD>
-        <bul:FINFLRNO>10</bul:FINFLRNO>
-        <bul:FINDEPT>IT</bul:FINDEPT>
-        <bul:FINPROV>Test Province 09</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000009</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100009</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000009</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200009</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-    <bul:record>
-        <bul:oldCustomerId>CUST0010</bul:oldCustomerId>
-        <bul:oldExternalId>EXT0010</bul:oldExternalId>
-        <bul:oldCompany>Test Company 10</bul:oldCompany>
-        <bul:printCard>Y</bul:printCard>
-        <bul:branchCode>110</bul:branchCode>
-        <bul:branchName>Test Branch 10</bul:branchName>
-        <bul:GIVENNAMES>TestGiven10</bul:GIVENNAMES>
-        <bul:FATHERNAME>TestFather10</bul:FATHERNAME>
-        <bul:FAMILYNAME>TestFamily10</bul:FAMILYNAME>
-        <bul:DATEOFBIRTH>1990-01-20</bul:DATEOFBIRTH>
-        <bul:EMAIL1>test.user10@example.com</bul:EMAIL1>
-        <bul:MOFIRSTNAME>TestMother10</bul:MOFIRSTNAME>
-        <bul:MOLASTNAME>TestMotherFamily10</bul:MOLASTNAME>
-        <bul:BIRTHCNT>LB</bul:BIRTHCNT>
-        <bul:NATIONALITY>LB</bul:NATIONALITY>
-        <bul:BIRTHREGISTER>REGISTER-1010</bul:BIRTHREGISTER>
-        <bul:LEGALID>TEST-ID-000010</bul:LEGALID>
-        <bul:LEGALDOCNAME>IDENTITY_CARD</bul:LEGALDOCNAME>
-        <bul:LEGALISSDATE>2020-10-01</bul:LEGALISSDATE>
-        <bul:LEGALEXPDATE>2030-10-01</bul:LEGALEXPDATE>
-        <bul:GENDER>F</bul:GENDER>
-        <bul:MARITALSTATUS>MARRIED</bul:MARITALSTATUS>
-        <bul:SPLASTNAME>TestSpouseFamily10</bul:SPLASTNAME>
-        <bul:SPFIRSTNAME>TestSpouse10</bul:SPFIRSTNAME>
-        <bul:HLDOTHMATH>N</bul:HLDOTHMATH>
-        <bul:OTHRNAT></bul:OTHRNAT>
-        <bul:PEP>N</bul:PEP>
-        <bul:BNRGTOWNR>Y</bul:BNRGTOWNR>
-        <bul:MOTACOPEN>SALARY_ACCOUNT</bul:MOTACOPEN>
-        <bul:SRCFUNDS>SALARY</bul:SRCFUNDS>
-        <bul:FINDETS>Monthly salary from Test Company 10</bul:FINDETS>
-        <bul:SRCWEALTH>EMPLOYMENT_INCOME</bul:SRCWEALTH>
-        <bul:ESTWEALTH>140000</bul:ESTWEALTH>
-        <bul:RESIDENCE>LB</bul:RESIDENCE>
-        <bul:CUSCITY>TestCity10</bul:CUSCITY>
-        <bul:CITY>TestCity10</bul:CITY>
-        <bul:STREET>Test Street 10</bul:STREET>
-        <bul:CUSBUILDING>Test Building 10</bul:CUSBUILDING>
-        <bul:FLOORNO>3</bul:FLOORNO>
-        <bul:DEPARTMENT>Apartment 10</bul:DEPARTMENT>
-        <bul:PROVINCE>Test Province 10</bul:PROVINCE>
-        <bul:EMPLOYMENTSTATUS>EMPLOYED</bul:EMPLOYMENTSTATUS>
-        <bul:SALARYDOM>Y</bul:SALARYDOM>
-        <bul:CLIENTFUNC>EMPLOYEE</bul:CLIENTFUNC>
-        <bul:OCCUPATION>ACCOUNTANT</bul:OCCUPATION>
-        <bul:JOBTITLE>Test Job Title</bul:JOBTITLE>
-        <bul:EMPLOYERSNAME>Test Company 10</bul:EMPLOYERSNAME>
-        <bul:EMPLOYMENTSTART>2019-01-01</bul:EMPLOYMENTSTART>
-        <bul:NETMONTHLYIN>5200</bul:NETMONTHLYIN>
-        <bul:NETMONTHLYOUT>2100</bul:NETMONTHLYOUT>
-        <bul:FINTWNCTY>LB</bul:FINTWNCTY>
-        <bul:FINLOC>TestCity10</bul:FINLOC>
-        <bul:FINCITY>TestCity10</bul:FINCITY>
-        <bul:FINSTREET>Financial Street 10</bul:FINSTREET>
-        <bul:FINBLD>Office Building 10</bul:FINBLD>
-        <bul:FINFLRNO>1</bul:FINFLRNO>
-        <bul:FINDEPT>FINANCE</bul:FINDEPT>
-        <bul:FINPROV>Test Province 10</bul:FINPROV>
-        <bul:CRSTAXRES_1>LB</bul:CRSTAXRES_1>
-        <bul:CRSTAXRES_2></bul:CRSTAXRES_2>
-        <bul:CRSTAXRES_3></bul:CRSTAXRES_3>
-        <bul:CRSTAXRES_4></bul:CRSTAXRES_4>
-        <bul:CRSTAXID_1>TIN-LB-000010</bul:CRSTAXID_1>
-        <bul:CRSTAXID_2></bul:CRSTAXID_2>
-        <bul:CRSTAXID_3></bul:CRSTAXID_3>
-        <bul:CRSTAXID_4></bul:CRSTAXID_4>
-        <bul:CRSTAXDT_1>2026-01-01</bul:CRSTAXDT_1>
-        <bul:CRSTAXDT_2></bul:CRSTAXDT_2>
-        <bul:CRSTAXDT_3></bul:CRSTAXDT_3>
-        <bul:CRSTAXDT_4></bul:CRSTAXDT_4>
-        <bul:PACKAGEID>STANDARD</bul:PACKAGEID>
-        <bul:HAVETINNB_1>Y</bul:HAVETINNB_1>
-        <bul:HAVETINNB_2>N</bul:HAVETINNB_2>
-        <bul:HAVETINNB_3>N</bul:HAVETINNB_3>
-        <bul:HAVETINNB_4>N</bul:HAVETINNB_4>
-        <bul:GREENCARDNB></bul:GREENCARDNB>
-        <bul:GREENCARDHOLD>N</bul:GREENCARDHOLD>
-        <bul:ISOCODE>LB</bul:ISOCODE>
-        <bul:MOBCOUNTRYCODE>961</bul:MOBCOUNTRYCODE>
-        <bul:MOBAREACODE>3</bul:MOBAREACODE>
-        <bul:MOBNUMBER>100010</bul:MOBNUMBER>
-        <bul:birthRegistrationNumber>BRN-000010</bul:birthRegistrationNumber>
-        <bul:landLineCountryCode_1>961</bul:landLineCountryCode_1>
-        <bul:landLineCountryCode_2></bul:landLineCountryCode_2>
-        <bul:landLineCountryCode_3></bul:landLineCountryCode_3>
-        <bul:landLineCountryCode_4></bul:landLineCountryCode_4>
-        <bul:landLineAreaCode_1>1</bul:landLineAreaCode_1>
-        <bul:landLineAreaCode_2></bul:landLineAreaCode_2>
-        <bul:landLineAreaCode_3></bul:landLineAreaCode_3>
-        <bul:landLineAreaCode_4></bul:landLineAreaCode_4>
-        <bul:landLineNumber_1>200010</bul:landLineNumber_1>
-        <bul:landLineNumber_2></bul:landLineNumber_2>
-        <bul:landLineNumber_3></bul:landLineNumber_3>
-        <bul:landLineNumber_4></bul:landLineNumber_4>
-    </bul:record>
-</bul:bulkOnboarding>
+{
+	"info": {
+		"_postman_id": "484a95e7-65b3-4f16-894f-e35331f44783",
+		"name": "Visa Direct - Certification Test Cases",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Funds Transfer Attributes Inquiry API",
+			"item": [
+				{
+					"name": "1_FTA_ENCRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"kid\",pm.request.headers.get(\"kid\"));"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"req_body\",jsonData.encData);",
+									"",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "kid",
+								"value": "{{MLE_KEY_ID}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"primaryAccountNumber\": \"4761300004221110\",\r\n    \"systemsTraceAuditNumber\": \"{{stan}}\",\r\n    \"retrievalReferenceNumber\": \"{{rrn}}\",\r\n    \"acquirerCountryCode\": \"{{ACQUIRER_COUNTRY_CODE}}\",\r\n    \"acquiringBin\": \"{{AQUIRING_BIN}}\"\r\n}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/EncryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"EncryptPayload"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2_FTA_VD_REQUEST",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"res_body\",jsonData.encData);",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{BASIC_AUTH_PASSWORD}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{BASIC_AUTH_USERNAME}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "keyId",
+								"value": "{{kid}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{req_body}}\"}"
+						},
+						"url": {
+							"raw": "{{REVERSE_PROXY_URL}}/paai/fundstransferattinq/v5/cardattributes/fundstransferinquiry",
+							"host": [
+								"{{REVERSE_PROXY_URL}}"
+							],
+							"path": [
+								"paai",
+								"fundstransferattinq",
+								"v5",
+								"cardattributes",
+								"fundstransferinquiry"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3_FTA_DECRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{res_body}}\"}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/DecryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"DecryptPayload"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Payment Account Validation API",
+			"item": [
+				{
+					"name": "1_PAV_ENCRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"kid\",pm.request.headers.get(\"kid\"));"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"req_body\",jsonData.encData);",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "kid",
+								"value": "{{MLE_KEY_ID}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"primaryAccountNumber\": \"4957030420210462\",\r\n    \r\n    \"systemsTraceAuditNumber\": \"743720\",\r\n    \"cardAcceptor\": {\r\n        \"idCode\": \"111111\",\r\n        \"name\": \"ABC Corp\",\r\n        \"address\": {\r\n            \"city\": \"Dekwaneh\",\r\n            \"country\": \"422\"\r\n        }\r\n    },\r\n    \"acquirerCountryCode\": \"{{ACQUIRER_COUNTRY_CODE}}\",\r\n    \"acquiringBin\": \"{{AQUIRING_BIN}}\",\r\n    \"retrievalReferenceNumber\": \"524114743720\"\r\n}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/EncryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"EncryptPayload"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2_PAV_VD_REQUEST",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"res_body\",jsonData.encData);",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{BASIC_AUTH_PASSWORD}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{BASIC_AUTH_USERNAME}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "keyId",
+								"value": "{{kid}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{req_body}}\"}"
+						},
+						"url": {
+							"raw": "{{REVERSE_PROXY_URL}}/pav/v1/cardvalidation",
+							"host": [
+								"{{REVERSE_PROXY_URL}}"
+							],
+							"path": [
+								"pav",
+								"v1",
+								"cardvalidation"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3_PAV_DECRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{res_body}}\"}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/DecryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"DecryptPayload"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Funds Transfer API - Create Push Funds Transaction",
+			"item": [
+				{
+					"name": "1_PUSH_ENCRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"kid\",pm.request.headers.get(\"kid\"));"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"req_body\",jsonData.encData);",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "kid",
+								"value": "{{MLE_KEY_ID}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"amount\": 124.05,\r\n    \"recipientPrimaryAccountNumber\": \"4757700009521115\",\r\n    \"recipientFirstName\": \"Karim\",\r\n    \"recipientLastName\": \"Saliba\",\r\n    \"recipientAddressLine1\": \"Boulevard Street, Opposite Municipality Square\",\r\n    \"recipientCity\": \"Zahle\",\r\n    \"recipientCountryCode\": \"422\",\r\n    \"transactionCurrencyCode\": \"USD\",\r\n\r\n    \"senderFirstName\": \"Pierre\",\r\n    \"senderLastName\": \"Abou Serhal\",\r\n    \"senderCountryCode\": \"422\",\r\n    \"senderCity\": \"Baabdat\",\r\n    \"senderAddress\": \"Rue 21-B\",\r\n    \"senderReference\": \"011260165002840\",\r\n\r\n    \"localTransactionDateTime\": \"{{timestamp}}\",\r\n    \"cardAcceptor\": {\r\n        \"idCode\": \"{{CARD_ACCEPTOR_ID_CODE}}\",\r\n        \"name\": \"{{CARD_ACCEPTOR_NAME}}\",\r\n        \"address\": {\r\n            \"city\": \"{{CARD_ACCEPTOR_CITY}}\",\r\n            \"country\": \"{{CARD_ACCEPTOR_COUNTRY}}\"\r\n        },\r\n        \"terminalId\": \"{{CARD_ACCEPTOR_TERMINAL_ID}}\"\r\n    },\r\n    \"acquirerCountryCode\": {{ACQUIRER_COUNTRY_CODE}},\r\n    \"acquiringBin\": {{AQUIRING_BIN}},\r\n    \"retrievalReferenceNumber\": \"{{rrn}}\",\r\n    \"systemsTraceAuditNumber\": {{stan}},\r\n    \"businessApplicationId\": \"PP\",\r\n    \"sourceOfFundsCode\": \"05\",\r\n\r\n\r\n\r\n    \"pointOfServiceData\" : {\r\n        \"panEntryMode\": \"01\",\r\n        \"posConditionCode\": \"05\" \r\n    }\r\n}\r\n"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/EncryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"EncryptPayload"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2_PUSH_VD_REQUEST",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"res_body\",jsonData.encData);",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{BASIC_AUTH_PASSWORD}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{BASIC_AUTH_USERNAME}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "keyId",
+								"value": "{{kid}}",
+								"type": "text"
+							},
+							{
+								"key": "X-Transaction-Timeout-MS",
+								"value": "1",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{req_body}}\"}"
+						},
+						"url": {
+							"raw": "{{REVERSE_PROXY_URL}}/visadirect/fundstransfer/v1/pushfundstransactions",
+							"host": [
+								"{{REVERSE_PROXY_URL}}"
+							],
+							"path": [
+								"visadirect",
+								"fundstransfer",
+								"v1",
+								"pushfundstransactions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3_PUSH_DECRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{res_body}}\"}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/DecryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"DecryptPayload"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Alias Directory Inquiry",
+			"item": [
+				{
+					"name": "1_AI_ENCRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"kid\",pm.request.headers.get(\"kid\"));"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"req_body\",jsonData.encData);",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "kid",
+								"value": "{{MLE_KEY_ID}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"aliases\": [\r\n    \"4357651127\"\r\n  ]\r\n}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/EncryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"EncryptPayload"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2_AI_VD_REQUEST",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"res_body\",jsonData.encData);",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{BASIC_AUTH_PASSWORD}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{BASIC_AUTH_USERNAME}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "keyId",
+								"value": "{{kid}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{req_body}}\"}"
+						},
+						"url": {
+							"raw": "{{REVERSE_PROXY_URL}}/aliasdirectory/v1/aliases/inquiry",
+							"host": [
+								"{{REVERSE_PROXY_URL}}"
+							],
+							"path": [
+								"aliasdirectory",
+								"v1",
+								"aliases",
+								"inquiry"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3_AI_DECRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{res_body}}\"}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/DecryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"DecryptPayload"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Alias Directory Resolve",
+			"item": [
+				{
+					"name": "1_AR_ENCRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"kid\",pm.request.headers.get(\"kid\"));"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"req_body\",jsonData.encData);",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "kid",
+								"value": "{{MLE_KEY_ID}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"aliasType\": \"PHONE\",\r\n    \"aliasValue\": \"9611123456\"\r\n}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/EncryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"EncryptPayload"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2_AR_VD_REQUEST",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"res_body\",jsonData.encData);",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{BASIC_AUTH_PASSWORD}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{BASIC_AUTH_USERNAME}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "keyId",
+								"value": "{{kid}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{req_body}}\"}"
+						},
+						"url": {
+							"raw": "{{REVERSE_PROXY_URL}}/aliasdirectory/v1/aliases/resolve",
+							"host": [
+								"{{REVERSE_PROXY_URL}}"
+							],
+							"path": [
+								"aliasdirectory",
+								"v1",
+								"aliases",
+								"resolve"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3_AR_DECRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{res_body}}\"}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/DecryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"DecryptPayload"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Query API",
+			"item": [
+				{
+					"name": "1_QUERY_ENCRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"pm.globals.set(\"kid\",pm.request.headers.get(\"kid\"));"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"req_body\",jsonData.encData);",
+									"",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "kid",
+								"value": "{{MLE_KEY_ID}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/EncryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"EncryptPayload"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "2_QUERY_VD_REQUEST",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.globals.set(\"res_body\",jsonData.encData);",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{BASIC_AUTH_PASSWORD}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{BASIC_AUTH_USERNAME}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "keyId",
+								"value": "{{kid}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{req_body}}\"}"
+						},
+						"url": {
+							"raw": "{{REVERSE_PROXY_URL}}/visadirect/v1/transactionquery?acquiringBIN={{AQUIRING_BIN}}&transactionIdentifier=306202319179232",
+							"host": [
+								"{{REVERSE_PROXY_URL}}"
+							],
+							"path": [
+								"visadirect",
+								"v1",
+								"transactionquery"
+							],
+							"query": [
+								{
+									"key": "acquiringBIN",
+									"value": "{{AQUIRING_BIN}}"
+								},
+								{
+									"key": "transactionIdentifier",
+									"value": "306202319179232"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "3_QUERY_DECRYPT",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"encData\":\"{{res_body}}\"}"
+						},
+						"url": {
+							"raw": "{{ALTERNA_VD_URL}}/api/VisaDirect/DecryptPayload",
+							"host": [
+								"{{ALTERNA_VD_URL}}"
+							],
+							"path": [
+								"api",
+								"VisaDirect",
+								"DecryptPayload"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Currency exchange",
+			"item": [
+				{
+					"name": "currency",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "{{BASIC_AUTH_PASSWORD}}",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "{{BASIC_AUTH_USERNAME}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "keyId",
+								"value": "{{MLE_KEY_ID}}",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"rateProductCode\": \"A\",\r\n    \"sourceAmount\": \"100\",\r\n    \"sourceCurrencyCode\": \"840\",\r\n    \"destinationCurrencyCode\": \"978\"\r\n}"
+						},
+						"url": {
+							"raw": "{{REVERSE_PROXY_URL}}/forexrates/v2/foreignexchangerates",
+							"host": [
+								"{{REVERSE_PROXY_URL}}"
+							],
+							"path": [
+								"forexrates",
+								"v2",
+								"foreignexchangerates"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// === 1. Generate Systems Trace Audit Number (STAN) ===",
+					"const randomNumber = Math.floor(Math.random() * 1000000);",
+					"const stan = String(randomNumber).padStart(6, '0');",
+					"pm.collectionVariables.set(\"stan\", stan);",
+					"",
+					"",
+					"// === 2. Generate Retrieval Reference Number (RRN) ===",
+					"const now = new Date();",
+					"",
+					"// Get the last digit of the year (y)",
+					"const lastDigitOfYear = String(now.getFullYear()).slice(-1);",
+					"",
+					"// Calculate Day of the Year (ddd)",
+					"const startOfYear = new Date(now.getFullYear(), 0, 0);",
+					"const diffInMs = now - startOfYear;",
+					"const oneDayInMs = 1000 * 60 * 60 * 24;",
+					"const dayOfYear = Math.floor(diffInMs / oneDayInMs);",
+					"const ddd = String(dayOfYear).padStart(3, '0');",
+					"",
+					"// Get 24-hour format hour (HH)",
+					"const hh = String(now.getHours()).padStart(2, '0');",
+					"",
+					"// Combine into final RRN (ydddHH + stan)",
+					"const rrn = `${lastDigitOfYear}${ddd}${hh}${stan}`;",
+					"pm.collectionVariables.set(\"rrn\", rrn);",
+					"",
+					"// === 3. Get the localTransactionDateTime",
+					"",
+					"// Get the current date and time",
+					"",
+					"// Format to ISO string and remove the milliseconds/Z suffix",
+					"const formattedTimestamp = now.toISOString().split('.')[0];",
+					"",
+					"// Save to a variable",
+					"pm.collectionVariables.set(\"timestamp\", formattedTimestamp);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "VISA_DIRECT_URL",
+			"value": "https://sandbox.api.visa.com"
+		},
+		{
+			"key": "REVERSE_PROXY_URL",
+			"value": "http://10.0.40.41:8211/visadirect"
+		},
+		{
+			"key": "ALTERNA_VD_URL",
+			"value": "http://10.0.40.41:8207"
+		},
+		{
+			"key": "BASIC_AUTH_USERNAME",
+			"value": "C0Z3WDQBO3J7CEPT4GKU21VEuDhhsQLFiMPGiF-Ob7nQon2_w"
+		},
+		{
+			"key": "BASIC_AUTH_PASSWORD",
+			"value": "B0U7I4Y2g8d1sy72R4HA8920cCXgJJx2uSP"
+		},
+		{
+			"key": "MLE_KEY_ID",
+			"value": "2ce4293f-5cdf-4215-afd8-ef045f2025b2"
+		},
+		{
+			"key": "AQUIRING_BIN",
+			"value": "408999"
+		},
+		{
+			"key": "ACQUIRER_COUNTRY_CODE",
+			"value": "422"
+		},
+		{
+			"key": "CARD_ACCEPTOR_ID_CODE",
+			"value": "SGBL"
+		},
+		{
+			"key": "CARD_ACCEPTOR_NAME",
+			"value": "SGBL Bank"
+		},
+		{
+			"key": "CARD_ACCEPTOR_TERMINAL_ID",
+			"value": "TID-0001"
+		},
+		{
+			"key": "CARD_ACCEPTOR_CITY",
+			"value": "Saloumeh"
+		},
+		{
+			"key": "CARD_ACCEPTOR_COUNTRY",
+			"value": "422"
+		},
+		{
+			"key": "stan",
+			"value": ""
+		},
+		{
+			"key": "rrn",
+			"value": ""
+		},
+		{
+			"key": "timestamp",
+			"value": ""
+		}
+	]
+}
