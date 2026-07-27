@@ -1,86 +1,73 @@
-    #region Query
+Your configured route already contains `transactionIdentifier={2}`, so it remains in the URL even when you want to query using `stan` and `rrn`.
 
-    public async Task<(dynamic, Int32)> Query(String correlationId, String? transactionIdentifier, String? stan, String? rrn)
+Keep the route free of query parameters and build them entirely in code.
+
+In `appsettings.json`:
+
+```json
+"QueryRoute": "visadirect/v1/transactionquery"
+```
+
+Replace your endpoint-building section with:
+
+```csharp
+String baseUrl = _globalSettings.VisaDirectConfigs.BaseUrl.TrimEnd('/');
+String queryRoute = _globalSettings.VisaDirectConfigs.QueryRoute.TrimStart('/');
+
+UriBuilder builder = new($"{baseUrl}/{queryRoute}");
+
+NameValueCollection queryParams =
+    HttpUtility.ParseQueryString(String.Empty);
+
+queryParams["acquiringBIN"] =
+    _globalSettings.VisaDirectConfigs.AcquiringBin;
+
+if (!String.IsNullOrWhiteSpace(transactionIdentifier))
+{
+    // Query using transactionIdentifier only
+    queryParams["transactionIdentifier"] = transactionIdentifier.Trim();
+}
+else
+{
+    // If transactionIdentifier is absent, both STAN and RRN are required
+    if (String.IsNullOrWhiteSpace(stan) ||
+        String.IsNullOrWhiteSpace(rrn))
     {
-        CorrelationInfo correlationInfo = new()
-        {
-            CorrelationId = correlationId,
-            RDirection = RequestDirection.Processing,
-            RequestURL = "Query",
-            UserName = _globalSettings.AppUsername
-        };
-
-        JsonSerializerOptions jsonSerializerOptions = new()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true
-        };
-
-        // Encrypting the request
-        EncryptedPayload queryEncryptedPayloadReq = GetEncryptedPayload(String.Empty);
-
-        correlationInfo.Reserved = "Query encrypted request payload.";
-        LogInfo(JsonSerializer.Serialize(queryEncryptedPayloadReq, jsonSerializerOptions), correlationInfo);
-
-        // Calling Visa Direct Query
-        Dictionary<String, String> queryHeaders = new ()
-        {
-            { "KeyId", _globalSettings.VisaDirectConfigs.MleKeyId },
-            { "Basic", $"{_globalSettings.VisaDirectConfigs.BasicAuthUsername}:{_globalSettings.VisaDirectConfigs.BasicAuthPassword}"}
-        };
-
-        // Building the endpoint
-        UriBuilder builder =
-            new($"{_globalSettings.VisaDirectConfigs.BaseUrl}{_globalSettings.VisaDirectConfigs.QueryRoute}");
-        NameValueCollection queryParams = HttpUtility.ParseQueryString(builder.Query);
-        queryParams[Char.ToLowerInvariant(nameof(_globalSettings.VisaDirectConfigs.AcquiringBin)[0]) + nameof(_globalSettings.VisaDirectConfigs.AcquiringBin)[1..]] = _globalSettings.VisaDirectConfigs.AcquiringBin;
-
-        // Either query by transactionIdentifier or stan + rrn (in case of timeout)
-        if (!String.IsNullOrWhiteSpace(transactionIdentifier))
-        {
-          queryParams[nameof(transactionIdentifier)] = transactionIdentifier;
-        }
-        else
-        {
-          queryParams[nameof(stan)] = stan;
-          queryParams[nameof(rrn)] = rrn;
-        }
-
-        builder.Query = queryParams.ToString();
-        String endpoint = builder.ToString();
-
-        (dynamic queryEncryptedPayloadRes, HttpStatusCode httpStatusCode) =
-            await GetAsync<dynamic>(
-                request: queryEncryptedPayloadReq,
-                endpoint: endpoint,
-                headers: queryHeaders,
-                checkOnSuccessStatusCode: false);
-
-        correlationInfo.Reserved = "Query response from Visa Direct.";
-        LogInfo(JsonSerializer.Serialize(queryEncryptedPayloadRes, jsonSerializerOptions), correlationInfo);
-
-        // Received non encrypted response from Visa Direct --> Response is not encrypted. Caused by certificate, Authorisation or header mis-configuration
-        if (!queryEncryptedPayloadRes.ToString().Contains("encData", StringComparison.InvariantCultureIgnoreCase))
-        {
-            return (queryEncryptedPayloadRes, (Int32)httpStatusCode);
-        }
-
-        // Decrypting the response
-        String queryDecryptedPayloadRes = GetDecryptedPayload(JsonSerializer.Serialize(queryEncryptedPayloadRes, jsonSerializerOptions));
-
-        // Returning response
-        Object response = ParseJsonOrReturnText(queryDecryptedPayloadRes) ?? throw new Exception("Deserializing Query response returned null.");
-
-        correlationInfo.Reserved = "Query decrypted response payload";
-        LogInfo(JsonSerializer.Serialize(response, jsonSerializerOptions), correlationInfo);
-
-        return (response, (Int32) httpStatusCode);
+        throw new SGBLBadRequestException(
+            "Either transactionIdentifier or both stan and rrn must be provided.");
     }
-    #endregion
 
-and in appsettings I have this:
-ueryRoute": "visadirect/v1/transactionquery?acquiringBIN={1}&transactionIdentifier={2}",
+    queryParams["stan"] = stan.Trim();
+    queryParams["rrn"] = rrn.Trim();
+}
 
-The thing is that now, I want to send transactionIdentifier query param if it is not null or empty, but stan and rrn will be sent if transactionIdentifier is null or empty
+builder.Query = queryParams.ToString();
 
-How to fix my code
+String endpoint = builder.Uri.ToString();
+```
+
+This produces one of these two URLs:
+
+```text
+visadirect/v1/transactionquery
+    ?acquiringBIN=408999
+    &transactionIdentifier=234234322342343
+```
+
+or:
+
+```text
+visadirect/v1/transactionquery
+    ?acquiringBIN=408999
+    &stan=123456
+    &rrn=123456789012
+```
+
+Also use the exact parameter name `acquiringBIN`. Your current expression generates `acquiringBin`, which has different capitalization:
+
+```csharp
+Char.ToLowerInvariant(nameof(AcquiringBin)[0]) + nameof(AcquiringBin)[1..]
+// Result: acquiringBin
+```
+
+Explicit query parameter names are clearer and safer for an external API contract.
