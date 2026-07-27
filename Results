@@ -1,100 +1,90 @@
-I have this code:
+The decryption is succeeding. The exception happens afterward here:
 
-    [HttpPost]
-    [Route("DecryptPayload")]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [ProducesResponseType(typeof(EncryptedPayload), 200)]
-    // [SwaggerResponseExample(200, typeof(EncryptedPayloadExample))]
-    public dynamic? DecryptPayload(
-        [FromBody] JsonElement? content)
-    {
-        CorrelationInfo correlationInfo = new()
-        {
-            CorrelationId = Guid.NewGuid().ToString(),
-            RDirection = RequestDirection.Request,
-            RequestURL = "DecryptPayload",
-            UserName = _globalSettings.AppUsername
-        };
+```csharp
+JsonSerializer.Deserialize<dynamic>(decryptedPayload)
+```
 
-        try
-        {
-            #region DataGuard
+`3310SGBLTID-0001620410277601` is not valid JSON. The parser interprets `3310` as a number, then encounters `S` at position 4, where it expected a delimiter such as `,`, `}` or the end of the JSON.
 
-            List<KeyValuePair<DataIntegrityCheckFunctions, Property>> dataGuardDict = new();
+Use a helper that returns parsed JSON when valid and plain text otherwise:
 
-            if (content is not null)
-            {
-                dataGuardDict.Add(new (DataIntegrityCheckFunctions.IS_JSON_STRING_INVALID, new ()
-                {
-                    PropName = "Content",
-                    PropValue = content.ToString()
-                }));
-            }
-
-            DataIntegrityCheck(dataGuardDict);
-
-            #endregion
-
-            correlationInfo.Reserved = "Decrypting the following visa direct payload.";
-            LogInfo(content.ToString(), correlationInfo);
-
-            dynamic? response = JsonSerializer.Deserialize<dynamic>(_bal.GetDecryptedPayload(content.ToString() ?? String.Empty));
-
-            correlationInfo.Reserved = "Visa direct decrypted payload.";
-            LogInfo(JsonSerializer.Serialize(response), correlationInfo);
-
-            return response;
-        }
-        catch (SGBLBadRequestException ex)
-        {
-            StringBuilder sb = new(_responseCodesDictionary["400"].Description);
-
-            sb.Replace("{0}", ex.Message);
-
-            LogErrorJson(content, correlationInfo, ex);
-
-            return ex.Message;
-        }
-        catch (Exception ex)
-        {
-            StringBuilder sb = new(_responseCodesDictionary["422"].Description);
-
-            sb.Replace("{0}", ex.Message);
-
-            LogErrorJson(content, correlationInfo, ex);
-
-            return ex.Message;
-        }
-    }
-
-And this is the GetDecryptedPayload funtion
-
-    public String GetDecryptedPayload(String encryptedContent)
-    {
-        EncryptedPayload encryptedPayload = JsonSerializer.Deserialize<EncryptedPayload>(encryptedContent, _jsonOptions) 
-                                            ?? throw new SGBLBadRequestException("Failed to parse encrypted payload");
-        
-        RSA privateKey = ImportMLEPrivateKey(Path.Combine(AppContext.BaseDirectory, "MLE-Keys", _globalSettings.VisaDirectConfigs.MlePrivateKeyName));
-        
-        return JWT.Decode(
-            encryptedPayload.EncData, 
-            privateKey);
-    }
-
-I have the following request:
+```csharp
+private static object? ParseJsonOrReturnText(string decryptedPayload)
 {
-    "encData": "eyJjdHkiOiJhcHBsaWNhdGlvbi9vY3RldC1zdHJlYW0iLCJlbmMiOiJBMTI4R0NNIiwiaWF0IjoxNzg0NzkzMjcwNDUyLCJhbGciOiJSU0EtT0FFUC0yNTYifQ.EhlFxBGhEYKAKbN4lghthhSoBXoGSYAgXdELUDCKBTzPVxg7XkFwq5FELwAZlr3vORNBWmm6rn8VGx9B4LKlu-bxNgPdMMZzKl1ZOy3QOIN7slzm4WmWXbMKXK3UNJS4bibbwQ55f1g1q-WEIHPUKv-goXtn2p_s0RVayCy6iqO6kl_g_jTBvDSJKjGWeNG-Sar_er4zxaEiwVQDVCgO1fMcNQnJvwE-PUjuJedFhLlFvVkGgmQoKI8ID6zUm4ahriEG3saY56gC-h82y7MJC7hfHKMW5RKrhHK0u03S229QvgkaJzG9kkuL_vtVb1QlikxYZu6joJzEcE7qekQUxQ.-8bdMcNXeibHDcQw.i-UGR2SbuelovEEI7bfCr_5WQvYt7-Rjs8nPUA.WGgqK70UycHVx3p4CcHGXQ"
+    if (string.IsNullOrWhiteSpace(decryptedPayload))
+        return decryptedPayload;
+
+    try
+    {
+        using JsonDocument document = JsonDocument.Parse(decryptedPayload);
+        return document.RootElement.Clone();
+    }
+    catch (JsonException)
+    {
+        return decryptedPayload;
+    }
 }
+```
 
-When it is being decrypted, it is returning:
+Then replace:
+
+```csharp
+dynamic? response = JsonSerializer.Deserialize<dynamic>(
+    _bal.GetDecryptedPayload(content.ToString() ?? string.Empty));
+```
+
+with:
+
+```csharp
+string decryptedPayload = _bal.GetDecryptedPayload(
+    content?.GetRawText() ?? string.Empty);
+
+object? response = ParseJsonOrReturnText(decryptedPayload);
+```
+
+The relevant part becomes:
+
+```csharp
+correlationInfo.Reserved =
+    "Decrypting the following Visa Direct payload.";
+
+LogInfo(content?.GetRawText() ?? string.Empty, correlationInfo);
+
+string decryptedPayload = _bal.GetDecryptedPayload(
+    content?.GetRawText() ?? string.Empty);
+
+object? response = ParseJsonOrReturnText(decryptedPayload);
+
+correlationInfo.Reserved = "Visa Direct decrypted payload.";
+LogInfo(JsonSerializer.Serialize(response), correlationInfo);
+
+return response;
+```
+
+This handles:
+
+```json
+{
+  "transactionId": "123"
+}
+```
+
+as a JSON object, and:
+
+```text
 3310SGBLTID-0001620410277601
+```
 
-But my API is throwing thie exception:
-"'S' is an invalid end of a number. Expected a delimiter. Path: $ | LineNumber: 0 | BytePositionInLine: 4."
+as a .NET string. ASP.NET Core will serialize the string into valid JSON:
 
-Why ?
+```json
+"3310SGBLTID-0001620410277601"
+```
 
-In normal scenarios, when decripting, I get  JSON obecjt, but sometimes I got text like this string above .
+One additional improvement: change the endpoint response declaration because it does not return an `EncryptedPayload`:
 
-How to cater for all that can be returned ?
+```csharp
+[ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+```
+
+Also, your exception handlers currently return HTTP `200` with an error message. Prefer returning `BadRequest(...)` and `UnprocessableEntity(...)` by changing the action return type to `IActionResult` or `ActionResult<object?>`.
