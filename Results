@@ -1,35 +1,100 @@
-- In CPF cardAcceptor.name should be formatted like this:
-	"SGBL*" + senderFirstName
-	It also needs to be truncated to the max lenght of cardAcceptor.name 
-	
-- CPF: Always send in cardAcceptor.address: these: addressLine, state, zipCode
+I have this code:
 
-- CPF always send senderMiddleName + recipientMiddleName 
-	
-- "merchantCategoryCode": "6012" should also be always sent in CPF
+    [HttpPost]
+    [Route("DecryptPayload")]
+    [Consumes("application/json")]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(EncryptedPayload), 200)]
+    // [SwaggerResponseExample(200, typeof(EncryptedPayloadExample))]
+    public dynamic? DecryptPayload(
+        [FromBody] JsonElement? content)
+    {
+        CorrelationInfo correlationInfo = new()
+        {
+            CorrelationId = Guid.NewGuid().ToString(),
+            RDirection = RequestDirection.Request,
+            RequestURL = "DecryptPayload",
+            UserName = _globalSettings.AppUsername
+        };
 
-- CPF: We should always send : "cardAcceptor.legalBusinessName" : "SGBL"
-	
-- If Cross-Border OCT to  Australia or Canada --> recipientAddressLine1=Must be Present
-recipientCity=Must be Present
-recipientState=Must be Present
-recipientPostalCode=Must be Present
-recipientCountryCode=Must be Present
-senderPostalCode=Must be Present
-senderStateCode=Must be Present
+        try
+        {
+            #region DataGuard
 
-- If Cross-Border OCT to South Africa: we need to send the recipientMiddleName +     "senderMiddleName"
+            List<KeyValuePair<DataIntegrityCheckFunctions, Property>> dataGuardDict = new();
 
-If the card is indian, we need to send the purposeOfPayment, sourceAmount and sourceCurrencyCode (note hat purposeOfPayment need to have certain specific values that can be found in this file Visa Direct for Card (AFT & OCT) Processing Guide
- 
-Appendix E – Purpose of Payment Standardized Codes List) WE CAN STICK TO THIS purposeOfPayment: ISMP2P or ISOTHR
+            if (content is not null)
+            {
+                dataGuardDict.Add(new (DataIntegrityCheckFunctions.IS_JSON_STRING_INVALID, new ()
+                {
+                    PropName = "Content",
+                    PropValue = content.ToString()
+                }));
+            }
 
+            DataIntegrityCheck(dataGuardDict);
 
-When received a timeout from CPF, I could not decrypt the response:
+            #endregion
+
+            correlationInfo.Reserved = "Decrypting the following visa direct payload.";
+            LogInfo(content.ToString(), correlationInfo);
+
+            dynamic? response = JsonSerializer.Deserialize<dynamic>(_bal.GetDecryptedPayload(content.ToString() ?? String.Empty));
+
+            correlationInfo.Reserved = "Visa direct decrypted payload.";
+            LogInfo(JsonSerializer.Serialize(response), correlationInfo);
+
+            return response;
+        }
+        catch (SGBLBadRequestException ex)
+        {
+            StringBuilder sb = new(_responseCodesDictionary["400"].Description);
+
+            sb.Replace("{0}", ex.Message);
+
+            LogErrorJson(content, correlationInfo, ex);
+
+            return ex.Message;
+        }
+        catch (Exception ex)
+        {
+            StringBuilder sb = new(_responseCodesDictionary["422"].Description);
+
+            sb.Replace("{0}", ex.Message);
+
+            LogErrorJson(content, correlationInfo, ex);
+
+            return ex.Message;
+        }
+    }
+
+And this is the GetDecryptedPayload funtion
+
+    public String GetDecryptedPayload(String encryptedContent)
+    {
+        EncryptedPayload encryptedPayload = JsonSerializer.Deserialize<EncryptedPayload>(encryptedContent, _jsonOptions) 
+                                            ?? throw new SGBLBadRequestException("Failed to parse encrypted payload");
+        
+        RSA privateKey = ImportMLEPrivateKey(Path.Combine(AppContext.BaseDirectory, "MLE-Keys", _globalSettings.VisaDirectConfigs.MlePrivateKeyName));
+        
+        return JWT.Decode(
+            encryptedPayload.EncData, 
+            privateKey);
+    }
+
+I have the following request:
 {
     "encData": "eyJjdHkiOiJhcHBsaWNhdGlvbi9vY3RldC1zdHJlYW0iLCJlbmMiOiJBMTI4R0NNIiwiaWF0IjoxNzg0NzkzMjcwNDUyLCJhbGciOiJSU0EtT0FFUC0yNTYifQ.EhlFxBGhEYKAKbN4lghthhSoBXoGSYAgXdELUDCKBTzPVxg7XkFwq5FELwAZlr3vORNBWmm6rn8VGx9B4LKlu-bxNgPdMMZzKl1ZOy3QOIN7slzm4WmWXbMKXK3UNJS4bibbwQ55f1g1q-WEIHPUKv-goXtn2p_s0RVayCy6iqO6kl_g_jTBvDSJKjGWeNG-Sar_er4zxaEiwVQDVCgO1fMcNQnJvwE-PUjuJedFhLlFvVkGgmQoKI8ID6zUm4ahriEG3saY56gC-h82y7MJC7hfHKMW5RKrhHK0u03S229QvgkaJzG9kkuL_vtVb1QlikxYZu6joJzEcE7qekQUxQ.-8bdMcNXeibHDcQw.i-UGR2SbuelovEEI7bfCr_5WQvYt7-Rjs8nPUA.WGgqK70UycHVx3p4CcHGXQ"
 }
 
-- We can send the Query API using stan and rrn if we receive a 202 timeout error with the encrypted body above
+When it is being decrypted, it is returning:
+3310SGBLTID-0001620410277601
 
-- We need to check the Visa Excel sheet before the meeting next week
+But my API is throwing thie exception:
+"'S' is an invalid end of a number. Expected a delimiter. Path: $ | LineNumber: 0 | BytePositionInLine: 4."
+
+Why ?
+
+In normal scenarios, when decripting, I get  JSON obecjt, but sometimes I got text like this string above .
+
+How to cater for all that can be returned ?
