@@ -1,73 +1,117 @@
-Your configured route already contains `transactionIdentifier={2}`, so it remains in the URL even when you want to query using `stan` and `rrn`.
+These are notes that are present in the Visa Direct Test EXCEL sheet
 
-Keep the route free of query parameters and build them entirely in code.
 
-In `appsettings.json`:
 
-```json
-"QueryRoute": "visadirect/v1/transactionquery"
-```
 
-Replace your endpoint-building section with:
+"If Account Name Inquiry supported by Originator
+cardHolderNameVerification.ownerType=01 or 02 May be present
+cardHolderNameVerification.lastName=Must be Present"
 
-```csharp
-String baseUrl = _globalSettings.VisaDirectConfigs.BaseUrl.TrimEnd('/');
-String queryRoute = _globalSettings.VisaDirectConfigs.QueryRoute.TrimStart('/');
+"If Non-US Domestic OCT supported by Originator
+pointOfServiceData.panEntryMode=01
+pointOfServiceData.posConditionCode=59
+pointOfServiceData.motoECIIndicator=7"
 
-UriBuilder builder = new($"{baseUrl}/{queryRoute}");
+"If Cross-Border OCT via Internet supported by Originator
+pointOfServiceData.panEntryMode=01
+pointOfServiceData.posConditionCode=59
+pointOfServiceData.motoECIIndicator=7"
+"If Cross-Border OCT to  Australia or Canada supported by Originator
+pointOfServiceData.panEntryMode=01
+pointOfServiceData.posConditionCode=05 or 59
+recipientAddressLine1=Must be Present
+recipientCity=Must be Present
+recipientState=Must be Present
+recipientPostalCode=Must be Present
+recipientCountryCode=Must be Present
+senderPostalCode=Must be Present
+senderStateCode=Must be Present
+legalBusinessName=Must be Present"
+"If Cross-Border OCT to South Africa supported by Originator
+pointOfServiceData.panEntryMode=01
+pointOfServiceData.posConditionCode=05 or 59
+pointOfServiceData.motoECIIndicator=May be present
+senderFirstName=Must be Present
+senderMiddleName=Must be Present
+senderLastName=Must be Present
+recipientFirstName=Must be Present
+recipientMiddleName=Must be Present
+recipientLastName=Must be Present
+sourceOfFundsCode=Must be Present"
+"If Cross-Border OCT to India supported by Originator
+pointOfServiceData.panEntryMode=01
+pointOfServiceData.posConditionCode=05 or 59
+pointOfServiceData.motoECIIndicator=May be present
+amount=Present
+transactionCurrencyCode=Present
+sourceAmount=Present
+sourceCurrencyCode=Present
+prepaidBalanceCurrency=Must be Present
+prepaidBalance=Must be Present
+purposeOfPayment=Must be Present"
 
-NameValueCollection queryParams =
-    HttpUtility.ParseQueryString(String.Empty);
+"pointOfServiceData.panEntryMode=01
+pointOfServiceData.posConditionCode=59
+pointOfServiceData.motoECIIndicator=7 
+"
+"Request:
+pointOfServiceData.panEntryMode=01
+pointOfServiceData.posConditionCode=59
+pointOfServiceData.motoECIIndicator=7
+or OCT type supported by Originator
+Response:
+statusIdentifier=Present
 
-queryParams["acquiringBIN"] =
-    _globalSettings.VisaDirectConfigs.AcquiringBin;
+To simulate STIP timeout response for self testing: 
+Include “X-Transaction-Timeout-MS"" in the HTTP header with value “1”"
+"acquiringBIN, rrn, and stan
+Example from Via Development Center, Query API:  e.g.: /transactionquery?acquiringBIN=408999&stan=351480&rrn=221917871070"
+"If originator's exceptions are processed online rather than via VROL.
+pointOfServiceData.panEntryMode=01
+pointOfServiceData.posConditionCode=59
+pointOfServiceData.motoECIIndicator=7
+or OCT type supported by Originator"
+"Elements in request:
+- transactionTypeCode=2 (Debit) or 22 (Credit)
+- messageReasonCode=2150
+Elements from original request:
+- recipientPrimaryAccountNumber=Present
+- businessApplicationId=Present
+- transactionIdentifier=Present in response to original request"
 
-if (!String.IsNullOrWhiteSpace(transactionIdentifier))
-{
-    // Query using transactionIdentifier only
-    queryParams["transactionIdentifier"] = transactionIdentifier.Trim();
-}
-else
-{
-    // If transactionIdentifier is absent, both STAN and RRN are required
-    if (String.IsNullOrWhiteSpace(stan) ||
-        String.IsNullOrWhiteSpace(rrn))
-    {
-        throw new SGBLBadRequestException(
-            "Either transactionIdentifier or both stan and rrn must be provided.");
-    }
 
-    queryParams["stan"] = stan.Trim();
-    queryParams["rrn"] = rrn.Trim();
-}
 
-builder.Query = queryParams.ToString();
 
-String endpoint = builder.Uri.ToString();
-```
 
-This produces one of these two URLs:
 
-```text
-visadirect/v1/transactionquery
-    ?acquiringBIN=408999
-    &transactionIdentifier=234234322342343
-```
 
-or:
 
-```text
-visadirect/v1/transactionquery
-    ?acquiringBIN=408999
-    &stan=123456
-    &rrn=123456789012
-```
 
-Also use the exact parameter name `acquiringBIN`. Your current expression generates `acquiringBin`, which has different capitalization:
+And these are the notes I have took during the technical meeting with Visa
+- In CPF cardAcceptor.name should be formatted like this:
+	"SGBL*" + senderFirstName
+	It also needs to be truncated to the max lenght of cardAcceptor.name -----------> DONE
+	
+- CPF: Always send in cardAcceptor.address: these: addressLine, state, zipCode -----------> DONE
 
-```csharp
-Char.ToLowerInvariant(nameof(AcquiringBin)[0]) + nameof(AcquiringBin)[1..]
-// Result: acquiringBin
-```
+- CPF always send senderMiddleName + recipientMiddleName 
+	
+- "merchantCategoryCode": "6012" should also be always sent in CPF -----------> DONE
 
-Explicit query parameter names are clearer and safer for an external API contract.
+- CPF: We should always send : "cardAcceptor.legalBusinessName" : "SGBL SAL" -----------> DONE
+	
+- If Cross-Border OCT to  Australia or Canada -->
+						recipientState=Must be Present
+						recipientPostalCode=Must be Present
+						senderPostalCode=Must be Present
+						senderStateCode=Must be Present
+
+- If Cross-Border OCT to South Africa: we need to send the recipientMiddleName +     "senderMiddleName"
+
+- If the card is indian, we need to send the purposeOfPayment, sourceAmount and sourceCurrencyCode (note that purposeOfPayment need to have certain specific values that can be found in this file Visa Direct for Card (AFT & OCT) Processing Guide
+ 
+Appendix E – Purpose of Payment Standardized Codes List) WE CAN STICK TO THIS purposeOfPayment: ISMP2P or ISOTHR
+
+- We can send the Query API using stan and rrn if we receive a 202 timeout error with the encrypted body above -----------> DONE
+
+- We need to check the Visa Excel sheet before the meeting next week
