@@ -1,117 +1,59 @@
-These are notes that are present in the Visa Direct Test EXCEL sheet
+Action code = '91' does not meaning pending transfer --> need to change it from OSB side
 
 
+- Restricted Countries
+Regarding the countries restricted in the PIF form we submitted, will these countries be automatically blocked by Visa, or do we need to configure the restrictions on our side? --> From our side
 
 
-"If Account Name Inquiry supported by Originator
-cardHolderNameVerification.ownerType=01 or 02 May be present
-cardHolderNameVerification.lastName=Must be Present"
+- MCC for OCT Transactions
+    For the MCC to be designated, please note that for Mastercard Send we have allocated:
+        6536 – Money Send Intracountry for domestic transactions.
+        6537 – Money Send Intercountry for international transactions.
 
-"If Non-US Domestic OCT supported by Originator
-pointOfServiceData.panEntryMode=01
-pointOfServiceData.posConditionCode=59
-pointOfServiceData.motoECIIndicator=7"
-
-"If Cross-Border OCT via Internet supported by Originator
-pointOfServiceData.panEntryMode=01
-pointOfServiceData.posConditionCode=59
-pointOfServiceData.motoECIIndicator=7"
-"If Cross-Border OCT to  Australia or Canada supported by Originator
-pointOfServiceData.panEntryMode=01
-pointOfServiceData.posConditionCode=05 or 59
-recipientAddressLine1=Must be Present
-recipientCity=Must be Present
-recipientState=Must be Present
-recipientPostalCode=Must be Present
-recipientCountryCode=Must be Present
-senderPostalCode=Must be Present
-senderStateCode=Must be Present
-legalBusinessName=Must be Present"
-"If Cross-Border OCT to South Africa supported by Originator
-pointOfServiceData.panEntryMode=01
-pointOfServiceData.posConditionCode=05 or 59
-pointOfServiceData.motoECIIndicator=May be present
-senderFirstName=Must be Present
-senderMiddleName=Must be Present
-senderLastName=Must be Present
-recipientFirstName=Must be Present
-recipientMiddleName=Must be Present
-recipientLastName=Must be Present
-sourceOfFundsCode=Must be Present"
-"If Cross-Border OCT to India supported by Originator
-pointOfServiceData.panEntryMode=01
-pointOfServiceData.posConditionCode=05 or 59
-pointOfServiceData.motoECIIndicator=May be present
-amount=Present
-transactionCurrencyCode=Present
-sourceAmount=Present
-sourceCurrencyCode=Present
-prepaidBalanceCurrency=Must be Present
-prepaidBalance=Must be Present
-purposeOfPayment=Must be Present"
-
-"pointOfServiceData.panEntryMode=01
-pointOfServiceData.posConditionCode=59
-pointOfServiceData.motoECIIndicator=7 
-"
-"Request:
-pointOfServiceData.panEntryMode=01
-pointOfServiceData.posConditionCode=59
-pointOfServiceData.motoECIIndicator=7
-or OCT type supported by Originator
-Response:
-statusIdentifier=Present
-
-To simulate STIP timeout response for self testing: 
-Include “X-Transaction-Timeout-MS"" in the HTTP header with value “1”"
-"acquiringBIN, rrn, and stan
-Example from Via Development Center, Query API:  e.g.: /transactionquery?acquiringBIN=408999&stan=351480&rrn=221917871070"
-"If originator's exceptions are processed online rather than via VROL.
-pointOfServiceData.panEntryMode=01
-pointOfServiceData.posConditionCode=59
-pointOfServiceData.motoECIIndicator=7
-or OCT type supported by Originator"
-"Elements in request:
-- transactionTypeCode=2 (Debit) or 22 (Credit)
-- messageReasonCode=2150
-Elements from original request:
-- recipientPrimaryAccountNumber=Present
-- businessApplicationId=Present
-- transactionIdentifier=Present in response to original request"
+- Could you please advise on Visa’s recommended MCCs for OCT transactions, for both domestic and international OCT transaction --> Check the doccumenttion: Visa Direct for Card (AFT & OCT) Processing Guide (Bas halla2 2am nesta3ml 6012 whish is correct)
 
 
-
-
-
-
-
-
-
-And these are the notes I have took during the technical meeting with Visa
-- In CPF cardAcceptor.name should be formatted like this:
-	"SGBL*" + senderFirstName
-	It also needs to be truncated to the max lenght of cardAcceptor.name -----------> DONE
+    Card Acceptor Name
+    Regarding the Card Acceptor Name since we are the acquirer should this correspond to the merchant name? In our case, would it be SGBL? Should this field be configured as static or dynamic? Please clarify. --> Yes we should be using "SGBL*{SENDER_NAME}" Same document we can see  Visa Direct for Card (AFT & OCT) Processing Guide Version 1.1 18 May 2026
 	
-- CPF: Always send in cardAcceptor.address: these: addressLine, state, zipCode -----------> DONE
-
-- CPF always send senderMiddleName + recipientMiddleName 
 	
-- "merchantCategoryCode": "6012" should also be always sent in CPF -----------> DONE
+- VROL Process
+Could you please advise on the VROL process and explain how transaction adjustments should be handled? --> to be sure that we have permission to perform adjustments. we need to find the transation 306211224674755 and make adjustment (In the excel 5.16 test case)
 
-- CPF: We should always send : "cardAcceptor.legalBusinessName" : "SGBL SAL" -----------> DONE
-	
-- If Cross-Border OCT to  Australia or Canada -->
-						recipientState=Must be Present
-						recipientPostalCode=Must be Present
-						senderPostalCode=Must be Present
-						senderStateCode=Must be Present
+- Production Configuration Timeline
+    We are currently completing the certification testing with Yuri. 
 
-- If Cross-Border OCT to South Africa: we need to send the recipientMiddleName +     "senderMiddleName"
+Once all certification tests have been successfully completed and we provide our sign-off for the certification environment, could you please advise how much time you will require to complete the production environment configuration so that we can proceed with the pilot testing in production --> Yuri does not know, Rana knows
 
-- If the card is indian, we need to send the purposeOfPayment, sourceAmount and sourceCurrencyCode (note that purposeOfPayment need to have certain specific values that can be found in this file Visa Direct for Card (AFT & OCT) Processing Guide
+
+- For transactions, will be sending the recipientMiddleName same as the recipient First Name. Will that cause an issue from your side ---> for middle name we can use space when it is required 
+
+- In OCT Cross-border transactions, there are countries where some additional fields are mandatory to be sent. --> We can but at ahe consequence of failing the transfer from the card issuer side. So we will be doing it at our own risk just like we did with master card
+
+Could we use a static values for these fields ? (Since we will not be asking the user to input them) 
+
+Scenario 1: If destination country is USA:
+
+	recipientState = IL
+
+	recipientPostalCode = 99999
  
-Appendix E – Purpose of Payment Standardized Codes List) WE CAN STICK TO THIS purposeOfPayment: ISMP2P or ISOTHR
+Scenario 2: If destination country is Canada
 
-- We can send the Query API using stan and rrn if we receive a 202 timeout error with the encrypted body above -----------> DONE
+	recipientState = QC
 
-- We need to check the Visa Excel sheet before the meeting next week
+	recipientPostalCode = A1A 1A1
+
+Scenario 3: If destination country is Australia
+
+	recipientState = VIC
+
+	recipientPostalCode = 9999
+
+Scenario 4: If destination country is India
+
+	sourceAmount: Same amount of the transfer
+
+	sourceCurrencyCode: Same currency of the transfer
+
+	purposeOfPayment: ISMP2P
