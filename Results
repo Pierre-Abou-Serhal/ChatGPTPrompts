@@ -1,59 +1,303 @@
-Action code = '91' does not meaning pending transfer --> need to change it from OSB side
+The database should be built around a document access grant, not around the token itself. The token is only a bearer credential used to locate and authenticate that grant.
 
+```mermaid
+erDiagram
+    CUSTOMER_REFERENCE ||--o{ DOCUMENT_REFERENCE : owns
+    DOCUMENT_REFERENCE ||--o{ DOCUMENT_ACCESS_GRANT : exposes
+    ACCESS_POLICY ||--o{ ACCESS_POLICY_RULE : contains
+    ACCESS_POLICY ||--o{ DOCUMENT_ACCESS_GRANT : governs
+    DOCUMENT_ACCESS_GRANT ||--o{ DOCUMENT_ACCESS_TOKEN : authenticates
+    DOCUMENT_ACCESS_GRANT ||--o{ ACCESS_EVENT : records
+    ACCESS_EVENT ||--o{ RULE_EVALUATION : explains
+    ACCESS_POLICY_RULE ||--o{ RULE_EVALUATION : evaluated
+```
 
-- Restricted Countries
-Regarding the countries restricted in the PIF form we submitted, will these countries be automatically blocked by Visa, or do we need to configure the restrictions on our side? --> From our side
+## Recommended tables
 
+### 1. `CustomerReference`
 
-- MCC for OCT Transactions
-    For the MCC to be designated, please note that for Mastercard Send we have allocated:
-        6536 – Money Send Intracountry for domestic transactions.
-        6537 – Money Send Intercountry for international transactions.
+Stores only the customer identifiers needed by this service.
 
-- Could you please advise on Visa’s recommended MCCs for OCT transactions, for both domestic and international OCT transaction --> Check the doccumenttion: Visa Direct for Card (AFT & OCT) Processing Guide (Bas halla2 2am nesta3ml 6012 whish is correct)
+| Column                | Type              | Notes                                             |
+| --------------------- | ----------------- | ------------------------------------------------- |
+| `CustomerReferenceId` | `bigint identity` | Primary key                                       |
+| `CustomerId`          | `nvarchar(64)`    | Your internal customer ID                         |
+| `ExternalId`          | `nvarchar(128)`   | External-system identifier                        |
+| `SourceSystemCode`    | `varchar(30)`     | Useful if external IDs come from multiple systems |
+| `CreatedAtUtc`        | `datetime2(3)`    | UTC                                               |
 
+Use the actual maximum lengths from the source system. If IDs may contain leading zeroes, keep them as strings.
 
-    Card Acceptor Name
-    Regarding the Card Acceptor Name since we are the acquirer should this correspond to the merchant name? In our case, would it be SGBL? Should this field be configured as static or dynamic? Please clarify. --> Yes we should be using "SGBL*{SENDER_NAME}" Same document we can see  Visa Direct for Card (AFT & OCT) Processing Guide Version 1.1 18 May 2026
-	
-	
-- VROL Process
-Could you please advise on the VROL process and explain how transaction adjustments should be handled? --> to be sure that we have permission to perform adjustments. we need to find the transation 306211224674755 and make adjustment (In the excel 5.16 test case)
+### 2. `DocumentReference`
 
-- Production Configuration Timeline
-    We are currently completing the certification testing with Yuri. 
+Represents the document in your archiving/document-management system.
 
-Once all certification tests have been successfully completed and we provide our sign-off for the certification environment, could you please advise how much time you will require to complete the production environment configuration so that we can proceed with the pilot testing in production --> Yuri does not know, Rana knows
+| Column                | Type              | Notes                                   |
+| --------------------- | ----------------- | --------------------------------------- |
+| `DocumentReferenceId` | `bigint identity` | Primary key                             |
+| `CustomerReferenceId` | `bigint`          | FK                                      |
+| `DocumentCuk`         | Appropriate type  | `uniqueidentifier`, `varchar`, etc.     |
+| `DocumentTypeCode`    | `varchar(30)`     | Optional                                |
+| `DocumentVersion`     | `int`             | Optional                                |
+| `IsActive`            | `bit`             | Prevent access without deleting history |
+| `CreatedAtUtc`        | `datetime2(3)`    | UTC                                     |
 
+Treat the CUK as immutable. If the archived document changes, preferably create a new document reference/version instead of overwriting the previous CUK.
 
-- For transactions, will be sending the recipientMiddleName same as the recipient First Name. Will that cause an issue from your side ---> for middle name we can use space when it is required 
+### 3. `AccessPolicy`
 
-- In OCT Cross-border transactions, there are countries where some additional fields are mandatory to be sent. --> We can but at ahe consequence of failing the transfer from the card issuer side. So we will be doing it at our own risk just like we did with master card
+Allows multiple configurations, such as default public documents, embassy documents, short-lived documents, and so on.
 
-Could we use a static values for these fields ? (Since we will not be asking the user to input them) 
+| Column           | Type            |
+| ---------------- | --------------- |
+| `AccessPolicyId` | `int identity`  |
+| `PolicyCode`     | `varchar(50)`   |
+| `PolicyName`     | `nvarchar(150)` |
+| `IsEnabled`      | `bit`           |
+| `CreatedAtUtc`   | `datetime2(3)`  |
 
-Scenario 1: If destination country is USA:
+### 4. `AccessPolicyRule`
 
-	recipientState = IL
+Each row represents one independently checked rule.
 
-	recipientPostalCode = 99999
- 
-Scenario 2: If destination country is Canada
+| Column               | Type                | Meaning                     |
+| -------------------- | ------------------- | --------------------------- |
+| `AccessPolicyRuleId` | `bigint identity`   | PK                          |
+| `AccessPolicyId`     | `int`               | FK                          |
+| `RuleName`           | `nvarchar(100)`     | Report-friendly name        |
+| `WindowSeconds`      | `int null`          | `NULL` means lifetime total |
+| `MaximumAccessCount` | `int`               | Maximum allowed             |
+| `EffectiveFromUtc`   | `datetime2(3)`      | Rule activation             |
+| `EffectiveToUtc`     | `datetime2(3) null` | Rule retirement             |
+| `CreatedAtUtc`       | `datetime2(3)`      | Audit                       |
 
-	recipientState = QC
+Example configuration:
 
-	recipientPostalCode = A1A 1A1
+| Rule           | `WindowSeconds` | `MaximumAccessCount` |
+| -------------- | --------------: | -------------------: |
+| Lifetime total |          `NULL` |                  100 |
+| Per hour       |           3,600 |                    5 |
+| Per 7 minutes  |             420 |                    2 |
+| Per 3 days     |         259,200 |                    8 |
 
-Scenario 3: If destination country is Australia
+All active rules are checked, and the request is denied if any one fails.
 
-	recipientState = VIC
+This represents rolling windows. “5 per day” means five during the previous 24 hours. If you later need calendar-day rules such as midnight-to-midnight Beirut time, that should be a separate `WindowType`.
 
-	recipientPostalCode = 9999
+Avoid a generic configuration table such as `SettingName/SettingValue`. Typed policy rows are easier to validate, index, audit, and query.
 
-Scenario 4: If destination country is India
+### 5. `DocumentAccessGrant`
 
-	sourceAmount: Same amount of the transfer
+This is the central business entity. It links a document to a policy and controls its validity.
 
-	sourceCurrencyCode: Same currency of the transfer
+| Column                      | Type                 | Notes                 |
+| --------------------------- | -------------------- | --------------------- |
+| `DocumentAccessGrantId`     | `bigint identity`    | PK                    |
+| `DocumentReferenceId`       | `bigint`             | FK                    |
+| `AccessPolicyId`            | `int`                | FK                    |
+| `CreatedAtUtc`              | `datetime2(3)`       | Actual issue time     |
+| `NotBeforeUtc`              | `datetime2(3) null`  | Optional              |
+| `ExpiresAtUtc`              | `datetime2(3)`       | Persisted expiry      |
+| `RevokedAtUtc`              | `datetime2(3) null`  | Manual revocation     |
+| `RevocationReason`          | `nvarchar(250) null` | Audit                 |
+| `SuccessfulAccessCount`     | `bigint`             | Cached lifetime count |
+| `LastSuccessfulAccessAtUtc` | `datetime2(3) null`  | Useful for reports    |
+| `RowVersion`                | `rowversion`         | Concurrency           |
 
-	purposeOfPayment: ISMP2P
+Persist the calculated expiry when the grant is created. For example:
+
+```text
+CreatedAtUtc = 2026-07-31 10:00 UTC
+ExpiresAtUtc = 2026-10-31 10:00 UTC
+```
+
+Changing the default expiry configuration later should normally affect only newly issued grants.
+
+### 6. `DocumentAccessToken`
+
+Separating tokens from grants allows you to rotate or replace a compromised token without resetting access counts.
+
+| Column                  | Type                | Notes                          |
+| ----------------------- | ------------------- | ------------------------------ |
+| `DocumentAccessTokenId` | `bigint identity`   | PK                             |
+| `DocumentAccessGrantId` | `bigint`            | FK                             |
+| `TokenHash`             | `binary(32)`        | SHA-256 hash                   |
+| `TokenFormatVersion`    | `tinyint`           | Supports future changes        |
+| `CreatedAtUtc`          | `datetime2(3)`      | UTC                            |
+| `ExpiresAtUtc`          | `datetime2(3) null` | Optional token-specific expiry |
+| `RevokedAtUtc`          | `datetime2(3) null` | Token rotation/revocation      |
+
+Generate at least 32 cryptographically random bytes and encode them as Base64Url. Store only the SHA-256 hash, never the raw token.
+
+The token itself does not need to contain:
+
+* Customer ID
+* External ID
+* Document CUK
+* Creation time
+
+You already require a database lookup for quotas and audit logging, so an opaque random token is safer and simpler than a self-contained token. A timestamp inside the token cannot be trusted unless the whole token is cryptographically signed or encrypted.
+
+### 7. `DocumentAccessEvent`
+
+Append-only audit ledger for every observable request.
+
+| Column                  | Type                    | Notes                                    |
+| ----------------------- | ----------------------- | ---------------------------------------- |
+| `AccessEventId`         | `bigint identity`       | PK                                       |
+| `OccurredAtUtc`         | `datetime2(3)`          | UTC                                      |
+| `InteractionId`         | `uniqueidentifier`      | Correlates page/API events               |
+| `IdempotencyKey`        | `uniqueidentifier null` | Prevents retry double-counting           |
+| `CorrelationId`         | `uniqueidentifier`      | Server request correlation               |
+| `DocumentAccessGrantId` | `bigint null`           | Null for unknown token                   |
+| `DocumentAccessTokenId` | `bigint null`           | Null for invalid token                   |
+| `PresentedTokenHash`    | `binary(32) null`       | For unknown tokens; never raw token      |
+| `EventTypeCode`         | `smallint`              | Page opened, requested, authorized, etc. |
+| `OutcomeCode`           | `smallint`              | Granted, expired, limited, invalid, etc. |
+| `ConsumesQuota`         | `bit`                   | Only authorized document access          |
+| `DeniedByRuleId`        | `bigint null`           | First/primary failed rule                |
+| `HttpStatusCode`        | `smallint null`         | Reporting                                |
+| `IpAddress`             | `varbinary(16) null`    | Supports IPv4 and IPv6                   |
+| `UserAgent`             | `nvarchar(512) null`    | Reporting/security                       |
+| `DurationMilliseconds`  | `int null`              | Performance reporting                    |
+
+Suggested events/outcomes include:
+
+* `QrPageOpened`
+* `DocumentRequested`
+* `AccessAuthorized`
+* `DocumentDelivered`
+* `InvalidToken`
+* `TokenExpired`
+* `TokenRevoked`
+* `DocumentInactive`
+* `QuotaExceeded`
+* `DeliveryFailed`
+
+Only an `AccessAuthorized` event should normally consume quota. Loading the HTML page should not consume quota because QR scanners, link previews, and browsers may preload or refresh it.
+
+Also, the server cannot prove that a physical QR scan occurred. It can only record HTTP page loads and API requests.
+
+### 8. `AccessRuleEvaluation`
+
+Recommended when detailed audit reporting is important.
+
+| Column               | Type                |
+| -------------------- | ------------------- |
+| `AccessEventId`      | `bigint`            |
+| `AccessPolicyRuleId` | `bigint`            |
+| `CountBeforeRequest` | `bigint`            |
+| `MaximumAccessCount` | `int`               |
+| `WindowStartUtc`     | `datetime2(3) null` |
+| `Passed`             | `bit`               |
+
+This lets a report explain:
+
+> Access denied because the “5 per hour” rule already contained five authorized requests.
+
+## Atomic authorization is essential
+
+The limit check and access count update must happen in one transaction. Otherwise, two simultaneous requests could both see `4 of 5` and both be allowed.
+
+The authorization procedure should work approximately like this:
+
+```text
+BEGIN TRANSACTION
+
+1. Hash the received token.
+2. Find and lock its access grant using UPDLOCK, HOLDLOCK.
+3. Check:
+   - token exists
+   - token is not revoked
+   - grant is not revoked
+   - current time is before ExpiresAtUtc
+   - document is active
+4. Load every currently active policy rule.
+5. Check the lifetime counter and rolling-window event counts.
+6. If any rule fails:
+   - insert a denied AccessEvent
+   - insert rule evaluations
+   - commit
+   - return denied
+7. Otherwise:
+   - insert AccessAuthorized with ConsumesQuota = 1
+   - increment SuccessfulAccessCount
+   - set LastSuccessfulAccessAtUtc
+   - commit
+   - return the internal document reference
+
+COMMIT
+```
+
+I would implement this as one stored procedure such as:
+
+```text
+dbo.TryAuthorizeDocumentAccess
+```
+
+The API should not independently execute “read count”, “insert event”, and “update count” as separate unprotected operations.
+
+## Important indexes
+
+At minimum:
+
+```sql
+CREATE UNIQUE NONCLUSTERED INDEX UX_DocumentAccessToken_TokenHash
+ON dbo.DocumentAccessToken(TokenHash);
+
+CREATE INDEX IX_AccessEvent_Grant_CountedTime
+ON dbo.DocumentAccessEvent
+(
+    DocumentAccessGrantId,
+    OccurredAtUtc
+)
+WHERE ConsumesQuota = 1;
+
+CREATE INDEX IX_AccessEvent_OccurredAtUtc
+ON dbo.DocumentAccessEvent(OccurredAtUtc);
+
+CREATE INDEX IX_AccessEvent_Outcome_Time
+ON dbo.DocumentAccessEvent(OutcomeCode, OccurredAtUtc);
+```
+
+Since your lifetime limit is around 100 accesses per grant, calculating rolling counts from the event index will be inexpensive. There is no need for complicated time-bucket tables initially.
+
+## Token URL security
+
+A token in a URL route can appear in:
+
+* IIS/reverse-proxy access logs
+* Browser history
+* Referrer headers
+* Analytics tools
+
+A safer QR URL is:
+
+```text
+https://documents.example.com/view#<token>
+```
+
+The URL fragment is not sent to the server. JavaScript reads it, immediately removes it from the visible URL, and sends it in an authorization header using a non-cacheable `POST` request.
+
+Also configure:
+
+```text
+Referrer-Policy: no-referrer
+Cache-Control: no-store
+```
+
+If you must keep the token in the route, ensure IIS, proxy, application, and monitoring logs do not capture the raw URL.
+
+## Do not expose the CUK publicly
+
+If the CUK is an internal document archive identifier or key, the public HTML page should not receive it.
+
+The preferable flow is:
+
+```text
+Public token → authorization → server uses CUK internally → server streams PDF
+```
+
+Alternatively, return a short-lived, one-time download handle. The CUK should only be returned if it is explicitly designed to be public.
+
+Finally, these limits are per access grant, not per real person. Because the third party is unauthenticated, everyone possessing or copying the QR token shares the same counters. Authentication would be required for genuine per-user limits.
