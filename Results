@@ -1,303 +1,234 @@
-The database should be built around a document access grant, not around the token itself. The token is only a bearer credential used to locate and authenticate that grant.
+Generate 32 random bytes using `RandomNumberGenerator`, encode them as Base64Url for the QR URL, hash the original bytes with SHA-256, and store that hash as a 64-character hexadecimal string.
 
-```mermaid
-erDiagram
-    CUSTOMER_REFERENCE ||--o{ DOCUMENT_REFERENCE : owns
-    DOCUMENT_REFERENCE ||--o{ DOCUMENT_ACCESS_GRANT : exposes
-    ACCESS_POLICY ||--o{ ACCESS_POLICY_RULE : contains
-    ACCESS_POLICY ||--o{ DOCUMENT_ACCESS_GRANT : governs
-    DOCUMENT_ACCESS_GRANT ||--o{ DOCUMENT_ACCESS_TOKEN : authenticates
-    DOCUMENT_ACCESS_GRANT ||--o{ ACCESS_EVENT : records
-    ACCESS_EVENT ||--o{ RULE_EVALUATION : explains
-    ACCESS_POLICY_RULE ||--o{ RULE_EVALUATION : evaluated
+A 32-byte token becomes a 43-character Base64Url value.
+
+## Complete token service
+
+This works with modern ASP.NET Core:
+
+```csharp
+using Microsoft.AspNetCore.WebUtilities;
+using System.Security.Cryptography;
+
+public sealed record DocumentTokenResult(
+    string PublicUrl,
+    string TokenHash
+);
+
+public static class DocumentTokenService
+{
+    private const int TokenByteLength = 32;
+    private const int EncodedTokenLength = 43;
+
+    public static DocumentTokenResult Generate(string publicBaseUrl)
+    {
+        if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out Uri? baseUri))
+        {
+            throw new ArgumentException(
+                "A valid absolute public URL is required.",
+                nameof(publicBaseUrl));
+        }
+
+        if (!string.Equals(
+                baseUri.Scheme,
+                Uri.UriSchemeHttps,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "The public URL must use HTTPS.",
+                nameof(publicBaseUrl));
+        }
+
+        // 1. Generate 32 cryptographically secure random bytes.
+        byte[] tokenBytes =
+            RandomNumberGenerator.GetBytes(TokenByteLength);
+
+        // 2. Convert them to a URL-safe 43-character token.
+        string rawToken =
+            WebEncoders.Base64UrlEncode(tokenBytes);
+
+        // 3. Hash the original random bytes using SHA-256.
+        byte[] hashBytes =
+            SHA256.HashData(tokenBytes);
+
+        // 4. Convert the 32-byte hash to a 64-character string.
+        string tokenHash =
+            Convert.ToHexString(hashBytes).ToLowerInvariant();
+
+        // Recommended: put token in URL fragment.
+        // The browser does not send fragments to IIS or the server.
+        Uri documentPageUri =
+            new Uri(baseUri, "public-document");
+
+        UriBuilder urlBuilder = new(documentPageUri)
+        {
+            Fragment = rawToken
+        };
+
+        return new DocumentTokenResult(
+            urlBuilder.Uri.AbsoluteUri,
+            tokenHash
+        );
+    }
+
+    public static bool TryHashToken(
+        string rawToken,
+        out string tokenHash)
+    {
+        tokenHash = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(rawToken) ||
+            rawToken.Length != EncodedTokenLength)
+        {
+            return false;
+        }
+
+        try
+        {
+            byte[] tokenBytes =
+                WebEncoders.Base64UrlDecode(rawToken);
+
+            if (tokenBytes.Length != TokenByteLength)
+            {
+                return false;
+            }
+
+            byte[] hashBytes =
+                SHA256.HashData(tokenBytes);
+
+            tokenHash =
+                Convert.ToHexString(hashBytes).ToLowerInvariant();
+
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+}
 ```
 
-## Recommended tables
+## Generating and saving the grant
 
-### 1. `CustomerReference`
+```csharp
+DocumentTokenResult tokenResult =
+    DocumentTokenService.Generate(
+        "https://documents.example.com/");
 
-Stores only the customer identifiers needed by this service.
+DocumentAccessGrant grant = new()
+{
+    CustomerId = customerId,
+    ExternalId = externalId,
+    DocumentCuk = documentCuk,
+    AccessPolicyId = accessPolicyId,
 
-| Column                | Type              | Notes                                             |
-| --------------------- | ----------------- | ------------------------------------------------- |
-| `CustomerReferenceId` | `bigint identity` | Primary key                                       |
-| `CustomerId`          | `nvarchar(64)`    | Your internal customer ID                         |
-| `ExternalId`          | `nvarchar(128)`   | External-system identifier                        |
-| `SourceSystemCode`    | `varchar(30)`     | Useful if external IDs come from multiple systems |
-| `CreatedAtUtc`        | `datetime2(3)`    | UTC                                               |
+    // Only the hash is stored.
+    TokenHash = tokenResult.TokenHash,
 
-Use the actual maximum lengths from the source system. If IDs may contain leading zeroes, keep them as strings.
+    CreatedAtUtc = DateTime.UtcNow,
+    ExpiresAtUtc = DateTime.UtcNow.AddMonths(3),
+    SuccessfulAccessCount = 0
+};
 
-### 2. `DocumentReference`
+_dbContext.DocumentAccessGrants.Add(grant);
 
-Represents the document in your archiving/document-management system.
+await _dbContext.SaveChangesAsync();
 
-| Column                | Type              | Notes                                   |
-| --------------------- | ----------------- | --------------------------------------- |
-| `DocumentReferenceId` | `bigint identity` | Primary key                             |
-| `CustomerReferenceId` | `bigint`          | FK                                      |
-| `DocumentCuk`         | Appropriate type  | `uniqueidentifier`, `varchar`, etc.     |
-| `DocumentTypeCode`    | `varchar(30)`     | Optional                                |
-| `DocumentVersion`     | `int`             | Optional                                |
-| `IsActive`            | `bit`             | Prevent access without deleting history |
-| `CreatedAtUtc`        | `datetime2(3)`    | UTC                                     |
+// This full URL is returned to the QR generator.
+return tokenResult.PublicUrl;
+```
 
-Treat the CUK as immutable. If the archived document changes, preferably create a new document reference/version instead of overwriting the previous CUK.
-
-### 3. `AccessPolicy`
-
-Allows multiple configurations, such as default public documents, embassy documents, short-lived documents, and so on.
-
-| Column           | Type            |
-| ---------------- | --------------- |
-| `AccessPolicyId` | `int identity`  |
-| `PolicyCode`     | `varchar(50)`   |
-| `PolicyName`     | `nvarchar(150)` |
-| `IsEnabled`      | `bit`           |
-| `CreatedAtUtc`   | `datetime2(3)`  |
-
-### 4. `AccessPolicyRule`
-
-Each row represents one independently checked rule.
-
-| Column               | Type                | Meaning                     |
-| -------------------- | ------------------- | --------------------------- |
-| `AccessPolicyRuleId` | `bigint identity`   | PK                          |
-| `AccessPolicyId`     | `int`               | FK                          |
-| `RuleName`           | `nvarchar(100)`     | Report-friendly name        |
-| `WindowSeconds`      | `int null`          | `NULL` means lifetime total |
-| `MaximumAccessCount` | `int`               | Maximum allowed             |
-| `EffectiveFromUtc`   | `datetime2(3)`      | Rule activation             |
-| `EffectiveToUtc`     | `datetime2(3) null` | Rule retirement             |
-| `CreatedAtUtc`       | `datetime2(3)`      | Audit                       |
-
-Example configuration:
-
-| Rule           | `WindowSeconds` | `MaximumAccessCount` |
-| -------------- | --------------: | -------------------: |
-| Lifetime total |          `NULL` |                  100 |
-| Per hour       |           3,600 |                    5 |
-| Per 7 minutes  |             420 |                    2 |
-| Per 3 days     |         259,200 |                    8 |
-
-All active rules are checked, and the request is denied if any one fails.
-
-This represents rolling windows. “5 per day” means five during the previous 24 hours. If you later need calendar-day rules such as midnight-to-midnight Beirut time, that should be a separate `WindowType`.
-
-Avoid a generic configuration table such as `SettingName/SettingValue`. Typed policy rows are easier to validate, index, audit, and query.
-
-### 5. `DocumentAccessGrant`
-
-This is the central business entity. It links a document to a policy and controls its validity.
-
-| Column                      | Type                 | Notes                 |
-| --------------------------- | -------------------- | --------------------- |
-| `DocumentAccessGrantId`     | `bigint identity`    | PK                    |
-| `DocumentReferenceId`       | `bigint`             | FK                    |
-| `AccessPolicyId`            | `int`                | FK                    |
-| `CreatedAtUtc`              | `datetime2(3)`       | Actual issue time     |
-| `NotBeforeUtc`              | `datetime2(3) null`  | Optional              |
-| `ExpiresAtUtc`              | `datetime2(3)`       | Persisted expiry      |
-| `RevokedAtUtc`              | `datetime2(3) null`  | Manual revocation     |
-| `RevocationReason`          | `nvarchar(250) null` | Audit                 |
-| `SuccessfulAccessCount`     | `bigint`             | Cached lifetime count |
-| `LastSuccessfulAccessAtUtc` | `datetime2(3) null`  | Useful for reports    |
-| `RowVersion`                | `rowversion`         | Concurrency           |
-
-Persist the calculated expiry when the grant is created. For example:
+The returned URL will resemble:
 
 ```text
-CreatedAtUtc = 2026-07-31 10:00 UTC
-ExpiresAtUtc = 2026-10-31 10:00 UTC
+https://documents.example.com/public-document#T5P8qx6dS3RwQJOEm2SuYp1YuZzvYxYpA-MiTA26tqw
 ```
 
-Changing the default expiry configuration later should normally affect only newly issued grants.
-
-### 6. `DocumentAccessToken`
-
-Separating tokens from grants allows you to rotate or replace a compromised token without resetting access counts.
-
-| Column                  | Type                | Notes                          |
-| ----------------------- | ------------------- | ------------------------------ |
-| `DocumentAccessTokenId` | `bigint identity`   | PK                             |
-| `DocumentAccessGrantId` | `bigint`            | FK                             |
-| `TokenHash`             | `binary(32)`        | SHA-256 hash                   |
-| `TokenFormatVersion`    | `tinyint`           | Supports future changes        |
-| `CreatedAtUtc`          | `datetime2(3)`      | UTC                            |
-| `ExpiresAtUtc`          | `datetime2(3) null` | Optional token-specific expiry |
-| `RevokedAtUtc`          | `datetime2(3) null` | Token rotation/revocation      |
-
-Generate at least 32 cryptographically random bytes and encode them as Base64Url. Store only the SHA-256 hash, never the raw token.
-
-The token itself does not need to contain:
-
-* Customer ID
-* External ID
-* Document CUK
-* Creation time
-
-You already require a database lookup for quotas and audit logging, so an opaque random token is safer and simpler than a self-contained token. A timestamp inside the token cannot be trusted unless the whole token is cryptographically signed or encrypted.
-
-### 7. `DocumentAccessEvent`
-
-Append-only audit ledger for every observable request.
-
-| Column                  | Type                    | Notes                                    |
-| ----------------------- | ----------------------- | ---------------------------------------- |
-| `AccessEventId`         | `bigint identity`       | PK                                       |
-| `OccurredAtUtc`         | `datetime2(3)`          | UTC                                      |
-| `InteractionId`         | `uniqueidentifier`      | Correlates page/API events               |
-| `IdempotencyKey`        | `uniqueidentifier null` | Prevents retry double-counting           |
-| `CorrelationId`         | `uniqueidentifier`      | Server request correlation               |
-| `DocumentAccessGrantId` | `bigint null`           | Null for unknown token                   |
-| `DocumentAccessTokenId` | `bigint null`           | Null for invalid token                   |
-| `PresentedTokenHash`    | `binary(32) null`       | For unknown tokens; never raw token      |
-| `EventTypeCode`         | `smallint`              | Page opened, requested, authorized, etc. |
-| `OutcomeCode`           | `smallint`              | Granted, expired, limited, invalid, etc. |
-| `ConsumesQuota`         | `bit`                   | Only authorized document access          |
-| `DeniedByRuleId`        | `bigint null`           | First/primary failed rule                |
-| `HttpStatusCode`        | `smallint null`         | Reporting                                |
-| `IpAddress`             | `varbinary(16) null`    | Supports IPv4 and IPv6                   |
-| `UserAgent`             | `nvarchar(512) null`    | Reporting/security                       |
-| `DurationMilliseconds`  | `int null`              | Performance reporting                    |
-
-Suggested events/outcomes include:
-
-* `QrPageOpened`
-* `DocumentRequested`
-* `AccessAuthorized`
-* `DocumentDelivered`
-* `InvalidToken`
-* `TokenExpired`
-* `TokenRevoked`
-* `DocumentInactive`
-* `QuotaExceeded`
-* `DeliveryFailed`
-
-Only an `AccessAuthorized` event should normally consume quota. Loading the HTML page should not consume quota because QR scanners, link previews, and browsers may preload or refresh it.
-
-Also, the server cannot prove that a physical QR scan occurred. It can only record HTTP page loads and API requests.
-
-### 8. `AccessRuleEvaluation`
-
-Recommended when detailed audit reporting is important.
-
-| Column               | Type                |
-| -------------------- | ------------------- |
-| `AccessEventId`      | `bigint`            |
-| `AccessPolicyRuleId` | `bigint`            |
-| `CountBeforeRequest` | `bigint`            |
-| `MaximumAccessCount` | `int`               |
-| `WindowStartUtc`     | `datetime2(3) null` |
-| `Passed`             | `bit`               |
-
-This lets a report explain:
-
-> Access denied because the “5 per hour” rule already contained five authorized requests.
-
-## Atomic authorization is essential
-
-The limit check and access count update must happen in one transaction. Otherwise, two simultaneous requests could both see `4 of 5` and both be allowed.
-
-The authorization procedure should work approximately like this:
+The database stores something resembling:
 
 ```text
-BEGIN TRANSACTION
-
-1. Hash the received token.
-2. Find and lock its access grant using UPDLOCK, HOLDLOCK.
-3. Check:
-   - token exists
-   - token is not revoked
-   - grant is not revoked
-   - current time is before ExpiresAtUtc
-   - document is active
-4. Load every currently active policy rule.
-5. Check the lifetime counter and rolling-window event counts.
-6. If any rule fails:
-   - insert a denied AccessEvent
-   - insert rule evaluations
-   - commit
-   - return denied
-7. Otherwise:
-   - insert AccessAuthorized with ConsumesQuota = 1
-   - increment SuccessfulAccessCount
-   - set LastSuccessfulAccessAtUtc
-   - commit
-   - return the internal document reference
-
-COMMIT
+836a98d4c12c8fac93d4aacb91da73bec0c98281369916c0fd7f5a04ba6fd933
 ```
 
-I would implement this as one stored procedure such as:
+The stored value cannot be used directly as the public token.
 
-```text
-dbo.TryAuthorizeDocumentAccess
-```
+## Database column
 
-The API should not independently execute “read count”, “insert event”, and “update count” as separate unprotected operations.
-
-## Important indexes
-
-At minimum:
+Because a SHA-256 hexadecimal hash is always exactly 64 ASCII characters:
 
 ```sql
-CREATE UNIQUE NONCLUSTERED INDEX UX_DocumentAccessToken_TokenHash
-ON dbo.DocumentAccessToken(TokenHash);
-
-CREATE INDEX IX_AccessEvent_Grant_CountedTime
-ON dbo.DocumentAccessEvent
-(
-    DocumentAccessGrantId,
-    OccurredAtUtc
-)
-WHERE ConsumesQuota = 1;
-
-CREATE INDEX IX_AccessEvent_OccurredAtUtc
-ON dbo.DocumentAccessEvent(OccurredAtUtc);
-
-CREATE INDEX IX_AccessEvent_Outcome_Time
-ON dbo.DocumentAccessEvent(OutcomeCode, OccurredAtUtc);
+TokenHash char(64)
+    COLLATE Latin1_General_100_BIN2
+    NOT NULL
 ```
 
-Since your lifetime limit is around 100 accesses per grant, calculating rolling counts from the event index will be inexpensive. There is no need for complicated time-bucket tables initially.
+Create a unique index:
 
-## Token URL security
-
-A token in a URL route can appear in:
-
-* IIS/reverse-proxy access logs
-* Browser history
-* Referrer headers
-* Analytics tools
-
-A safer QR URL is:
-
-```text
-https://documents.example.com/view#<token>
+```sql
+CREATE UNIQUE INDEX UX_DocumentAccessGrant_TokenHash
+ON dbo.DocumentAccessGrant(TokenHash);
 ```
 
-The URL fragment is not sent to the server. JavaScript reads it, immediately removes it from the visible URL, and sends it in an authorization header using a non-cacheable `POST` request.
+Using `char(64)` is appropriate here because:
 
-Also configure:
+* Hexadecimal SHA-256 always has 64 characters.
+* Only ASCII characters `0-9` and `a-f` are stored.
+* Every hash has the same length.
 
-```text
-Referrer-Policy: no-referrer
-Cache-Control: no-store
+`binary(32)` would consume less space, but storing it as `char(64)` is completely acceptable.
+
+## Validating the token later
+
+The HTML page reads the fragment:
+
+```javascript
+const token = window.location.hash.substring(1);
+
+history.replaceState(
+    null,
+    document.title,
+    window.location.pathname
+);
 ```
 
-If you must keep the token in the route, ensure IIS, proxy, application, and monitoring logs do not capture the raw URL.
+It then sends the token to the API in a header:
 
-## Do not expose the CUK publicly
-
-If the CUK is an internal document archive identifier or key, the public HTML page should not receive it.
-
-The preferable flow is:
-
-```text
-Public token → authorization → server uses CUK internally → server streams PDF
+```http
+POST /api/public-document/access
+X-Document-Token: T5P8qx6dS3RwQJOEm2SuYp1YuZzvYxYpA-MiTA26tqw
 ```
 
-Alternatively, return a short-lived, one-time download handle. The CUK should only be returned if it is explicitly designed to be public.
+The backend hashes it:
 
-Finally, these limits are per access grant, not per real person. Because the third party is unauthenticated, everyone possessing or copying the QR token shares the same counters. Authentication would be required for genuine per-user limits.
+```csharp
+if (!Request.Headers.TryGetValue(
+        "X-Document-Token",
+        out var headerValue))
+{
+    return Unauthorized();
+}
+
+string rawToken = headerValue.ToString();
+
+if (!DocumentTokenService.TryHashToken(
+        rawToken,
+        out string tokenHash))
+{
+    return Unauthorized();
+}
+
+DocumentAccessGrant? grant =
+    await _dbContext.DocumentAccessGrants
+        .SingleOrDefaultAsync(x =>
+            x.TokenHash == tokenHash);
+
+if (grant is null)
+{
+    return Unauthorized();
+}
+```
+
+After finding the grant, perform the expiry, revocation, lifetime-count, and rolling-window rule checks.
+
+One important consequence: because you store only the hash, you cannot reconstruct the raw token or URL later. Therefore, generate the QR code immediately from the returned URL. If the URL is lost, issue a new grant/token instead of trying to recover the old one.
