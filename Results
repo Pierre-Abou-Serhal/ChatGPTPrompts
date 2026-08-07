@@ -1,234 +1,171 @@
-Generate 32 random bytes using `RandomNumberGenerator`, encode them as Base64Url for the QR URL, hash the original bytes with SHA-256, and store that hash as a 64-character hexadecimal string.
+USE [Alterna_AccountStatementManagement]
+GO
+/****** Object:  Table [dbo].[t_AccessPolicy]    Script Date: 8/7/2026 10:27:27 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_AccessPolicy](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[PolicyCode] [nvarchar](255) NOT NULL,
+	[PolicyName] [nvarchar](255) NOT NULL,
+	[IsEnabled] [bit] NOT NULL,
+	[CreatedDate] [datetime2](3) NOT NULL,
+	[CreatedBy] [nvarchar](255) NOT NULL,
+	[LastModifiedDate] [datetime2](3) NOT NULL,
+	[LastModifiedBy] [nvarchar](255) NOT NULL,
+ CONSTRAINT [PK_t_AccessPolicy] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
 
-A 32-byte token becomes a 43-character Base64Url value.
+GO
+/****** Object:  Table [dbo].[t_AccessPolicyRule]    Script Date: 8/7/2026 10:27:27 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_AccessPolicyRule](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[AccessPolicyId] [bigint] NOT NULL,
+	[RuleName] [nvarchar](255) NOT NULL,
+	[WindowSeconds] [int] NULL,
+	[MaximumAccessCount] [int] NOT NULL,
+	[CreatedDate] [datetime2](3) NOT NULL,
+	[CreatedBy] [nvarchar](255) NOT NULL,
+	[LastModifiedDate] [datetime2](3) NOT NULL,
+	[LastModifiedBy] [nvarchar](255) NOT NULL,
+ CONSTRAINT [PK_t_AccessPolicyRule] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
 
-## Complete token service
+GO
+/****** Object:  Table [dbo].[t_Config]    Script Date: 8/7/2026 10:27:27 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_Config](
+	[SettingName] [nvarchar](255) NOT NULL,
+	[SettingValue] [nvarchar](255) NOT NULL,
+	[SettingDescription] [nvarchar](255) NULL,
+	[IsActive] [bit] NOT NULL,
+	[CreatedBy] [nvarchar](255) NOT NULL,
+	[CreatedDate] [datetime2](3) NOT NULL,
+	[LastModifiedBy] [nvarchar](255) NOT NULL,
+	[LastModifiedDate] [datetime2](3) NOT NULL
+) ON [PRIMARY]
 
-This works with modern ASP.NET Core:
+GO
+/****** Object:  Table [dbo].[t_DocumentAccessAudit]    Script Date: 8/7/2026 10:27:27 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_DocumentAccessAudit](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[DocumentReferenceId] [bigint] NULL,
+	[CorrelationId] [nvarchar](255) NOT NULL,
+	[PresentedTokenHash] [nvarchar](255) NOT NULL,
+	[OutcomeCode] [nvarchar](255) NOT NULL,
+	[ConsumesQuota] [bit] NOT NULL,
+	[DeniedByRuleId] [bigint] NULL,
+	[IpAddress] [nvarchar](255) NULL,
+	[UserAgent] [nvarchar](255) NULL,
+	[CreatedDate] [datetime2](3) NULL,
+	[CreatedBy] [nvarchar](255) NULL,
+ CONSTRAINT [PK_t_DocumentAccessAudit] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
 
-```csharp
-using Microsoft.AspNetCore.WebUtilities;
-using System.Security.Cryptography;
+GO
+/****** Object:  Table [dbo].[t_DocumentReference]    Script Date: 8/7/2026 10:27:27 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_DocumentReference](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[CustomerId] [nvarchar](255) NOT NULL,
+	[ExternalId] [nvarchar](255) NOT NULL,
+	[AccessPolicyId] [bigint] NOT NULL,
+	[AccountNumber] [nvarchar](255) NOT NULL,
+	[DocumentCuk] [nvarchar](255) NOT NULL,
+	[TokenHash] [nvarchar](255) NOT NULL,
+	[ExpiredDate] [datetime2](3) NOT NULL,
+	[RevokedDate] [datetime2](3) NULL,
+	[RevokedBy] [nvarchar](255) NULL,
+	[RevokedReason] [nvarchar](255) NULL,
+	[IsActive] [bit] NOT NULL,
+	[CreatedDate] [datetime2](3) NOT NULL,
+	[CreatedBy] [nvarchar](255) NOT NULL,
+	[LastModifiedDate] [datetime2](3) NOT NULL,
+	[LastModifiedBy] [nvarchar](255) NOT NULL,
+ CONSTRAINT [PK_t_DocumentReference] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
 
-public sealed record DocumentTokenResult(
-    string PublicUrl,
-    string TokenHash
-);
-
-public static class DocumentTokenService
-{
-    private const int TokenByteLength = 32;
-    private const int EncodedTokenLength = 43;
-
-    public static DocumentTokenResult Generate(string publicBaseUrl)
-    {
-        if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out Uri? baseUri))
-        {
-            throw new ArgumentException(
-                "A valid absolute public URL is required.",
-                nameof(publicBaseUrl));
-        }
-
-        if (!string.Equals(
-                baseUri.Scheme,
-                Uri.UriSchemeHttps,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException(
-                "The public URL must use HTTPS.",
-                nameof(publicBaseUrl));
-        }
-
-        // 1. Generate 32 cryptographically secure random bytes.
-        byte[] tokenBytes =
-            RandomNumberGenerator.GetBytes(TokenByteLength);
-
-        // 2. Convert them to a URL-safe 43-character token.
-        string rawToken =
-            WebEncoders.Base64UrlEncode(tokenBytes);
-
-        // 3. Hash the original random bytes using SHA-256.
-        byte[] hashBytes =
-            SHA256.HashData(tokenBytes);
-
-        // 4. Convert the 32-byte hash to a 64-character string.
-        string tokenHash =
-            Convert.ToHexString(hashBytes).ToLowerInvariant();
-
-        // Recommended: put token in URL fragment.
-        // The browser does not send fragments to IIS or the server.
-        Uri documentPageUri =
-            new Uri(baseUri, "public-document");
-
-        UriBuilder urlBuilder = new(documentPageUri)
-        {
-            Fragment = rawToken
-        };
-
-        return new DocumentTokenResult(
-            urlBuilder.Uri.AbsoluteUri,
-            tokenHash
-        );
-    }
-
-    public static bool TryHashToken(
-        string rawToken,
-        out string tokenHash)
-    {
-        tokenHash = string.Empty;
-
-        if (string.IsNullOrWhiteSpace(rawToken) ||
-            rawToken.Length != EncodedTokenLength)
-        {
-            return false;
-        }
-
-        try
-        {
-            byte[] tokenBytes =
-                WebEncoders.Base64UrlDecode(rawToken);
-
-            if (tokenBytes.Length != TokenByteLength)
-            {
-                return false;
-            }
-
-            byte[] hashBytes =
-                SHA256.HashData(tokenBytes);
-
-            tokenHash =
-                Convert.ToHexString(hashBytes).ToLowerInvariant();
-
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
-}
-```
-
-## Generating and saving the grant
-
-```csharp
-DocumentTokenResult tokenResult =
-    DocumentTokenService.Generate(
-        "https://documents.example.com/");
-
-DocumentAccessGrant grant = new()
-{
-    CustomerId = customerId,
-    ExternalId = externalId,
-    DocumentCuk = documentCuk,
-    AccessPolicyId = accessPolicyId,
-
-    // Only the hash is stored.
-    TokenHash = tokenResult.TokenHash,
-
-    CreatedAtUtc = DateTime.UtcNow,
-    ExpiresAtUtc = DateTime.UtcNow.AddMonths(3),
-    SuccessfulAccessCount = 0
-};
-
-_dbContext.DocumentAccessGrants.Add(grant);
-
-await _dbContext.SaveChangesAsync();
-
-// This full URL is returned to the QR generator.
-return tokenResult.PublicUrl;
-```
-
-The returned URL will resemble:
-
-```text
-https://documents.example.com/public-document#T5P8qx6dS3RwQJOEm2SuYp1YuZzvYxYpA-MiTA26tqw
-```
-
-The database stores something resembling:
-
-```text
-836a98d4c12c8fac93d4aacb91da73bec0c98281369916c0fd7f5a04ba6fd933
-```
-
-The stored value cannot be used directly as the public token.
-
-## Database column
-
-Because a SHA-256 hexadecimal hash is always exactly 64 ASCII characters:
-
-```sql
-TokenHash char(64)
-    COLLATE Latin1_General_100_BIN2
-    NOT NULL
-```
-
-Create a unique index:
-
-```sql
-CREATE UNIQUE INDEX UX_DocumentAccessGrant_TokenHash
-ON dbo.DocumentAccessGrant(TokenHash);
-```
-
-Using `char(64)` is appropriate here because:
-
-* Hexadecimal SHA-256 always has 64 characters.
-* Only ASCII characters `0-9` and `a-f` are stored.
-* Every hash has the same length.
-
-`binary(32)` would consume less space, but storing it as `char(64)` is completely acceptable.
-
-## Validating the token later
-
-The HTML page reads the fragment:
-
-```javascript
-const token = window.location.hash.substring(1);
-
-history.replaceState(
-    null,
-    document.title,
-    window.location.pathname
-);
-```
-
-It then sends the token to the API in a header:
-
-```http
-POST /api/public-document/access
-X-Document-Token: T5P8qx6dS3RwQJOEm2SuYp1YuZzvYxYpA-MiTA26tqw
-```
-
-The backend hashes it:
-
-```csharp
-if (!Request.Headers.TryGetValue(
-        "X-Document-Token",
-        out var headerValue))
-{
-    return Unauthorized();
-}
-
-string rawToken = headerValue.ToString();
-
-if (!DocumentTokenService.TryHashToken(
-        rawToken,
-        out string tokenHash))
-{
-    return Unauthorized();
-}
-
-DocumentAccessGrant? grant =
-    await _dbContext.DocumentAccessGrants
-        .SingleOrDefaultAsync(x =>
-            x.TokenHash == tokenHash);
-
-if (grant is null)
-{
-    return Unauthorized();
-}
-```
-
-After finding the grant, perform the expiry, revocation, lifetime-count, and rolling-window rule checks.
-
-One important consequence: because you store only the hash, you cannot reconstruct the raw token or URL later. Therefore, generate the QR code immediately from the returned URL. If the URL is lost, issue a new grant/token instead of trying to recover the old one.
+GO
+ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit] ADD  CONSTRAINT [DF_t_DocumentAccessAudit_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit] ADD  CONSTRAINT [DF_t_DocumentAccessAudit_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule]  WITH CHECK ADD  CONSTRAINT [FK_t_AccessPolicyRule_t_AccessPolicy] FOREIGN KEY([AccessPolicyId])
+REFERENCES [dbo].[t_AccessPolicy] ([Id])
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] CHECK CONSTRAINT [FK_t_AccessPolicyRule_t_AccessPolicy]
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit]  WITH CHECK ADD  CONSTRAINT [FK_t_DocumentAccessAudit_t_AccessPolicyRule] FOREIGN KEY([DeniedByRuleId])
+REFERENCES [dbo].[t_AccessPolicyRule] ([Id])
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit] CHECK CONSTRAINT [FK_t_DocumentAccessAudit_t_AccessPolicyRule]
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit]  WITH CHECK ADD  CONSTRAINT [FK_t_DocumentAccessAudit_t_DocumentReference] FOREIGN KEY([DocumentReferenceId])
+REFERENCES [dbo].[t_DocumentReference] ([Id])
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit] CHECK CONSTRAINT [FK_t_DocumentAccessAudit_t_DocumentReference]
+GO
+ALTER TABLE [dbo].[t_DocumentReference]  WITH CHECK ADD  CONSTRAINT [FK_t_DocumentReference_t_AccessPolicy] FOREIGN KEY([AccessPolicyId])
+REFERENCES [dbo].[t_AccessPolicy] ([Id])
+GO
+ALTER TABLE [dbo].[t_DocumentReference] CHECK CONSTRAINT [FK_t_DocumentReference_t_AccessPolicy]
+GO
