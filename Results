@@ -1,28 +1,270 @@
- public async Task<String> GetDocumentCuk(GetDocumentCukRequest request)
-  {
-    DapperDal dal = new DapperDal(_globalSettings.ConnString);
-    DynamicParameters parameters = new DynamicParameters();
+ALTER PROCEDURE [dbo].[usp_GetDocumentCuk]
+(
+    @P__RawTokenHash NVARCHAR(255),
+	@P__CorrelationId NVARCHAR(255),
+	@P__IpAddress NVARCHAR(255),
+	@P__UserAgent NVARCHAR(255),
+    @P__Error NVARCHAR(4000) OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
 
-    if (!Utils.TryHashToken(request.Token, out String rawTokenHash))
-    {
-      throw new SGBLBadRequestException("Invalid token format");
-    }
+    DECLARE @CurrentDate DATETIME2(3) = GETDATE();
 
-    parameters.Add("P__RawTokenHash", rawTokenHash);
-    parameters.Add("P__CorrelationId", request.BaseReq.CorrelationId);
-    parameters.Add("P__IpAddress", request.IpAddress);
-    parameters.Add("P__UserAgent", request.UserAgent);
-    parameters.Add("P__Error", dbType: DbType.String, direction: ParameterDirection.Output, size: 4000);
+    DECLARE @TokenHash NVARCHAR(255) = LOWER(LTRIM(RTRIM(ISNULL(@P__RawTokenHash, N''))));
 
-    IEnumerable<String> res = await dal.ExecuteQueryAsync<String>("usp_GetDocumentCuk", parameters,
-      CommandType.StoredProcedure, DapperDal.CommandDirection.Update);
+    DECLARE @DocumentReferenceId BIGINT = NULL;
+    DECLARE @AccessPolicyId BIGINT = NULL;
+    DECLARE @DocumentCuk NVARCHAR(255) = NULL;
+    DECLARE @ExpiredDate DATETIME2(3) = NULL;
+    DECLARE @RevokedDate DATETIME2(3) = NULL;
+    DECLARE @DocumentIsActive BIT = NULL;
+    DECLARE @PolicyIsEnabled BIT = NULL;
 
-    String storedProcedureErrorMessage = parameters.Get<String>("P__Error");
+    DECLARE @Allowed BIT = 0;
+    DECLARE @ConsumesQuota BIT = 0;
+    DECLARE @OutcomeCode NVARCHAR(255) = N'UNDETERMINED';
 
-    if (!String.IsNullOrWhiteSpace(storedProcedureErrorMessage))
-    {
-      throw new SGBLBadRequestException(storedProcedureErrorMessage);
-    }
+    DECLARE @DeniedRuleId BIGINT = NULL;
+    DECLARE @DeniedRuleName NVARCHAR(255) = NULL;
+    DECLARE @CurrentAccessCount BIGINT = NULL;
+    DECLARE @MaximumAccessCount INT = NULL;
+    DECLARE @WindowSeconds INT = NULL;
 
-    return res.First();
-  }
+    SET @P__Error = NULL;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        BEGIN
+            /*
+             * UPDLOCK and HOLDLOCK serialize access attempts for the
+             * same document so concurrent scans cannot both pass
+             * the quota check.
+             */
+            SELECT
+                @DocumentReferenceId = d.Id,
+                @AccessPolicyId = d.AccessPolicyId,
+                @DocumentCuk = d.DocumentCuk,
+                @ExpiredDate = d.ExpiredDate,
+                @RevokedDate = d.RevokedDate,
+                @DocumentIsActive = d.IsActive,
+                @PolicyIsEnabled = p.IsEnabled
+            FROM dbo.t_DocumentReference AS d
+                WITH (UPDLOCK, HOLDLOCK)
+            INNER JOIN dbo.t_AccessPolicy AS p
+                WITH (HOLDLOCK)
+                ON p.Id = d.AccessPolicyId
+            WHERE d.TokenHash = @TokenHash;
+
+            IF @DocumentReferenceId IS NULL
+            BEGIN
+                SET @OutcomeCode = N'INVALID_TOKEN';
+                SET @P__Error = N'The document token is invalid.';
+            END
+            ELSE IF @DocumentIsActive = 0
+            BEGIN
+                SET @OutcomeCode = N'DOCUMENT_INACTIVE';
+                SET @P__Error = N'The requested document is not available.';
+            END
+            ELSE IF @RevokedDate IS NOT NULL
+            BEGIN
+                SET @OutcomeCode = N'DOCUMENT_REVOKED';
+                SET @P__Error = N'Document access has been revoked.';
+            END
+            ELSE IF @CurrentDate >= @ExpiredDate
+            BEGIN
+                SET @OutcomeCode = N'DOCUMENT_EXPIRED';
+                SET @P__Error = N'Document access has expired.';
+            END
+            ELSE IF ISNULL(@PolicyIsEnabled, 0) = 0
+            BEGIN
+                SET @OutcomeCode = N'POLICY_DISABLED';
+                SET @P__Error = N'The document access policy is disabled.';
+            END
+            ELSE IF NOT EXISTS
+            (
+                SELECT 1
+                FROM dbo.t_AccessPolicyRule AS r
+                    WITH (HOLDLOCK)
+                WHERE r.AccessPolicyId = @AccessPolicyId 
+					AND r.IsEnabled = 1
+            )
+            BEGIN
+                /*
+                 * Fail closed if the policy has no rules.
+                 */
+                SET @OutcomeCode = N'POLICY_RULE_NOT_CONFIGURED';
+                SET @P__Error =
+                    N'No access rules are configured for this policy.';
+            END
+            ELSE IF EXISTS
+            (
+                SELECT 1
+                FROM dbo.t_AccessPolicyRule AS r
+                    WITH (HOLDLOCK)
+                WHERE r.AccessPolicyId = @AccessPolicyId
+                  AND
+                  (
+                      r.MaximumAccessCount <= 0
+                      OR
+                      (
+                          r.WindowSeconds IS NOT NULL
+                          AND r.WindowSeconds <= 0
+                      )
+                  )
+				  AND r.IsEnabled = 1
+            )
+            BEGIN
+                SET @OutcomeCode = N'POLICY_CONFIGURATION_INVALID';
+                SET @P__Error =
+                    N'The document access policy contains an invalid rule.';
+            END
+            ELSE
+            BEGIN
+                /*
+                 * WindowSeconds IS NULL:
+                 *     Count every quota-consuming access for the lifetime
+                 *     of the document reference.
+                 *
+                 * WindowSeconds has a value:
+                 *     Count accesses inside the rolling time window.
+                 */
+                SELECT TOP (1)
+                    @DeniedRuleId = r.Id,
+                    @DeniedRuleName = r.RuleName,
+                    @WindowSeconds = r.WindowSeconds,
+                    @MaximumAccessCount = r.MaximumAccessCount,
+                    @CurrentAccessCount = q.CurrentAccessCount
+                FROM dbo.t_AccessPolicyRule AS r
+                    WITH (HOLDLOCK)
+                CROSS APPLY
+                (
+                    SELECT
+                        COUNT_BIG(1) AS CurrentAccessCount
+                    FROM dbo.t_DocumentAccessAudit AS a
+                    WHERE a.DocumentReferenceId =
+                              @DocumentReferenceId
+                      AND a.ConsumesQuota = 1
+                      AND
+                      (
+                          r.WindowSeconds IS NULL
+                          OR a.CreatedDate >
+                             DATEADD(
+                                 SECOND,
+                                 -r.WindowSeconds,
+                                 @CurrentDate
+                             )
+                      )
+                      AND a.CreatedDate <= @CurrentDate
+                ) AS q
+                WHERE r.AccessPolicyId = @AccessPolicyId
+				  AND r.IsEnabled = 1
+                  AND q.CurrentAccessCount >=
+                      r.MaximumAccessCount
+                ORDER BY
+                    CASE
+                        WHEN r.WindowSeconds IS NULL THEN 1
+                        ELSE 0
+                    END,
+                    r.WindowSeconds,
+                    r.Id;
+
+                IF @DeniedRuleId IS NOT NULL
+                BEGIN
+                    SET @OutcomeCode = N'ACCESS_LIMIT_EXCEEDED';
+
+                    SET @P__Error =
+                        LEFT(
+                            CONCAT(
+                                N'Access limit exceeded. Rule: ',
+                                @DeniedRuleName,
+                                N'; current count: ',
+                                @CurrentAccessCount,
+                                N'; maximum: ',
+                                @MaximumAccessCount,
+                                CASE
+                                    WHEN @WindowSeconds IS NULL
+                                    THEN N'; window: lifetime.'
+                                    ELSE CONCAT(
+                                        N'; window seconds: ',
+                                        @WindowSeconds,
+                                        N'.'
+                                    )
+                                END
+                            ),
+                            4000
+                        );
+                END
+                ELSE
+                BEGIN
+                    SET @Allowed = 1;
+                    SET @ConsumesQuota = 1;
+                    SET @OutcomeCode = N'ACCESS_GRANTED';
+                    SET @P__Error = NULL;
+                END
+            END
+        END
+
+        /*
+         * Every known validation attempt is recorded.
+         * Only ACCESS_GRANTED consumes quota.
+         */
+        INSERT INTO dbo.t_DocumentAccessAudit
+        (
+            DocumentReferenceId,
+            CorrelationId,
+            PresentedTokenHash,
+            OutcomeCode,
+            ConsumesQuota,
+            DeniedByRuleId,
+            IpAddress,
+            UserAgent,
+            CreatedDate
+        )
+        VALUES
+        (
+            @DocumentReferenceId,
+            @P__CorrelationId,
+            @TokenHash,
+            @OutcomeCode,
+            @ConsumesQuota,
+            @DeniedRuleId,
+            @P__IpAddress,
+            @P__UserAgent,
+            @CurrentDate
+        );
+
+        COMMIT TRANSACTION;
+
+        IF @Allowed = 1
+        BEGIN
+            SELECT @DocumentCuk AS DocumentCuk;
+            RETURN 0;
+        END;
+
+        SELECT CAST(NULL AS NVARCHAR(255)) AS DocumentCuk;
+        RETURN 1;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+        END;
+
+        SET @P__Error =
+            LEFT(
+                CONCAT(
+                    N'Unexpected error while validating document access: ',
+                    ERROR_MESSAGE()
+                ),
+                4000
+            );
+
+        SELECT CAST(NULL AS NVARCHAR(255)) AS DocumentCuk;
+        RETURN -1;
+    END CATCH;
+END
+GO
