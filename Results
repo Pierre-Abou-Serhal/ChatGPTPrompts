@@ -1,270 +1,275 @@
-ALTER PROCEDURE [dbo].[usp_GetDocumentCuk]
+No special lock hints are normally required for `INSERT`, `UPDATE`, or `DELETE`. SQL Server automatically acquires exclusive locks for write operations.
+
+Your update procedure may temporarily wait if `usp_GetDocumentCuk` is currently validating the same document or policy. That blocking is intentional—it prevents validation from reading half-updated configuration.
+
+## Single-statement update
+
+A single `UPDATE` statement is already atomic:
+
+```sql
+CREATE PROCEDURE dbo.usp_UpdateDocumentReference
 (
-    @P__RawTokenHash NVARCHAR(255),
-	@P__CorrelationId NVARCHAR(255),
-	@P__IpAddress NVARCHAR(255),
-	@P__UserAgent NVARCHAR(255),
-    @P__Error NVARCHAR(4000) OUTPUT
+    @P__Id                 BIGINT,
+    @P__DocumentCuk        NVARCHAR(255),
+    @P__ExpiredDate        DATETIME2(3),
+    @P__LastModifiedBy     NVARCHAR(255),
+    @P__Error              NVARCHAR(4000) OUTPUT
 )
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @CurrentDate DATETIME2(3) = GETDATE();
+    SET @P__Error = NULL;
 
-    DECLARE @TokenHash NVARCHAR(255) = LOWER(LTRIM(RTRIM(ISNULL(@P__RawTokenHash, N''))));
+    UPDATE dbo.t_DocumentReference
+    SET
+        DocumentCuk = @P__DocumentCuk,
+        ExpiredDate = @P__ExpiredDate,
+        LastModifiedDate = SYSUTCDATETIME(),
+        LastModifiedBy = @P__LastModifiedBy
+    WHERE Id = @P__Id;
 
-    DECLARE @DocumentReferenceId BIGINT = NULL;
-    DECLARE @AccessPolicyId BIGINT = NULL;
-    DECLARE @DocumentCuk NVARCHAR(255) = NULL;
-    DECLARE @ExpiredDate DATETIME2(3) = NULL;
-    DECLARE @RevokedDate DATETIME2(3) = NULL;
-    DECLARE @DocumentIsActive BIT = NULL;
-    DECLARE @PolicyIsEnabled BIT = NULL;
+    IF @@ROWCOUNT = 0
+    BEGIN
+        SET @P__Error = N'Document reference was not found.';
+        RETURN 1;
+    END;
 
-    DECLARE @Allowed BIT = 0;
-    DECLARE @ConsumesQuota BIT = 0;
-    DECLARE @OutcomeCode NVARCHAR(255) = N'UNDETERMINED';
+    RETURN 0;
+END
+GO
+```
 
-    DECLARE @DeniedRuleId BIGINT = NULL;
-    DECLARE @DeniedRuleName NVARCHAR(255) = NULL;
-    DECLARE @CurrentAccessCount BIGINT = NULL;
-    DECLARE @MaximumAccessCount INT = NULL;
-    DECLARE @WindowSeconds INT = NULL;
+You do not need:
+
+```sql
+WITH (UPDLOCK, HOLDLOCK)
+```
+
+on the `UPDATE`, because `UPDATE` already obtains the required locks.
+
+## When a transaction is required
+
+Use an explicit transaction when several changes must be committed together.
+
+For example, updating a policy and adding a policy rule:
+
+```sql
+CREATE PROCEDURE dbo.usp_UpdateAccessPolicy
+(
+    @P__AccessPolicyId     BIGINT,
+    @P__PolicyName         NVARCHAR(255),
+    @P__IsEnabled          BIT,
+
+    @P__RuleName           NVARCHAR(255),
+    @P__WindowSeconds      INT,
+    @P__MaximumAccessCount INT,
+
+    @P__ModifiedBy         NVARCHAR(255),
+    @P__Error              NVARCHAR(4000) OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
 
     SET @P__Error = NULL;
 
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        BEGIN
-            /*
-             * UPDLOCK and HOLDLOCK serialize access attempts for the
-             * same document so concurrent scans cannot both pass
-             * the quota check.
-             */
-            SELECT
-                @DocumentReferenceId = d.Id,
-                @AccessPolicyId = d.AccessPolicyId,
-                @DocumentCuk = d.DocumentCuk,
-                @ExpiredDate = d.ExpiredDate,
-                @RevokedDate = d.RevokedDate,
-                @DocumentIsActive = d.IsActive,
-                @PolicyIsEnabled = p.IsEnabled
-            FROM dbo.t_DocumentReference AS d
-                WITH (UPDLOCK, HOLDLOCK)
-            INNER JOIN dbo.t_AccessPolicy AS p
-                WITH (HOLDLOCK)
-                ON p.Id = d.AccessPolicyId
-            WHERE d.TokenHash = @TokenHash;
-
-            IF @DocumentReferenceId IS NULL
-            BEGIN
-                SET @OutcomeCode = N'INVALID_TOKEN';
-                SET @P__Error = N'The document token is invalid.';
-            END
-            ELSE IF @DocumentIsActive = 0
-            BEGIN
-                SET @OutcomeCode = N'DOCUMENT_INACTIVE';
-                SET @P__Error = N'The requested document is not available.';
-            END
-            ELSE IF @RevokedDate IS NOT NULL
-            BEGIN
-                SET @OutcomeCode = N'DOCUMENT_REVOKED';
-                SET @P__Error = N'Document access has been revoked.';
-            END
-            ELSE IF @CurrentDate >= @ExpiredDate
-            BEGIN
-                SET @OutcomeCode = N'DOCUMENT_EXPIRED';
-                SET @P__Error = N'Document access has expired.';
-            END
-            ELSE IF ISNULL(@PolicyIsEnabled, 0) = 0
-            BEGIN
-                SET @OutcomeCode = N'POLICY_DISABLED';
-                SET @P__Error = N'The document access policy is disabled.';
-            END
-            ELSE IF NOT EXISTS
-            (
-                SELECT 1
-                FROM dbo.t_AccessPolicyRule AS r
-                    WITH (HOLDLOCK)
-                WHERE r.AccessPolicyId = @AccessPolicyId 
-					AND r.IsEnabled = 1
-            )
-            BEGIN
-                /*
-                 * Fail closed if the policy has no rules.
-                 */
-                SET @OutcomeCode = N'POLICY_RULE_NOT_CONFIGURED';
-                SET @P__Error =
-                    N'No access rules are configured for this policy.';
-            END
-            ELSE IF EXISTS
-            (
-                SELECT 1
-                FROM dbo.t_AccessPolicyRule AS r
-                    WITH (HOLDLOCK)
-                WHERE r.AccessPolicyId = @AccessPolicyId
-                  AND
-                  (
-                      r.MaximumAccessCount <= 0
-                      OR
-                      (
-                          r.WindowSeconds IS NOT NULL
-                          AND r.WindowSeconds <= 0
-                      )
-                  )
-				  AND r.IsEnabled = 1
-            )
-            BEGIN
-                SET @OutcomeCode = N'POLICY_CONFIGURATION_INVALID';
-                SET @P__Error =
-                    N'The document access policy contains an invalid rule.';
-            END
-            ELSE
-            BEGIN
-                /*
-                 * WindowSeconds IS NULL:
-                 *     Count every quota-consuming access for the lifetime
-                 *     of the document reference.
-                 *
-                 * WindowSeconds has a value:
-                 *     Count accesses inside the rolling time window.
-                 */
-                SELECT TOP (1)
-                    @DeniedRuleId = r.Id,
-                    @DeniedRuleName = r.RuleName,
-                    @WindowSeconds = r.WindowSeconds,
-                    @MaximumAccessCount = r.MaximumAccessCount,
-                    @CurrentAccessCount = q.CurrentAccessCount
-                FROM dbo.t_AccessPolicyRule AS r
-                    WITH (HOLDLOCK)
-                CROSS APPLY
-                (
-                    SELECT
-                        COUNT_BIG(1) AS CurrentAccessCount
-                    FROM dbo.t_DocumentAccessAudit AS a
-                    WHERE a.DocumentReferenceId =
-                              @DocumentReferenceId
-                      AND a.ConsumesQuota = 1
-                      AND
-                      (
-                          r.WindowSeconds IS NULL
-                          OR a.CreatedDate >
-                             DATEADD(
-                                 SECOND,
-                                 -r.WindowSeconds,
-                                 @CurrentDate
-                             )
-                      )
-                      AND a.CreatedDate <= @CurrentDate
-                ) AS q
-                WHERE r.AccessPolicyId = @AccessPolicyId
-				  AND r.IsEnabled = 1
-                  AND q.CurrentAccessCount >=
-                      r.MaximumAccessCount
-                ORDER BY
-                    CASE
-                        WHEN r.WindowSeconds IS NULL THEN 1
-                        ELSE 0
-                    END,
-                    r.WindowSeconds,
-                    r.Id;
-
-                IF @DeniedRuleId IS NOT NULL
-                BEGIN
-                    SET @OutcomeCode = N'ACCESS_LIMIT_EXCEEDED';
-
-                    SET @P__Error =
-                        LEFT(
-                            CONCAT(
-                                N'Access limit exceeded. Rule: ',
-                                @DeniedRuleName,
-                                N'; current count: ',
-                                @CurrentAccessCount,
-                                N'; maximum: ',
-                                @MaximumAccessCount,
-                                CASE
-                                    WHEN @WindowSeconds IS NULL
-                                    THEN N'; window: lifetime.'
-                                    ELSE CONCAT(
-                                        N'; window seconds: ',
-                                        @WindowSeconds,
-                                        N'.'
-                                    )
-                                END
-                            ),
-                            4000
-                        );
-                END
-                ELSE
-                BEGIN
-                    SET @Allowed = 1;
-                    SET @ConsumesQuota = 1;
-                    SET @OutcomeCode = N'ACCESS_GRANTED';
-                    SET @P__Error = NULL;
-                END
-            END
-        END
-
-        /*
-         * Every known validation attempt is recorded.
-         * Only ACCESS_GRANTED consumes quota.
-         */
-        INSERT INTO dbo.t_DocumentAccessAudit
-        (
-            DocumentReferenceId,
-            CorrelationId,
-            PresentedTokenHash,
-            OutcomeCode,
-            ConsumesQuota,
-            DeniedByRuleId,
-            IpAddress,
-            UserAgent,
-            CreatedDate
-        )
-        VALUES
-        (
-            @DocumentReferenceId,
-            @P__CorrelationId,
-            @TokenHash,
-            @OutcomeCode,
-            @ConsumesQuota,
-            @DeniedRuleId,
-            @P__IpAddress,
-            @P__UserAgent,
-            @CurrentDate
-        );
-
-        COMMIT TRANSACTION;
-
-        IF @Allowed = 1
-        BEGIN
-            SELECT @DocumentCuk AS DocumentCuk;
-            RETURN 0;
-        END;
-
-        SELECT CAST(NULL AS NVARCHAR(255)) AS DocumentCuk;
-        RETURN 1;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-        BEGIN
-            ROLLBACK TRANSACTION;
-        END;
-
+    IF @P__MaximumAccessCount <= 0
+    BEGIN
         SET @P__Error =
-            LEFT(
-                CONCAT(
-                    N'Unexpected error while validating document access: ',
-                    ERROR_MESSAGE()
-                ),
-                4000
-            );
+            N'Maximum access count must be greater than zero.';
+        RETURN 1;
+    END;
 
-        SELECT CAST(NULL AS NVARCHAR(255)) AS DocumentCuk;
-        RETURN -1;
-    END CATCH;
+    IF @P__WindowSeconds IS NOT NULL
+       AND @P__WindowSeconds <= 0
+    BEGIN
+        SET @P__Error =
+            N'Window seconds must be greater than zero.';
+        RETURN 1;
+    END;
+
+    BEGIN TRANSACTION;
+
+    UPDATE dbo.t_AccessPolicy
+    SET
+        PolicyName = @P__PolicyName,
+        IsEnabled = @P__IsEnabled,
+        LastModifiedDate = SYSUTCDATETIME(),
+        LastModifiedBy = @P__ModifiedBy
+    WHERE Id = @P__AccessPolicyId;
+
+    IF @@ROWCOUNT = 0
+    BEGIN
+        ROLLBACK TRANSACTION;
+
+        SET @P__Error = N'Access policy was not found.';
+        RETURN 1;
+    END;
+
+    INSERT INTO dbo.t_AccessPolicyRule
+    (
+        AccessPolicyId,
+        RuleName,
+        WindowSeconds,
+        MaximumAccessCount,
+        CreatedDate,
+        CreatedBy,
+        LastModifiedDate,
+        LastModifiedBy
+    )
+    VALUES
+    (
+        @P__AccessPolicyId,
+        @P__RuleName,
+        @P__WindowSeconds,
+        @P__MaximumAccessCount,
+        SYSUTCDATETIME(),
+        @P__ModifiedBy,
+        SYSUTCDATETIME(),
+        @P__ModifiedBy
+    );
+
+    COMMIT TRANSACTION;
+
+    RETURN 0;
 END
 GO
+```
+
+This ensures validation sees either:
+
+* The old policy and old rules, or
+* The new policy and new rules
+
+It should not see a policy update committed before its related rule update.
+
+## Read before update
+
+If the procedure must read a value, make a decision, and then update it, use `UPDLOCK, HOLDLOCK` during the read:
+
+```sql
+BEGIN TRANSACTION;
+
+DECLARE @CurrentIsActive BIT;
+
+SELECT
+    @CurrentIsActive = IsActive
+FROM dbo.t_DocumentReference WITH (UPDLOCK, HOLDLOCK)
+WHERE Id = @P__Id;
+
+IF @CurrentIsActive IS NULL
+BEGIN
+    ROLLBACK TRANSACTION;
+
+    SET @P__Error = N'Document reference was not found.';
+    RETURN 1;
+END;
+
+IF @CurrentIsActive = 0
+BEGIN
+    ROLLBACK TRANSACTION;
+
+    SET @P__Error = N'An inactive document cannot be updated.';
+    RETURN 1;
+END;
+
+UPDATE dbo.t_DocumentReference
+SET
+    ExpiredDate = @P__ExpiredDate,
+    LastModifiedDate = SYSUTCDATETIME(),
+    LastModifiedBy = @P__ModifiedBy
+WHERE Id = @P__Id;
+
+COMMIT TRANSACTION;
+```
+
+Without `UPDLOCK`, another request could modify the row between the `SELECT` and `UPDATE`.
+
+Whenever possible, combine the condition into one atomic statement instead:
+
+```sql
+UPDATE dbo.t_DocumentReference
+SET
+    ExpiredDate = @P__ExpiredDate,
+    LastModifiedDate = SYSUTCDATETIME(),
+    LastModifiedBy = @P__ModifiedBy
+WHERE Id = @P__Id
+  AND IsActive = 1;
+```
+
+This is simpler and usually preferable.
+
+## How it interacts with document validation
+
+If validation is currently holding this lock:
+
+```sql
+FROM dbo.t_DocumentReference
+    WITH (UPDLOCK, HOLDLOCK)
+```
+
+and another procedure tries to update that document, the update waits until validation commits.
+
+The reverse is also true:
+
+* If the update commits first, validation reads the new values.
+* If validation commits first, the update happens afterward.
+
+For example, when revoking a document:
+
+```sql
+UPDATE dbo.t_DocumentReference
+SET
+    IsActive = 0,
+    RevokedDate = SYSUTCDATETIME(),
+    RevokedBy = @P__RevokedBy,
+    RevokedReason = @P__RevokedReason,
+    LastModifiedDate = SYSUTCDATETIME(),
+    LastModifiedBy = @P__RevokedBy
+WHERE Id = @P__Id
+  AND IsActive = 1
+  AND RevokedDate IS NULL;
+```
+
+No explicit lock hint is required.
+
+## Lock order
+
+When a procedure modifies several of your tables, use a consistent order to reduce deadlocks:
+
+1. `t_DocumentReference`
+2. `t_AccessPolicy`
+3. `t_AccessPolicyRule`
+4. `t_DocumentAccessAudit`
+
+If a procedure only updates a policy and its rules, use:
+
+1. `t_AccessPolicy`
+2. `t_AccessPolicyRule`
+
+Avoid one procedure locking policy rules and then the document while another locks the document and then policy rules.
+
+Also keep transactions short:
+
+* Do not call external APIs inside the transaction.
+* Do not generate documents inside the transaction.
+* Do not wait for user input.
+* Commit immediately after database changes.
+
+## Avoid these lock hints
+
+Do not add these without a specific measured reason:
+
+```sql
+WITH (NOLOCK)
+WITH (ROWLOCK)
+WITH (TABLOCK)
+WITH (READPAST)
+```
+
+Especially avoid `NOLOCK` for policy and access validation because it could read uncommitted or inconsistent configuration.
+
+One architectural point: updating `WindowSeconds` or `MaximumAccessCount` in place means historical reports cannot know what the old rule values were. If that historical accuracy matters, add policy/rule versioning or effective-date columns instead of overwriting rules.
