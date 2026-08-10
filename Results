@@ -1,6 +1,6 @@
 USE [Alterna_AccountStatementManagement]
 GO
-/****** Object:  UserDefinedTableType [dbo].[TVP_t_AccessPolicyRule]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  UserDefinedTableType [dbo].[TVP_t_AccessPolicyRule]    Script Date: 8/10/2026 4:23:24 PM ******/
 CREATE TYPE [dbo].[TVP_t_AccessPolicyRule] AS TABLE(
 	[Id] [bigint] NOT NULL,
 	[AccessPolicyId] [bigint] NOT NULL,
@@ -10,7 +10,177 @@ CREATE TYPE [dbo].[TVP_t_AccessPolicyRule] AS TABLE(
 	[IsEnabled] [bit] NOT NULL
 )
 GO
-/****** Object:  StoredProcedure [dbo].[usp_CreateDocumentReference]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  Table [dbo].[t_AccessPolicy]    Script Date: 8/10/2026 4:23:24 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_AccessPolicy](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[PolicyCode] [nvarchar](255) NOT NULL,
+	[PolicyName] [nvarchar](255) NOT NULL,
+	[IsEnabled] [bit] NOT NULL,
+	[CreatedDate] [datetime2](3) NOT NULL,
+	[CreatedBy] [nvarchar](255) NOT NULL,
+	[LastModifiedDate] [datetime2](3) NOT NULL,
+	[LastModifiedBy] [nvarchar](255) NOT NULL,
+ CONSTRAINT [PK_t_AccessPolicy] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+/****** Object:  Table [dbo].[t_AccessPolicyRule]    Script Date: 8/10/2026 4:23:24 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_AccessPolicyRule](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[AccessPolicyId] [bigint] NOT NULL,
+	[RuleName] [nvarchar](255) NOT NULL,
+	[WindowSeconds] [int] NULL,
+	[MaximumAccessCount] [int] NOT NULL,
+	[IsEnabled] [bit] NOT NULL,
+	[CreatedDate] [datetime2](3) NOT NULL,
+	[CreatedBy] [nvarchar](255) NOT NULL,
+	[LastModifiedDate] [datetime2](3) NOT NULL,
+	[LastModifiedBy] [nvarchar](255) NOT NULL,
+ CONSTRAINT [PK_t_AccessPolicyRule] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+/****** Object:  Table [dbo].[t_Config]    Script Date: 8/10/2026 4:23:24 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_Config](
+	[SettingName] [nvarchar](255) NOT NULL,
+	[SettingValue] [nvarchar](255) NOT NULL,
+	[SettingDescription] [nvarchar](255) NULL,
+	[IsActive] [bit] NOT NULL,
+	[CreatedBy] [nvarchar](255) NOT NULL,
+	[CreatedDate] [datetime2](3) NOT NULL,
+	[LastModifiedBy] [nvarchar](255) NOT NULL,
+	[LastModifiedDate] [datetime2](3) NOT NULL
+) ON [PRIMARY]
+
+GO
+/****** Object:  Table [dbo].[t_DocumentAccessAudit]    Script Date: 8/10/2026 4:23:24 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_DocumentAccessAudit](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[DocumentReferenceId] [bigint] NULL,
+	[CorrelationId] [nvarchar](255) NOT NULL,
+	[PresentedTokenHash] [nvarchar](255) NOT NULL,
+	[OutcomeCode] [nvarchar](255) NOT NULL,
+	[ConsumesQuota] [bit] NOT NULL,
+	[DeniedByRuleId] [bigint] NULL,
+	[IpAddress] [nvarchar](255) NULL,
+	[UserAgent] [nvarchar](1000) NULL,
+	[CreatedDate] [datetime2](3) NULL,
+	[CreatedBy] [nvarchar](255) NULL,
+ CONSTRAINT [PK_t_DocumentAccessAudit] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+/****** Object:  Table [dbo].[t_DocumentReference]    Script Date: 8/10/2026 4:23:24 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[t_DocumentReference](
+	[Id] [bigint] IDENTITY(1,1) NOT NULL,
+	[CustomerId] [nvarchar](255) NOT NULL,
+	[ExternalId] [nvarchar](255) NOT NULL,
+	[AccessPolicyId] [bigint] NOT NULL,
+	[AccountNumber] [nvarchar](255) NOT NULL,
+	[DocumentCuk] [nvarchar](255) NOT NULL,
+	[TokenHash] [nvarchar](255) NOT NULL,
+	[ExpiredDate] [datetime2](3) NOT NULL,
+	[RevokedDate] [datetime2](3) NULL,
+	[RevokedBy] [nvarchar](255) NULL,
+	[RevokedReason] [nvarchar](255) NULL,
+	[IsActive] [bit] NOT NULL,
+	[CreatedDate] [datetime2](3) NOT NULL,
+	[CreatedBy] [nvarchar](255) NOT NULL,
+	[LastModifiedDate] [datetime2](3) NOT NULL,
+	[LastModifiedBy] [nvarchar](255) NOT NULL,
+ CONSTRAINT [PK_t_DocumentReference] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+
+GO
+ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit] ADD  CONSTRAINT [DF_t_DocumentAccessAudit_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit] ADD  CONSTRAINT [DF_t_DocumentAccessAudit_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
+GO
+ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
+GO
+ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule]  WITH CHECK ADD  CONSTRAINT [FK_t_AccessPolicyRule_t_AccessPolicy] FOREIGN KEY([AccessPolicyId])
+REFERENCES [dbo].[t_AccessPolicy] ([Id])
+GO
+ALTER TABLE [dbo].[t_AccessPolicyRule] CHECK CONSTRAINT [FK_t_AccessPolicyRule_t_AccessPolicy]
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit]  WITH CHECK ADD  CONSTRAINT [FK_t_DocumentAccessAudit_t_AccessPolicyRule] FOREIGN KEY([DeniedByRuleId])
+REFERENCES [dbo].[t_AccessPolicyRule] ([Id])
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit] CHECK CONSTRAINT [FK_t_DocumentAccessAudit_t_AccessPolicyRule]
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit]  WITH CHECK ADD  CONSTRAINT [FK_t_DocumentAccessAudit_t_DocumentReference] FOREIGN KEY([DocumentReferenceId])
+REFERENCES [dbo].[t_DocumentReference] ([Id])
+GO
+ALTER TABLE [dbo].[t_DocumentAccessAudit] CHECK CONSTRAINT [FK_t_DocumentAccessAudit_t_DocumentReference]
+GO
+ALTER TABLE [dbo].[t_DocumentReference]  WITH CHECK ADD  CONSTRAINT [FK_t_DocumentReference_t_AccessPolicy] FOREIGN KEY([AccessPolicyId])
+REFERENCES [dbo].[t_AccessPolicy] ([Id])
+GO
+ALTER TABLE [dbo].[t_DocumentReference] CHECK CONSTRAINT [FK_t_DocumentReference_t_AccessPolicy]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_CreateDocumentReference]    Script Date: 8/10/2026 4:23:24 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -100,7 +270,7 @@ BEGIN
 END
 
 GO
-/****** Object:  StoredProcedure [dbo].[usp_GetAccessPolicy]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  StoredProcedure [dbo].[usp_GetAccessPolicy]    Script Date: 8/10/2026 4:23:24 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -111,19 +281,20 @@ BEGIN
     SET NOCOUNT ON;
     
 	SELECT 
-		AP.Id,
+		AP.[Id],
 		AP.[PolicyCode],
 		AP.[PolicyName],
-		AP.[IsEnabled],
+		AP.[IsEnabled] AS IsAccessPolicyEnabled,
 		AP.[CreatedDate] AS AccessPolicyCreatedDate,
 		AP.[CreatedBy] AS AccessPolicyCreatedBy,
 		AP.[LastModifiedDate] AS AccessPolicyLastModifiedDate,
 		AP.[LastModifiedBy] AS AccessPolicyLastModifiedBy,
-		APR.AccessPolicyId,
+		APR.[Id] AS AccessPolicyRuleId,
+		APR.[AccessPolicyId],
 		APR.[RuleName],
 		APR.[WindowSeconds],
 		APR.[MaximumAccessCount],
-		APR.[IsEnabled],
+		APR.[IsEnabled] AS IsAccessPolicyRuleEnabled,
 		APR.[CreatedDate] AS AccessPolicyRuleCreatedDate,
 		APR.[CreatedBy] AS AccessPolicyRuleCreatedBy,
 		APR.[LastModifiedDate] AS AccessPolicyRuleLastModifiedDate,
@@ -134,7 +305,7 @@ BEGIN
 END
 
 GO
-/****** Object:  StoredProcedure [dbo].[usp_GetDbConfigs]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  StoredProcedure [dbo].[usp_GetDbConfigs]    Script Date: 8/10/2026 4:23:24 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -153,7 +324,7 @@ BEGIN
 END
 
 GO
-/****** Object:  StoredProcedure [dbo].[usp_GetDocumentAccessAudit]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  StoredProcedure [dbo].[usp_GetDocumentAccessAudit]    Script Date: 8/10/2026 4:23:24 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -186,7 +357,7 @@ BEGIN
 END
 
 GO
-/****** Object:  StoredProcedure [dbo].[usp_GetDocumentCuk]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  StoredProcedure [dbo].[usp_GetDocumentCuk]    Script Date: 8/10/2026 4:23:24 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -464,7 +635,7 @@ BEGIN
 END
 
 GO
-/****** Object:  StoredProcedure [dbo].[usp_GetDocumentReference]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  StoredProcedure [dbo].[usp_GetDocumentReference]    Script Date: 8/10/2026 4:23:24 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -515,7 +686,7 @@ BEGIN
 END
 
 GO
-/****** Object:  StoredProcedure [dbo].[usp_UpdateAccessPolicy]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  StoredProcedure [dbo].[usp_UpdateAccessPolicy]    Script Date: 8/10/2026 4:23:24 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -531,6 +702,8 @@ CREATE PROCEDURE [dbo].[usp_UpdateAccessPolicy]
 AS
 BEGIN
     SET NOCOUNT ON;
+	SET XACT_ABORT ON;
+
     SET @P__Error = NULL;
 	
 	IF EXISTS (SELECT 1 FROM @P__AccessPolicyRules WHERE MaximumAccessCount <= 0 OR (WindowSeconds IS NOT NULL AND WindowSeconds <= 0))
@@ -539,93 +712,135 @@ BEGIN
 		RETURN;
 	END
 
-	-- Insert new policy + rules
-	IF @P__PolicyId = -1
-	BEGIN
-		INSERT INTO t_AccessPolicy
-		(
-			[PolicyCode],
-			[PolicyName],
-			[IsEnabled],
-			[CreatedBy],
-			[LastModifiedBy]
-		)
-		VALUES
-		(
-			@P__PolicyCode,
-			@P__PolicyName,
-			@P__IsEnabled,
-			@P__User,
-			@P__User
-		);
+	BEGIN TRY
+		BEGIN TRANSACTION;
 
-		SET @P__PolicyId = SCOPE_IDENTITY();
-
-		INSERT INTO t_AccessPolicyRule
-		(
-			[AccessPolicyId],
-			[RuleName],
-			[WindowSeconds],
-			[MaximumAccessCount],
-			[IsEnabled],
-			[CreatedBy],
-			[LastModifiedBy]
-		)
-		SELECT
-			@P__PolicyId,
-			[RuleName],
-			[WindowSeconds],
-			[MaximumAccessCount],
-			[IsEnabled],
-			@P__User,
-			@P__User
-		FROM @P__AccessPolicyRules;
-	END
-
-	-- Update existing policy + rules
-	ELSE
-	BEGIN
-		IF NOT EXISTS (SELECT 1 FROM t_AccessPolicy WHERE Id = @P__PolicyId)
+		-- Insert new policy + rules
+		IF @P__PolicyId = -1
 		BEGIN
-			SET @P__Error = 'The document access policy is not found.';
-			RETURN;
+			INSERT INTO t_AccessPolicy
+			(
+				[PolicyCode],
+				[PolicyName],
+				[IsEnabled],
+				[CreatedBy],
+				[LastModifiedBy]
+			)
+			VALUES
+			(
+				@P__PolicyCode,
+				@P__PolicyName,
+				@P__IsEnabled,
+				@P__User,
+				@P__User
+			);
+
+			SET @P__PolicyId = SCOPE_IDENTITY();
+
+			INSERT INTO t_AccessPolicyRule
+			(
+				[AccessPolicyId],
+				[RuleName],
+				[WindowSeconds],
+				[MaximumAccessCount],
+				[IsEnabled],
+				[CreatedBy],
+				[LastModifiedBy]
+			)
+			SELECT
+				@P__PolicyId,
+				[RuleName],
+				[WindowSeconds],
+				[MaximumAccessCount],
+				[IsEnabled],
+				@P__User,
+				@P__User
+			FROM @P__AccessPolicyRules;
 		END
 
-		UPDATE t_AccessPolicy SET
-			[PolicyCode] = @P__PolicyCode,
-			[PolicyName] = @P__PolicyName,
-			[IsEnabled] = @P__IsEnabled,
-			[LastModifiedBy] = @P__User,
-			[LastModifiedDate] = GETDATE()
-		WHERE Id = @P__PolicyId;
+		-- Update existing policy + rules
+		ELSE
+		BEGIN
+			IF NOT EXISTS (SELECT 1 FROM t_AccessPolicy WHERE Id = @P__PolicyId)
+			BEGIN
+				SET @P__Error = 'The document access policy is not found.';
+				RETURN;
+			END
 
-		MERGE INTO t_AccessPolicyRule AS Target
-		USING @P__AccessPolicyRules AS Source
-		ON Target.Id = Source.Id
-		WHEN MATCHED THEN 
-			UPDATE SET 
-				Target.[RuleName] = Source.RuleName,
-				Target.[WindowSeconds] = Source.WindowSeconds,
-				Target.[MaximumAccessCount] = Source.MaximumAccessCount,
-				Target.[IsEnabled] = Source.IsEnabled,
-				Target.[LastModifiedBy] = @P__User,
-				Target.[LastModifiedDate] = GETDATE();
-	END
+			UPDATE t_AccessPolicy SET
+				[PolicyCode] = @P__PolicyCode,
+				[PolicyName] = @P__PolicyName,
+				[IsEnabled] = @P__IsEnabled,
+				[LastModifiedBy] = @P__User,
+				[LastModifiedDate] = GETDATE()
+			WHERE Id = @P__PolicyId;
+
+			MERGE INTO t_AccessPolicyRule AS Target
+			USING @P__AccessPolicyRules AS Source
+			ON Target.Id = Source.Id AND Target.AccessPolicyId = @P__PolicyId
+			WHEN MATCHED THEN 
+				UPDATE SET 
+					Target.[RuleName] = Source.RuleName,
+					Target.[WindowSeconds] = Source.WindowSeconds,
+					Target.[MaximumAccessCount] = Source.MaximumAccessCount,
+					Target.[IsEnabled] = Source.IsEnabled,
+					Target.[LastModifiedBy] = @P__User,
+					Target.[LastModifiedDate] = GETDATE()
+			WHEN NOT MATCHED THEN
+				INSERT 
+				(
+					[AccessPolicyId],
+					[RuleName],
+					[WindowSeconds],
+					[MaximumAccessCount],
+					[IsEnabled],
+					[CreatedBy],
+					[LastModifiedBy]
+				)
+				VALUES
+				(
+					@P__PolicyId,
+					Source.RuleName,
+					Source.WindowSeconds,
+					Source.MaximumAccessCount,
+					Source.IsEnabled,
+					@P__User,
+					@P__User
+				);
+		END
+
+		COMMIT TRANSACTION;
+	END TRY
+	BEGIN CATCH
+		IF  XACT_STATE() <> 0 
+			ROLLBACK TRANSACTION;
+
+		SET @P__Error =  LEFT(
+                CONCAT(
+                    N'Unexpected error while updating access policy: ',
+                    ERROR_MESSAGE()
+                ),
+                4000
+            );
+
+		RETURN;
+	END CATCH
 
 	SELECT 
-		AP.Id,
+		AP.[Id],
 		AP.[PolicyCode],
 		AP.[PolicyName],
-		AP.[IsEnabled],
+		AP.[IsEnabled] AS IsAccessPolicyEnabled,
 		AP.[CreatedDate] AS AccessPolicyCreatedDate,
 		AP.[CreatedBy] AS AccessPolicyCreatedBy,
 		AP.[LastModifiedDate] AS AccessPolicyLastModifiedDate,
 		AP.[LastModifiedBy] AS AccessPolicyLastModifiedBy,
-		APR.AccessPolicyId,
+		APR.[Id] AS AccessPolicyRuleId,
+		APR.[AccessPolicyId],
 		APR.[RuleName],
 		APR.[WindowSeconds],
 		APR.[MaximumAccessCount],
-		APR.[IsEnabled],
+		APR.[IsEnabled] AS IsAccessPolicyRuleEnabled,
 		APR.[CreatedDate] AS AccessPolicyRuleCreatedDate,
 		APR.[CreatedBy] AS AccessPolicyRuleCreatedBy,
 		APR.[LastModifiedDate] AS AccessPolicyRuleLastModifiedDate,
@@ -637,7 +852,7 @@ BEGIN
 END
 
 GO
-/****** Object:  StoredProcedure [dbo].[usp_UpdateConfig]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  StoredProcedure [dbo].[usp_UpdateConfig]    Script Date: 8/10/2026 4:23:24 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -673,7 +888,7 @@ BEGIN
 END
 
 GO
-/****** Object:  StoredProcedure [dbo].[usp_UpdateDocumentReference]    Script Date: 8/10/2026 3:46:59 PM ******/
+/****** Object:  StoredProcedure [dbo].[usp_UpdateDocumentReference]    Script Date: 8/10/2026 4:23:24 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -707,6 +922,7 @@ BEGIN
 		IsActive = @P__IsActive,
 		RevokedBy = CASE WHEN @P__RevokedReason IS NOT NULL THEN @P__User ELSE RevokedBy END,
 		RevokedReason = CASE WHEN @P__RevokedReason IS NOT NULL THEN @P__RevokedReason ELSE RevokedReason END,
+		RevokedDate = CASE WHEN @P__RevokedReason IS NOT NULL THEN GETDATE() ELSE RevokedDate END,
 		LastModifiedBy = @P__User,
 		LastModifiedDate = GETDATE()
 	WHERE Id = @P__DocumentReferenceId
