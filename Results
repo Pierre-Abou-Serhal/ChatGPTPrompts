@@ -1,965 +1,194 @@
-USE [Alterna_AccountStatementManagement]
-GO
-/****** Object:  UserDefinedTableType [dbo].[TVP_t_AccessPolicyRule]    Script Date: 8/10/2026 4:43:12 PM ******/
-CREATE TYPE [dbo].[TVP_t_AccessPolicyRule] AS TABLE(
-	[Id] [bigint] NOT NULL,
-	[AccessPolicyId] [bigint] NOT NULL,
-	[RuleName] [nvarchar](255) NOT NULL,
-	[WindowSeconds] [int] NULL,
-	[MaximumAccessCount] [int] NOT NULL,
-	[IsEnabled] [bit] NOT NULL
-)
-GO
-/****** Object:  Table [dbo].[t_AccessPolicy]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE TABLE [dbo].[t_AccessPolicy](
-	[Id] [bigint] IDENTITY(1,1) NOT NULL,
-	[PolicyCode] [nvarchar](255) NOT NULL,
-	[PolicyName] [nvarchar](255) NOT NULL,
-	[IsEnabled] [bit] NOT NULL,
-	[CreatedDate] [datetime2](3) NOT NULL,
-	[CreatedBy] [nvarchar](255) NOT NULL,
-	[LastModifiedDate] [datetime2](3) NOT NULL,
-	[LastModifiedBy] [nvarchar](255) NOT NULL,
- CONSTRAINT [PK_t_AccessPolicy] PRIMARY KEY CLUSTERED 
-(
-	[Id] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-) ON [PRIMARY]
+// Decompiled with JetBrains decompiler
+// Type: DAL.DapperDal
+// Assembly: DAL, Version=1.0.1.0, Culture=neutral, PublicKeyToken=null
+// MVID: 1087FDDC-B1D2-49C9-8DF5-DCAC75857D3B
+// Assembly location: C:\Users\pabouserhal\.nuget\packages\dal\1.0.1\lib\net8.0\DAL.dll
 
-GO
-/****** Object:  Table [dbo].[t_AccessPolicyRule]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE TABLE [dbo].[t_AccessPolicyRule](
-	[Id] [bigint] IDENTITY(1,1) NOT NULL,
-	[AccessPolicyId] [bigint] NOT NULL,
-	[RuleName] [nvarchar](255) NOT NULL,
-	[WindowSeconds] [int] NULL,
-	[MaximumAccessCount] [int] NOT NULL,
-	[IsEnabled] [bit] NOT NULL,
-	[CreatedDate] [datetime2](3) NOT NULL,
-	[CreatedBy] [nvarchar](255) NOT NULL,
-	[LastModifiedDate] [datetime2](3) NOT NULL,
-	[LastModifiedBy] [nvarchar](255) NOT NULL,
- CONSTRAINT [PK_t_AccessPolicyRule] PRIMARY KEY CLUSTERED 
-(
-	[Id] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-) ON [PRIMARY]
+using Dapper;
+using Microsoft.Data.SqlClient;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Common;
+using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
 
-GO
-/****** Object:  Table [dbo].[t_Config]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE TABLE [dbo].[t_Config](
-	[SettingName] [nvarchar](255) NOT NULL,
-	[SettingValue] [nvarchar](255) NOT NULL,
-	[SettingDescription] [nvarchar](255) NULL,
-	[IsActive] [bit] NOT NULL,
-	[CreatedBy] [nvarchar](255) NOT NULL,
-	[CreatedDate] [datetime2](3) NOT NULL,
-	[LastModifiedBy] [nvarchar](255) NOT NULL,
-	[LastModifiedDate] [datetime2](3) NOT NULL
-) ON [PRIMARY]
+#nullable enable
+namespace DAL;
 
-GO
-/****** Object:  Table [dbo].[t_DocumentAccessAudit]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE TABLE [dbo].[t_DocumentAccessAudit](
-	[Id] [bigint] IDENTITY(1,1) NOT NULL,
-	[DocumentReferenceId] [bigint] NULL,
-	[CorrelationId] [nvarchar](255) NOT NULL,
-	[PresentedTokenHash] [nvarchar](255) NOT NULL,
-	[OutcomeCode] [nvarchar](255) NOT NULL,
-	[ConsumesQuota] [bit] NOT NULL,
-	[DeniedByRuleId] [bigint] NULL,
-	[IpAddress] [nvarchar](255) NULL,
-	[UserAgent] [nvarchar](1000) NULL,
-	[CreatedDate] [datetime2](3) NULL,
-	[CreatedBy] [nvarchar](255) NULL,
- CONSTRAINT [PK_t_DocumentAccessAudit] PRIMARY KEY CLUSTERED 
-(
-	[Id] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-) ON [PRIMARY]
+public class DapperDal(string dbConnString)
+{
+  public async Task<IEnumerable<T>> ExecuteQueryAsync<T>(
+    string command,
+    DynamicParameters? dynamicParams,
+    CommandType cmdType,
+    DapperDal.CommandDirection cmdDirection)
+  {
+    await using (SqlConnection dbConnection = new SqlConnection(dbConnString))
+    {
+      if (cmdDirection == DapperDal.CommandDirection.Select)
+      {
+        if (dbConnection.State != ConnectionState.Open)
+          dbConnection.Open();
+        SqlConnection cnn = dbConnection;
+        string sql = command;
+        DynamicParameters dynamicParameters = dynamicParams;
+        CommandType? nullable = new CommandType?(cmdType);
+        int? commandTimeout = new int?();
+        CommandType? commandType = nullable;
+        return await cnn.QueryAsync<T>(sql, (object) dynamicParameters, commandTimeout: commandTimeout, commandType: commandType);
+      }
+      if (dbConnection.State != ConnectionState.Open)
+        dbConnection.Open();
+      await using (DbTransaction transaction1 = await dbConnection.BeginTransactionAsync())
+      {
+        object obj;
+        int num;
+        try
+        {
+          SqlConnection cnn = dbConnection;
+          string sql = command;
+          DynamicParameters dynamicParameters = dynamicParams;
+          CommandType? nullable = new CommandType?(cmdType);
+          DbTransaction transaction2 = transaction1;
+          int? commandTimeout = new int?();
+          CommandType? commandType = nullable;
+          IEnumerable<T> result = await cnn.QueryAsync<T>(sql, (object) dynamicParameters, (IDbTransaction) transaction2, commandTimeout, commandType);
+          await transaction1.CommitAsync();
+          return result;
+        }
+        catch (object ex)
+        {
+          obj = ex;
+          num = 1;
+        }
+        if (num == 1)
+        {
+          await transaction1.RollbackAsync();
+          if (!(obj is Exception source))
+            throw obj;
+          ExceptionDispatchInfo.Capture(source).Throw();
+        }
+        obj = (object) null;
+      }
+    }
+    transaction1 = (DbTransaction) null;
+    IEnumerable<T> objs;
+    return objs;
+  }
 
-GO
-/****** Object:  Table [dbo].[t_DocumentReference]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE TABLE [dbo].[t_DocumentReference](
-	[Id] [bigint] IDENTITY(1,1) NOT NULL,
-	[CustomerId] [nvarchar](255) NOT NULL,
-	[ExternalId] [nvarchar](255) NOT NULL,
-	[AccessPolicyId] [bigint] NOT NULL,
-	[AccountNumber] [nvarchar](255) NOT NULL,
-	[DocumentCuk] [nvarchar](255) NOT NULL,
-	[TokenHash] [nvarchar](255) NOT NULL,
-	[ExpiredDate] [datetime2](3) NOT NULL,
-	[RevokedDate] [datetime2](3) NULL,
-	[RevokedBy] [nvarchar](255) NULL,
-	[RevokedReason] [nvarchar](255) NULL,
-	[IsActive] [bit] NOT NULL,
-	[CreatedDate] [datetime2](3) NOT NULL,
-	[CreatedBy] [nvarchar](255) NOT NULL,
-	[LastModifiedDate] [datetime2](3) NOT NULL,
-	[LastModifiedBy] [nvarchar](255) NOT NULL,
- CONSTRAINT [PK_t_DocumentReference] PRIMARY KEY CLUSTERED 
-(
-	[Id] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-) ON [PRIMARY]
+  public async Task ExecuteQueryAsync(
+    string command,
+    DynamicParameters? dynamicParams,
+    CommandType cmdType)
+  {
+    SqlConnection dbConnection = new SqlConnection(dbConnString);
+    object obj1 = (object) null;
+    int num1 = 0;
+    DbTransaction transaction;
+    try
+    {
+      if (dbConnection.State != ConnectionState.Open)
+        dbConnection.Open();
+      transaction = await dbConnection.BeginTransactionAsync();
+      object obj2 = (object) null;
+      int num2 = 0;
+      try
+      {
+        try
+        {
+          SqlConnection cnn = dbConnection;
+          string sql = command;
+          DynamicParameters dynamicParameters = dynamicParams;
+          CommandType? nullable = new CommandType?(cmdType);
+          DbTransaction transaction1 = transaction;
+          int? commandTimeout = new int?();
+          CommandType? commandType = nullable;
+          int num = await cnn.ExecuteAsync(sql, (object) dynamicParameters, (IDbTransaction) transaction1, commandTimeout, commandType);
+          await transaction.CommitAsync();
+        }
+        catch (object ex)
+        {
+          await transaction.RollbackAsync();
+          throw;
+        }
+        num2 = 1;
+      }
+      catch (object ex)
+      {
+        obj2 = ex;
+      }
+      if (transaction != null)
+        await transaction.DisposeAsync();
+      object obj = obj2;
+      if (obj != null)
+      {
+        if (!(obj is Exception source))
+          throw obj;
+        ExceptionDispatchInfo.Capture(source).Throw();
+      }
+      if (num2 != 1)
+        obj2 = (object) null;
+      else
+        num1 = 1;
+    }
+    catch (object ex)
+    {
+      obj1 = ex;
+    }
+    if (dbConnection != null)
+      await dbConnection.DisposeAsync();
+    object obj3 = obj1;
+    if (obj3 != null)
+    {
+      if (!(obj3 is Exception source))
+        throw obj3;
+      ExceptionDispatchInfo.Capture(source).Throw();
+    }
+    if (num1 == 1)
+    {
+      dbConnection = (SqlConnection) null;
+      transaction = (DbTransaction) null;
+    }
+    else
+    {
+      obj1 = (object) null;
+      dbConnection = (SqlConnection) null;
+      transaction = (DbTransaction) null;
+      dbConnection = (SqlConnection) null;
+      transaction = (DbTransaction) null;
+    }
+  }
 
-GO
-ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
-GO
-ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
-GO
-ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
-GO
-ALTER TABLE [dbo].[t_AccessPolicy] ADD  CONSTRAINT [DF_t_AccessPolicy_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
-GO
-ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
-GO
-ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
-GO
-ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
-GO
-ALTER TABLE [dbo].[t_AccessPolicyRule] ADD  CONSTRAINT [DF_t_AccessPolicyRule_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
-GO
-ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
-GO
-ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
-GO
-ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
-GO
-ALTER TABLE [dbo].[t_Config] ADD  CONSTRAINT [DF_t_Config_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
-GO
-ALTER TABLE [dbo].[t_DocumentAccessAudit] ADD  CONSTRAINT [DF_t_DocumentAccessAudit_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
-GO
-ALTER TABLE [dbo].[t_DocumentAccessAudit] ADD  CONSTRAINT [DF_t_DocumentAccessAudit_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
-GO
-ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_CreatedDate]  DEFAULT (getdate()) FOR [CreatedDate]
-GO
-ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_CreatedBy]  DEFAULT (N'AlternaSystem') FOR [CreatedBy]
-GO
-ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_LastModifiedDate]  DEFAULT (getdate()) FOR [LastModifiedDate]
-GO
-ALTER TABLE [dbo].[t_DocumentReference] ADD  CONSTRAINT [DF_t_DocumentReference_LastModifiedBy]  DEFAULT (N'AlternaSystem') FOR [LastModifiedBy]
-GO
-ALTER TABLE [dbo].[t_AccessPolicyRule]  WITH CHECK ADD  CONSTRAINT [FK_t_AccessPolicyRule_t_AccessPolicy] FOREIGN KEY([AccessPolicyId])
-REFERENCES [dbo].[t_AccessPolicy] ([Id])
-GO
-ALTER TABLE [dbo].[t_AccessPolicyRule] CHECK CONSTRAINT [FK_t_AccessPolicyRule_t_AccessPolicy]
-GO
-ALTER TABLE [dbo].[t_DocumentAccessAudit]  WITH CHECK ADD  CONSTRAINT [FK_t_DocumentAccessAudit_t_AccessPolicyRule] FOREIGN KEY([DeniedByRuleId])
-REFERENCES [dbo].[t_AccessPolicyRule] ([Id])
-GO
-ALTER TABLE [dbo].[t_DocumentAccessAudit] CHECK CONSTRAINT [FK_t_DocumentAccessAudit_t_AccessPolicyRule]
-GO
-ALTER TABLE [dbo].[t_DocumentAccessAudit]  WITH CHECK ADD  CONSTRAINT [FK_t_DocumentAccessAudit_t_DocumentReference] FOREIGN KEY([DocumentReferenceId])
-REFERENCES [dbo].[t_DocumentReference] ([Id])
-GO
-ALTER TABLE [dbo].[t_DocumentAccessAudit] CHECK CONSTRAINT [FK_t_DocumentAccessAudit_t_DocumentReference]
-GO
-ALTER TABLE [dbo].[t_DocumentReference]  WITH CHECK ADD  CONSTRAINT [FK_t_DocumentReference_t_AccessPolicy] FOREIGN KEY([AccessPolicyId])
-REFERENCES [dbo].[t_AccessPolicy] ([Id])
-GO
-ALTER TABLE [dbo].[t_DocumentReference] CHECK CONSTRAINT [FK_t_DocumentReference_t_AccessPolicy]
-GO
-/****** Object:  StoredProcedure [dbo].[usp_CreateDocumentReference]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE PROCEDURE [dbo].[usp_CreateDocumentReference]
-	@P__CustomerId NVARCHAR(255),
-	@P__ExternalId NVARCHAR(255),
-	@P__AccountNumber NVARCHAR(255),
-	@P__DocumentCuk NVARCHAR(255),
-	@P__DocumentTokenHash NVARCHAR(255),
-	@P__Error NVARCHAR(4000) OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET @P__Error = NULL;
-	
-	DECLARE @DocExpiryInDays INT = NULL; -- DOCUMENT_EXPIRY_IN_DAYS
-	DECLARE @DefaulyAccessPolicyCode NVARCHAR(255) = NULL; -- DEFAULT_ACCESS_POLICY
-	DECLARE @DefaulyAccessPolicyId BIGINT = NULL;
-	DECLARE @CurrentDate DATETIME2(3) = GETDATE();
+  public async Task<T> QueryMultipleAsync<T>(
+    string command,
+    DynamicParameters parameters,
+    CommandType commandType,
+    Func<SqlMapper.GridReader, Task<T>> mapFunction)
+  {
+    using (IDbConnection db = (IDbConnection) new SqlConnection(dbConnString))
+    {
+      if (db.State != ConnectionState.Open)
+        db.Open();
+      IDbConnection cnn = db;
+      string sql = command;
+      DynamicParameters dynamicParameters = parameters;
+      CommandType? nullable = new CommandType?(commandType);
+      int? commandTimeout = new int?();
+      CommandType? commandType1 = nullable;
+      await using (SqlMapper.GridReader multi = await cnn.QueryMultipleAsync(sql, (object) dynamicParameters, commandTimeout: commandTimeout, commandType: commandType1))
+        return await mapFunction(multi);
+      T obj = default (T);
+    }
+    multi = (SqlMapper.GridReader) null;
+    T obj1;
+    return obj1;
+  }
 
-	-- 1- Try to get config values
-	SELECT @DocExpiryInDays = TRY_CONVERT(INT, SettingValue)
-	FROM t_Config 
-		WHERE SettingName = 'DOCUMENT_EXPIRY_IN_DAYS'
-		AND IsActive = 1;
-
-	SELECT @DefaulyAccessPolicyCode = SettingValue
-	FROM t_Config 
-		WHERE SettingName = 'DEFAULT_ACCESS_POLICY'
-		AND IsActive = 1;
-
-	IF @DocExpiryInDays IS NULL
-	BEGIN
-		SET @P__Error = 'DB document expiry in days config not set';
-		RETURN
-	END
-
-	IF @DefaulyAccessPolicyCode IS NULL
-	BEGIN
-		SET @P__Error = 'DB default access policy config not set';
-		RETURN
-	END
-
-	-- 2- Try to get default access policy id from table
-	SELECT @DefaulyAccessPolicyId = Id
-	FROM t_AccessPolicy 
-		WHERE PolicyCode = @DefaulyAccessPolicyCode
-		AND IsEnabled = 1;
-
-	IF @DefaulyAccessPolicyId IS NULL
-	BEGIN
-		SET @P__Error = 'Could not find the default access policy in DB';
-		RETURN
-	END
-
-	INSERT INTO [dbo].[t_DocumentReference]
-	(
-		CustomerId,
-		ExternalId,
-		AccessPolicyId,
-		AccountNumber,
-		DocumentCuk,
-		TokenHash,
-		ExpiredDate,
-		IsActive,
-		CreatedDate,
-		CreatedBy,
-		LastModifiedDate,
-		LastModifiedBy
-	)
-	VALUES
-	(
-		@P__CustomerId,
-		@P__ExternalId,
-		@DefaulyAccessPolicyId,
-		@P__AccountNumber,
-		@P__DocumentCuk,
-		@P__DocumentTokenHash,
-		DATEADD(day, @DocExpiryInDays, @CurrentDate),
-		1,
-		@CurrentDate,
-		@P__CustomerId,
-		@CurrentDate,
-		@P__CustomerId
-	)
-END
-
-GO
-/****** Object:  StoredProcedure [dbo].[usp_GetAccessPolicy]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE PROCEDURE [dbo].[usp_GetAccessPolicy]
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-	SELECT 
-		AP.[Id],
-		AP.[PolicyCode],
-		AP.[PolicyName],
-		AP.[IsEnabled] AS IsAccessPolicyEnabled,
-		AP.[CreatedDate] AS AccessPolicyCreatedDate,
-		AP.[CreatedBy] AS AccessPolicyCreatedBy,
-		AP.[LastModifiedDate] AS AccessPolicyLastModifiedDate,
-		AP.[LastModifiedBy] AS AccessPolicyLastModifiedBy,
-		APR.[Id] AS AccessPolicyRuleId,
-		APR.[AccessPolicyId],
-		APR.[RuleName],
-		APR.[WindowSeconds],
-		APR.[MaximumAccessCount],
-		APR.[IsEnabled] AS IsAccessPolicyRuleEnabled,
-		APR.[CreatedDate] AS AccessPolicyRuleCreatedDate,
-		APR.[CreatedBy] AS AccessPolicyRuleCreatedBy,
-		APR.[LastModifiedDate] AS AccessPolicyRuleLastModifiedDate,
-		APR.[LastModifiedBy] AS AccessPolicyRuleLastModifiedBy
-	FROM [dbo].[t_AccessPolicy] AS AP
-	JOIN [dbo].[t_AccessPolicyRule] AS APR ON AP.Id = APR.AccessPolicyId;
-
-END
-
-GO
-/****** Object:  StoredProcedure [dbo].[usp_GetDbConfigs]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE PROCEDURE [dbo].[usp_GetDbConfigs]
-    @P__ConfigNames NVARCHAR(MAX) 
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    SELECT * 
-    FROM t_Config 
-    WHERE 
-        SettingName IN (SELECT VALUE FROM STRING_SPLIT(@P__ConfigNames, ','))
-		AND IsActive = 1;
-END
-
-GO
-/****** Object:  StoredProcedure [dbo].[usp_GetDocumentAccessAudit]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE PROCEDURE [dbo].[usp_GetDocumentAccessAudit]
-    @P__DocumentReferenceId BIGINT
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-	SELECT 
-		DAA.[Id],
-		DAA.[DocumentReferenceId],
-		DAA.[CorrelationId],
-		DAA.[PresentedTokenHash],
-		DAA.[OutcomeCode],
-		DAA.[ConsumesQuota],
-		DAA.[DeniedByRuleId],
-		CONCAT(AP.PolicyName, ' : ', APR.[RuleName]) AS DeniedByRuleName,
-		DAA.[IpAddress],
-		DAA.[UserAgent],
-		DAA.[CreatedDate],
-		DAA.[CreatedBy]
-	FROM [dbo].[t_DocumentAccessAudit] AS DAA
-	LEFT JOIN t_AccessPolicyRule AS APR ON APR.Id = DAA.DeniedByRuleId
-	LEFT JOIN t_AccessPolicy AS AP ON AP.Id= APR.AccessPolicyId
-	
-	WHERE
-		DAA.[DocumentReferenceId] = @P__DocumentReferenceId
-	ORDER BY DAA.CreatedDate DESC, DAA.Id DESC
-END
-
-GO
-/****** Object:  StoredProcedure [dbo].[usp_GetDocumentCuk]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE PROCEDURE [dbo].[usp_GetDocumentCuk]
-(
-    @P__RawTokenHash NVARCHAR(255),
-	@P__CorrelationId NVARCHAR(255),
-	@P__IpAddress NVARCHAR(255),
-	@P__UserAgent NVARCHAR(1000),
-    @P__Error NVARCHAR(4000) OUTPUT
-)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    DECLARE @CurrentDate DATETIME2(3) = NULL;
-
-    DECLARE @TokenHash NVARCHAR(255) = LOWER(LTRIM(RTRIM(ISNULL(@P__RawTokenHash, N''))));
-
-    DECLARE @DocumentReferenceId BIGINT = NULL;
-    DECLARE @AccessPolicyId BIGINT = NULL;
-    DECLARE @DocumentCuk NVARCHAR(255) = NULL;
-    DECLARE @ExpiredDate DATETIME2(3) = NULL;
-    DECLARE @RevokedDate DATETIME2(3) = NULL;
-    DECLARE @DocumentIsActive BIT = NULL;
-    DECLARE @PolicyIsEnabled BIT = NULL;
-
-    DECLARE @Allowed BIT = 0;
-    DECLARE @ConsumesQuota BIT = 0;
-    DECLARE @OutcomeCode NVARCHAR(255) = N'UNDETERMINED';
-
-    DECLARE @DeniedRuleId BIGINT = NULL;
-    DECLARE @DeniedRuleName NVARCHAR(255) = NULL;
-    DECLARE @CurrentAccessCount BIGINT = NULL;
-    DECLARE @MaximumAccessCount INT = NULL;
-    DECLARE @WindowSeconds INT = NULL;
-
-    SET @P__Error = NULL;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        BEGIN
-            /*
-             * UPDLOCK and HOLDLOCK serialize access attempts for the
-             * same document so concurrent scans cannot both pass
-             * the quota check.
-             */
-            SELECT
-                @DocumentReferenceId = d.Id,
-                @AccessPolicyId = d.AccessPolicyId,
-                @DocumentCuk = d.DocumentCuk,
-                @ExpiredDate = d.ExpiredDate,
-                @RevokedDate = d.RevokedDate,
-                @DocumentIsActive = d.IsActive,
-                @PolicyIsEnabled = p.IsEnabled
-            FROM dbo.t_DocumentReference AS d
-                WITH (UPDLOCK, HOLDLOCK)
-            INNER JOIN dbo.t_AccessPolicy AS p
-                WITH (HOLDLOCK)
-                ON p.Id = d.AccessPolicyId
-            WHERE d.TokenHash = @TokenHash;
-
-			SET @CurrentDate =  GETDATE();
-
-            IF @DocumentReferenceId IS NULL
-            BEGIN
-                SET @OutcomeCode = N'INVALID_TOKEN';
-                SET @P__Error = N'The document token is invalid.';
-            END
-            ELSE IF @RevokedDate IS NOT NULL
-            BEGIN
-                SET @OutcomeCode = N'DOCUMENT_REVOKED';
-                SET @P__Error = N'Document access has been revoked.';
-            END
-			ELSE IF @DocumentIsActive = 0
-            BEGIN
-                SET @OutcomeCode = N'DOCUMENT_INACTIVE';
-                SET @P__Error = N'The requested document is not available.';
-            END
-            ELSE IF @CurrentDate >= @ExpiredDate
-            BEGIN
-                SET @OutcomeCode = N'DOCUMENT_EXPIRED';
-                SET @P__Error = N'Document access has expired.';
-            END
-            ELSE IF ISNULL(@PolicyIsEnabled, 0) = 0
-            BEGIN
-                SET @OutcomeCode = N'POLICY_DISABLED';
-                SET @P__Error = N'The document access policy is disabled.';
-            END
-            ELSE IF NOT EXISTS
-            (
-                SELECT 1
-                FROM dbo.t_AccessPolicyRule AS r
-                    WITH (HOLDLOCK)
-                WHERE r.AccessPolicyId = @AccessPolicyId 
-					AND r.IsEnabled = 1
-            )
-            BEGIN
-                /*
-                 * Fail closed if the policy has no rules.
-                 */
-                SET @OutcomeCode = N'POLICY_RULE_NOT_CONFIGURED';
-                SET @P__Error =
-                    N'No access rules are configured for this policy.';
-            END
-            ELSE IF EXISTS
-            (
-                SELECT 1
-                FROM dbo.t_AccessPolicyRule AS r
-                    WITH (HOLDLOCK)
-                WHERE r.AccessPolicyId = @AccessPolicyId
-                  AND
-                  (
-                      r.MaximumAccessCount <= 0
-                      OR
-                      (
-                          r.WindowSeconds IS NOT NULL
-                          AND r.WindowSeconds <= 0
-                      )
-                  )
-				  AND r.IsEnabled = 1
-            )
-            BEGIN
-                SET @OutcomeCode = N'POLICY_CONFIGURATION_INVALID';
-                SET @P__Error =
-                    N'The document access policy contains an invalid rule.';
-            END
-            ELSE
-            BEGIN
-                /*
-                 * WindowSeconds IS NULL:
-                 *     Count every quota-consuming access for the lifetime
-                 *     of the document reference.
-                 *
-                 * WindowSeconds has a value:
-                 *     Count accesses inside the rolling time window.
-                 */
-                SELECT TOP (1)
-                    @DeniedRuleId = r.Id,
-                    @DeniedRuleName = r.RuleName,
-                    @WindowSeconds = r.WindowSeconds,
-                    @MaximumAccessCount = r.MaximumAccessCount,
-                    @CurrentAccessCount = q.CurrentAccessCount
-                FROM dbo.t_AccessPolicyRule AS r
-                    WITH (HOLDLOCK)
-                CROSS APPLY
-                (
-                    SELECT
-                        COUNT_BIG(1) AS CurrentAccessCount
-                    FROM dbo.t_DocumentAccessAudit AS a
-                    WHERE a.DocumentReferenceId =
-                              @DocumentReferenceId
-                      AND a.ConsumesQuota = 1
-                      AND
-                      (
-                          r.WindowSeconds IS NULL
-                          OR a.CreatedDate >
-                             DATEADD(
-                                 SECOND,
-                                 -r.WindowSeconds,
-                                 @CurrentDate
-                             )
-                      )
-                      AND a.CreatedDate <= @CurrentDate
-                ) AS q
-                WHERE r.AccessPolicyId = @AccessPolicyId
-				  AND r.IsEnabled = 1
-                  AND q.CurrentAccessCount >=
-                      r.MaximumAccessCount
-                ORDER BY
-                    CASE
-                        WHEN r.WindowSeconds IS NULL THEN 1
-                        ELSE 0
-                    END,
-                    r.WindowSeconds,
-                    r.Id;
-
-                IF @DeniedRuleId IS NOT NULL
-                BEGIN
-                    SET @OutcomeCode = N'ACCESS_LIMIT_EXCEEDED';
-
-                    SET @P__Error =
-                        LEFT(
-                            CONCAT(
-                                N'Access limit exceeded. Rule: ',
-                                @DeniedRuleName,
-                                N'; current count: ',
-                                @CurrentAccessCount,
-                                N'; maximum: ',
-                                @MaximumAccessCount,
-                                CASE
-                                    WHEN @WindowSeconds IS NULL
-                                    THEN N'; window: lifetime.'
-                                    ELSE CONCAT(
-                                        N'; window seconds: ',
-                                        @WindowSeconds,
-                                        N'.'
-                                    )
-                                END
-                            ),
-                            4000
-                        );
-                END
-                ELSE
-                BEGIN
-                    SET @Allowed = 1;
-                    SET @ConsumesQuota = 1;
-                    SET @OutcomeCode = N'ACCESS_GRANTED';
-                    SET @P__Error = NULL;
-                END
-            END
-        END
-
-        /*
-         * Every known validation attempt is recorded.
-         * Only ACCESS_GRANTED consumes quota.
-         */
-        INSERT INTO dbo.t_DocumentAccessAudit
-        (
-            DocumentReferenceId,
-            CorrelationId,
-            PresentedTokenHash,
-            OutcomeCode,
-            ConsumesQuota,
-            DeniedByRuleId,
-            IpAddress,
-            UserAgent,
-            CreatedDate
-        )
-        VALUES
-        (
-            @DocumentReferenceId,
-            @P__CorrelationId,
-            @TokenHash,
-            @OutcomeCode,
-            @ConsumesQuota,
-            @DeniedRuleId,
-            @P__IpAddress,
-            @P__UserAgent,
-            @CurrentDate
-        );
-
-        COMMIT TRANSACTION;
-
-        IF @Allowed = 1
-        BEGIN
-            SELECT @DocumentCuk AS DocumentCuk;
-            RETURN 0;
-        END;
-
-        SELECT CAST(NULL AS NVARCHAR(255)) AS DocumentCuk;
-        RETURN 1;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-        BEGIN
-            ROLLBACK TRANSACTION;
-        END;
-
-        SET @P__Error =
-            LEFT(
-                CONCAT(
-                    N'Unexpected error while validating document access: ',
-                    ERROR_MESSAGE()
-                ),
-                4000
-            );
-
-        SELECT CAST(NULL AS NVARCHAR(255)) AS DocumentCuk;
-        RETURN -1;
-    END CATCH;
-END
-
-GO
-/****** Object:  StoredProcedure [dbo].[usp_GetDocumentReference]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE PROCEDURE [dbo].[usp_GetDocumentReference]
-    @P__CustomerId NVARCHAR(255) = NULL,
-    @P__ExternalId NVARCHAR(255) = NULL,
-	@P__AccountNumber NVARCHAR(255) = NULL,
-	@P__DocumentCuk NVARCHAR(255) = NULL,
-	@P__PageNumber INT = 1,
-    @P__PageSize INT = 10,
-    @P__TotalRecords INT OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-	SELECT @P__TotalRecords = COUNT(*) 
-    FROM [dbo].[t_DocumentReference]
-	WHERE (@P__CustomerId IS NULL OR [CustomerId] = @P__CustomerId)
-		AND (@P__ExternalId IS NULL OR [ExternalId] = @P__ExternalId)
-		AND (@P__AccountNumber IS NULL OR [AccountNumber] = @P__AccountNumber)
-		AND (@P__DocumentCuk IS NULL OR [DocumentCuk] = @P__DocumentCuk);
-
-	SELECT 
-		DR.[Id],
-		DR.[CustomerId],
-		DR.[ExternalId],
-		DR.[AccessPolicyId],
-		AP.[PolicyName],
-		DR.[AccountNumber],
-		DR.[DocumentCuk],
-		DR.[TokenHash],
-		DR.[ExpiredDate],
-		DR.[RevokedDate],
-		DR.[RevokedBy],
-		DR.[RevokedReason],
-		DR.[IsActive],
-		DR.[CreatedDate],
-		DR.[CreatedBy],
-		DR.[LastModifiedDate],
-		DR.[LastModifiedBy]
-	FROM [dbo].[t_DocumentReference] AS DR
-	JOIN t_AccessPolicy AS AP ON DR.AccessPolicyId = AP.Id
-	WHERE
-		(@P__CustomerId IS NULL OR DR.[CustomerId] = @P__CustomerId)
-		AND (@P__ExternalId IS NULL OR DR.[ExternalId] = @P__ExternalId)
-		AND (@P__AccountNumber IS NULL OR DR.[AccountNumber] = @P__AccountNumber)
-		AND (@P__DocumentCuk IS NULL OR DR.[DocumentCuk] = @P__DocumentCuk)
-	ORDER BY CreatedDate DESC
-	OFFSET (@P__PageNumber - 1) * @P__PageSize ROWS
-    FETCH NEXT @P__PageSize ROWS ONLY;
-END
-
-GO
-/****** Object:  StoredProcedure [dbo].[usp_UpdateAccessPolicy]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE PROCEDURE [dbo].[usp_UpdateAccessPolicy]
-	@P__AccessPolicyRules dbo.TVP_t_AccessPolicyRule READONLY,
-	@P__PolicyId BIGINT,
-	@P__PolicyCode NVARCHAR(255),
-	@P__PolicyName NVARCHAR(255),
-	@P__IsEnabled BIT,
-	@P__User NVARCHAR(255),
-	@P__Error NVARCHAR(4000) OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-	SET XACT_ABORT ON;
-
-    SET @P__Error = NULL;
-	
-	IF EXISTS (SELECT 1 FROM @P__AccessPolicyRules WHERE MaximumAccessCount <= 0 OR (WindowSeconds IS NOT NULL AND WindowSeconds <= 0))
-	BEGIN
-		SET @P__Error = 'The document access policy contains an invalid rule.';
-		RETURN;
-	END
-
-	BEGIN TRY
-		BEGIN TRANSACTION;
-
-		-- Insert new policy + rules
-		IF @P__PolicyId = -1
-		BEGIN
-			INSERT INTO t_AccessPolicy
-			(
-				[PolicyCode],
-				[PolicyName],
-				[IsEnabled],
-				[CreatedBy],
-				[LastModifiedBy]
-			)
-			VALUES
-			(
-				@P__PolicyCode,
-				@P__PolicyName,
-				@P__IsEnabled,
-				@P__User,
-				@P__User
-			);
-
-			SET @P__PolicyId = SCOPE_IDENTITY();
-
-			INSERT INTO t_AccessPolicyRule
-			(
-				[AccessPolicyId],
-				[RuleName],
-				[WindowSeconds],
-				[MaximumAccessCount],
-				[IsEnabled],
-				[CreatedBy],
-				[LastModifiedBy]
-			)
-			SELECT
-				@P__PolicyId,
-				[RuleName],
-				[WindowSeconds],
-				[MaximumAccessCount],
-				[IsEnabled],
-				@P__User,
-				@P__User
-			FROM @P__AccessPolicyRules;
-		END
-
-		-- Update existing policy + rules
-		ELSE
-		BEGIN
-			IF NOT EXISTS (SELECT 1 FROM t_AccessPolicy WHERE Id = @P__PolicyId)
-			BEGIN
-				SET @P__Error = 'The document access policy is not found.';
-				RETURN;
-			END
-
-			UPDATE t_AccessPolicy SET
-				[PolicyCode] = @P__PolicyCode,
-				[PolicyName] = @P__PolicyName,
-				[IsEnabled] = @P__IsEnabled,
-				[LastModifiedBy] = @P__User,
-				[LastModifiedDate] = GETDATE()
-			WHERE Id = @P__PolicyId;
-
-			MERGE INTO t_AccessPolicyRule AS Target
-			USING @P__AccessPolicyRules AS Source
-			ON Target.Id = Source.Id AND Target.AccessPolicyId = @P__PolicyId
-			WHEN MATCHED THEN 
-				UPDATE SET 
-					Target.[RuleName] = Source.RuleName,
-					Target.[WindowSeconds] = Source.WindowSeconds,
-					Target.[MaximumAccessCount] = Source.MaximumAccessCount,
-					Target.[IsEnabled] = Source.IsEnabled,
-					Target.[LastModifiedBy] = @P__User,
-					Target.[LastModifiedDate] = GETDATE()
-			WHEN NOT MATCHED THEN
-				INSERT 
-				(
-					[AccessPolicyId],
-					[RuleName],
-					[WindowSeconds],
-					[MaximumAccessCount],
-					[IsEnabled],
-					[CreatedBy],
-					[LastModifiedBy]
-				)
-				VALUES
-				(
-					@P__PolicyId,
-					Source.RuleName,
-					Source.WindowSeconds,
-					Source.MaximumAccessCount,
-					Source.IsEnabled,
-					@P__User,
-					@P__User
-				);
-		END
-
-		COMMIT TRANSACTION;
-	END TRY
-	BEGIN CATCH
-		IF  XACT_STATE() <> 0 
-			ROLLBACK TRANSACTION;
-
-		SET @P__Error =  LEFT(
-                CONCAT(
-                    N'Unexpected error while updating access policy: ',
-                    ERROR_MESSAGE()
-                ),
-                4000
-            );
-
-		RETURN;
-	END CATCH
-
-	SELECT 
-		AP.[Id],
-		AP.[PolicyCode],
-		AP.[PolicyName],
-		AP.[IsEnabled] AS IsAccessPolicyEnabled,
-		AP.[CreatedDate] AS AccessPolicyCreatedDate,
-		AP.[CreatedBy] AS AccessPolicyCreatedBy,
-		AP.[LastModifiedDate] AS AccessPolicyLastModifiedDate,
-		AP.[LastModifiedBy] AS AccessPolicyLastModifiedBy,
-		APR.[Id] AS AccessPolicyRuleId,
-		APR.[AccessPolicyId],
-		APR.[RuleName],
-		APR.[WindowSeconds],
-		APR.[MaximumAccessCount],
-		APR.[IsEnabled] AS IsAccessPolicyRuleEnabled,
-		APR.[CreatedDate] AS AccessPolicyRuleCreatedDate,
-		APR.[CreatedBy] AS AccessPolicyRuleCreatedBy,
-		APR.[LastModifiedDate] AS AccessPolicyRuleLastModifiedDate,
-		APR.[LastModifiedBy] AS AccessPolicyRuleLastModifiedBy
-	FROM [dbo].[t_AccessPolicy] AS AP
-	JOIN [dbo].[t_AccessPolicyRule] AS APR ON AP.Id = APR.AccessPolicyId
-	WHERE AP.Id = @P__PolicyId;
-
-END
-
-GO
-/****** Object:  StoredProcedure [dbo].[usp_UpdateConfig]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE PROCEDURE [dbo].[usp_UpdateConfig]
-	@P__SettingName NVARCHAR(255),
-	@P__SettingValue NVARCHAR(255),
-	@P__SettingDescription NVARCHAR(255),
-	@P__User NVARCHAR(255),
-	@P__Error NVARCHAR(4000) OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET @P__Error = NULL;
-	
-	IF NOT EXISTS (SELECT 1 FROM t_Config WHERE SettingName = @P__SettingName)
-	BEGIN
-		SET @P__Error = 'Config not found';
-		RETURN;
-	END
-
-	UPDATE t_Config SET
-		SettingValue = @P__SettingValue,
-		SettingDescription = @P__SettingDescription,
-		LastModifiedBy = @P__User,
-		LastModifiedDate = GETDATE()
-	WHERE SettingName = @P__SettingName;
-
-	SELECT * 
-	FROM t_Config
-	WHERE SettingName = @P__SettingName;
-
-END
-
-GO
-/****** Object:  StoredProcedure [dbo].[usp_UpdateDocumentReference]    Script Date: 8/10/2026 4:43:12 PM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE PROCEDURE [dbo].[usp_UpdateDocumentReference]
-	@P__DocumentReferenceId BIGINT,
-	@P__AccessPolicyId BIGINT,
-	@P__IsActive BIT,
-	@P__RevokedReason NVARCHAR(255) = NULL,
-	@P__User NVARCHAR(255),
-	@P__Error NVARCHAR(4000) OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET @P__Error = NULL;
-	
-	IF NOT EXISTS (SELECT 1 FROM t_DocumentReference WHERE Id = @P__DocumentReferenceId) 
-	BEGIN
-		SET @P__Error = 'Docuement reference not found.';
-		RETURN;
-	END
-
-	IF NOT EXISTS (SELECT 1 FROM t_AccessPolicy WHERE Id = @P__AccessPolicyId)
-	BEGIN
-		SET @P__Error = 'Access policy not found.';
-		RETURN;
-	END
-
-	IF @P__RevokedReason IS NOT NULL AND @P__IsActive = 1
-	BEGIN
-		SET @P__Error = 'A revoked document cannot remain active.';
-		RETURN;
-	END
-
-	UPDATE t_DocumentReference SET
-		AccessPolicyId = @P__AccessPolicyId,
-		IsActive = @P__IsActive,
-		RevokedBy = CASE WHEN @P__RevokedReason IS NOT NULL THEN @P__User ELSE RevokedBy END,
-		RevokedReason = CASE WHEN @P__RevokedReason IS NOT NULL THEN @P__RevokedReason ELSE RevokedReason END,
-		RevokedDate = CASE WHEN @P__RevokedReason IS NOT NULL THEN GETDATE() ELSE RevokedDate END,
-		LastModifiedBy = @P__User,
-		LastModifiedDate = GETDATE()
-	WHERE Id = @P__DocumentReferenceId
-
-	SELECT 
-		DR.[Id],
-		DR.[CustomerId],
-		DR.[ExternalId],
-		DR.[AccessPolicyId],
-		AP.[PolicyName],
-		DR.[AccountNumber],
-		DR.[DocumentCuk],
-		DR.[TokenHash],
-		DR.[ExpiredDate],
-		DR.[RevokedDate],
-		DR.[RevokedBy],
-		DR.[RevokedReason],
-		DR.[IsActive],
-		DR.[CreatedDate],
-		DR.[CreatedBy],
-		DR.[LastModifiedDate],
-		DR.[LastModifiedBy]
-	FROM [dbo].[t_DocumentReference] AS DR
-	JOIN t_AccessPolicy AS AP ON DR.AccessPolicyId = AP.Id
-	WHERE DR.[Id] = @P__DocumentReferenceId;
-
-END
-
-GO
+  public enum CommandDirection
+  {
+    Update,
+    Delete,
+    Select,
+  }
+}
