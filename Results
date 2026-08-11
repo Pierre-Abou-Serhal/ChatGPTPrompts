@@ -1,152 +1,134 @@
-Your stored procedure should still return one flat row per rule. Then C# combines those rows into one `AccessPolicy` object.
-
-Do not use `TOP 1`, because that would return only one rule.
-
-```text
-Policy 1 + Rule 1
-Policy 1 + Rule 2
-Policy 1 + Rule 3
-```
-
-becomes one policy containing three rules.
-
-Create a reusable mapper:
+Create one mapper that converts flat DTO rows into policy models. The single-policy mapper can reuse the list mapper.
 
 ```csharp
-private static AccessPolicy MapSingleAccessPolicy(
-    IEnumerable<AccessPolicyDbRowDto> source)
+public static class AccessPolicyMapper
 {
-    List<AccessPolicyDbRowDto> rows = source.ToList();
-
-    if (rows.Count == 0)
+    public static List<AccessPolicy> ToModels(
+        IEnumerable<AccessPolicyDbRowDto> dbRows)
     {
-        throw new InvalidOperationException(
-            "The stored procedure did not return an access policy.");
+        return dbRows
+            .GroupBy(row => row.AccessPolicyId)
+            .Select(MapPolicyGroup)
+            .OrderBy(policy => policy.Id)
+            .ToList();
     }
 
-    AccessPolicyDbRowDto firstRow = rows[0];
-
-    if (rows.Any(row =>
-            row.AccessPolicyId != firstRow.AccessPolicyId))
+    public static AccessPolicy ToSingleModel(
+        IEnumerable<AccessPolicyDbRowDto> dbRows)
     {
-        throw new InvalidOperationException(
-            "The stored procedure returned more than one access policy.");
+        List<AccessPolicy> policies = ToModels(dbRows);
+
+        return policies.Count switch
+        {
+            1 => policies[0],
+
+            0 => throw new InvalidOperationException(
+                "The stored procedure did not return an access policy."),
+
+            _ => throw new InvalidOperationException(
+                "The stored procedure returned more than one access policy.")
+        };
     }
 
-    return new AccessPolicy
+    private static AccessPolicy MapPolicyGroup(
+        IGrouping<Int64, AccessPolicyDbRowDto> policyGroup)
     {
-        Id = firstRow.AccessPolicyId,
-        PolicyCode = firstRow.AccessPolicyCode,
-        PolicyName = firstRow.AccessPolicyName,
-        IsEnabled = firstRow.IsAccessPolicyEnabled,
-        CreatedDate = firstRow.AccessPolicyCreatedDate,
-        CreatedBy = firstRow.AccessPolicyCreatedBy,
-        LastModifiedDate =
-            firstRow.AccessPolicyLastModifiedDate,
-        LastModifiedBy =
-            firstRow.AccessPolicyLastModifiedBy,
+        AccessPolicyDbRowDto firstRow = policyGroup.First();
 
-        AccessPolicyRules = rows
-            .Select(row => new AccessPolicyRule
-            {
-                Id = row.AccessPolicyRuleId,
-                AccessPolicyId =
-                    row.AccessPolicyRuleAccessPolicyId,
-                RuleName =
-                    row.AccessPolicyRuleName,
-                WindowSeconds =
-                    row.AccessPolicyRuleWindowSeconds,
-                MaximumAccessCount =
-                    row.AccessPolicyRuleMaximumAccessCount,
-                IsEnabled =
-                    row.IsAccessPolicyRuleEnabled,
-                CreatedDate =
-                    row.AccessPolicyRuleCreatedDate,
-                CreatedBy =
-                    row.AccessPolicyRuleCreatedBy,
-                LastModifiedDate =
-                    row.AccessPolicyRuleLastModifiedDate,
-                LastModifiedBy =
-                    row.AccessPolicyRuleLastModifiedBy
-            })
-            .OrderBy(rule => rule.Id)
-            .ToList()
-    };
+        return new AccessPolicy
+        {
+            Id = firstRow.AccessPolicyId,
+            PolicyCode = firstRow.AccessPolicyCode,
+            PolicyName = firstRow.AccessPolicyName,
+            IsEnabled = firstRow.IsAccessPolicyEnabled,
+            CreatedDate = firstRow.AccessPolicyCreatedDate,
+            CreatedBy = firstRow.AccessPolicyCreatedBy,
+            LastModifiedDate =
+                firstRow.AccessPolicyLastModifiedDate,
+            LastModifiedBy =
+                firstRow.AccessPolicyLastModifiedBy,
+
+            AccessPolicyRules = policyGroup
+                .Select(MapRule)
+                .OrderBy(rule => rule.Id)
+                .ToList()
+        };
+    }
+
+    private static AccessPolicyRule MapRule(
+        AccessPolicyDbRowDto row)
+    {
+        return new AccessPolicyRule
+        {
+            Id = row.AccessPolicyRuleId,
+            AccessPolicyId =
+                row.AccessPolicyRuleAccessPolicyId,
+            RuleName =
+                row.AccessPolicyRuleName,
+            WindowSeconds =
+                row.AccessPolicyRuleWindowSeconds,
+            MaximumAccessCount =
+                row.AccessPolicyRuleMaximumAccessCount,
+            IsEnabled =
+                row.IsAccessPolicyRuleEnabled,
+            CreatedDate =
+                row.AccessPolicyRuleCreatedDate,
+            CreatedBy =
+                row.AccessPolicyRuleCreatedBy,
+            LastModifiedDate =
+                row.AccessPolicyRuleLastModifiedDate,
+            LastModifiedBy =
+                row.AccessPolicyRuleLastModifiedBy
+        };
+    }
 }
 ```
 
-Then use it in your update method:
+Then your list method becomes:
 
 ```csharp
-public async Task<AccessPolicy> UpdateAccessPolicy(
-    UpdateAccessPolicyRequest request)
+public async Task<List<AccessPolicy>> GetAccessPolicy(
+    GetAccessPolicyRequest request)
 {
     DapperDal dal =
         new DapperDal(_globalSettings.ConnString);
 
-    DynamicParameters parameters = new();
-
-    // Add your policy and TVP parameters here.
-    parameters.Add(
-        "P__PolicyId",
-        request.PolicyId);
-
-    parameters.Add(
-        "P__PolicyCode",
-        request.PolicyCode);
-
-    parameters.Add(
-        "P__PolicyName",
-        request.PolicyName);
-
-    parameters.Add(
-        "P__IsEnabled",
-        request.IsEnabled);
-
-    parameters.Add(
-        "P__User",
-        request.User);
-
-    parameters.Add(
-        "P__Error",
-        dbType: DbType.String,
-        direction: ParameterDirection.Output,
-        size: 4000);
-
-    IEnumerable<AccessPolicyDbRowDto> result =
+    IEnumerable<AccessPolicyDbRowDto> dbRows =
         await dal.ExecuteQueryAsync<AccessPolicyDbRowDto>(
-            "usp_UpdateAccessPolicy",
-            parameters,
+            "usp_GetAccessPolicy",
+            null,
             CommandType.StoredProcedure,
-            DapperDal.CommandDirection.Update);
+            DapperDal.CommandDirection.Select);
 
-    String? storedProcedureError =
-        parameters.Get<String>("P__Error");
-
-    if (!String.IsNullOrWhiteSpace(storedProcedureError))
-    {
-        throw new SGBLBadRequestException(
-            storedProcedureError);
-    }
-
-    return MapSingleAccessPolicy(result);
+    return AccessPolicyMapper.ToModels(dbRows);
 }
 ```
 
-Your final SQL query should continue using:
+And the update method uses the same mapping:
 
-```sql
-WHERE AP.Id = @P__PolicyId
+```csharp
+IEnumerable<AccessPolicyDbRowDto> dbRows =
+    await dal.ExecuteQueryAsync<AccessPolicyDbRowDto>(
+        "usp_UpdateAccessPolicy",
+        parameters,
+        CommandType.StoredProcedure,
+        DapperDal.CommandDirection.Update);
+
+String? storedProcedureError =
+    parameters.Get<String>("P__Error");
+
+if (!String.IsNullOrWhiteSpace(storedProcedureError))
+{
+    throw new SGBLBadRequestException(
+        storedProcedureError);
+}
+
+return AccessPolicyMapper.ToSingleModel(dbRows);
 ```
 
-and joining the rules:
+This keeps the actual field mapping in exactly one place:
 
-```sql
-FROM dbo.t_AccessPolicy AS AP
-INNER JOIN dbo.t_AccessPolicyRule AS APR
-    ON APR.AccessPolicyId = AP.Id
-WHERE AP.Id = @P__PolicyId
-ORDER BY APR.Id;
-```
-
-SQL returns multiple physical rows, but they all represent one policy. Your C# method returns one `AccessPolicy` model with its complete `AccessPolicyRules` collection.
+* `ToModels()` handles zero or multiple policies.
+* `ToSingleModel()` requires exactly one policy.
+* `MapPolicyGroup()` builds the policy.
+* `MapRule()` builds each rule.
