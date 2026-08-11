@@ -1,68 +1,138 @@
-  public async Task<List<AccessPolicy>> GetAccessPolicy(GetAccessPolicyRequest request)
-  {
+Dapper will not automatically populate the nested `AccessPolicyRules` list through your generic DAL method. Query the flat DTO rows first, group them by policy, and then construct the models.
+
+First, ensure the SQL aliases match the DTO property names exactly:
+
+```sql
+ALTER PROCEDURE dbo.usp_GetAccessPolicy
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        AP.Id AS AccessPolicyId,
+        AP.PolicyCode AS AccessPolicyCode,
+        AP.PolicyName AS AccessPolicyName,
+        AP.IsEnabled AS IsAccessPolicyEnabled,
+        AP.CreatedDate AS AccessPolicyCreatedDate,
+        AP.CreatedBy AS AccessPolicyCreatedBy,
+        AP.LastModifiedDate AS AccessPolicyLastModifiedDate,
+        AP.LastModifiedBy AS AccessPolicyLastModifiedBy,
+
+        APR.Id AS AccessPolicyRuleId,
+        APR.AccessPolicyId AS AccessPolicyRuleAccessPolicyId,
+        APR.RuleName AS AccessPolicyRuleName,
+        APR.WindowSeconds AS AccessPolicyRuleWindowSeconds,
+        APR.MaximumAccessCount AS AccessPolicyRuleMaximumAccessCount,
+        APR.IsEnabled AS IsAccessPolicyRuleEnabled,
+        APR.CreatedDate AS AccessPolicyRuleCreatedDate,
+        APR.CreatedBy AS AccessPolicyRuleCreatedBy,
+        APR.LastModifiedDate AS AccessPolicyRuleLastModifiedDate,
+        APR.LastModifiedBy AS AccessPolicyRuleLastModifiedBy
+    FROM dbo.t_AccessPolicy AS AP
+    INNER JOIN dbo.t_AccessPolicyRule AS APR
+        ON APR.AccessPolicyId = AP.Id
+    ORDER BY
+        AP.Id,
+        APR.Id;
+END;
+```
+
+Then change the C# method to query `AccessPolicyDbRowDto`:
+
+```csharp
+public async Task<List<AccessPolicy>> GetAccessPolicy(
+    GetAccessPolicyRequest request)
+{
     DapperDal dal = new DapperDal(_globalSettings.ConnString);
 
-    IEnumerable<AccessPolicy> res = await dal.ExecuteQueryAsync<AccessPolicy>("usp_GetAccessPolicy", null,
-      CommandType.StoredProcedure, DapperDal.CommandDirection.Select);
+    IEnumerable<AccessPolicyDbRowDto> dbRows =
+        await dal.ExecuteQueryAsync<AccessPolicyDbRowDto>(
+            "usp_GetAccessPolicy",
+            null,
+            CommandType.StoredProcedure,
+            DapperDal.CommandDirection.Select);
 
-    return res.ToList();
-  }
+    List<AccessPolicy> accessPolicies = dbRows
+        .GroupBy(row => row.AccessPolicyId)
+        .Select(policyGroup =>
+        {
+            AccessPolicyDbRowDto firstRow = policyGroup.First();
 
-Models:
-public class AccessPolicy
-{
-  public Int64 Id { get; set; }
-  public String PolicyCode { get; set; } = String.Empty;
-  public String PolicyName { get; set; } = String.Empty;
-  public Boolean IsEnabled { get; set; }
-  public DateTime CreatedDate { get; set; }
-  public String CreatedBy { get; set; } = String.Empty;
-  public DateTime LastModifiedDate { get; set; }
-  public String LastModifiedBy { get; set; } = String.Empty;
-  public List<AccessPolicyRule> AccessPolicyRules { get; set; } = [];
+            return new AccessPolicy
+            {
+                Id = firstRow.AccessPolicyId,
+                PolicyCode = firstRow.AccessPolicyCode,
+                PolicyName = firstRow.AccessPolicyName,
+                IsEnabled = firstRow.IsAccessPolicyEnabled,
+                CreatedDate = firstRow.AccessPolicyCreatedDate,
+                CreatedBy = firstRow.AccessPolicyCreatedBy,
+                LastModifiedDate =
+                    firstRow.AccessPolicyLastModifiedDate,
+                LastModifiedBy =
+                    firstRow.AccessPolicyLastModifiedBy,
+
+                AccessPolicyRules = policyGroup
+                    .Select(row => new AccessPolicyRule
+                    {
+                        Id = row.AccessPolicyRuleId,
+                        AccessPolicyId =
+                            row.AccessPolicyRuleAccessPolicyId,
+                        RuleName = row.AccessPolicyRuleName,
+                        WindowSeconds =
+                            row.AccessPolicyRuleWindowSeconds,
+                        MaximumAccessCount =
+                            row.AccessPolicyRuleMaximumAccessCount,
+                        IsEnabled =
+                            row.IsAccessPolicyRuleEnabled,
+                        CreatedDate =
+                            row.AccessPolicyRuleCreatedDate,
+                        CreatedBy =
+                            row.AccessPolicyRuleCreatedBy,
+                        LastModifiedDate =
+                            row.AccessPolicyRuleLastModifiedDate,
+                        LastModifiedBy =
+                            row.AccessPolicyRuleLastModifiedBy
+                    })
+                    .OrderBy(rule => rule.Id)
+                    .ToList()
+            };
+        })
+        .OrderBy(policy => policy.Id)
+        .ToList();
+
+    return accessPolicies;
 }
+```
 
-public class AccessPolicyRule
-{
-  public Int64 Id { get; set; }
-  public Int64 AccessPolicyId { get; set; }
-  public String RuleName { get; set; } = String.Empty;
-  public Int32? WindowSeconds { get; set; }
-  public Int32 MaximumAccessCount { get; set; }
-  public Boolean IsEnabled { get; set; }
-  public DateTime CreatedDate { get; set; }
-  public String CreatedBy { get; set; } = String.Empty;
-  public DateTime LastModifiedDate { get; set; }
-  public String LastModifiedBy { get; set; } = String.Empty;
-}
+The database returns flat rows such as:
 
-DTOs:
+```text
+Policy 1 + Rule 1
+Policy 1 + Rule 2
+Policy 1 + Rule 3
+Policy 2 + Rule 4
+```
 
-public sealed record AccessPolicyDbRowDto(
-  // Access Policy Properties
-  Int64 AccessPolicyId,
-  String AccessPolicyCode,
-  String AccessPolicyName,
-  Boolean IsAccessPolicyEnabled,
-  DateTime AccessPolicyCreatedDate,
-  String AccessPolicyCreatedBy,
-  DateTime AccessPolicyLastModifiedDate,
-  String AccessPolicyLastModifiedBy,
+The `GroupBy(row => row.AccessPolicyId)` converts these into:
 
-  // Access Policy Rule Properties
-  Int64 AccessPolicyRuleId,
-  Int64 AccessPolicyRuleAccessPolicyId,
-  String AccessPolicyRuleName,
-  Int32? AccessPolicyRuleWindowSeconds,
-  Int32 AccessPolicyRuleMaximumAccessCount,
-  Boolean IsAccessPolicyRuleEnabled,
-  DateTime AccessPolicyRuleCreatedDate,
-  String AccessPolicyRuleCreatedBy,
-  DateTime AccessPolicyRuleLastModifiedDate,
-  String AccessPolicyRuleLastModifiedBy
-);
+```text
+Policy 1
+  Rules: 1, 2, 3
 
-My SQL procedure usp_GetAccessPolicy will return a list of DTo
-I want to convert the DTo to AccessPolicy Model with Access Policy Rules
+Policy 2
+  Rules: 4
+```
 
-How to do it ?
+Your original query should not use:
+
+```csharp
+ExecuteQueryAsync<AccessPolicy>
+```
+
+because the returned SQL columns represent both a policy and a rule. It must use:
+
+```csharp
+ExecuteQueryAsync<AccessPolicyDbRowDto>
+```
+
+Also, `request` is currently unused. You can remove it unless you plan to add policy filters. If policies without any rules must also be returned, use a `LEFT JOIN` and make all rule fields in `AccessPolicyDbRowDto` nullable.
