@@ -1,138 +1,152 @@
-Dapper will not automatically populate the nested `AccessPolicyRules` list through your generic DAL method. Query the flat DTO rows first, group them by policy, and then construct the models.
+Your stored procedure should still return one flat row per rule. Then C# combines those rows into one `AccessPolicy` object.
 
-First, ensure the SQL aliases match the DTO property names exactly:
-
-```sql
-ALTER PROCEDURE dbo.usp_GetAccessPolicy
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    SELECT
-        AP.Id AS AccessPolicyId,
-        AP.PolicyCode AS AccessPolicyCode,
-        AP.PolicyName AS AccessPolicyName,
-        AP.IsEnabled AS IsAccessPolicyEnabled,
-        AP.CreatedDate AS AccessPolicyCreatedDate,
-        AP.CreatedBy AS AccessPolicyCreatedBy,
-        AP.LastModifiedDate AS AccessPolicyLastModifiedDate,
-        AP.LastModifiedBy AS AccessPolicyLastModifiedBy,
-
-        APR.Id AS AccessPolicyRuleId,
-        APR.AccessPolicyId AS AccessPolicyRuleAccessPolicyId,
-        APR.RuleName AS AccessPolicyRuleName,
-        APR.WindowSeconds AS AccessPolicyRuleWindowSeconds,
-        APR.MaximumAccessCount AS AccessPolicyRuleMaximumAccessCount,
-        APR.IsEnabled AS IsAccessPolicyRuleEnabled,
-        APR.CreatedDate AS AccessPolicyRuleCreatedDate,
-        APR.CreatedBy AS AccessPolicyRuleCreatedBy,
-        APR.LastModifiedDate AS AccessPolicyRuleLastModifiedDate,
-        APR.LastModifiedBy AS AccessPolicyRuleLastModifiedBy
-    FROM dbo.t_AccessPolicy AS AP
-    INNER JOIN dbo.t_AccessPolicyRule AS APR
-        ON APR.AccessPolicyId = AP.Id
-    ORDER BY
-        AP.Id,
-        APR.Id;
-END;
-```
-
-Then change the C# method to query `AccessPolicyDbRowDto`:
-
-```csharp
-public async Task<List<AccessPolicy>> GetAccessPolicy(
-    GetAccessPolicyRequest request)
-{
-    DapperDal dal = new DapperDal(_globalSettings.ConnString);
-
-    IEnumerable<AccessPolicyDbRowDto> dbRows =
-        await dal.ExecuteQueryAsync<AccessPolicyDbRowDto>(
-            "usp_GetAccessPolicy",
-            null,
-            CommandType.StoredProcedure,
-            DapperDal.CommandDirection.Select);
-
-    List<AccessPolicy> accessPolicies = dbRows
-        .GroupBy(row => row.AccessPolicyId)
-        .Select(policyGroup =>
-        {
-            AccessPolicyDbRowDto firstRow = policyGroup.First();
-
-            return new AccessPolicy
-            {
-                Id = firstRow.AccessPolicyId,
-                PolicyCode = firstRow.AccessPolicyCode,
-                PolicyName = firstRow.AccessPolicyName,
-                IsEnabled = firstRow.IsAccessPolicyEnabled,
-                CreatedDate = firstRow.AccessPolicyCreatedDate,
-                CreatedBy = firstRow.AccessPolicyCreatedBy,
-                LastModifiedDate =
-                    firstRow.AccessPolicyLastModifiedDate,
-                LastModifiedBy =
-                    firstRow.AccessPolicyLastModifiedBy,
-
-                AccessPolicyRules = policyGroup
-                    .Select(row => new AccessPolicyRule
-                    {
-                        Id = row.AccessPolicyRuleId,
-                        AccessPolicyId =
-                            row.AccessPolicyRuleAccessPolicyId,
-                        RuleName = row.AccessPolicyRuleName,
-                        WindowSeconds =
-                            row.AccessPolicyRuleWindowSeconds,
-                        MaximumAccessCount =
-                            row.AccessPolicyRuleMaximumAccessCount,
-                        IsEnabled =
-                            row.IsAccessPolicyRuleEnabled,
-                        CreatedDate =
-                            row.AccessPolicyRuleCreatedDate,
-                        CreatedBy =
-                            row.AccessPolicyRuleCreatedBy,
-                        LastModifiedDate =
-                            row.AccessPolicyRuleLastModifiedDate,
-                        LastModifiedBy =
-                            row.AccessPolicyRuleLastModifiedBy
-                    })
-                    .OrderBy(rule => rule.Id)
-                    .ToList()
-            };
-        })
-        .OrderBy(policy => policy.Id)
-        .ToList();
-
-    return accessPolicies;
-}
-```
-
-The database returns flat rows such as:
+Do not use `TOP 1`, because that would return only one rule.
 
 ```text
 Policy 1 + Rule 1
 Policy 1 + Rule 2
 Policy 1 + Rule 3
-Policy 2 + Rule 4
 ```
 
-The `GroupBy(row => row.AccessPolicyId)` converts these into:
+becomes one policy containing three rules.
 
-```text
-Policy 1
-  Rules: 1, 2, 3
-
-Policy 2
-  Rules: 4
-```
-
-Your original query should not use:
+Create a reusable mapper:
 
 ```csharp
-ExecuteQueryAsync<AccessPolicy>
+private static AccessPolicy MapSingleAccessPolicy(
+    IEnumerable<AccessPolicyDbRowDto> source)
+{
+    List<AccessPolicyDbRowDto> rows = source.ToList();
+
+    if (rows.Count == 0)
+    {
+        throw new InvalidOperationException(
+            "The stored procedure did not return an access policy.");
+    }
+
+    AccessPolicyDbRowDto firstRow = rows[0];
+
+    if (rows.Any(row =>
+            row.AccessPolicyId != firstRow.AccessPolicyId))
+    {
+        throw new InvalidOperationException(
+            "The stored procedure returned more than one access policy.");
+    }
+
+    return new AccessPolicy
+    {
+        Id = firstRow.AccessPolicyId,
+        PolicyCode = firstRow.AccessPolicyCode,
+        PolicyName = firstRow.AccessPolicyName,
+        IsEnabled = firstRow.IsAccessPolicyEnabled,
+        CreatedDate = firstRow.AccessPolicyCreatedDate,
+        CreatedBy = firstRow.AccessPolicyCreatedBy,
+        LastModifiedDate =
+            firstRow.AccessPolicyLastModifiedDate,
+        LastModifiedBy =
+            firstRow.AccessPolicyLastModifiedBy,
+
+        AccessPolicyRules = rows
+            .Select(row => new AccessPolicyRule
+            {
+                Id = row.AccessPolicyRuleId,
+                AccessPolicyId =
+                    row.AccessPolicyRuleAccessPolicyId,
+                RuleName =
+                    row.AccessPolicyRuleName,
+                WindowSeconds =
+                    row.AccessPolicyRuleWindowSeconds,
+                MaximumAccessCount =
+                    row.AccessPolicyRuleMaximumAccessCount,
+                IsEnabled =
+                    row.IsAccessPolicyRuleEnabled,
+                CreatedDate =
+                    row.AccessPolicyRuleCreatedDate,
+                CreatedBy =
+                    row.AccessPolicyRuleCreatedBy,
+                LastModifiedDate =
+                    row.AccessPolicyRuleLastModifiedDate,
+                LastModifiedBy =
+                    row.AccessPolicyRuleLastModifiedBy
+            })
+            .OrderBy(rule => rule.Id)
+            .ToList()
+    };
+}
 ```
 
-because the returned SQL columns represent both a policy and a rule. It must use:
+Then use it in your update method:
 
 ```csharp
-ExecuteQueryAsync<AccessPolicyDbRowDto>
+public async Task<AccessPolicy> UpdateAccessPolicy(
+    UpdateAccessPolicyRequest request)
+{
+    DapperDal dal =
+        new DapperDal(_globalSettings.ConnString);
+
+    DynamicParameters parameters = new();
+
+    // Add your policy and TVP parameters here.
+    parameters.Add(
+        "P__PolicyId",
+        request.PolicyId);
+
+    parameters.Add(
+        "P__PolicyCode",
+        request.PolicyCode);
+
+    parameters.Add(
+        "P__PolicyName",
+        request.PolicyName);
+
+    parameters.Add(
+        "P__IsEnabled",
+        request.IsEnabled);
+
+    parameters.Add(
+        "P__User",
+        request.User);
+
+    parameters.Add(
+        "P__Error",
+        dbType: DbType.String,
+        direction: ParameterDirection.Output,
+        size: 4000);
+
+    IEnumerable<AccessPolicyDbRowDto> result =
+        await dal.ExecuteQueryAsync<AccessPolicyDbRowDto>(
+            "usp_UpdateAccessPolicy",
+            parameters,
+            CommandType.StoredProcedure,
+            DapperDal.CommandDirection.Update);
+
+    String? storedProcedureError =
+        parameters.Get<String>("P__Error");
+
+    if (!String.IsNullOrWhiteSpace(storedProcedureError))
+    {
+        throw new SGBLBadRequestException(
+            storedProcedureError);
+    }
+
+    return MapSingleAccessPolicy(result);
+}
 ```
 
-Also, `request` is currently unused. You can remove it unless you plan to add policy filters. If policies without any rules must also be returned, use a `LEFT JOIN` and make all rule fields in `AccessPolicyDbRowDto` nullable.
+Your final SQL query should continue using:
+
+```sql
+WHERE AP.Id = @P__PolicyId
+```
+
+and joining the rules:
+
+```sql
+FROM dbo.t_AccessPolicy AS AP
+INNER JOIN dbo.t_AccessPolicyRule AS APR
+    ON APR.AccessPolicyId = AP.Id
+WHERE AP.Id = @P__PolicyId
+ORDER BY APR.Id;
+```
+
+SQL returns multiple physical rows, but they all represent one policy. Your C# method returns one `AccessPolicy` model with its complete `AccessPolicyRules` collection.
