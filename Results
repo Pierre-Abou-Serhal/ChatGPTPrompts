@@ -12,13 +12,12 @@ Mastercard®
 Debit Mastercard
 Maestro®
 Cirrus®
-Product or service:
 Release:
 26.Q4
 Action indicator:
-Mandated: Acquirer
-Optional: Issuer
+Mandated: Acquirer, Issuer
 System:
+Dual Message Authorization System
 Dual Message Clearing System
 Single Message System
 Published:
@@ -26,67 +25,56 @@ Published:
 Effective:
 23 October 2026
 Overview
-Mastercard is introducing Mastercard Send payment returns to provide
-automated return‑of‑funds capability.
+Mastercard is introducing Transaction Type Identifiers (TTIs) for Issuer-
+Initiated Person-to-Person (P2P) transactions as part of the Mastercard
+MoneySend Payment and Funding Transactions Program.
 Effective date details
 Date Time Details
-23 October 2026 11:00 to 15:00 U.S.
+23 October 2026 01:00 to 09:00 U.S.
 Central Time
-16:00 to 20:00 UTC
-Delivery of IPM MPE
-Daily Update File T067
+06:00 to 14:00 UTC
+Dual Message
+Authorization System
 18:00 to 23:59 U.S.
 Central Time
-00:00 to 05:59 UTC
+23:00 to 04:59 UTC
 (+1D)
 Dual Message
 Clearing System
 02:00 to 05:00 U.S.
 Central Time
-08:00 to 11:00 UTC
+07:00 to 10:00 UTC
 Single Message
 System
 Customer benefit
-Originating Institutions (OIs) and Receiving Institutions (RIs) and issuers
-may benefit from faster and more efficient funds return and increased
-end-user trust resulting in an enhanced end-to-end customer experience.
-NOTE: For the purpose of message flows, the Receiving Institution
-acts in the issuer role in the relevant reversal messages.
+The new TTIs enable customers to identify and differentiate P2P
+transaction types as part of the Mastercard MoneySend Payment and
+Funding Transactions Program to support more accurate reporting,
+billing, and program optimization.
 What Mastercard is doing
-Mastercard is enabling RIs to return funds to OIs for approved
-MoneySend Payment and Gaming Payment Transactions through
-reversal messages when those funds cannot be retained due to
-regulatory, compliance, fraud, or operational reasons. Mastercard is
-introducing a new message reason code to support the RI-initiated
-reversal processes.
-NOTE: The new messages are not applicable for domestic South Africa
+Mastercard is introducing two TTIs within the Mastercard MoneySend
+Payment and Funding Transactions Program for issuer-initiated P2P
 transactions.
-GLB 13300.2 Introducing Mastercard Send Online Payment
-Returns
-© 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13300.2 Introducing Mastercard Send Online Payment Returns • 16 June 2026 1
 Background
-RIs that accept Mastercard MoneySend and Gaming Payment Transactions may need to return funds after
-authorization due to compliance, risk, or regulatory concerns. Currently, the system does not support an
-automated return mechanism. RIs must rely on a manual, non‑scalable Form 1268 process, and chargebacks
-cannot be used under Mastercard Rules. Mastercard acknowledges RIs concerns related to operational cost and
-risk and is taking steps to help mitigate these impacts.
+Mastercard supports different types of P2P transactions as part of the
+Mastercard MoneySend Payment and Funding Transactions Program.
+Given the continued evolution of P2P payment solutions, it is important
+to differentiate transaction types under P2P.
+GLB 13264.2 Identifying Issuer-Initiated Person-to-Person
+Payment and Funding Transactions
+© 2026 Mastercard. Proprietary. All rights reserved.
+GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding Transactions • 16
+June 2026 1
+Usage of the new TTIs must be approved on a case-by-case basis, based on specific criteria and geographic
+availability to be defined and communicated separately.
 Version history
 Date Description of change
-16 June 2026 • Updates to Single Message System section:
-– Updated message reason code from 4351 to 0051 in DE 60 in the
-RI: Optional section
-– Added bullet for reason code 489 to RI: Optional
-– Added Subfield 1 to DE 60
-– Updated code from 4351 to 0051 in DE 60, subfield 2
-– Replaced reason code 4351 with 0051 in Single Message System
-edits
-• Replaced Reversal – Issuer-Initiated Funds Return with Reversal - RI
-Initiated Funds Return throughout
-• Added:
-– System Release 26.Q4 v1 Combined Dual Message Annex to the
-Testing section
-– Other media to Related documentation
+16 June 2026 Added:
+• Clarification in the customer impact section for acquirers approved to
+use the new TTIs
+• System Release 26.Q4 v1 Combined Dual and Single Message Annex to
+the Testing section
+• Other media to Related documentation
 21 April 2026 Initial publication date
 Customer impact
 This table represents a high-level overview of the impact as detailed in later sections of this announcement.
@@ -101,18 +89,16 @@ Commercial:
 • Debit
 • Prepaid
 Dual Message
+Authorization
+Dual Message
 Clearing
 Single Message
 System
-Date element
+Data element
 definitions
 IPM MPE
-Edits
-Error numbers
+Edits/Error numbers
 Mandated
-© 2026 Mastercard. Proprietary. All rights reserved.
-2 16 June 2026 • GLB 13300.2 Introducing Mastercard Send Online Payment Returns
-Audience Card type System connections Impact type Action indicator
 Issuer Consumer:
 • Credit
 • Debit
@@ -122,49 +108,34 @@ Commercial:
 • Debit
 • Prepaid
 Dual Message
+Authorization
+Dual Message
 Clearing
 Single Message
 System
-Date element
+Data element
 definitions
 IPM MPE
-Edits
-Error numbers
-Optional
-OI: Mandated
-OIs globally participating in Mastercard MoneySend Payment Transactions and Gaming Payment Transactions
-must be prepared to receive in the Dual Message Clearing System:
-• Message reason code 4351 (Reversal – RI Initiated Funds Return) in Data Element (DE) 25 (Message Reason
-Code) for First Chargeback (Full)/1442-450 messages
-• Clearing message reason indicator codes RI01 to RI25 in DE 72 (Data Record) for First Chargeback (Full)/
-1442-450 messages
-OIs globally participating in Mastercard MoneySend Payment Transactions and Gaming Payment Transactions
-must be prepared to receive in the Single Message System:
-• Advice reason code 489 (Chargeback) in DE60 (Advice Reason Code), subfield 1 (Advice Reason Code) in
-Issuer Reversal Advice/0422
-• Message reason code 0051 (Reversal – RI Initiated Funds Return) in DE 60 (Advice Reason Code), subfield 2
-(Advice Reason Code) in Issuer Reversal Advice/0422 messages
-• Message reason indicator codes RI01 to RI25 in DE 60 (Advice Reason Code), subfield 3 (Advice Reason
-Details Text) in Issuer Reversal Advice/0422 messages
-OIs and RIs must be aware of Integrated Product Message (IPM) Mastercard Parameter Extract (MPE) changes
-as described in this release announcement.
-RI: Optional
-RIs globally participating in Mastercard MoneySend Payment Transactions and Gaming Payment Transactions
-must be aware that they may populate the following codes in the Dual Message Clearing System:
-• Message reason code 4351 (Reversal – RI Initiated Funds Return) in Data Element (DE) 25 (Message Reason
-Code) for First Chargeback (Full)/1442-450 messages
-• Clearing message reason indicator codes RI01 to RI25 in DE 72 (Data Record) for First Chargeback (Full)/
-1442-450 messages
-RIs globally participating in Mastercard MoneySend Payment Transactions and Gaming Payment Transactions
-must be aware that they may populate the following codes in the Single Message System:
-• Advice reason code 489 (Chargeback) in DE60 (Advice Reason Code), subfield 1 (Advice Reason Code) in
-Issuer Reversal Advice/0422
-• Message reason code 0051 (Reversal – RI Initiated Funds Return) in DE 60 (Advice Reason Code), subfield 2
-(Advice Reason Code) in Issuer Reversal Advice/0422 messages
-• Message reason indicator codes RI01 to RI25 in DE 60 (Advice Reason Code), subfield 3 (Advice Reason
-Details Text) in Issuer Reversal Advice/0422 messages
+Edits/Error numbers
+Mandated
 © 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13300.2 Introducing Mastercard Send Online Payment Returns • 16 June 2026 3
+16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
+2 Funding Transactions
+Acquirer, Issuer: Mandated
+Acquirers approved to use the new TTIs as part of the Mastercard MoneySend Payment and Funding
+Transactions Program must be prepared to populate or support the new values C09 (Issuer-Initiated P2P) and
+F09 (Issuer-Initiated P2P) in:
+• Data Element (DE) 48 (Additional Data: Private Use), subelement 77 (Transaction Type Identifier)
+• Private Data Subelement (PDS) 0043 (Transaction Type Identifier)
+Issuers participating in the Mastercard MoneySend Payment and Funding Transactions Program must be
+prepared to receive the new values C09 and F09 in:
+• DE 48, subelement 77
+• PDS 0043
+Acquirers approved to use the new TTIs and issuers participating in the Mastercard MoneySend Payment and
+Funding Transactions Program must:
+• Support the new and modified edits
+• Be aware of Integrated Product Message (IPM) Mastercard Parameter Extract (MPE) changes detailed in
+this release announcement
 Impacted switch transactions
 How a customer connects to Mastercard determines the applicable switch transactions message types. This
 release announcement affects the message flows marked in the table.
@@ -180,6 +151,9 @@ Review the System Release 26.Q4 v1 Combined Dual and Single Message Annex for co
 and tables. Note that the testing information remains applicable and available for up to four releases. These
 test cases verify that the required audience for the relevant system accurately processes transactions in
 alignment with the specifications outlined in this release announcement.
+© 2026 Mastercard. Proprietary. All rights reserved.
+GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
+Transactions • 16 June 2026 3
 System impact
 For items marked Yes, details are available in the corresponding sections.
 System impact
@@ -191,267 +165,271 @@ Dual Message
 Clearing System
 Single Message
 System
-Data element definitions No Yes Yes
+Data element definitions Yes Yes Yes
 IPM MPE No Yes No
-Edits No Yes Yes
+Interchange programs No Yes No
+Edits Yes Yes Yes
 Error numbers No Yes No
+Dual Message Authorization System specification changes
+Mastercard will introduce changes to the Dual Message Authorization System to support this release
+announcement.
+DE 48 (Additional Data: Private Use)
+DE 48 (Additional Data: Private Use) contains data associated with various Mastercard programs, products,
+and services. DE 48 is used to convey data that is not related to any other ISO-defined data elements. It is a
+variable-length data element used for multiple purposes.
+Subelement 77 (Transaction Type Identifier)
+DE 48, subelement 77 (Transaction Type Identifier) indicates the type of additional transaction purpose.
+DE 48, subelement 77 values
+Value Description
+C09 Issuer-Initiated P2P
+F09 Issuer-Initiated P2P
+Edits
+Mastercard is updating the existing Dual Message Authorization System edits on the Authorization Request/
+0100 messages and Reversal Request/0400 messages for Mastercard MoneySend Payment and Funding
+Transactions and will be applicable to TTIs C09 and F09.
 © 2026 Mastercard. Proprietary. All rights reserved.
-4 16 June 2026 • GLB 13300.2 Introducing Mastercard Send Online Payment Returns
+16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
+4 Funding Transactions
 Dual Message Clearing System specification changes
 Mastercard will introduce changes to the Dual Message Clearing System to support this release announcement.
-DE 25 (Message Reason Code)
-DE 25 (Message Reason Code) provides the message receiver with the reason for sending the message.
-DE 25 First Chargeback (Full)/1442 (Function Code = 450)
-Message Reason
-Code
-Message Reason
-Code Description
-Valid for (a) nonintra-
-European and
-non-inter-European
-messages AND (b)
-intra-European and
-inter-European
-Mastercard POS
-and manual cash
-disbursement
-messages
-Valid for intra-
-European Maestro
-POS messages
-Valid for intra-
-European and inter-
-European
-Mastercard ATM,
-Maestro ATM,
-Maestro manual
-cash disbursement
-and Cirrus
-messages
-4351 Reversal – RI
-Initiated Funds
-Return
-Yes Yes Yes
-DE 72 (Data Record)
-DE 72 (Data Record) contains message text data, file update data, or other information as specified in
-individual IPM messages.
-DE 72, message reason indicator codes
-Indicators codes Reason
-RI01 RI must return funds to Sender
-RI02 Receiver refuses the funds
-RI03 Receiver did not collect the funds within 30 calendar
-days of authorization
-RI04 RI Compliance or regulatory concern
-RI05 Account specified is blocked, prohibiting the posting of
-transactions against it
-RI06 Invalid Sender account type
-RI07 Transaction forbidden on this type of Receiver's
-account
-RI08 Sender is not recognized by Receiver
-RI09 Reason has not been specified by the Receiver
-© 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13300.2 Introducing Mastercard Send Online Payment Returns • 16 June 2026 5
-Indicators codes Reason
-RI10 Sender’s account information or unique identifier
-required for regulatory compliance is either
-insufficient or missing
-RI11 Sender’s name and/or address required for regulatory
-compliance is either insufficient or missing
-RI12 Receiver’s name and/or address required for
-regulatory compliance is either insufficient or missing
-RI13 Account specified has been closed
-RI14 Fraud
-RI15 Account does not exist or invalid
-RI16 Account limit exceeded
-RI17 Mandatory information is either insufficient or missing
-RI18 Duplicate Transaction ID
-RI19 Invalid routing/configuration
-RI20 System error or time out error
-RI21 Purpose of Payment information is insufficient
-RI22 Recipient Government ID is incorrect
-RI23 Card Expired
-RI24 Invalid character, length or input value
-RI25 Invalid Recipient account type/Bank details
+PDS 0043 (Transaction Type Identifier)
+PDS 0043 (Transaction Type Identifier) monitors and tracks a participant’s activity in special promotion
+programs.
+PDS 0043 values
+Value Description
+C09 Issuer-Initiated P2P
+F09 Issuer-Initiated P2P
 IPM MPE
-Mastercard will update the non-compressed and optimized versions of these IPM MPE tables.
+Mastercard will update the following IPM MPE tables to support this release announcement.
 IPM MPE tables
 Table Modified fields
-IP0011T1: Expanded MTI/Function/Reason Code Expanded MTI, Function, Reason Code
 IP0015T1: IPM Error Messages Error Number, IPM Error Message Text
-IP0025T1: Message Reason Codes Message Reason Codes
-IP0097T1: Message Reason Code Restrictions for
-Card Program Identifier and Business Service
-Arrangement
-MTI, Function code, Reason code
+IP0304T1: Transaction Type Identifier and AB Code Transaction Type Identifier
+IP3001T1: Payment Transaction Type Codes N/A
+Interchange programs
+For Funding Transactions, Transaction Type Identifier (TTI) F09: Issuer-Initiated P2P will leverage the existing
+IRD Q2: General Person-to-Person. For Payment Transactions, TTI C09: Issuer-Initiated P2P will leverage the
+existing IRD Q2: General Person-to-Person.
 © 2026 Mastercard. Proprietary. All rights reserved.
-6 16 June 2026 • GLB 13300.2 Introducing Mastercard Send Online Payment Returns
+GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
+Transactions • 16 June 2026 5
 Edits
-Mastercard will add new edits, modify existing edits, or remove existing edits to support this announcement.
-New edit: DE 25 (Message Reason Code)
+Mastercard will add new edits, modify existing edits, or remove existing edits to support this release
+announcement.
+New edit: PDS 0043 (Transaction Type Identifier)
 Error number Requirement
-3188 The Dual Message Clearing System must ensure that
-DE 25 Message Reason Code 4351 is applicable only
-for First Chargebacks (Full)/1442-450 payment
-messages and will not be permitted for any other
-message types.
-The edit is performed in the Clearing Optimizer and in the Dual Message Clearing System for the following
+2947 The Dual Message Clearing System will ensure that
+PDS 0043 (Transaction Type Identifier) must be
+present and contain the valid value C09 or F09.
+This edit is performed in the Dual Message Clearing System for the following message:
+• First Presentment/1240
+Collection Only messages excluded.
+Modified Edit: PDS 0043 (Transaction Type Identifier)
+Error number Current requirement Modification for this release
+2275 If DE 3, subfield 1 is equal to 28,
+then PDS 0043 must contain a
+valid value.
+Adding values C09: Issuer-Initiated
+P2P and F09: Issuer-Initiated P2P
+in the Valid Value table IP3001T1:
+Payment Transaction Type Codes.
+This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
+message:
+• First Presentment/1240
+Collection Only messages excluded.
+© 2026 Mastercard. Proprietary. All rights reserved.
+16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
+6 Funding Transactions
+Modified Edit: PDS 0043 (Transaction Type Identifier)
+Error number Current requirement Modification for this release
+1066 The Clearing System must ensure
+that if PDS 0043 (Transaction Type
+Identifier) is present and equal valid
+MoneySend ID, then DE 3, subfield
+1 must equal 28 (Payment
+Transaction) or 20 (Return/Refund
+Transaction) or 00 (Funding
+Transaction). PDS 0043 Validation
+is done in IP0304T1.
+Modified to include new TTI C09
+and F09.
+This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
+message:
+• First Presentment/1240
+Collection Only messages excluded.
+Modified Edit: PDS 0043 (Transaction Type Identifier)
+Error number Current requirement Modification for this release
+2947 PDS 0043 (Transaction Type
+Identifier) must be present and
+contain a valid value found on IPM
+MPE table IP0144T1 for DE 3
+(Processing Code), subfield 1
+(Cardholder Transaction Type) and
+PDS 0158 (Business Activity),
+subfield 4 (Interchange Rate
+Designator) combination.
+Modified to include new TTI C09
+and F09.
+This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
+message:
+• First Presentment/1240
+Collection Only messages excluded.
+© 2026 Mastercard. Proprietary. All rights reserved.
+GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
+Transactions • 16 June 2026 7
+Modified Edit: DE 26 (Acceptor Business Code [MCC])
+Error number Current requirement Modification for this release
+2898 The Clearing System will ensure
+that if PDS 0043 equals a valid
+MoneySend Transaction Type ID,
+then DE 26 must be valid for the
+MoneySend program.
+Modified to include new TTI C09
+and F09.
+This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
+message:
+• First Presentment/1240
+Collection Only messages excluded.
+Modified Edit: PDS 0043 (Transaction Type Identifier)
+Error number Current requirement Modification for this release
+2502 If PDS 0043 (Transaction Type
+Identifier) value equals a
+MoneySend ID in IP0304T1, then
+the Financial Detail Addendum
+Payment Transaction Detail/1644
+(PDS 0501, subfield 1 [Usage
+Code] equals 10 and PDS 0501,
+subfield 2 [Industry Record
+Number] is 000) must be present.
+PDS 0043 validation done in
+common area 150.
+Modified to include new TTI C09.
+This edit is performed in the Dual Message Clearing System for the following message:
+• First Presentment/1240
+Collection Only and Presentment reversal messages are excluded from this edit.
+© 2026 Mastercard. Proprietary. All rights reserved.
+16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
+8 Funding Transactions
+Modified Edit: PDS 0023 (Terminal Type)
+Error number Current requirement Modification for this release
+0022 The Clearing System must ensure
+that if PDS 0158 (Business
+Activity), subfield 4 (Interchange
+Rate Designator) is a MoneySend
+IRD, and DE 3 (Processing Code ),
+subfield 1 (Cardholder Transaction
+Type) equals 28 (Payment
+Transaction) then PDS 0023
+(Terminal Type) must be a value of
+ATM, CT1, CT2, CT6, CT8, or NA.
+Modified to include new TTI C09.
+This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
 messages:
 • First Presentment/1240
 • Second Presentment/1240
 • First Chargeback/1442
-Collection only messages are excluded from this edit.
-New edit: DE 72 (Data Record)
-Error number Requirement
-3189 The Dual Message Clearing System must ensure that
-DE 72 is present whenever DE 25 Message Reason
-Code 4351.
-The edit is performed in the Clearing Optimizer and in the Dual Message Clearing System for the following
+Collection Only messages excluded.
+Modified Edit: DE 38 (Approval Code)
+Error number Current requirement Modification for this release
+1023 The Clearing System must ensure
+that a MoneySend transaction was
+successfully authorized by an
+approved acquirer by presence of
+DE 38.
+Modified to include new TTI C09.
+This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
 message:
-• First Chargeback (Full)/1442-450
-Collection only messages are excluded from this edit.
+• First Presentment/1240
+Collection Only messages excluded.
 © 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13300.2 Introducing Mastercard Send Online Payment Returns • 16 June 2026 7
-New edit: DE 31 (Acquirer Reference Data), subfield 3 (Julian Processing Date YDDD)
-Error number Requirement
-3190 The Dual Message Clearing System must ensure that
-the transaction date is within 90 days of the original
-transaction when DE 25 Message Reason Code 4351.
-The edit is performed in the Clearing Optimizer and in the Dual Message Clearing System for the following
-message:
-• First Chargebacks (Full)/1442-450
-Collection only messages are excluded from this edit.
+GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
+Transactions • 16 June 2026 9
 Error numbers
-The error numbers and messages listed represent edits that are new, modified, or removed to support this
+The error numbers and messages listed represent edits that are new, modified, or deleted to support this
 release announcement.
 Error numbers for new edits
 Field/subfield Error number Error message Edit performed by...
-DE 25 3188 DE25 INVALID VALUE
-NOT ALLOWED FOR THE
-MSGTYPE AND PROC
-CODE COMBINATION.
+PDS 0043 2947 PDS0043 IS NOT VALID
+FOR THE PROCESSING
+CODE/IRD
+COMBINATION
+Dual Message Clearing
+System
+Error numbers for modified edits
+Field/subfield Error number Error message Edit performed by...
+PDS 0043 2275 PDS0043 TRANSACTION
+TYPE ID MUST BE
+PRESENT AND MUST
+CONTAIN A VALID VALUE
 Both
-DE 72 3189 DE72 MUST BE PRESENT
-IF MESSAGE REASON
-CODE IS 4351.
+PDS 0043 1066 DE3 PROCESSING CODE
+AND PDS0043
+TRANSACTION TYPE ID
+COMBINATION INVALID
 Both
-DE 31, s3 3190 TRANSACTION
-PROCESSING DATE
-CANNOT BE GREATER
-THAN 90 DAYS FROM
-ORIGINAL TRANSACTION
-DATE.
+PDS 0043 2947 PDS0043 IS NOT VALID
+FOR THE PROCESSING
+CODE/IRD
+COMBINATION
 Both
-Transaction Investigator
-Mastercard will update the Clearing Transaction Investigator tool to support this release announcement.
+DE 26 2898 DE26 INVALID
+COMBINATION OF DE 26
+AND TRANSACTION TYPE
+IDENTIFIER
+Both
+PDS 0043 2502 PAYMENT TRANSACTION
+DETAIL ADDENDUM
+MUST BE PRESENT
+Dual Message Clearing
+System
+PDS 0023 0022 PDS0023 TERMINAL
+TYPE/PDS0158S4
+INTERCHANGE RATE
+DESIGNATOR CONFLICT
+Both
+DE 38 1023 DE38 APPROVAL CODE
+MUST BE PRESENT
+Both
+© 2026 Mastercard. Proprietary. All rights reserved.
+16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
+10 Funding Transactions
 Single Message System specification changes
 Mastercard will introduce changes to the Single Message System to support this release announcement.
-DE 60 (Advice Reason Code)
-DE 60 (Advice Reason Code) is used to indicate the specific purpose of an advice message.
-© 2026 Mastercard. Proprietary. All rights reserved.
-8 16 June 2026 • GLB 13300.2 Introducing Mastercard Send Online Payment Returns
-Subfield 1 (Advice Reason Code)
-DE 60, subfield 1 contains the advice reason code.
-Usage notes DE 60, subfield 1
-DE 60, subfield 1 message reason code
-Code Description
-489 Chargeback
-Subfield 2 (Advice Reason Detail Code)
-DE 60, subfield 2 contains the advice reason detail code.
-Usage notes DE 60, subfield 2
-DE 60, subfield 2 message reason code
-Code Description
-0051 Reversal – RI Initiated Funds Return
-© 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13300.2 Introducing Mastercard Send Online Payment Returns • 16 June 2026 9
-Subfield 3 (Advice Reason Detail Text)
-DE 60, subfield 3 contains the advice reason detail text.
-© 2026 Mastercard. Proprietary. All rights reserved.
-10 16 June 2026 • GLB 13300.2 Introducing Mastercard Send Online Payment Returns
-DE 60, subfield 3 RI initiated return of funds (applicable to all Mastercard Brands)
-Position Indicator codes Reason
-8-11 RI01 RI must return funds to Sender
-RI02 Receiver refuses the funds
-RI03 Receiver did not collect the funds
-within 30 calendar days of
-authorization
-RI04 RI Compliance or regulatory
-concern
-RI05 Account specified is blocked,
-prohibiting the posting of
-transactions against it
-RI06 Invalid Sender account type
-RI07 Transaction forbidden on this type
-of Receiver's account
-RI08 Sender is not recognized by
-Receiver
-RI09 Reason has not been specified by
-the Receiver
-RI10 Sender’s account information or
-unique identifier required for
-regulatory compliance is either
-insufficient or missing
-RI11 Sender’s name and/or address
-required for regulatory compliance
-is either insufficient or missing
-RI12 Receiver’s name and/or address
-required for regulatory compliance
-is either insufficient or missing
-RI13 Account specified has been closed
-RI14 Fraud
-RI15 Account does not exist or invalid
-RI16 Account limit exceeded
-RI17 Mandatory information is either
-insufficient or missing
-RI18 Duplicate Transaction ID
-RI19 Invalid routing/configuration
-RI20 System error or time out error
-© 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13300.2 Introducing Mastercard Send Online Payment Returns • 16 June 2026 11
-Position Indicator codes Reason
-RI21 Purpose of Payment information is
-insufficient
-RI22 Recipient Government ID is
-incorrect
-RI23 Card Expired
-RI24 Invalid character, length or input
-value
-RI25 Invalid Recipient account type/Bank
-details
-12-60 Future Use
-Single Message System edits
-The Single Message System will perform the following edits.
-Issuer Reversal Advice/0422 message
-When... The Single Message System will...
-an Issuer Reversal Advice/0422 message contains
-DE60 SF1 (Advice Reason Code) = 489 and subfield 2
-(Advice Reason Detail Code) = 0051 and DE 3
-(Processing Code) is not equal to 28 (Payment) and
-the message is not submitted within 90 days of the
-original Financial Transaction Request Message/0200
-reject the message and send an Issuer Reversal Advice
-Response/0432 message with DE 39 (Response Code)
-= 30 (Format Error) with Error code in DE 44
-(Additional Response Data) = 330 (Receiving
-Institution submitted reversal not allowed)
+DE 48 (Additional Data: Private Use)
+DE 48 (Additional Data: Private Use) contains data associated with various Mastercard programs, products,
+and services. DE 48 is used to convey data that is not related to any other ISO-defined data elements. It is a
+variable-length data element used for multiple purposes.
+Subelement 77 (Transaction Type Identifier)
+DE 48, subelement 77 (Transaction Type Identifier) indicates the additional transaction purpose.
+DE 48, subelement 77 values
+Value Description
+C09 Issuer-Initiated P2P
+F09 Issuer-Initiated P2P
+Edits
+Mastercard is updating the existing Single Message System edits on the Financial Transaction Request/0200
+messages for Mastercard MoneySend Payment and Funding Transactions and will be applicable to TTIs C09
+and F09.
 Related documentation
 Information relevant to this release announcement can be found in the documents available on the Technical
 Resource Center within Mastercard Connect®. Depending on timing, information provided in this release
 announcement may not be reflected in a manual until after the effective dates of this release announcement.
-Announcements
-For more information refer to GLB 13351 26.Q4 IPM Mastercard Parameter Extract Table Updates, Release
-26.Q4.
 Reference manuals
 For information about Mastercard processing refer to:
+• Mastercard Move - MoneySend and Funding Transactions Program Standards
 • Mastercard Network Processing Dual Message Clearing System Guide
+• Mastercard Network Processing Dual Message Authorization System Guide
 • Mastercard Network Processing Single Message System Guide
 Other media
 Statements made in videos presented at the Customer Technical Conference are current when the video was
 recorded. Videos are currently available only for those announcements presented at the Customer Technical
-© 2026 Mastercard. Proprietary. All rights reserved.
-12 16 June 2026 • GLB 13300.2 Introducing Mastercard Send Online Payment Returns
 Conference. Mastercard may update announcements without updating the corresponding video. Refer to the
 most recent version of the announcement on the Technical Resource Center for the most up-to-date
 information.
-GLB 13300 Introducing Mastercard Send Online Payment Returns, Customer Technical Conference, May 2026
 © 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13300.2 Introducing Mastercard Send Online Payment Returns • 16 June 2026 13
+GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
+Transactions • 16 June 2026 11
+GLB 13264 Identifying Issuer-Initiated Person-to-Person Payment and Funding Transactions, Customer
+Technical Conference, May 2026
+© 2026 Mastercard. Proprietary. All rights reserved.
+16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
+12 Funding Transactions
