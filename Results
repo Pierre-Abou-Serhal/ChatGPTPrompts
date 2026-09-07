@@ -1,8 +1,1 @@
-https://sandbox.api.visa.com/forexrates/v2/foreignexchangerates
-
-{
-  "initiatingPartyId": 1002,
-  "rateProductCode": "BANK",
-  "destinationCurrencyCode": "USD",
-  "sourceCurrencyCode": "EUR",
-  "quoteIdRequired": true
+https://developer.mastercard.com/mastercard-send/documentation/send-at-a-glance/#payment-types
