@@ -1,435 +1,101 @@
 Type:
-Switching Release Announcement
+Bulletin announcement
+Category:
+Rules/Standards
 Audience:
 Acquirer
+Branded Processor
 Issuer
-Processor
 Network Enablement Partner
+Processor
+Send - Mastercard Send Reseller
+Send - Send Service Provider
+Send - Send Transaction Initiator
 Region:
-Global
+Europe
+Latin America and the Caribbean
+Middle East/Africa
 Brand:
 Mastercard®
 Debit Mastercard
 Maestro®
-Cirrus®
-Release:
-26.Q4
+Product or service:
+Send by Mastercard Move
 Action indicator:
-Mandated: Acquirer, Issuer
-System:
-Dual Message Authorization System
-Dual Message Clearing System
-Single Message System
+Informational
 Published:
-16 June 2026
+14 July 2026
 Effective:
-23 October 2026
+16 June 2026
 Overview
-Mastercard is introducing Transaction Type Identifiers (TTIs) for Issuer-
-Initiated Person-to-Person (P2P) transactions as part of the Mastercard
-MoneySend Payment and Funding Transactions Program.
+Mastercard is revising the Mastercard Move - MoneySend and Funding
+Transactions Program Standards - Geographic Availability of Service
+Addendum.
 Effective date details
-Date Time Details
-23 October 2026 01:00 to 09:00 U.S.
-Central Time
-06:00 to 14:00 UTC
-Dual Message
-Authorization System
-18:00 to 23:59 U.S.
-Central Time
-23:00 to 04:59 UTC
-(+1D)
-Dual Message
-Clearing System
-02:00 to 05:00 U.S.
-Central Time
-07:00 to 10:00 UTC
-Single Message
-System
+Date Details
+16 June 2026 Revised Standards become effective.
 Customer benefit
-The new TTIs enable customers to identify and differentiate P2P
-transaction types as part of the Mastercard MoneySend Payment and
-Funding Transactions Program to support more accurate reporting,
-billing, and program optimization.
+Customers participating in the Mastercard Move – MoneySend and
+Funding Transactions Program will benefit from the expanded list of
+available countries and additional types of transactions.
 What Mastercard is doing
-Mastercard is introducing two TTIs within the Mastercard MoneySend
-Payment and Funding Transactions Program for issuer-initiated P2P
-transactions.
-Background
-Mastercard supports different types of P2P transactions as part of the
-Mastercard MoneySend Payment and Funding Transactions Program.
-Given the continued evolution of P2P payment solutions, it is important
-to differentiate transaction types under P2P.
-GLB 13264.2 Identifying Issuer-Initiated Person-to-Person
-Payment and Funding Transactions
+Mastercard is expanding the list of additional types of transactions in
+Latin America and the Caribbean, Europe, and Middle East/Africa
+regions for the Mastercard Move – MoneySend and Funding Transactions
+Program Standards – Geographic Availability of Service Addendum.
+NOTE: The changes to the Mastercard Move – MoneySend and Funding
+Transactions Program Standards – Geographic Availability of Service
+Addendum detailed in this bulletin announcement are effective as of
+the date of publication of this announcement.
+EUR/LAC/MEA 13872.2 Revised Standards for Mastercard
+Move - MoneySend and Funding Transactions Program
+Standards - Geographic Availability of Service Addendum
 © 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding Transactions • 16
-June 2026 1
-Usage of the new TTIs must be approved on a case-by-case basis, based on specific criteria and geographic
-availability to be defined and communicated separately.
+EUR/LAC/MEA 13872.2 Revised Standards for Mastercard Move - MoneySend and Funding
+Transactions Program Standards - Geographic Availability of Service Addendum • 14 July 2026 1
 Version history
 Date Description of change
-16 June 2026 Added:
-• Clarification in the customer impact section for acquirers approved to
-use the new TTIs
-• System Release 26.Q4 v1 Combined Dual and Single Message Annex to
-the Testing section
-• Other media to Related documentation
-21 April 2026 Initial publication date
-Customer impact
-This table represents a high-level overview of the impact as detailed in later sections of this announcement.
-Impact overview
-Audience Card type System connections Impact type Action indicator
-Acquirer Consumer:
-• Credit
-• Debit
-• Prepaid
-Commercial:
-• Credit
-• Debit
-• Prepaid
-Dual Message
-Authorization
-Dual Message
-Clearing
-Single Message
-System
-Data element
-definitions
-IPM MPE
-Edits/Error numbers
-Mandated
-Issuer Consumer:
-• Credit
-• Debit
-• Prepaid
-Commercial:
-• Credit
-• Debit
-• Prepaid
-Dual Message
-Authorization
-Dual Message
-Clearing
-Single Message
-System
-Data element
-definitions
-IPM MPE
-Edits/Error numbers
-Mandated
+14 July 2026 Added Bosnia and Herzegovina to the Domestic column of the Countries
+approved table in Section 2.7.5 Cash-in at ATM - Payment Transaction
+(as originally announced in GLB 13174).
+16 June 2026 Initial publication date
+Overview of revised Standards
+Mastercard will update the Mastercard Move – MoneySend and Funding Transactions Program Standards –
+Geographic Availability of Service Addendum to reflect the changes detailed in this bulletin announcement.
+Mastercard will update the Mastercard Move – MoneySend and Funding Transactions Program Standards –
+Geographic Availability of Service Addendum to modify the countries in which Mastercard will make the
+MoneySend and Funding Transactions Program available:
+• Chapter 2 Geographic availability of Service
+– Section 2.3 Europe Region
+– Section 2.3.1 Geographic availability for Europe Region
+– Section 2.4. Latin America and the Caribbean Region
+– Section 2.4.1 Geographic availability for Latin America and the Caribbean Region
+– Section 2.5 Middle East/Africa Region
+– Section 2.5.1 Geographic availability for Middle East/Africa Region
+– Section 2.7 Geographic Availability of Additional Types of Transactions
+– Section 2.7.1 MoneySend Payment Transactions involving funds from the sale of Cryptocurrency
+– Section 2.7.2 Funding Transaction into a Cryptocurrency Account
+– Section 2.7.3 Funding Transaction into a Gaming or Gambling Account
+– Section 2.7.5 Cash-In at ATM – Payment Transaction
+– Section 2.7.6 Cash-In at Point of Sale (POS) - Payment Transactions
+– Section 2.7.13 Gaming Payment Transaction
+Revised Standards
+To view the revision, refer to the attachment associated with this bulletin announcement, which shows
+underlining for additions and strikethrough for deletions.
+Related information
+• GLB 13174 Revised Standards for Mastercard MoneySend and Funding Transactions Program Standards
+Addendum for Geographic Availability of Service (excluding Canada Region)
+• Mastercard Move – MoneySend and Funding Transactions Program Standards – Geographic Availability of
+Service Addendum
+• Mastercard Move – MoneySend and Funding Transactions Program Standards
 © 2026 Mastercard. Proprietary. All rights reserved.
-16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
-2 Funding Transactions
-Acquirer, Issuer: Mandated
-Acquirers approved to use the new TTIs as part of the Mastercard MoneySend Payment and Funding
-Transactions Program must be prepared to populate or support the new values C09 (Issuer-Initiated P2P) and
-F09 (Issuer-Initiated P2P) in:
-• Data Element (DE) 48 (Additional Data: Private Use), subelement 77 (Transaction Type Identifier)
-• Private Data Subelement (PDS) 0043 (Transaction Type Identifier)
-Issuers participating in the Mastercard MoneySend Payment and Funding Transactions Program must be
-prepared to receive the new values C09 and F09 in:
-• DE 48, subelement 77
-• PDS 0043
-Acquirers approved to use the new TTIs and issuers participating in the Mastercard MoneySend Payment and
-Funding Transactions Program must:
-• Support the new and modified edits
-• Be aware of Integrated Product Message (IPM) Mastercard Parameter Extract (MPE) changes detailed in
-this release announcement
-Impacted switch transactions
-How a customer connects to Mastercard determines the applicable switch transactions message types. This
-release announcement affects the message flows marked in the table.
-Impacted switch transactions
-Acquirer to Mastercard Mastercard to issuer Impacted
-Dual Message System Dual Message System √
-Single Message System √
-Single Message System Single Message System √
-Dual Message System √
-Testing
-Mastercard recommends testing to support the enhancements described in this release announcement.
-Review the System Release 26.Q4 v1 Combined Dual and Single Message Annex for complete testing details
-and tables. Note that the testing information remains applicable and available for up to four releases. These
-test cases verify that the required audience for the relevant system accurately processes transactions in
-alignment with the specifications outlined in this release announcement.
+14 July 2026 • EUR/LAC/MEA 13872.2 Revised Standards for Mastercard Move -
+MoneySend and Funding Transactions Program Standards - Geographic Availability of
+2 Service Addendum
+Questions
+Customers with questions about the information in this bulletin announcement should select Create a case on
+the Technical Resource Center to create a case in Support Case Management.
 © 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
-Transactions • 16 June 2026 3
-System impact
-For items marked Yes, details are available in the corresponding sections.
-System impact
-Topic
-Dual Message
-Authorization
-System
-Dual Message
-Clearing System
-Single Message
-System
-Data element definitions Yes Yes Yes
-IPM MPE No Yes No
-Interchange programs No Yes No
-Edits Yes Yes Yes
-Error numbers No Yes No
-Dual Message Authorization System specification changes
-Mastercard will introduce changes to the Dual Message Authorization System to support this release
-announcement.
-DE 48 (Additional Data: Private Use)
-DE 48 (Additional Data: Private Use) contains data associated with various Mastercard programs, products,
-and services. DE 48 is used to convey data that is not related to any other ISO-defined data elements. It is a
-variable-length data element used for multiple purposes.
-Subelement 77 (Transaction Type Identifier)
-DE 48, subelement 77 (Transaction Type Identifier) indicates the type of additional transaction purpose.
-DE 48, subelement 77 values
-Value Description
-C09 Issuer-Initiated P2P
-F09 Issuer-Initiated P2P
-Edits
-Mastercard is updating the existing Dual Message Authorization System edits on the Authorization Request/
-0100 messages and Reversal Request/0400 messages for Mastercard MoneySend Payment and Funding
-Transactions and will be applicable to TTIs C09 and F09.
-© 2026 Mastercard. Proprietary. All rights reserved.
-16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
-4 Funding Transactions
-Dual Message Clearing System specification changes
-Mastercard will introduce changes to the Dual Message Clearing System to support this release announcement.
-PDS 0043 (Transaction Type Identifier)
-PDS 0043 (Transaction Type Identifier) monitors and tracks a participant’s activity in special promotion
-programs.
-PDS 0043 values
-Value Description
-C09 Issuer-Initiated P2P
-F09 Issuer-Initiated P2P
-IPM MPE
-Mastercard will update the following IPM MPE tables to support this release announcement.
-IPM MPE tables
-Table Modified fields
-IP0015T1: IPM Error Messages Error Number, IPM Error Message Text
-IP0304T1: Transaction Type Identifier and AB Code Transaction Type Identifier
-IP3001T1: Payment Transaction Type Codes N/A
-Interchange programs
-For Funding Transactions, Transaction Type Identifier (TTI) F09: Issuer-Initiated P2P will leverage the existing
-IRD Q2: General Person-to-Person. For Payment Transactions, TTI C09: Issuer-Initiated P2P will leverage the
-existing IRD Q2: General Person-to-Person.
-© 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
-Transactions • 16 June 2026 5
-Edits
-Mastercard will add new edits, modify existing edits, or remove existing edits to support this release
-announcement.
-New edit: PDS 0043 (Transaction Type Identifier)
-Error number Requirement
-2947 The Dual Message Clearing System will ensure that
-PDS 0043 (Transaction Type Identifier) must be
-present and contain the valid value C09 or F09.
-This edit is performed in the Dual Message Clearing System for the following message:
-• First Presentment/1240
-Collection Only messages excluded.
-Modified Edit: PDS 0043 (Transaction Type Identifier)
-Error number Current requirement Modification for this release
-2275 If DE 3, subfield 1 is equal to 28,
-then PDS 0043 must contain a
-valid value.
-Adding values C09: Issuer-Initiated
-P2P and F09: Issuer-Initiated P2P
-in the Valid Value table IP3001T1:
-Payment Transaction Type Codes.
-This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
-message:
-• First Presentment/1240
-Collection Only messages excluded.
-© 2026 Mastercard. Proprietary. All rights reserved.
-16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
-6 Funding Transactions
-Modified Edit: PDS 0043 (Transaction Type Identifier)
-Error number Current requirement Modification for this release
-1066 The Clearing System must ensure
-that if PDS 0043 (Transaction Type
-Identifier) is present and equal valid
-MoneySend ID, then DE 3, subfield
-1 must equal 28 (Payment
-Transaction) or 20 (Return/Refund
-Transaction) or 00 (Funding
-Transaction). PDS 0043 Validation
-is done in IP0304T1.
-Modified to include new TTI C09
-and F09.
-This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
-message:
-• First Presentment/1240
-Collection Only messages excluded.
-Modified Edit: PDS 0043 (Transaction Type Identifier)
-Error number Current requirement Modification for this release
-2947 PDS 0043 (Transaction Type
-Identifier) must be present and
-contain a valid value found on IPM
-MPE table IP0144T1 for DE 3
-(Processing Code), subfield 1
-(Cardholder Transaction Type) and
-PDS 0158 (Business Activity),
-subfield 4 (Interchange Rate
-Designator) combination.
-Modified to include new TTI C09
-and F09.
-This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
-message:
-• First Presentment/1240
-Collection Only messages excluded.
-© 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
-Transactions • 16 June 2026 7
-Modified Edit: DE 26 (Acceptor Business Code [MCC])
-Error number Current requirement Modification for this release
-2898 The Clearing System will ensure
-that if PDS 0043 equals a valid
-MoneySend Transaction Type ID,
-then DE 26 must be valid for the
-MoneySend program.
-Modified to include new TTI C09
-and F09.
-This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
-message:
-• First Presentment/1240
-Collection Only messages excluded.
-Modified Edit: PDS 0043 (Transaction Type Identifier)
-Error number Current requirement Modification for this release
-2502 If PDS 0043 (Transaction Type
-Identifier) value equals a
-MoneySend ID in IP0304T1, then
-the Financial Detail Addendum
-Payment Transaction Detail/1644
-(PDS 0501, subfield 1 [Usage
-Code] equals 10 and PDS 0501,
-subfield 2 [Industry Record
-Number] is 000) must be present.
-PDS 0043 validation done in
-common area 150.
-Modified to include new TTI C09.
-This edit is performed in the Dual Message Clearing System for the following message:
-• First Presentment/1240
-Collection Only and Presentment reversal messages are excluded from this edit.
-© 2026 Mastercard. Proprietary. All rights reserved.
-16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
-8 Funding Transactions
-Modified Edit: PDS 0023 (Terminal Type)
-Error number Current requirement Modification for this release
-0022 The Clearing System must ensure
-that if PDS 0158 (Business
-Activity), subfield 4 (Interchange
-Rate Designator) is a MoneySend
-IRD, and DE 3 (Processing Code ),
-subfield 1 (Cardholder Transaction
-Type) equals 28 (Payment
-Transaction) then PDS 0023
-(Terminal Type) must be a value of
-ATM, CT1, CT2, CT6, CT8, or NA.
-Modified to include new TTI C09.
-This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
-messages:
-• First Presentment/1240
-• Second Presentment/1240
-• First Chargeback/1442
-Collection Only messages excluded.
-Modified Edit: DE 38 (Approval Code)
-Error number Current requirement Modification for this release
-1023 The Clearing System must ensure
-that a MoneySend transaction was
-successfully authorized by an
-approved acquirer by presence of
-DE 38.
-Modified to include new TTI C09.
-This edit is performed in the Clearing Optimizer and the Dual Message Clearing System for the following
-message:
-• First Presentment/1240
-Collection Only messages excluded.
-© 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
-Transactions • 16 June 2026 9
-Error numbers
-The error numbers and messages listed represent edits that are new, modified, or deleted to support this
-release announcement.
-Error numbers for new edits
-Field/subfield Error number Error message Edit performed by...
-PDS 0043 2947 PDS0043 IS NOT VALID
-FOR THE PROCESSING
-CODE/IRD
-COMBINATION
-Dual Message Clearing
-System
-Error numbers for modified edits
-Field/subfield Error number Error message Edit performed by...
-PDS 0043 2275 PDS0043 TRANSACTION
-TYPE ID MUST BE
-PRESENT AND MUST
-CONTAIN A VALID VALUE
-Both
-PDS 0043 1066 DE3 PROCESSING CODE
-AND PDS0043
-TRANSACTION TYPE ID
-COMBINATION INVALID
-Both
-PDS 0043 2947 PDS0043 IS NOT VALID
-FOR THE PROCESSING
-CODE/IRD
-COMBINATION
-Both
-DE 26 2898 DE26 INVALID
-COMBINATION OF DE 26
-AND TRANSACTION TYPE
-IDENTIFIER
-Both
-PDS 0043 2502 PAYMENT TRANSACTION
-DETAIL ADDENDUM
-MUST BE PRESENT
-Dual Message Clearing
-System
-PDS 0023 0022 PDS0023 TERMINAL
-TYPE/PDS0158S4
-INTERCHANGE RATE
-DESIGNATOR CONFLICT
-Both
-DE 38 1023 DE38 APPROVAL CODE
-MUST BE PRESENT
-Both
-© 2026 Mastercard. Proprietary. All rights reserved.
-16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
-10 Funding Transactions
-Single Message System specification changes
-Mastercard will introduce changes to the Single Message System to support this release announcement.
-DE 48 (Additional Data: Private Use)
-DE 48 (Additional Data: Private Use) contains data associated with various Mastercard programs, products,
-and services. DE 48 is used to convey data that is not related to any other ISO-defined data elements. It is a
-variable-length data element used for multiple purposes.
-Subelement 77 (Transaction Type Identifier)
-DE 48, subelement 77 (Transaction Type Identifier) indicates the additional transaction purpose.
-DE 48, subelement 77 values
-Value Description
-C09 Issuer-Initiated P2P
-F09 Issuer-Initiated P2P
-Edits
-Mastercard is updating the existing Single Message System edits on the Financial Transaction Request/0200
-messages for Mastercard MoneySend Payment and Funding Transactions and will be applicable to TTIs C09
-and F09.
-Related documentation
-Information relevant to this release announcement can be found in the documents available on the Technical
-Resource Center within Mastercard Connect®. Depending on timing, information provided in this release
-announcement may not be reflected in a manual until after the effective dates of this release announcement.
-Reference manuals
-For information about Mastercard processing refer to:
-• Mastercard Move - MoneySend and Funding Transactions Program Standards
-• Mastercard Network Processing Dual Message Clearing System Guide
-• Mastercard Network Processing Dual Message Authorization System Guide
-• Mastercard Network Processing Single Message System Guide
-Other media
-Statements made in videos presented at the Customer Technical Conference are current when the video was
-recorded. Videos are currently available only for those announcements presented at the Customer Technical
-Conference. Mastercard may update announcements without updating the corresponding video. Refer to the
-most recent version of the announcement on the Technical Resource Center for the most up-to-date
-information.
-© 2026 Mastercard. Proprietary. All rights reserved.
-GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and Funding
-Transactions • 16 June 2026 11
-GLB 13264 Identifying Issuer-Initiated Person-to-Person Payment and Funding Transactions, Customer
-Technical Conference, May 2026
-© 2026 Mastercard. Proprietary. All rights reserved.
-16 June 2026 • GLB 13264.2 Identifying Issuer-Initiated Person-to-Person Payment and
-12 Funding Transactions
+EUR/LAC/MEA 13872.2 Revised Standards for Mastercard Move - MoneySend and
+Funding Transactions Program Standards - Geographic Availability of Service
+Addendum • 14 July 2026 3
