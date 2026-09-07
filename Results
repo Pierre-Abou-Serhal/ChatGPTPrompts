@@ -1,1 +1,279 @@
-https://developer.mastercard.com/mastercard-send/documentation/send-at-a-glance/#payment-types
+Type:
+Switching Release Announcement
+Audience:
+Acquirer
+Issuer
+Processor
+Network Enablement Partner
+Region:
+Global
+Brand:
+Mastercard®
+Debit Mastercard
+Maestro®
+Cirrus®
+Release:
+26.Q4
+Action indicator:
+Mandated: Acquirer
+Informational: Issuer
+System:
+Dual Message Authorization System
+Single Message System
+Published:
+16 June 2026
+Effective:
+10 November 2026
+Overview
+Mastercard is introducing a capability to detect and decline duplicate
+authorization request messages for MoneySend Payment Transactions
+and Gaming Payment Transactions.
+Effective date details
+Date Time Details
+10 November 2026 01:00 to 09:00 U.S.
+Central Time
+07:00 to 15:00 UTC
+Dual Message
+Authorization System
+02:00 to 05:00 U.S.
+Central Time
+08:00 to 11:00 UTC
+Single Message
+System
+Customer benefit
+The new feature:
+• Helps reduce the risk of duplicate processing
+• Creates a smoother and more reliable payment experience
+What Mastercard is doing
+Mastercard is introducing an Authorization Request Duplicate Protection
+capability on the Mastercard Network that detects and declines
+duplicate authorization requests for MoneySend Payment Transactions
+and Gaming Payment Transactions based on certain criteria.
+This capability verifies for MoneySend Payment and Gaming Payment
+Transaction Request/0100 messages and Financial Transaction Request/
+0200 messages switched on the Mastercard Network (the "New
+Message") whether or not they meet the following conditions in relation
+to previously effected authorization request message (the "Original
+Message")
+1. Both the Original Message and the New Message were
+authorization requests for MoneySend Payment or a Gaming
+Payment Transaction.
+2. Both the Original Message and the New Message were switched
+over the Mastercard Network.
+GLB 12943.2 Preventing Duplicate MoneySend Payment
+Transactions and Gaming Payment Transactions
+© 2026 Mastercard. Proprietary. All rights reserved.
+GLB 12943.2 Preventing Duplicate MoneySend Payment Transactions and Gaming Payment
+Transactions • 16 June 2026 1
+3. Both the Original Message and the New Message transmitted the exact same values in all the following
+fields:
+a. DE 2 (Primary Account Number [PAN])
+b. DE 7 (Transmission Date and Time)
+c. DE 11 (Systems Trace Audit Number [STAN])
+d. DE 32 (Acquiring Institution ID Code)
+e. DE 33 (Forwarding Institution ID Code)
+f. DE 42 (Acceptor ID)
+4. The New Message was submitted to the Mastercard network no sooner than 60 seconds after the Original
+message and no later than 24 hours after the Original Message.
+Outcome
+Condition Action by Mastercard Network
+A request message (Authorization Request/0100 or
+Financial Transaction Request/0200) was assessed to
+be a duplicate (all conditions for duplicate apply).
+Does not deliver the request message to the Issuer
+(Receiving Institution). Automatically generates and
+delivers a response message (Authorization Request
+Response/0110 or Financial Transaction Request
+Response/0210) to the Acquirer (Originating
+Institution). The response message delivered to the
+Acquirer is coded as follows:
+• DE 39 (Response Code) = 94 (Duplicate
+transmission detected)
+• DE 48 (Additional Data Private Use) SE 84
+(Merchant Advice Code) is coded with a code that
+describes the status of the Original Message
+Version history
+Date Description of change
+16 June 2026 Added:
+• System Release 26.Q4 v1 Combined Dual Message Annex to the
+Testing section
+• Other media to Related documentation
+17 March 2026 Revised effective date to align with release 26.Q4
+20 January 2026 Initial publication date
+© 2026 Mastercard. Proprietary. All rights reserved.
+16 June 2026 • GLB 12943.2 Preventing Duplicate MoneySend Payment Transactions and
+2 Gaming Payment Transactions
+Customer impact
+This table represents a high-level overview of the impact as detailed in later sections of this announcement.
+Impact overview
+Audience Card type System connections Impact type Action indicator
+Acquirer Consumer:
+• Credit
+• Debit
+• Prepaid
+Commercial:
+• Credit
+• Debit
+• Prepaid
+Dual Message
+Authorization
+Single Message
+System
+Data element
+definitions
+Mandated
+Issuer Consumer:
+• Credit
+• Debit
+• Prepaid
+Commercial:
+• Credit
+• Debit
+• Prepaid
+Dual Message
+Authorization
+Single Message
+System
+Data element
+definitions
+Informational
+Acquirer: Mandated
+Acquirers (Originating Institutions) must be prepared to receive an Authorization Request Response/0110 or
+Financial Transaction Request Response/0210 message with decline response code 94 (Duplicate transmission
+detected) in DE 39 (Response Code) result when a MoneySend Payment Transaction or Gaming Payment
+Transaction is duplicated.
+Acquirers (Originating Institutions) must support three new values in data element (DE) 48 (Additional Data:
+Private Use), subelement 84 (Merchant Advice Code), shown in the specification changes section of this
+announcement.
+Issuer: Informational
+When Mastercard detects a duplicate MoneySend Payment Transaction or Gaming Payment Transaction
+message, Mastercard will respond to the originator with decline response code value 94 (Duplicate transmission
+detected) in DE 39 (Response Code). No advice message is sent to the Issuer (Receiving Institution).
+Issuers (Receiving Institutions) should be aware of the new Merchant Advice Code values as described in the
+Data Element tables in this release announcement.
+© 2026 Mastercard. Proprietary. All rights reserved.
+GLB 12943.2 Preventing Duplicate MoneySend Payment Transactions and Gaming
+Payment Transactions • 16 June 2026 3
+Impacted switch transactions
+How a customer connects to Mastercard determines the applicable switch transactions message types. This
+release announcement affects the message flows marked in the table.
+Impacted switch transactions
+Acquirer to Mastercard Mastercard to issuer Impacted
+Dual Message System Dual Message System √
+Single Message System √
+Single Message System Single Message System √
+Dual Message System √
+Message flows
+Mastercard will detect duplications of MoneySend Payment and Gaming Payment Authorization Request/0100
+and Financial Transaction Request/0200 messages. The detection criteria will include:
+• DE 2 (Primary Account Number [PAN])
+• DE 7 (Transmission Date and Time) - up to minutes will be considered
+• DE 11 (Systems Trace Audit Number [STAN])
+• DE 32 (Acquiring Institution ID Code)
+• DE 33 (Forwarding Institution ID Code), when present
+• DE 42 (Acceptor ID), when present
+Mastercard will automatically decline duplicate requests by generating an Authorization Request Response/
+0110 or Financial Transaction Request Response/0210 message containing:
+• DE 39 (Response Code), existing value 94 (Duplicate transmission detected)
+• DE 48 (Additional Data: Private Use), subelement 84 (Merchant Advice Code) new value as described in the
+data element tables in this release announcement
+Testing
+Mastercard recommends testing to support the enhancements described in this release announcement.
+Review the System Release 26.Q4 v1 Combined Dual and Single Message Annex for complete testing details
+and tables. Note that the testing information remains applicable and available for up to four releases. These
+test cases verify that the required audience for the relevant system accurately processes transactions in
+alignment with the specifications outlined in this release announcement.
+© 2026 Mastercard. Proprietary. All rights reserved.
+16 June 2026 • GLB 12943.2 Preventing Duplicate MoneySend Payment Transactions and
+4 Gaming Payment Transactions
+System impact
+For items marked √ (Yes), details are available in the corresponding sections.
+System impact
+Topic
+Dual Message
+Authorization
+System
+Dual Message
+Clearing System
+Single Message
+System
+Message flows
+Message layouts
+Data element definitions √ √
+IPM MPE
+Interchange programs
+AB programs, descriptions, and associated MCCs
+Edits
+Error numbers
+Alternate processing
+Interchange compliance
+Pricing and fees
+Reports
+Bulk files
+Forms
+Quarterly Mastercard reporting
+Transaction Investigator
+SAFE
+Single Message Transaction Manager
+250-byte Batch Data File
+80-byte Financial Institution Table File
+© 2026 Mastercard. Proprietary. All rights reserved.
+GLB 12943.2 Preventing Duplicate MoneySend Payment Transactions and Gaming
+Payment Transactions • 16 June 2026 5
+Dual Message Authorization System specification changes
+Mastercard will introduce changes to the Dual Message Authorization System to support this release
+announcement.
+DE 48 (Additional Data: Private Use)
+DE 48 (Additional Data: Private Use) contains data associated with various Mastercard programs, products,
+and services. DE 48 is used to convey data that is not related to any other ISO-defined data elements. It is a
+variable-length data element used for multiple purposes.
+Subelement 84 (Merchant Advice Code)
+DE 48, subelement 84 (Merchant Advice Code) contains the merchant advice code.
+Values
+Value Description
+06 Original message approved
+07 Original message declined
+08 Original message approval status unknown
+NOTE: Merchant Advice Code values 06, 07, 08 apply only to MoneySend Payment Transactions and Gaming
+Payment Transactions.
+Single Message System specification changes
+Mastercard will introduce changes to the Single Message System to support this release announcement.
+DE 48 (Additional Data: Private Use)
+DE 48 (Additional Data: Private Use) contains data associated with various Mastercard programs, products,
+and services. DE 48 is used to convey data that is not related to any other ISO-defined data elements. It is a
+variable-length data element used for multiple purposes.
+Subelement 84 (Merchant Advice Code)
+DE 48, subelement 84 (Merchant Advice Code) contains the merchant advice code.
+Values
+Value Description
+06 Original message approved
+07 Original message declined
+© 2026 Mastercard. Proprietary. All rights reserved.
+16 June 2026 • GLB 12943.2 Preventing Duplicate MoneySend Payment Transactions and
+6 Gaming Payment Transactions
+Value Description
+08 Original message approval status unknown
+NOTE: Merchant Advice Code values 06, 07, 08 apply only to MoneySend Payment Transactions and Gaming
+Payment Transactions.
+Related documentation
+Information relevant to this release announcement can be found in the documents available on the Technical
+Resource Center within Mastercard Connect®. Depending on timing, information provided in this release
+announcement may not be reflected in a manual until after the effective dates of this release announcement.
+Reference manuals
+For information about Mastercard processing refer to:
+• Mastercard MoneySend and Funding Transactions Implementation and Operations for MIP Connections
+• Mastercard Network Processing Dual Message Authorization System Guide
+• Mastercard Network Processing Single Message System Guide
+• Mastercard Move - MoneySend and Funding Transactions Program Standards
+• Mastercard Gaming and Gambling Payments Program Standards
+Other media
+Statements made in videos presented at the Customer Technical Conference are current when the video was
+recorded. Videos are currently available only for those announcements presented at the Customer Technical
+Conference. Mastercard may update announcements without updating the corresponding video. Refer to the
+most recent version of the announcement on the Technical Resource Center for the most up-to-date
+information.
+GLB 12943 Preventing Duplicate MoneySend Payment Transactions and Gaming Payment Transactions,
+Customer Technical Conference, May 2026
+© 2026 Mastercard. Proprietary. All rights reserved.
+GLB 12943.2 Preventing Duplicate MoneySend Payment Transactions and Gaming
+Payment Transactions • 16 June 2026 7
