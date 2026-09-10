@@ -1,313 +1,273 @@
-using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+USE [Alterna_MobileMoneyTransfer]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_ExpireTransfer]    Script Date: 9/10/2026 10:44:12 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_ExpireTransfer]
+    @P__TransferReference NVARCHAR(255),
+    @P__ExpiredStatus NVARCHAR(255),
+    @P__PendingStatus NVARCHAR(255),
+	@P__TransferExpiryHours INT,
+	@P__RowCount INT OUTPUT,
+    @P__Error NVARCHAR(4000) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-namespace BAL;
+	SET @P__RowCount = 0;
+    SET @P__Error = NULL;
 
-public class BackgroundTaskService(
-    IServiceScopeFactory scopeFactory,
-    IOptionsMonitor<GlobalSettings> globalSettings,
-    ILogger<BackgroundTaskService> logger)
-    : BackgroundService
-{
-    private readonly GlobalSettings _globalSettings = globalSettings.CurrentValue;
+    IF NOT EXISTS (SELECT 1 FROM t_Transfer WHERE TransferReference = @P__TransferReference)
+    BEGIN
+       SET @P__Error = 'Transfer not found.';
+	   RETURN;
+    END
+    ELSE
+    BEGIN
+        UPDATE t_Transfer
+        SET 
+            [Status] = @P__ExpiredStatus,
+            LastModifiedDate = GETDATE()
+        WHERE 
+            TransferReference = @P__TransferReference
+			AND [Status] = @P__PendingStatus
+			AND GETDATE() >= DATEADD(HOUR, @P__TransferExpiryHours, CreatedDate);
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                JsonSerializerOptions indentedOptions = new JsonSerializerOptions()
-                {
-                    WriteIndented = true,
-                };
+		SET @P__RowCount = @@ROWCOUNT;
+    END
 
-                using var scope = scopeFactory.CreateScope();
-                Bal bal = scope.ServiceProvider.GetRequiredService<Bal>();
+END
 
-                String correlationId = Guid.NewGuid().ToString();
+USE [Alterna_MobileMoneyTransfer]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_GetTransfer]    Script Date: 9/10/2026 10:44:34 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_GetTransfer]
+    @P__TransferReference NVARCHAR(255) = NULL,
+    @P__SenderCustomerId NVARCHAR(255) = NULL,
+    @P__SenderExternalId NVARCHAR(255) = NULL,
+    @P__SenderLoginCustomerId NVARCHAR(255) = NULL,
+    @P__SenderDebitAccount NVARCHAR(255) = NULL,
+    @P__SenderDebitCommission DECIMAL(18, 4) = NULL,
+    @P__SenderFirstName NVARCHAR(255) = NULL,
+    @P__SenderMiddleName NVARCHAR(255) = NULL,
+    @P__SenderLastName NVARCHAR(255) = NULL,
+    @P__SenderMobileNumber NVARCHAR(255) = NULL,
+    @P__InternalAccountNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCustomerId NVARCHAR(255) = NULL,
+    @P__ReceiverExternalId NVARCHAR(255) = NULL,
+    @P__ReceiverFirstName NVARCHAR(255) = NULL,
+    @P__ReceiverMiddleName NVARCHAR(255) = NULL,
+    @P__ReceiverLastName NVARCHAR(255) = NULL,
+    @P__ReceiverMobileNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCreditAccountNumber NVARCHAR(255) = NULL,
+    @P__SentTransferFt NVARCHAR(255) = NULL,
+    @P__ReceivedTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalReason NVARCHAR(255) = NULL,
+    @P__TransferCurrency NVARCHAR(255) = NULL,
+    @P__TransferAmount DECIMAL(18, 4) = NULL,
+    @P__Status NVARCHAR(MAX) = NULL,
+    @P__Notes NVARCHAR(MAX) = NULL,
+    @P__FromDate DATETIME2(3) = NULL,
+    @P__ToDate DATETIME2(3) = NULL,
+	@P__TransferExpiryHours INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT * 
+    FROM t_Transfer 
+    WHERE 
+        (@P__TransferReference IS NULL OR TransferReference = @P__TransferReference)
+        AND (@P__SenderCustomerId IS NULL OR SenderCustomerId = @P__SenderCustomerId)
+        AND (@P__SenderExternalId IS NULL OR SenderExternalId = @P__SenderExternalId)
+        AND (@P__SenderLoginCustomerId IS NULL OR SenderLoginCustomerId = @P__SenderLoginCustomerId)
+        AND (@P__SenderDebitAccount IS NULL OR SenderDebitAccount = @P__SenderDebitAccount)
+        AND (@P__SenderDebitCommission IS NULL OR SenderDebitCommission = @P__SenderDebitCommission)
+        AND (@P__SenderFirstName IS NULL OR SenderFirstName = @P__SenderFirstName)
+        AND (@P__SenderMiddleName IS NULL OR SenderMiddleName = @P__SenderMiddleName)
+        AND (@P__SenderLastName IS NULL OR SenderLastName = @P__SenderLastName)
+        AND (@P__SenderMobileNumber IS NULL OR SenderMobileNumber = @P__SenderMobileNumber)
+        AND (@P__InternalAccountNumber IS NULL OR InternalAccountNumber = @P__InternalAccountNumber)
+        AND (@P__ReceiverCustomerId IS NULL OR ReceiverCustomerId = @P__ReceiverCustomerId)
+        AND (@P__ReceiverExternalId IS NULL OR ReceiverExternalId = @P__ReceiverExternalId)
+        AND (@P__ReceiverFirstName IS NULL OR ReceiverFirstName = @P__ReceiverFirstName)
+        AND (@P__ReceiverMiddleName IS NULL OR ReceiverMiddleName = @P__ReceiverMiddleName)
+        AND (@P__ReceiverLastName IS NULL OR ReceiverLastName = @P__ReceiverLastName)
+        AND (@P__ReceiverMobileNumber IS NULL OR ReceiverMobileNumber = @P__ReceiverMobileNumber)
+        AND (@P__ReceiverCreditAccountNumber IS NULL OR ReceiverCreditAccountNumber = @P__ReceiverCreditAccountNumber)
+        AND (@P__SentTransferFt IS NULL OR SentTransferFt = @P__SentTransferFt)
+        AND (@P__ReceivedTransferFt IS NULL OR ReceivedTransferFt = @P__ReceivedTransferFt)
+        AND (@P__ReversalTransferFt IS NULL OR ReversalTransferFt = @P__ReversalTransferFt)
+        AND (@P__ReversalReason IS NULL OR ReversalReason = @P__ReversalReason)
+        AND (@P__TransferCurrency IS NULL OR TransferCurrency = @P__TransferCurrency)
+        AND (@P__TransferAmount IS NULL OR TransferAmount = @P__TransferAmount)
+        AND (@P__Status IS NULL OR [Status] IN (SELECT VALUE FROM STRING_SPLIT(@P__Status, ',')))
+        
+        -- Wildcard Partial Match for Notes
+        AND (@P__Notes IS NULL OR Notes LIKE '%' + @P__Notes + '%')
+        
+        -- Date Range Queries
+        AND (@P__FromDate IS NULL OR CreatedDate >= @P__FromDate)
+        AND (@P__ToDate IS NULL OR CreatedDate <= @P__ToDate)
 
-                List<Transfer> pendingExpiredTransfers = await bal.GetTransfer(new()
-                {
-                  BaseReq = new()
-                  {
-                    CorrelationId = correlationId,
-                    Channel = "Windows Service",
-                    Platform = "Alterna"
-                  },
-                  Status = TransferStatus.Pending,
-                  TransferExpiryHours = _globalSettings.TransferExpiryHours
+		AND (@P__TransferExpiryHours IS NULL OR GETDATE() >= DATEADD(HOUR, @P__TransferExpiryHours, CreatedDate))
+		ORDER BY CreatedDate DESC;
+END
 
-                });
+USE [Alterna_MobileMoneyTransfer]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_UpdateTransfer]    Script Date: 9/10/2026 10:44:41 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_UpdateTransfer]
+    @P__TransferReference NVARCHAR(255),
+    @P__SenderCustomerId NVARCHAR(255) = NULL,
+    @P__SenderExternalId NVARCHAR(255) = NULL,
+    @P__SenderLoginCustomerId NVARCHAR(255) = NULL,
+    @P__SenderDebitAccount NVARCHAR(255) = NULL,
+    @P__SenderDebitCommission DECIMAL(18, 4) = NULL,
+    @P__SenderFirstName NVARCHAR(255) = NULL,
+    @P__SenderMiddleName NVARCHAR(255) = NULL,
+    @P__SenderLastName NVARCHAR(255) = NULL,
+    @P__SenderMobileNumber NVARCHAR(255) = NULL,
+    @P__InternalAccountNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCustomerId NVARCHAR(255) = NULL,
+    @P__ReceiverExternalId NVARCHAR(255) = NULL,
+    @P__ReceiverFirstName NVARCHAR(255) = NULL,
+    @P__ReceiverMiddleName NVARCHAR(255) = NULL,
+    @P__ReceiverLastName NVARCHAR(255) = NULL,
+    @P__ReceiverMobileNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCreditAccountNumber NVARCHAR(255) = NULL,
+    @P__SentTransferFt NVARCHAR(255) = NULL,
+    @P__ReceivedTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalReason NVARCHAR(255) = NULL,
+    @P__TransferCurrency NVARCHAR(255) = NULL,
+    @P__TransferAmount DECIMAL(18, 4) = NULL,
+	@P__TransferExpiryHours INT,
+    @P__Status NVARCHAR(255),
+    @P__Notes NVARCHAR(4000) = NULL,
+    @P__Error NVARCHAR(4000) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET @P__Error = NULL;
 
-                List<Transfer> expiredTransfers = [];
+    IF NOT EXISTS (SELECT 1 FROM t_Transfer WHERE TransferReference = @P__TransferReference)
+    BEGIN
+        INSERT INTO t_Transfer (
+            TransferReference, 
+            SenderCustomerId, 
+            SenderExternalId, 
+            SenderLoginCustomerId,
+            SenderDebitAccount, 
+            SenderDebitCommission, 
+            SenderFirstName,
+            SenderMiddleName,
+            SenderLastName,
+            SenderMobileNumber,
+            InternalAccountNumber, 
+            ReceiverCustomerId, 
+            ReceiverExternalId, 
+            ReceiverFirstName,
+            ReceiverMiddleName,
+            ReceiverLastName,
+            ReceiverMobileNumber, 
+            ReceiverCreditAccountNumber, 
+            SentTransferFt, 
+            ReceivedTransferFt, 
+            ReversalTransferFt, 
+            ReversalReason,
+            TransferCurrency, 
+            TransferAmount, 
+            [Status],
+            Notes
+        )
+        VALUES (
+            @P__TransferReference, 
+            @P__SenderCustomerId, 
+            @P__SenderExternalId, 
+            @P__SenderLoginCustomerId, 
+            @P__SenderDebitAccount, 
+            @P__SenderDebitCommission, 
+            @P__SenderFirstName,
+            @P__SenderMiddleName,
+            @P__SenderLastName,
+            @P__SenderMobileNumber,
+            @P__InternalAccountNumber,
+            @P__ReceiverCustomerId,
+            @P__ReceiverExternalId, 
+            @P__ReceiverFirstName,
+            @P__ReceiverMiddleName,
+            @P__ReceiverLastName,
+            @P__ReceiverMobileNumber,
+            @P__ReceiverCreditAccountNumber, 
+            @P__SentTransferFt, 
+            @P__ReceivedTransferFt, 
+            @P__ReversalTransferFt, 
+            @P__ReversalReason,
+            @P__TransferCurrency,
+            @P__TransferAmount, 
+            @P__Status,
+            @P__Notes
+        );
+    END
+    ELSE
+    BEGIN
 
-                if (pendingExpiredTransfers.Count > 0)
-                {
-                    logger.LogInformation($"Pending expired transfers: {pendingExpiredTransfers.Count} \n {JsonSerializer.Serialize(pendingExpiredTransfers, indentedOptions)}");
+        UPDATE t_Transfer
+        SET 
+            SenderCustomerId = COALESCE(@P__SenderCustomerId, SenderCustomerId),
+            SenderExternalId = COALESCE(@P__SenderExternalId, SenderExternalId),
+            SenderLoginCustomerId = COALESCE(@P__SenderLoginCustomerId, SenderLoginCustomerId),
+            SenderDebitAccount = COALESCE(@P__SenderDebitAccount, SenderDebitAccount),
+            SenderDebitCommission = COALESCE(@P__SenderDebitCommission, SenderDebitCommission),
+            SenderFirstName = COALESCE(@P__SenderFirstName, SenderFirstName),
+            SenderMiddleName = COALESCE(@P__SenderMiddleName, SenderMiddleName),
+            SenderLastName = COALESCE(@P__SenderLastName, SenderLastName),
+            SenderMobileNumber = COALESCE(@P__SenderMobileNumber, SenderMobileNumber),
+            InternalAccountNumber = COALESCE(@P__InternalAccountNumber, InternalAccountNumber),
+            ReceiverCustomerId = COALESCE(@P__ReceiverCustomerId, ReceiverCustomerId),
+            ReceiverExternalId = COALESCE(@P__ReceiverExternalId, ReceiverExternalId),
+            ReceiverFirstName = COALESCE(@P__ReceiverFirstName, ReceiverFirstName),
+            ReceiverMiddleName = COALESCE(@P__ReceiverMiddleName, ReceiverMiddleName),
+            ReceiverLastName = COALESCE(@P__ReceiverLastName, ReceiverLastName),
+            ReceiverMobileNumber = COALESCE(@P__ReceiverMobileNumber, ReceiverMobileNumber),
+            ReceiverCreditAccountNumber = COALESCE(@P__ReceiverCreditAccountNumber, ReceiverCreditAccountNumber),
+            SentTransferFt = COALESCE(@P__SentTransferFt, SentTransferFt),
+            ReceivedTransferFt = COALESCE(@P__ReceivedTransferFt, ReceivedTransferFt),
+            ReversalTransferFt = COALESCE(@P__ReversalTransferFt, ReversalTransferFt),
+            ReversalReason = COALESCE(@P__ReversalReason, ReversalReason),
+            TransferCurrency = COALESCE(@P__TransferCurrency, TransferCurrency),
+            TransferAmount = COALESCE(@P__TransferAmount, TransferAmount),
 
-                    foreach (Transfer pendingExpiredTransfer in pendingExpiredTransfers)
-                    {
-                      Int32 res = await bal.ExpireTransferAlterna(new ()
-                      {
-                        TransferReference = pendingExpiredTransfer.TransferReference,
-                        TransferExpiryHours =_globalSettings.TransferExpiryHours,
-                        ExpiredStatus = TransferStatus.Expired,
-                        PendingStatus = TransferStatus.Pending
-                      });
+            [Status] = 
+			CASE 
+				WHEN 
+					[Status] = 'PENDING'
+					AND @P__Status IN ('ACCEPTED', 'CANCELLED', 'REJECTED') 
+					AND GETDATE() >= DATEADD(HOUR, @P__TransferExpiryHours, CreatedDate) THEN 'EXPIRED'
+				ELSE @P__Status
+			END,
 
-                      // successfully set transfer to expired in DB
-                      if (res == 1)
-                        expiredTransfers.Add(pendingExpiredTransfer);
-                    }
+            Notes = COALESCE(@P__Notes, Notes),
+            LastModifiedDate = GETDATE()
+        WHERE 
+            TransferReference = @P__TransferReference;
+    END
 
-                    logger.LogInformation($"Expired transfers: {expiredTransfers.Count} \n {JsonSerializer.Serialize(expiredTransfers, indentedOptions)}");
+    SELECT TOP 1 * 
+    FROM t_Transfer 
+    WHERE 
+        TransferReference = @P__TransferReference;
 
-                    ExpireFtOsbResponse[] returnedTransfers =  await bal.ExpireFtOsb(expiredTransfers);
-
-                    logger.LogInformation($"Transfer Cancelled From OSB: {returnedTransfers.Length} \n {JsonSerializer.Serialize(returnedTransfers, indentedOptions)}");
-
-                    foreach (ExpireFtOsbResponse returnedTransfer in returnedTransfers)
-                    {
-                      await bal.UpdateTransfer(new()
-                        {
-                            BaseReq = new()
-                            {
-                                CorrelationId = correlationId,
-                                Channel = "Windows Service",
-                                Platform = "Alterna"
-                            },
-                            TransferReference = returnedTransfer.TransferId,
-                            Status = returnedTransfer.ReturnCode == OSBProcessTransferResponseCode.Success
-                              ? TransferStatus.Expired
-                              : TransferStatus.Failed,
-                        });
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex.Message);
-            }
-
-            Int64 intervalInSeconds = _globalSettings.BackgroundTaskIntervalInSeconds;
-
-            Console.WriteLine(intervalInSeconds);
-            try
-            {
-                await Task.Delay(TimeSpan.FromSeconds(intervalInSeconds), stoppingToken);
-            }
-            catch (TaskCanceledException)
-            {
-                break;
-            }
-        }
-    }
-}
-
-
-using System.Data;
-using System.Text.Json;
-using Microsoft.Extensions.Options;
-using DAL;
-using Dapper;
-using EmailSenderTokenGenerator;
-using Microsoft.Extensions.Logging;
-using static BAL.CustomExceptions;
-
-namespace BAL;
-
-public partial class Bal
-{
-  private readonly GlobalSettings _globalSettings;
-  private readonly IHttpClientFactory _httpClientFactory;
-  private readonly ILogger<BackgroundTaskService> _logger;
-
-  public Bal(IOptionsMonitor<GlobalSettings> globalSettings, IHttpClientFactory httpClientFactory, ILogger<BackgroundTaskService> logger)
-  {
-    _globalSettings = globalSettings.CurrentValue;
-    _httpClientFactory = httpClientFactory;
-    _logger = logger;
-  }
-
-  public async Task<Transfer> UpdateTransfer(UpdateTransferRequest request)
-  {
-      DapperDal dal = new DapperDal(_globalSettings.ConnString);
-
-      DynamicParameters parameters = new DynamicParameters();
-      parameters.Add("P__TransferReference", request.TransferReference);
-      parameters.Add("P__SenderCustomerId", request.SenderCustomerId);
-      parameters.Add("P__SenderExternalId", request.SenderExternalId);
-      parameters.Add("P__SenderLoginCustomerId", request.SenderLoginCustomerId);
-      parameters.Add("P__SenderDebitAccount", request.SenderDebitAccount);
-      parameters.Add("P__SenderDebitCommission", request.SenderDebitCommission);
-      parameters.Add("P__SenderFirstName", request.SenderFirstName);
-      parameters.Add("P__SenderMiddleName", request.SenderMiddleName);
-      parameters.Add("P__SenderLastName", request.SenderLastName);
-      parameters.Add("P__SenderMobileNumber", request.SenderMobileNumber);
-      parameters.Add("P__InternalAccountNumber", request.InternalAccountNumber);
-      parameters.Add("P__ReceiverCustomerId", request.ReceiverCustomerId);
-      parameters.Add("P__ReceiverExternalId", request.ReceiverExternalId);
-      parameters.Add("P__ReceiverFirstName", request.ReceiverFirstName);
-      parameters.Add("P__ReceiverMiddleName", request.ReceiverMiddleName);
-      parameters.Add("P__ReceiverLastName", request.ReceiverLastName);
-      parameters.Add("P__ReceiverMobileNumber", request.ReceiverMobileNumber);
-      parameters.Add("P__ReceiverCreditAccountNumber", request.ReceiverCreditAccountNumber);
-      parameters.Add("P__SentTransferFt", request.SentTransferFt);
-      parameters.Add("P__ReceivedTransferFt", request.ReceivedTransferFt);
-      parameters.Add("P__ReversalTransferFt", request.ReversalTransferFt);
-      parameters.Add("P__ReversalReason", request.ReversalReason);
-      parameters.Add("P__TransferCurrency", request.TransferCurrency);
-      parameters.Add("P__TransferAmount", request.TransferAmount);
-      parameters.Add("P__TransferExpiryHours", _globalSettings.TransferExpiryHours);
-      parameters.Add("P__Status", request.Status);
-      parameters.Add("P__Notes", request.Notes);
-      parameters.Add("P__Error", dbType: DbType.String, direction: ParameterDirection.Output, size: 4000);
-
-      IEnumerable<Transfer> res = await dal.ExecuteQueryAsync<Transfer>("usp_UpdateTransfer", parameters, CommandType.StoredProcedure, DapperDal.CommandDirection.Update);
-
-      String storedProcedureErrorMessage = parameters.Get<String>("P__Error");
-
-      if (!String.IsNullOrWhiteSpace(storedProcedureErrorMessage))
-      {
-          throw new SGBLBadRequestException(storedProcedureErrorMessage);
-      }
-
-      return res.FirstOrDefault() ?? throw new SGBLBadRequestException("Transfer not returned from DB");
-  }
-
-  public async Task<List<Transfer>> GetTransfer(GetTransferRequest request)
-  {
-      DapperDal dal = new DapperDal(_globalSettings.ConnString);
-
-      DynamicParameters parameters = new DynamicParameters();
-      parameters.Add("P__TransferReference", request.TransferReference);
-      parameters.Add("P__SenderCustomerId", request.SenderCustomerId);
-      parameters.Add("P__SenderExternalId", request.SenderExternalId);
-      parameters.Add("P__SenderLoginCustomerId", request.SenderLoginCustomerId);
-      parameters.Add("P__SenderDebitAccount", request.SenderDebitAccount);
-      parameters.Add("P__SenderDebitCommission", request.SenderDebitCommission);
-      parameters.Add("P__SenderFirstName", request.SenderFirstName);
-      parameters.Add("P__SenderMiddleName", request.SenderMiddleName);
-      parameters.Add("P__SenderLastName", request.SenderLastName);
-      parameters.Add("P__SenderMobileNumber", request.SenderMobileNumber);
-      parameters.Add("P__InternalAccountNumber", request.InternalAccountNumber);
-      parameters.Add("P__ReceiverCustomerId", request.ReceiverCustomerId);
-      parameters.Add("P__ReceiverExternalId", request.ReceiverExternalId);
-      parameters.Add("P__ReceiverFirstName", request.ReceiverFirstName);
-      parameters.Add("P__ReceiverMiddleName", request.ReceiverMiddleName);
-      parameters.Add("P__ReceiverLastName", request.ReceiverLastName);
-      parameters.Add("P__ReceiverMobileNumber", request.ReceiverMobileNumber);
-      parameters.Add("P__ReceiverCreditAccountNumber", request.ReceiverCreditAccountNumber);
-      parameters.Add("P__SentTransferFt", request.SentTransferFt);
-      parameters.Add("P__ReceivedTransferFt", request.ReceivedTransferFt);
-      parameters.Add("P__ReversalTransferFt", request.ReversalTransferFt);
-      parameters.Add("P__ReversalReason", request.ReversalReason);
-      parameters.Add("P__TransferCurrency", request.TransferCurrency);
-      parameters.Add("P__TransferAmount", request.TransferAmount);
-      parameters.Add("P__Status", request.Status);
-      parameters.Add("P__Notes", request.Notes);
-      parameters.Add("P__FromDate", request.FromDate);
-      parameters.Add("P__ToDate", request.ToDate);
-      parameters.Add("P__TransferExpiryHours", request.TransferExpiryHours);
-
-      IEnumerable<Transfer> res = await dal.ExecuteQueryAsync<Transfer>("usp_GetTransfer", parameters, CommandType.StoredProcedure, DapperDal.CommandDirection.Select);
-
-      return res.ToList();
-  }
-
-  #region Cancel FT
-  public async Task<ExpireFtOsbResponse[]> ExpireFtOsb(List<Transfer> pendingTransfers)
-  {
-      IEnumerable<Task<ExpireFtOsbResponse>> tasks = pendingTransfers
-        .Select(async i =>
-      {
-          try
-          {
-              ExpireFtOSBRequest request = new ExpireFtOSBRequest()
-              {
-                  CorrelationId = Guid.NewGuid().ToString(),
-                  TransferId = i.TransferReference,
-                  CustomerId = Int32.Parse(i.SenderCustomerId!),
-                  ExternalId = i.SenderExternalId!,
-                  Action = OSBProcessTransferStatus.Expired,
-                  Platform = "Alterna",
-                  Channel = "Windows Service"
-              };
-
-              (ExpireFtOsbResponse expireFtOsbResponse, _) =
-                  await PostAsync<ExpireFtOsbResponse>(request,
-                      $"{_globalSettings.OSBEndpointUrl}Moma/processTransfer");
-
-              return expireFtOsbResponse;
-          }
-          catch (Exception ex)
-          {
-              _logger.LogError($"Error occured while cancelling transfer: {i.TransferReference} by calling OSB API. \nError: {ex.Message}");
-
-              String sendEmailUsername = "AlternaSysUser";
-              String emailSubject = $"Technical error occured while cancelling {_globalSettings.AppUsername} transfer through OSB. Transfer Ref: {i.TransferReference}";
-
-              SendEmailRequest sendEmailRequest = new()
-              {
-                  Username = sendEmailUsername,
-                  CorrelationId = i.TransferReference,
-                  PublicKey = TokenGenerator.GeneratePublicKey(sendEmailUsername, i.TransferReference, _globalSettings.EmailSalt),
-                  EmailParameters = new()
-                  {
-                      EmailFrom = _globalSettings.SendEmailFrom,
-                      EmailTo = _globalSettings.AlternaErrorSendEmailTo,
-                      Subject = emailSubject,
-                      Body = $"{_globalSettings.AppUsername} Transfer Reference: {i.TransferReference}. \nError Reason: {ex.Message}. \n Please contact support to check this issue.",
-                  }
-              };
-
-              JsonSerializerOptions indentedOptions = new JsonSerializerOptions()
-              {
-                  WriteIndented = true
-              };
-
-              _logger.LogInformation($"Sending Email From Alterna With The Following Request: \n{JsonSerializer.Serialize(sendEmailRequest, indentedOptions)}");
-
-              await PostAsync<dynamic>(sendEmailRequest, $"{_globalSettings.SendEmailApiUrl}api/Email/SendEmail");
-
-              return new ExpireFtOsbResponse();
-          }
-      });
-
-      ExpireFtOsbResponse[] response = await Task.WhenAll(tasks);
-
-      return response;
-  }
-  #endregion
-
-  #region ExpireTransferAlterna
-  public async Task<Int32> ExpireTransferAlterna(ExpireTransferAlternaRequest request)
-  {
-      DapperDal dal = new DapperDal(_globalSettings.ConnString);
-
-      DynamicParameters parameters = new DynamicParameters();
-      parameters.Add("P__TransferReference", request.TransferReference);
-      parameters.Add("P__ExpiredStatus", request.ExpiredStatus);
-      parameters.Add("P__PendingStatus", request.PendingStatus);
-      parameters.Add("P__TransferExpiryHours", request.TransferExpiryHours);
-      parameters.Add("P__RowCount", dbType: DbType.Int32, direction: ParameterDirection.Output);
-      parameters.Add("P__Error", dbType: DbType.String, direction: ParameterDirection.Output, size: 4000);
-
-      await dal.ExecuteQueryAsync<Transfer>("usp_ExpireTransfer", parameters, CommandType.StoredProcedure, DapperDal.CommandDirection.Select);
-
-      String storedProcedureErrorMessage = parameters.Get<String>("P__Error");
-      Int32 rowCount = parameters.Get<Int32>("P__RowCount");
-
-      if (!String.IsNullOrWhiteSpace(storedProcedureErrorMessage))
-      {
-        throw new SGBLBadRequestException(storedProcedureErrorMessage);
-      }
-
-      return rowCount;
-  }
-  #endregion
-}
+END
