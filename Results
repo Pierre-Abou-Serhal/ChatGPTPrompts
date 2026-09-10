@@ -1,50 +1,376 @@
-xquery version "1.0" encoding "utf-8";
+-- Complete procedures for Alterna_MobileMoneyTransfer.
+-- ADDED / CHANGED comments identify the changes from the supplied procedures.
+-- No transfer statuses or table columns are added.
+--
+-- Integration requirements:
+--   processTransfer: first UpdateTransfer before T24 -> IsInitialAction = true.
+--   submit, result updates, error updates and background final updates -> false.
+--   Initial OSB GetTransfer lookup: reference only; status/expiry filters unset.
+--   Background: call OSB only when usp_ExpireTransfer returns P__RowCount = 1.
+--   Customer pending lists: omit rows without a completed sender posting.
+--
+-- Review assumptions:
+--   TransferReference uniquely identifies a row.
+--   Existing GETDATE()/CreatedDate time convention is retained.
+--   EXPIRED -> EXPIRED is for the reserved background expiry call; it is not
+--   an idempotency guarantee for arbitrary repeated expiry requests.
+--   The initial branch uses direct OUTPUT INSERTED.*. If t_Transfer has enabled
+--   UPDATE triggers, adapt this to OUTPUT INTO before running it.
+--   No procedures have been executed against the user's database.
 
-(:: OracleAnnotationVersion "1.0" ::)
+USE [Alterna_MobileMoneyTransfer]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_ExpireTransfer]    Script Date: 9/10/2026 10:44:12 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_ExpireTransfer]
+    @P__TransferReference NVARCHAR(255),
+    @P__ExpiredStatus NVARCHAR(255),
+    @P__PendingStatus NVARCHAR(255),
+    @P__TransferExpiryHours INT,
+    @P__RowCount INT OUTPUT,
+    @P__Error NVARCHAR(4000) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-declare namespace ns2="http://www.sgbl.com.lb/UpdateTransferReq";
-(:: import schema at "../../../../../../Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.UpdateTransferReq.xsd" ::)
-declare namespace ns1="http://www.sgbl.com.lb/submitReq";
-(:: import schema at "../../xsd/submitReq.xsd" ::)
+    SET @P__RowCount = 0;
+    SET @P__Error = NULL;
 
-declare variable $request as element() (:: schema-element(ns1:submitReq) ::) external;
-declare variable $receiverCreditAccountNumber as xs:string external;
-declare variable $receiverFirstName as xs:string external;
-declare variable $receiverMiddleName as xs:string external;
-declare variable $receiverLastName as xs:string external;
-declare variable $receiverCustomerId as xs:string external;
-declare variable $receiverExternalId as xs:string external;
-declare variable $commission as xs:string external;
-declare variable $internalAccount as xs:string external;
-declare function local:func($commission,$receiverCustomerId,$receiverExternalId,$receiverCreditAccountNumber,$receiverFirstName,$receiverMiddleName,$receiverLastName,$request as element() (:: schema-element(ns1:submitReq) ::)) as element() (:: schema-element(ns2:UpdateTransferReq) ::) {
-    <ns2:UpdateTransferReq>
-        <ns2:baseReq>
-            <ns2:correlationId>{fn:data($request/ns1:correlationId)}</ns2:correlationId>
-            <ns2:channel>{fn:data($request/ns1:channel)}</ns2:channel>
-            <ns2:platform>{fn:data($request/ns1:platform)}</ns2:platform>
-        </ns2:baseReq>
-        <ns2:transferReference>{fn:data($request/ns1:correlationId)}</ns2:transferReference>
-        <ns2:senderCustomerId>{fn:substring($request/ns1:account/text(), 3, 7)}</ns2:senderCustomerId>
-        <ns2:senderExternalId>{fn:data($request/ns1:externalId)}</ns2:senderExternalId>
-        <ns2:senderLoginCustomerId>{fn:data($request/ns1:customerId)}</ns2:senderLoginCustomerId>
-        <ns2:senderFirstName>{fn:data($request/ns1:senderFirstName)}</ns2:senderFirstName>
-        <ns2:senderMiddleName>{fn:data($request/ns1:senderMiddleName)}</ns2:senderMiddleName>
-        <ns2:senderLastName>{fn:data($request/ns1:senderLastName)}</ns2:senderLastName>
-        <ns2:senderDebitAccount>{fn:data($request/ns1:account)}</ns2:senderDebitAccount>
-        <ns2:senderDebitCommission>{$commission}</ns2:senderDebitCommission>
-        <ns2:internalAccountNumber>{dvmtr:lookupValue('core/dvm/InternalBankAccountsBeneficiaries','Service','MOMA','AccountNumber','',('Currency',fn:data($request/ns1:currency),'Location','SEND'))}</ns2:internalAccountNumber>
-        <ns2:receiverCustomerId>{$receiverCustomerId}</ns2:receiverCustomerId>
-        <ns2:receiverExternalId>{$receiverExternalId}</ns2:receiverExternalId>
-        <ns2:receiverMobileNumber>{fn:concat(fn:data($request/ns1:countryCode),fn:data($request/ns1:mobileNumber))}</ns2:receiverMobileNumber>
-        <ns2:receiverCreditAccountNumber>{$receiverCreditAccountNumber}</ns2:receiverCreditAccountNumber>
-        <ns2:receiverFirstName>{$receiverFirstName}</ns2:receiverFirstName>
-        <ns2:receiverMiddleName>{$receiverMiddleName}</ns2:receiverMiddleName>
-        <ns2:receiverLastName>{$receiverLastName}</ns2:receiverLastName>
-        <ns2:transferCurrency>{fn:data($request/ns1:currency)}</ns2:transferCurrency>
-        <ns2:transferAmount>{fn:data($request/ns1:amount)}</ns2:transferAmount>
-        <ns2:notes>{fn:data($request/ns1:notes)}</ns2:notes>
-        <ns2:status>PENDING</ns2:status>
-    </ns2:UpdateTransferReq>
-};
+    IF NOT EXISTS (SELECT 1 FROM t_Transfer WHERE TransferReference = @P__TransferReference)
+    BEGIN
+       SET @P__Error = 'Transfer not found.';
+       RETURN;
+    END
+    ELSE
+    BEGIN
+        UPDATE t_Transfer
+        SET
+            [Status] = @P__ExpiredStatus,
+            LastModifiedDate = GETDATE()
+        WHERE
+            TransferReference = @P__TransferReference
+            AND [Status] = @P__PendingStatus
+            -- ADDED: Do not expire a transfer whose sender posting is unfinished.
+            AND NULLIF(LTRIM(RTRIM(SentTransferFt)), '') IS NOT NULL
+            AND GETDATE() >= DATEADD(HOUR, @P__TransferExpiryHours, CreatedDate);
 
-local:func($commission,$receiverCustomerId,$receiverExternalId,$receiverCreditAccountNumber,$receiverFirstName,$receiverMiddleName,$receiverLastName,$request)
+        SET @P__RowCount = @@ROWCOUNT;
+    END
+
+END
+GO
+
+-- UNCHANGED: All existing GetTransfer filters are preserved.
+USE [Alterna_MobileMoneyTransfer]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_GetTransfer]    Script Date: 9/10/2026 10:44:34 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_GetTransfer]
+    @P__TransferReference NVARCHAR(255) = NULL,
+    @P__SenderCustomerId NVARCHAR(255) = NULL,
+    @P__SenderExternalId NVARCHAR(255) = NULL,
+    @P__SenderLoginCustomerId NVARCHAR(255) = NULL,
+    @P__SenderDebitAccount NVARCHAR(255) = NULL,
+    @P__SenderDebitCommission DECIMAL(18, 4) = NULL,
+    @P__SenderFirstName NVARCHAR(255) = NULL,
+    @P__SenderMiddleName NVARCHAR(255) = NULL,
+    @P__SenderLastName NVARCHAR(255) = NULL,
+    @P__SenderMobileNumber NVARCHAR(255) = NULL,
+    @P__InternalAccountNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCustomerId NVARCHAR(255) = NULL,
+    @P__ReceiverExternalId NVARCHAR(255) = NULL,
+    @P__ReceiverFirstName NVARCHAR(255) = NULL,
+    @P__ReceiverMiddleName NVARCHAR(255) = NULL,
+    @P__ReceiverLastName NVARCHAR(255) = NULL,
+    @P__ReceiverMobileNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCreditAccountNumber NVARCHAR(255) = NULL,
+    @P__SentTransferFt NVARCHAR(255) = NULL,
+    @P__ReceivedTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalReason NVARCHAR(255) = NULL,
+    @P__TransferCurrency NVARCHAR(255) = NULL,
+    @P__TransferAmount DECIMAL(18, 4) = NULL,
+    @P__Status NVARCHAR(MAX) = NULL,
+    @P__Notes NVARCHAR(MAX) = NULL,
+    @P__FromDate DATETIME2(3) = NULL,
+    @P__ToDate DATETIME2(3) = NULL,
+    @P__TransferExpiryHours INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT *
+    FROM t_Transfer
+    WHERE
+        (@P__TransferReference IS NULL OR TransferReference = @P__TransferReference)
+        AND (@P__SenderCustomerId IS NULL OR SenderCustomerId = @P__SenderCustomerId)
+        AND (@P__SenderExternalId IS NULL OR SenderExternalId = @P__SenderExternalId)
+        AND (@P__SenderLoginCustomerId IS NULL OR SenderLoginCustomerId = @P__SenderLoginCustomerId)
+        AND (@P__SenderDebitAccount IS NULL OR SenderDebitAccount = @P__SenderDebitAccount)
+        AND (@P__SenderDebitCommission IS NULL OR SenderDebitCommission = @P__SenderDebitCommission)
+        AND (@P__SenderFirstName IS NULL OR SenderFirstName = @P__SenderFirstName)
+        AND (@P__SenderMiddleName IS NULL OR SenderMiddleName = @P__SenderMiddleName)
+        AND (@P__SenderLastName IS NULL OR SenderLastName = @P__SenderLastName)
+        AND (@P__SenderMobileNumber IS NULL OR SenderMobileNumber = @P__SenderMobileNumber)
+        AND (@P__InternalAccountNumber IS NULL OR InternalAccountNumber = @P__InternalAccountNumber)
+        AND (@P__ReceiverCustomerId IS NULL OR ReceiverCustomerId = @P__ReceiverCustomerId)
+        AND (@P__ReceiverExternalId IS NULL OR ReceiverExternalId = @P__ReceiverExternalId)
+        AND (@P__ReceiverFirstName IS NULL OR ReceiverFirstName = @P__ReceiverFirstName)
+        AND (@P__ReceiverMiddleName IS NULL OR ReceiverMiddleName = @P__ReceiverMiddleName)
+        AND (@P__ReceiverLastName IS NULL OR ReceiverLastName = @P__ReceiverLastName)
+        AND (@P__ReceiverMobileNumber IS NULL OR ReceiverMobileNumber = @P__ReceiverMobileNumber)
+        AND (@P__ReceiverCreditAccountNumber IS NULL OR ReceiverCreditAccountNumber = @P__ReceiverCreditAccountNumber)
+        AND (@P__SentTransferFt IS NULL OR SentTransferFt = @P__SentTransferFt)
+        AND (@P__ReceivedTransferFt IS NULL OR ReceivedTransferFt = @P__ReceivedTransferFt)
+        AND (@P__ReversalTransferFt IS NULL OR ReversalTransferFt = @P__ReversalTransferFt)
+        AND (@P__ReversalReason IS NULL OR ReversalReason = @P__ReversalReason)
+        AND (@P__TransferCurrency IS NULL OR TransferCurrency = @P__TransferCurrency)
+        AND (@P__TransferAmount IS NULL OR TransferAmount = @P__TransferAmount)
+        AND (@P__Status IS NULL OR [Status] IN (SELECT VALUE FROM STRING_SPLIT(@P__Status, ',')))
+
+        -- Wildcard Partial Match for Notes
+        AND (@P__Notes IS NULL OR Notes LIKE '%' + @P__Notes + '%')
+
+        -- Date Range Queries
+        AND (@P__FromDate IS NULL OR CreatedDate >= @P__FromDate)
+        AND (@P__ToDate IS NULL OR CreatedDate <= @P__ToDate)
+
+        AND (@P__TransferExpiryHours IS NULL OR GETDATE() >= DATEADD(HOUR, @P__TransferExpiryHours, CreatedDate))
+        ORDER BY CreatedDate DESC;
+END
+GO
+
+USE [Alterna_MobileMoneyTransfer]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_UpdateTransfer]    Script Date: 9/10/2026 10:44:41 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_UpdateTransfer]
+    @P__TransferReference NVARCHAR(255),
+    @P__SenderCustomerId NVARCHAR(255) = NULL,
+    @P__SenderExternalId NVARCHAR(255) = NULL,
+    @P__SenderLoginCustomerId NVARCHAR(255) = NULL,
+    @P__SenderDebitAccount NVARCHAR(255) = NULL,
+    @P__SenderDebitCommission DECIMAL(18, 4) = NULL,
+    @P__SenderFirstName NVARCHAR(255) = NULL,
+    @P__SenderMiddleName NVARCHAR(255) = NULL,
+    @P__SenderLastName NVARCHAR(255) = NULL,
+    @P__SenderMobileNumber NVARCHAR(255) = NULL,
+    @P__InternalAccountNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCustomerId NVARCHAR(255) = NULL,
+    @P__ReceiverExternalId NVARCHAR(255) = NULL,
+    @P__ReceiverFirstName NVARCHAR(255) = NULL,
+    @P__ReceiverMiddleName NVARCHAR(255) = NULL,
+    @P__ReceiverLastName NVARCHAR(255) = NULL,
+    @P__ReceiverMobileNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCreditAccountNumber NVARCHAR(255) = NULL,
+    @P__SentTransferFt NVARCHAR(255) = NULL,
+    @P__ReceivedTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalReason NVARCHAR(255) = NULL,
+    @P__TransferCurrency NVARCHAR(255) = NULL,
+    @P__TransferAmount DECIMAL(18, 4) = NULL,
+    @P__TransferExpiryHours INT,
+    @P__Status NVARCHAR(255),
+    @P__Notes NVARCHAR(4000) = NULL,
+    @P__Error NVARCHAR(4000) OUTPUT,
+    -- ADDED: Set to 1 only for the first processTransfer update before T24.
+    @P__IsInitialAction BIT = 0
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET @P__Error = NULL;
+
+    -- ADDED START: Validate/reserve an initial processing action atomically.
+    -- This is used for APPROVE/REJECT/CANCEL/EXPIRED processing, not creation.
+    -- P__Status contains the mapped database status, e.g. ACCEPTED for APPROVE.
+    IF @P__IsInitialAction = 1
+    BEGIN
+        IF @P__Status IS NULL
+           OR @P__Status NOT IN ('ACCEPTED', 'CANCELLED', 'REJECTED', 'EXPIRED')
+        BEGIN
+            SET @P__Error = 'Invalid transfer action.';
+            RETURN;
+        END;
+
+        IF @P__TransferExpiryHours IS NULL
+           OR @P__TransferExpiryHours <= 0
+        BEGIN
+            SET @P__Error = 'Invalid transfer expiry hours.';
+            RETURN;
+        END;
+
+        DECLARE @ActionDate DATETIME = GETDATE();
+
+        UPDATE dbo.t_Transfer
+        SET
+            [Status] =
+                CASE
+                    WHEN @ActionDate >= DATEADD(
+                        HOUR, @P__TransferExpiryHours, CreatedDate
+                    )
+                    THEN 'EXPIRED'
+                    ELSE @P__Status
+                END,
+            ReversalReason =
+                CASE
+                    WHEN @ActionDate >= DATEADD(
+                        HOUR, @P__TransferExpiryHours, CreatedDate
+                    )
+                    THEN 'Expired'
+                    ELSE COALESCE(NULLIF(@P__ReversalReason, ''), ReversalReason)
+                END,
+            Notes = COALESCE(@P__Notes, Notes),
+            LastModifiedDate = @ActionDate
+        OUTPUT INSERTED.*
+        WHERE
+            TransferReference = @P__TransferReference
+            -- Sender posting must have completed before an action can start.
+            AND NULLIF(LTRIM(RTRIM(SentTransferFt)), '') IS NOT NULL
+            AND
+            (
+                (
+                    [Status] = 'PENDING'
+                    AND @P__Status IN ('ACCEPTED', 'CANCELLED', 'REJECTED')
+                )
+                OR
+                (
+                    -- EXPIRED -> EXPIRED supports the one background call
+                    -- after usp_ExpireTransfer has reserved the transfer.
+                    [Status] IN ('PENDING', 'EXPIRED')
+                    AND @P__Status = 'EXPIRED'
+                    AND @ActionDate >= DATEADD(
+                        HOUR, @P__TransferExpiryHours, CreatedDate
+                    )
+                )
+            );
+
+        -- Read the update's row count immediately, before any other statement.
+        IF @@ROWCOUNT = 0
+        BEGIN
+            SET @P__Error =
+                'Transfer not found, sender posting unfinished, or action not allowed.';
+        END;
+
+        -- The updated row was returned by OUTPUT. Do not enter the upsert below.
+        RETURN;
+    END;
+    -- ADDED END
+
+    -- IsInitialAction = 0: existing creation/result/error-update path.
+    -- This path is not an authorization to start a banking action.
+
+    IF NOT EXISTS (SELECT 1 FROM t_Transfer WHERE TransferReference = @P__TransferReference)
+    BEGIN
+        INSERT INTO t_Transfer (
+            TransferReference,
+            SenderCustomerId,
+            SenderExternalId,
+            SenderLoginCustomerId,
+            SenderDebitAccount,
+            SenderDebitCommission,
+            SenderFirstName,
+            SenderMiddleName,
+            SenderLastName,
+            SenderMobileNumber,
+            InternalAccountNumber,
+            ReceiverCustomerId,
+            ReceiverExternalId,
+            ReceiverFirstName,
+            ReceiverMiddleName,
+            ReceiverLastName,
+            ReceiverMobileNumber,
+            ReceiverCreditAccountNumber,
+            SentTransferFt,
+            ReceivedTransferFt,
+            ReversalTransferFt,
+            ReversalReason,
+            TransferCurrency,
+            TransferAmount,
+            [Status],
+            Notes
+        )
+        VALUES (
+            @P__TransferReference,
+            @P__SenderCustomerId,
+            @P__SenderExternalId,
+            @P__SenderLoginCustomerId,
+            @P__SenderDebitAccount,
+            @P__SenderDebitCommission,
+            @P__SenderFirstName,
+            @P__SenderMiddleName,
+            @P__SenderLastName,
+            @P__SenderMobileNumber,
+            @P__InternalAccountNumber,
+            @P__ReceiverCustomerId,
+            @P__ReceiverExternalId,
+            @P__ReceiverFirstName,
+            @P__ReceiverMiddleName,
+            @P__ReceiverLastName,
+            @P__ReceiverMobileNumber,
+            @P__ReceiverCreditAccountNumber,
+            @P__SentTransferFt,
+            @P__ReceivedTransferFt,
+            @P__ReversalTransferFt,
+            @P__ReversalReason,
+            @P__TransferCurrency,
+            @P__TransferAmount,
+            @P__Status,
+            @P__Notes
+        );
+    END
+    ELSE
+    BEGIN
+
+        UPDATE t_Transfer
+        SET
+            SenderCustomerId = COALESCE(@P__SenderCustomerId, SenderCustomerId),
+            SenderExternalId = COALESCE(@P__SenderExternalId, SenderExternalId),
+            SenderLoginCustomerId = COALESCE(@P__SenderLoginCustomerId, SenderLoginCustomerId),
+            SenderDebitAccount = COALESCE(@P__SenderDebitAccount, SenderDebitAccount),
+            SenderDebitCommission = COALESCE(@P__SenderDebitCommission, SenderDebitCommission),
+            SenderFirstName = COALESCE(@P__SenderFirstName, SenderFirstName),
+            SenderMiddleName = COALESCE(@P__SenderMiddleName, SenderMiddleName),
+            SenderLastName = COALESCE(@P__SenderLastName, SenderLastName),
+            SenderMobileNumber = COALESCE(@P__SenderMobileNumber, SenderMobileNumber),
+            InternalAccountNumber = COALESCE(@P__InternalAccountNumber, InternalAccountNumber),
+            ReceiverCustomerId = COALESCE(@P__ReceiverCustomerId, ReceiverCustomerId),
+            ReceiverExternalId = COALESCE(@P__ReceiverExternalId, ReceiverExternalId),
+            ReceiverFirstName = COALESCE(@P__ReceiverFirstName, ReceiverFirstName),
+            ReceiverMiddleName = COALESCE(@P__ReceiverMiddleName, ReceiverMiddleName),
+            ReceiverLastName = COALESCE(@P__ReceiverLastName, ReceiverLastName),
+            ReceiverMobileNumber = COALESCE(@P__ReceiverMobileNumber, ReceiverMobileNumber),
+            ReceiverCreditAccountNumber = COALESCE(@P__ReceiverCreditAccountNumber, ReceiverCreditAccountNumber),
+            -- CHANGED: Empty placeholders must not erase saved references/reason.
+            SentTransferFt = COALESCE(NULLIF(@P__SentTransferFt, ''), SentTransferFt),
+            ReceivedTransferFt = COALESCE(NULLIF(@P__ReceivedTransferFt, ''), ReceivedTransferFt),
+            ReversalTransferFt = COALESCE(NULLIF(@P__ReversalTransferFt, ''), ReversalTransferFt),
+            ReversalReason = COALESCE(NULLIF(@P__ReversalReason, ''), ReversalReason),
+            TransferCurrency = COALESCE(@P__TransferCurrency, TransferCurrency),
+            TransferAmount = COALESCE(@P__TransferAmount, TransferAmount),
+
+            -- CHANGED: Expiry decisions are handled by the initial-action branch.
+            -- Result/error updates record the status supplied by the trusted workflow.
+            [Status] = @P__Status,
+
+            Notes = COALESCE(@P__Notes, Notes),
+            LastModifiedDate = GETDATE()
+        WHERE
+            TransferReference = @P__TransferReference;
+    END
+
+    SELECT TOP 1 *
+    FROM t_Transfer
+    WHERE
+        TransferReference = @P__TransferReference;
+
+END
+GO
