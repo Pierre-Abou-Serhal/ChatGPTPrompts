@@ -1,101 +1,150 @@
-Type:
-Bulletin announcement
-Category:
-Rules/Standards
-Audience:
-Acquirer
-Branded Processor
-Issuer
-Network Enablement Partner
-Processor
-Send - Mastercard Send Reseller
-Send - Send Service Provider
-Send - Send Transaction Initiator
-Region:
-Europe
-Latin America and the Caribbean
-Middle East/Africa
-Brand:
-Mastercard®
-Debit Mastercard
-Maestro®
-Product or service:
-Send by Mastercard Move
-Action indicator:
-Informational
-Published:
-14 July 2026
-Effective:
-16 June 2026
-Overview
-Mastercard is revising the Mastercard Move - MoneySend and Funding
-Transactions Program Standards - Geographic Availability of Service
-Addendum.
-Effective date details
-Date Details
-16 June 2026 Revised Standards become effective.
-Customer benefit
-Customers participating in the Mastercard Move – MoneySend and
-Funding Transactions Program will benefit from the expanded list of
-available countries and additional types of transactions.
-What Mastercard is doing
-Mastercard is expanding the list of additional types of transactions in
-Latin America and the Caribbean, Europe, and Middle East/Africa
-regions for the Mastercard Move – MoneySend and Funding Transactions
-Program Standards – Geographic Availability of Service Addendum.
-NOTE: The changes to the Mastercard Move – MoneySend and Funding
-Transactions Program Standards – Geographic Availability of Service
-Addendum detailed in this bulletin announcement are effective as of
-the date of publication of this announcement.
-EUR/LAC/MEA 13872.2 Revised Standards for Mastercard
-Move - MoneySend and Funding Transactions Program
-Standards - Geographic Availability of Service Addendum
-© 2026 Mastercard. Proprietary. All rights reserved.
-EUR/LAC/MEA 13872.2 Revised Standards for Mastercard Move - MoneySend and Funding
-Transactions Program Standards - Geographic Availability of Service Addendum • 14 July 2026 1
-Version history
-Date Description of change
-14 July 2026 Added Bosnia and Herzegovina to the Domestic column of the Countries
-approved table in Section 2.7.5 Cash-in at ATM - Payment Transaction
-(as originally announced in GLB 13174).
-16 June 2026 Initial publication date
-Overview of revised Standards
-Mastercard will update the Mastercard Move – MoneySend and Funding Transactions Program Standards –
-Geographic Availability of Service Addendum to reflect the changes detailed in this bulletin announcement.
-Mastercard will update the Mastercard Move – MoneySend and Funding Transactions Program Standards –
-Geographic Availability of Service Addendum to modify the countries in which Mastercard will make the
-MoneySend and Funding Transactions Program available:
-• Chapter 2 Geographic availability of Service
-– Section 2.3 Europe Region
-– Section 2.3.1 Geographic availability for Europe Region
-– Section 2.4. Latin America and the Caribbean Region
-– Section 2.4.1 Geographic availability for Latin America and the Caribbean Region
-– Section 2.5 Middle East/Africa Region
-– Section 2.5.1 Geographic availability for Middle East/Africa Region
-– Section 2.7 Geographic Availability of Additional Types of Transactions
-– Section 2.7.1 MoneySend Payment Transactions involving funds from the sale of Cryptocurrency
-– Section 2.7.2 Funding Transaction into a Cryptocurrency Account
-– Section 2.7.3 Funding Transaction into a Gaming or Gambling Account
-– Section 2.7.5 Cash-In at ATM – Payment Transaction
-– Section 2.7.6 Cash-In at Point of Sale (POS) - Payment Transactions
-– Section 2.7.13 Gaming Payment Transaction
-Revised Standards
-To view the revision, refer to the attachment associated with this bulletin announcement, which shows
-underlining for additions and strikethrough for deletions.
-Related information
-• GLB 13174 Revised Standards for Mastercard MoneySend and Funding Transactions Program Standards
-Addendum for Geographic Availability of Service (excluding Canada Region)
-• Mastercard Move – MoneySend and Funding Transactions Program Standards – Geographic Availability of
-Service Addendum
-• Mastercard Move – MoneySend and Funding Transactions Program Standards
-© 2026 Mastercard. Proprietary. All rights reserved.
-14 July 2026 • EUR/LAC/MEA 13872.2 Revised Standards for Mastercard Move -
-MoneySend and Funding Transactions Program Standards - Geographic Availability of
-2 Service Addendum
-Questions
-Customers with questions about the information in this bulletin announcement should select Create a case on
-the Technical Resource Center to create a case in Support Case Management.
-© 2026 Mastercard. Proprietary. All rights reserved.
-EUR/LAC/MEA 13872.2 Revised Standards for Mastercard Move - MoneySend and
-Funding Transactions Program Standards - Geographic Availability of Service
-Addendum • 14 July 2026 3
+USE [Alterna_MobileMoneyTransfer]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_UpdateTransfer]    Script Date: 9/10/2026 10:13:56 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_UpdateTransfer]
+    @P__TransferReference NVARCHAR(255),
+    @P__SenderCustomerId NVARCHAR(255) = NULL,
+    @P__SenderExternalId NVARCHAR(255) = NULL,
+    @P__SenderLoginCustomerId NVARCHAR(255) = NULL,
+    @P__SenderDebitAccount NVARCHAR(255) = NULL,
+    @P__SenderDebitCommission DECIMAL(18, 4) = NULL,
+    @P__SenderFirstName NVARCHAR(255) = NULL,
+    @P__SenderMiddleName NVARCHAR(255) = NULL,
+    @P__SenderLastName NVARCHAR(255) = NULL,
+    @P__SenderMobileNumber NVARCHAR(255) = NULL,
+    @P__InternalAccountNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCustomerId NVARCHAR(255) = NULL,
+    @P__ReceiverExternalId NVARCHAR(255) = NULL,
+    @P__ReceiverFirstName NVARCHAR(255) = NULL,
+    @P__ReceiverMiddleName NVARCHAR(255) = NULL,
+    @P__ReceiverLastName NVARCHAR(255) = NULL,
+    @P__ReceiverMobileNumber NVARCHAR(255) = NULL,
+    @P__ReceiverCreditAccountNumber NVARCHAR(255) = NULL,
+    @P__SentTransferFt NVARCHAR(255) = NULL,
+    @P__ReceivedTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalTransferFt NVARCHAR(255) = NULL,
+    @P__ReversalReason NVARCHAR(255) = NULL,
+    @P__TransferCurrency NVARCHAR(255) = NULL,
+    @P__TransferAmount DECIMAL(18, 4) = NULL,
+	@P__TransferExpiryHours INT,
+    @P__Status NVARCHAR(255),
+    @P__Notes NVARCHAR(4000) = NULL,
+    @P__Error NVARCHAR(4000) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET @P__Error = NULL;
+
+    IF NOT EXISTS (SELECT 1 FROM t_Transfer WHERE TransferReference = @P__TransferReference)
+    BEGIN
+        INSERT INTO t_Transfer (
+            TransferReference, 
+            SenderCustomerId, 
+            SenderExternalId, 
+            SenderLoginCustomerId,
+            SenderDebitAccount, 
+            SenderDebitCommission, 
+            SenderFirstName,
+            SenderMiddleName,
+            SenderLastName,
+            SenderMobileNumber,
+            InternalAccountNumber, 
+            ReceiverCustomerId, 
+            ReceiverExternalId, 
+            ReceiverFirstName,
+            ReceiverMiddleName,
+            ReceiverLastName,
+            ReceiverMobileNumber, 
+            ReceiverCreditAccountNumber, 
+            SentTransferFt, 
+            ReceivedTransferFt, 
+            ReversalTransferFt, 
+            ReversalReason,
+            TransferCurrency, 
+            TransferAmount, 
+            [Status],
+            Notes
+        )
+        VALUES (
+            @P__TransferReference, 
+            @P__SenderCustomerId, 
+            @P__SenderExternalId, 
+            @P__SenderLoginCustomerId, 
+            @P__SenderDebitAccount, 
+            @P__SenderDebitCommission, 
+            @P__SenderFirstName,
+            @P__SenderMiddleName,
+            @P__SenderLastName,
+            @P__SenderMobileNumber,
+            @P__InternalAccountNumber,
+            @P__ReceiverCustomerId,
+            @P__ReceiverExternalId, 
+            @P__ReceiverFirstName,
+            @P__ReceiverMiddleName,
+            @P__ReceiverLastName,
+            @P__ReceiverMobileNumber,
+            @P__ReceiverCreditAccountNumber, 
+            @P__SentTransferFt, 
+            @P__ReceivedTransferFt, 
+            @P__ReversalTransferFt, 
+            @P__ReversalReason,
+            @P__TransferCurrency,
+            @P__TransferAmount, 
+            @P__Status,
+            @P__Notes
+        );
+    END
+    ELSE
+    BEGIN
+
+        UPDATE t_Transfer
+        SET 
+            SenderCustomerId = COALESCE(@P__SenderCustomerId, SenderCustomerId),
+            SenderExternalId = COALESCE(@P__SenderExternalId, SenderExternalId),
+            SenderLoginCustomerId = COALESCE(@P__SenderLoginCustomerId, SenderLoginCustomerId),
+            SenderDebitAccount = COALESCE(@P__SenderDebitAccount, SenderDebitAccount),
+            SenderDebitCommission = COALESCE(@P__SenderDebitCommission, SenderDebitCommission),
+            SenderFirstName = COALESCE(@P__SenderFirstName, SenderFirstName),
+            SenderMiddleName = COALESCE(@P__SenderMiddleName, SenderMiddleName),
+            SenderLastName = COALESCE(@P__SenderLastName, SenderLastName),
+            SenderMobileNumber = COALESCE(@P__SenderMobileNumber, SenderMobileNumber),
+            InternalAccountNumber = COALESCE(@P__InternalAccountNumber, InternalAccountNumber),
+            ReceiverCustomerId = COALESCE(@P__ReceiverCustomerId, ReceiverCustomerId),
+            ReceiverExternalId = COALESCE(@P__ReceiverExternalId, ReceiverExternalId),
+            ReceiverFirstName = COALESCE(@P__ReceiverFirstName, ReceiverFirstName),
+            ReceiverMiddleName = COALESCE(@P__ReceiverMiddleName, ReceiverMiddleName),
+            ReceiverLastName = COALESCE(@P__ReceiverLastName, ReceiverLastName),
+            ReceiverMobileNumber = COALESCE(@P__ReceiverMobileNumber, ReceiverMobileNumber),
+            ReceiverCreditAccountNumber = COALESCE(@P__ReceiverCreditAccountNumber, ReceiverCreditAccountNumber),
+            SentTransferFt = COALESCE(@P__SentTransferFt, SentTransferFt),
+            ReceivedTransferFt = COALESCE(@P__ReceivedTransferFt, ReceivedTransferFt),
+            ReversalTransferFt = COALESCE(@P__ReversalTransferFt, ReversalTransferFt),
+            ReversalReason = COALESCE(@P__ReversalReason, ReversalReason),
+            TransferCurrency = COALESCE(@P__TransferCurrency, TransferCurrency),
+            TransferAmount = COALESCE(@P__TransferAmount, TransferAmount),
+
+            [Status] = 
+			CASE 
+				WHEN 
+					[Status] = 'PENDING'
+					AND @P__Status IN ('ACCEPTED', 'CANCELLED', 'REJECTED') 
+					AND GETDATE() >= DATEADD(HOUR, @P__TransferExpiryHours, CreatedDate) THEN 'EXPIRED'
+				ELSE @P__Status
+			END,
+
+            Notes = COALESCE(@P__Notes, Notes),
+            LastModifiedDate = GETDATE()
+        WHERE 
+            TransferReference = @P__TransferReference;
+    END
+
+    SELECT TOP 1 * 
+    FROM t_Transfer 
+    WHERE 
+        TransferReference = @P__TransferReference;
+
+END
