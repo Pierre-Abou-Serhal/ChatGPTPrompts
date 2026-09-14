@@ -5038,11 +5038,22 @@ else
                             <con2:assign varName="steps">
                                 <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.N4e5bf517.0.1a0246198fa.N7576</con7:id>
                                 <con2:expr>
-                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'- Get Transaction By ID Success 
+                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">if(fn:exists($deleteFtRes//*:successIndicator) and $deleteFtRes//*:successIndicator/text()!='T24Error') then
+(
+'- Get Transaction By ID Success 
+- Update MOMA Transfer Success 
+X Create FT Returned RECORDSTATUS 
+- Delete FT API Success
+X Update MOMA Transfer API Error '
+)
+else
+(
+'- Get Transaction By ID Success 
 - Update MOMA Transfer Success 
 X Create FT Returned RECORDSTATUS 
 X Delete FT API Error 
-X Update MOMA Transfer API Error '</con7:xqueryText>
+X Update MOMA Transfer API Error '
+)</con7:xqueryText>
                                 </con2:expr>
                             </con2:assign>
                             <con6:assign varName="emailMessage">
@@ -6005,12 +6016,24 @@ else
                                         <con2:assign varName="steps">
                                             <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7b71</con7:id>
                                             <con2:expr>
-                                                <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'- Get Transaction By ID Success 
+                                                <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">if(fn:exists($deleteFtRes//*:successIndicator) and fn:lower-case($deleteFtRes//*:Status/*:successIndicator/text())='success') then
+(
+'- Get Transaction By ID Success 
 - Update MOMA Transfer Success 
 X Create FT Returned RECORDSTATUS 
 - Delete FT API Success 
 X Create Sender Reversal FT Returned RECORDSTATUS 
-X Delete Sender Reversal FT API Error'</con7:xqueryText>
+- Delete Sender Reversal FT Success'
+)
+else 
+(
+'- Get Transaction By ID Success 
+- Update MOMA Transfer Success 
+X Create FT Returned RECORDSTATUS 
+- Delete FT API Success 
+X Create Sender Reversal FT Returned RECORDSTATUS 
+X Delete Sender Reversal API Error'
+)</con7:xqueryText>
                                             </con2:expr>
                                         </con2:assign>
                                         <con6:assign varName="emailMessage">
@@ -6448,13 +6471,26 @@ X Delete Sender Reversal FT API Error'</con7:xqueryText>
                             <con2:assign varName="steps">
                                 <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.N4e5bf517.0.1a0246198fa.N65a8</con7:id>
                                 <con2:expr>
-                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'- Get Transaction By ID Success 
+                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">if(fn:exists($deleteFtRes//*:successIndicator) and $deleteFtRes//*:successIndicator/text()='T24Error') then
+(
+'- Get Transaction By ID Success 
 - Update MOMA Transfer Success 
 X Create FT Returned RECORDSTATUS 
 - Delete FT API Success 
 X Create Sender Reversal FT Returned RECORDSTATUS 
 X Delete Sender Reversal FT API Error 
-X Update MOMA Transfer API Error '</con7:xqueryText>
+X Update MOMA Transfer API Error '
+)
+else
+(
+'- Get Transaction By ID Success 
+- Update MOMA Transfer Success 
+X Create FT Returned RECORDSTATUS 
+- Delete FT API Success 
+X Create Sender Reversal FT Returned RECORDSTATUS 
+- Delete Sender Reversal Success
+X Update MOMA Transfer API Error '
+)</con7:xqueryText>
                                 </con2:expr>
                             </con2:assign>
                             <con6:assign varName="emailMessage">
@@ -7533,7 +7569,7 @@ X Reverse Lima accruals Response Error
                         </con6:case>
                         <con6:case id="_BranchId-a008298.N4e5bf517.0.1a0246198fa.N62e8">
                             <con6:condition>
-                                <con2:xqueryText>fn:exists($updateAlternaRes//*:returnCode) and $updateAlternaRes//*:returnCode/text() != '0x0000'</con2:xqueryText>
+                                <con2:xqueryText>not(fn:exists($updateAlternaRes//*:returnCode)) or (fn:exists($updateAlternaRes//*:returnCode) and $updateAlternaRes//*:returnCode/text() != '0x0000')</con2:xqueryText>
                             </con6:condition>
                             <con6:actions>
                                 <con3:route xmlns:con5="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
