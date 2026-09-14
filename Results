@@ -6471,14 +6471,14 @@ X Delete Sender Reversal API Error'
                             <con2:assign varName="steps">
                                 <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.N4e5bf517.0.1a0246198fa.N65a8</con7:id>
                                 <con2:expr>
-                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">if(fn:exists($deleteFtRes//*:successIndicator) and $deleteFtRes//*:successIndicator/text()='T24Error') then
+                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">if(fn:lower-case($deleteFtRes//*:successIndicator/text())='success') then
 (
 '- Get Transaction By ID Success 
 - Update MOMA Transfer Success 
 X Create FT Returned RECORDSTATUS 
 - Delete FT API Success 
 X Create Sender Reversal FT Returned RECORDSTATUS 
-X Delete Sender Reversal FT API Error 
+- Delete Sender Reversal FT Success
 X Update MOMA Transfer API Error '
 )
 else
@@ -6488,7 +6488,7 @@ else
 X Create FT Returned RECORDSTATUS 
 - Delete FT API Success 
 X Create Sender Reversal FT Returned RECORDSTATUS 
-- Delete Sender Reversal Success
+X Delete Sender Reversal API Error 
 X Update MOMA Transfer API Error '
 )</con7:xqueryText>
                                 </con2:expr>
@@ -7386,7 +7386,7 @@ X Update Moma Transfer API Error'</con7:xqueryText>
                                         <con2:assign varName="steps">
                                             <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.N4e5bf517.0.1a0246198fa.N630d</con7:id>
                                             <con2:expr>
-                                                <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">if(fn:exists($updateAlternaRes//*:returnCode) and $updateAlternaRes//*:returnCode/text() != '0x0000') then
+                                                <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">if($updateAlternaRes//*:returnCode/text() = '0x0000') then
 (
 '- Get Transaction By ID Success 
 - Update MOMA Transfer Success 
@@ -7394,7 +7394,7 @@ X Create FT Returned RECORDSTATUS
 - Delete FT API Success 
 - Create Sender Reversal FT Success 
 X Reverse Lima accruals Response Error
-X Update MOMA Transfer API Error '
+- Update MOMA Transfer Success'
 )
 else
 (
@@ -7404,7 +7404,7 @@ X Create FT Returned RECORDSTATUS
 - Delete FT API Success 
 - Create Sender Reversal FT Success 
 X Reverse Lima accruals Response Error
-- Update MOMA Transfer Success '
+X Update MOMA Transfer API Error '
 )</con7:xqueryText>
                                             </con2:expr>
                                         </con2:assign>
@@ -7844,15 +7844,15 @@ X Update MOMA Transfer API Error '</con7:xqueryText>
                             <con6:assign varName="steps">
                                 <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.N4e5bf517.0.1a0246198fa.N62f5</con7:id>
                                 <con2:expr>
-                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">if(fn:exists($updateAlternaRes//*:returnCode) and $updateAlternaRes//*:returnCode/text() != '0x0000') then
+                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">if($updateAlternaRes//*:returnCode/text() = '0x0000') then
 (
 '- Get Transaction By ID Success 
 - Update MOMA Transfer Success 
 X Create FT Returned RECORDSTATUS 
 - Delete FT API Success 
 - Create Sender Reversal FT Success 
-X Reverse Lima accruals Response Error
-X Update MOMA Transfer API Error '
+X Reverse Lima accruals API Error
+- Update MOMA Transfer Success '
 )
 else
 (
@@ -7862,7 +7862,7 @@ X Create FT Returned RECORDSTATUS
 - Delete FT API Success 
 - Create Sender Reversal FT Success 
 X Reverse Lima accruals Response Error
-- Update MOMA Transfer Success '
+X Update MOMA Transfer API Error '
 )</con7:xqueryText>
                                 </con2:expr>
                             </con6:assign>
