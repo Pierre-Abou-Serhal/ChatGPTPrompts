@@ -3720,6 +3720,43 @@ else
                             </con2:xqueryTransform>
                         </con1:expr>
                     </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7ab0</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferExc"/>
+                                <con2:param name="returnCode">
+                                    <con2:path>if(upper-case($initialBody/*:processTransferReq/*:action/text()) != 'EXPIRED' and $action = 'EXPIRED') then 
+(
+  '0x0002'
+)
+else 
+(
+  '0x0000'
+)</con2:path>
+                                </con2:param>
+                                <con2:param name="response">
+                                    <con2:path>&lt;GetTransferRes xmlns="http://www.sgbl.com.lb/GetTransferRes" xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/"/></con2:path>
+                                </con2:param>
+                                <con2:param name="correlationId">
+                                    <con2:path>$correlationId</con2:path>
+                                </con2:param>
+                                <con2:param name="transferId">
+                                    <con2:path>$transferId</con2:path>
+                                </con2:param>
+                                <con2:param name="returnDesc">
+                                    <con2:path>if(upper-case($initialBody/*:processTransferReq/*:action/text()) != 'EXPIRED' and $action = 'EXPIRED') then 
+(
+  'Your transaction cannot be processed. Please try again later or call 1674.'
+)
+else
+(
+  'Success'
+)</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:replace>
                     <con2:reply>
                         <con2:id>_ActionId-a00829b.N72515bd.0.19fd6312b8e.N72c6</con2:id>
                     </con2:reply>
@@ -3788,15 +3825,22 @@ else
                         </con5:outboundTransform>
                     </con6:route>
                     <con1:replace varName="body" contents-only="true">
-                        <con2:id>_ActionId-a00829b.N72515bd.0.19fd6312b8e.N6fd8</con2:id>
+                        <con2:id>_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7ab2</con2:id>
                         <con1:expr>
                             <con2:xqueryTransform>
                                 <con2:resource ref="chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferExc"/>
                                 <con2:param name="returnCode">
-                                    <con2:path>'0x0000'</con2:path>
+                                    <con2:path>if(upper-case($initialBody/*:processTransferReq/*:action/text()) != 'EXPIRED' and $action = 'EXPIRED') then 
+(
+  '0x0002'
+)
+else 
+(
+  '0x0000'
+)</con2:path>
                                 </con2:param>
                                 <con2:param name="response">
-                                    <con2:path>&lt;GetTransferRes xmlns="http://www.sgbl.com.lb/GetTransferRes" xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/"/></con2:path>
+                                    <con2:path>$getRemainingTransferRes</con2:path>
                                 </con2:param>
                                 <con2:param name="correlationId">
                                     <con2:path>$correlationId</con2:path>
@@ -3805,7 +3849,14 @@ else
                                     <con2:path>$transferId</con2:path>
                                 </con2:param>
                                 <con2:param name="returnDesc">
-                                    <con2:path>'Success'</con2:path>
+                                    <con2:path>if(upper-case($initialBody/*:processTransferReq/*:action/text()) != 'EXPIRED' and $action = 'EXPIRED') then 
+(
+  'Your transaction cannot be processed. Please try again later or call 1674.'
+)
+else
+(
+  'Success'
+)</con2:path>
                                 </con2:param>
                             </con2:xqueryTransform>
                         </con1:expr>
@@ -6335,157 +6386,479 @@ else
             <con:stage id="_StageId-a008298.4456f626.0.1a09e9bcc5f.N7cd2" name="Send email">
                 <con:context/>
                 <con:actions>
-                    <con3:route xmlns:con5="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con6="http://www.bea.com/wli/sb/stages/transform/config">
-                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7ce4</con7:id>
-                        <con3:service ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/cvs.email" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
-                        <con3:operation>SendEmail</con3:operation>
-                        <con3:outboundTransform>
-                            <con2:assign varName="case">
-                                <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7ce3</con7:id>
-                                <con2:expr>
-                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'1'</con7:xqueryText>
-                                </con2:expr>
-                            </con2:assign>
-                            <con6:assign varName="steps">
-                                <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7ce2</con7:id>
-                                <con2:expr>
-                                    <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'- Get Transaction By ID Success 
+                    <con2:ifThenElse>
+                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7aa9</con5:id>
+                        <con2:case id="_BranchId-a008298.4456f626.0.1a09e9bcc5f.N7aa8">
+                            <con2:condition>
+                                <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:exists($updateAlternaRes//*:returnCode) and $updateAlternaRes//*:returnCode/text() != '0x0000'</con5:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con3:route xmlns:con5="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con6="http://www.bea.com/wli/sb/stages/transform/config">
+                                    <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7a2b</con7:id>
+                                    <con3:service ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/cvs.email" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>SendEmail</con3:operation>
+                                    <con3:outboundTransform>
+                                        <con2:assign varName="case">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7a2a</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'1'</con7:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con6:assign varName="steps">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7a29</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'- Get Transaction By ID Success 
 - Update MOMA Transfer Success 
 X Create FT Returned RECORDSTATUS 
 - Delete FT Success 
 - Create FT (reverse for sender) Success
 X Update Moma Transfer API Error'</con7:xqueryText>
-                                </con2:expr>
-                            </con6:assign>
-                            <con6:assign varName="emailMessage">
-                                <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7ce1</con7:id>
-                                <con2:expr>
-                                    <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
-                                        <con7:resource ref="core/Xquery/interpolate"/>
-                                        <con7:param name="template">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','message','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="values">
-                                            <con7:path>($correlationId, $steps, fn:concat(fn-bea:serialize($originalResponse), $updateAlternaRes//*:returnDescription/text()))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="index">
-                                            <con7:path>(1,2,3)</con7:path>
-                                        </con7:param>
-                                    </con7:xqueryTransform>
-                                </con2:expr>
-                            </con6:assign>
-                            <con2:assign varName="userName">
-                                <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7ce0</con7:id>
-                                <con2:expr>
-                                    <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">dvm:lookup('core/dvm/AlternaParams','Id','1', 'Username','N/A')</con1:xqueryText>
-                                </con2:expr>
-                            </con2:assign>
-                            <con2:assign varName="publicKey">
-                                <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7cdf</con7:id>
-                                <con2:expr>
-                                    <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">dvm:lookup('core/dvm/AlternaParams','Id','1', 'PublicKey','N/A')</con1:xqueryText>
-                                </con2:expr>
-                            </con2:assign>
-                            <con2:javaCallout varName="finalPublicKey">
-                                <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7cde</con7:id>
-                                <con2:archive ref="core/JavaLib/osbUtils"/>
-                                <con2:className>lb.com.sgbl.utils.keyGenerator.PublicKeyGenerator</con2:className>
-                                <con2:method>public static java.lang.String GenerateKey(java.lang.String)</con2:method>
-                                <con2:expr>
-                                    <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">concat($userName,$correlationId,$publicKey)</con1:xqueryText>
-                                </con2:expr>
-                                <con2:return-param-as-ref>false</con2:return-param-as-ref>
-                            </con2:javaCallout>
-                            <con2:assign varName="bodyEmailReq">
-                                <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7cdd</con7:id>
-                                <con2:expr>
-                                    <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
-                                        <con7:resource ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/xquery/SendEmail/mapGenericEmail"/>
-                                        <con7:param name="isZipped">
-                                            <con7:path>0</con7:path>
-                                        </con7:param>
-                                        <con7:param name="emailCC">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsCC','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="subject">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','subject','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="emailTo">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsTo','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="publicKey">
-                                            <con7:path>$finalPublicKey</con7:path>
-                                        </con7:param>
-                                        <con7:param name="body">
-                                            <con7:path>$emailMessage</con7:path>
-                                        </con7:param>
-                                        <con7:param name="priority">
-                                            <con7:path>'1'</con7:path>
-                                        </con7:param>
-                                        <con7:param name="isHtml">
-                                            <con7:path>0</con7:path>
-                                        </con7:param>
-                                        <con7:param name="correlationId">
-                                            <con7:path>$correlationId</con7:path>
-                                        </con7:param>
-                                        <con7:param name="emailFrom">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','emailFrom','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="emailBCC">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientBCC','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="username">
-                                            <con7:path>$userName</con7:path>
-                                        </con7:param>
-                                    </con7:xqueryTransform>
-                                </con2:expr>
-                            </con2:assign>
-                            <con2:replace varName="body" contents-only="true">
-                                <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7cdc</con7:id>
-                                <con2:expr>
-                                    <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
-                                        <con7:resource ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/xquery/SendEmail/mapGenericEmail"/>
-                                        <con7:param name="isZipped">
-                                            <con7:path>0</con7:path>
-                                        </con7:param>
-                                        <con7:param name="emailCC">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsCC','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="subject">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','subject','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="emailTo">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsTo','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="publicKey">
-                                            <con7:path>$finalPublicKey</con7:path>
-                                        </con7:param>
-                                        <con7:param name="body">
-                                            <con7:path>$emailMessage</con7:path>
-                                        </con7:param>
-                                        <con7:param name="priority">
-                                            <con7:path>'1'</con7:path>
-                                        </con7:param>
-                                        <con7:param name="isHtml">
-                                            <con7:path>0</con7:path>
-                                        </con7:param>
-                                        <con7:param name="correlationId">
-                                            <con7:path>$correlationId</con7:path>
-                                        </con7:param>
-                                        <con7:param name="emailFrom">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','emailFrom','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="emailBCC">
-                                            <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientBCC','value','',('case',$case,'service','MOMA'))</con7:path>
-                                        </con7:param>
-                                        <con7:param name="username">
-                                            <con7:path>$userName</con7:path>
-                                        </con7:param>
-                                    </con7:xqueryTransform>
-                                </con2:expr>
-                            </con2:replace>
-                        </con3:outboundTransform>
-                    </con3:route>
+                                            </con2:expr>
+                                        </con6:assign>
+                                        <con6:assign varName="emailMessage">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7a28</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
+                                                    <con7:resource ref="core/Xquery/interpolate"/>
+                                                    <con7:param name="template">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','message','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="values">
+                                                        <con7:path>($correlationId, $steps, fn:concat(fn-bea:serialize($originalResponse), $updateAlternaRes//*:returnDescription/text()))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="index">
+                                                        <con7:path>(1,2,3)</con7:path>
+                                                    </con7:param>
+                                                </con7:xqueryTransform>
+                                            </con2:expr>
+                                        </con6:assign>
+                                        <con2:assign varName="userName">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7a27</con7:id>
+                                            <con2:expr>
+                                                <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">dvm:lookup('core/dvm/AlternaParams','Id','1', 'Username','N/A')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="publicKey">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7a26</con7:id>
+                                            <con2:expr>
+                                                <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">dvm:lookup('core/dvm/AlternaParams','Id','1', 'PublicKey','N/A')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:javaCallout varName="finalPublicKey">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7a25</con7:id>
+                                            <con2:archive ref="core/JavaLib/osbUtils"/>
+                                            <con2:className>lb.com.sgbl.utils.keyGenerator.PublicKeyGenerator</con2:className>
+                                            <con2:method>public static java.lang.String GenerateKey(java.lang.String)</con2:method>
+                                            <con2:expr>
+                                                <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">concat($userName,$correlationId,$publicKey)</con1:xqueryText>
+                                            </con2:expr>
+                                            <con2:return-param-as-ref>false</con2:return-param-as-ref>
+                                        </con2:javaCallout>
+                                        <con2:assign varName="bodyEmailReq">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7a24</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
+                                                    <con7:resource ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/xquery/SendEmail/mapGenericEmail"/>
+                                                    <con7:param name="isZipped">
+                                                        <con7:path>0</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailCC">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="subject">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','subject','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailTo">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsTo','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="publicKey">
+                                                        <con7:path>$finalPublicKey</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="body">
+                                                        <con7:path>$emailMessage</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="priority">
+                                                        <con7:path>'1'</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="isHtml">
+                                                        <con7:path>0</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="correlationId">
+                                                        <con7:path>$correlationId</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailFrom">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','emailFrom','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailBCC">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientBCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="username">
+                                                        <con7:path>$userName</con7:path>
+                                                    </con7:param>
+                                                </con7:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:replace varName="body" contents-only="true">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7a23</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
+                                                    <con7:resource ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/xquery/SendEmail/mapGenericEmail"/>
+                                                    <con7:param name="isZipped">
+                                                        <con7:path>0</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailCC">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="subject">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','subject','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailTo">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsTo','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="publicKey">
+                                                        <con7:path>$finalPublicKey</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="body">
+                                                        <con7:path>$emailMessage</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="priority">
+                                                        <con7:path>'1'</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="isHtml">
+                                                        <con7:path>0</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="correlationId">
+                                                        <con7:path>$correlationId</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailFrom">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','emailFrom','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailBCC">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientBCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="username">
+                                                        <con7:path>$userName</con7:path>
+                                                    </con7:param>
+                                                </con7:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con3:outboundTransform>
+                                </con3:route>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case id="_BranchId-a008298.4456f626.0.1a09e9bcc5f.N7962">
+                            <con2:condition>
+                                <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:exists($updateAlternaRes//*:returnCode) and $updateAlternaRes//*:returnCode/text() = '0x0000'</con5:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con3:route xmlns:con5="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con6="http://www.bea.com/wli/sb/stages/transform/config">
+                                    <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N78e5</con7:id>
+                                    <con3:service ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/cvs.email" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>SendEmail</con3:operation>
+                                    <con3:outboundTransform>
+                                        <con2:assign varName="case">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N78e4</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'1'</con7:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con6:assign varName="steps">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N78e3</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'- Get Transaction By ID Success 
+- Update MOMA Transfer Success 
+X Create FT Returned RECORDSTATUS 
+- Delete FT Success 
+- Create FT (reverse for sender) Success
+- Update Moma Transfer Success'</con7:xqueryText>
+                                            </con2:expr>
+                                        </con6:assign>
+                                        <con6:assign varName="emailMessage">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N78e2</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
+                                                    <con7:resource ref="core/Xquery/interpolate"/>
+                                                    <con7:param name="template">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','message','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="values">
+                                                        <con7:path>($correlationId, $steps, fn-bea:serialize($originalResponse))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="index">
+                                                        <con7:path>(1,2,3)</con7:path>
+                                                    </con7:param>
+                                                </con7:xqueryTransform>
+                                            </con2:expr>
+                                        </con6:assign>
+                                        <con2:assign varName="userName">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N78e1</con7:id>
+                                            <con2:expr>
+                                                <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">dvm:lookup('core/dvm/AlternaParams','Id','1', 'Username','N/A')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="publicKey">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N78e0</con7:id>
+                                            <con2:expr>
+                                                <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">dvm:lookup('core/dvm/AlternaParams','Id','1', 'PublicKey','N/A')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:javaCallout varName="finalPublicKey">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N78df</con7:id>
+                                            <con2:archive ref="core/JavaLib/osbUtils"/>
+                                            <con2:className>lb.com.sgbl.utils.keyGenerator.PublicKeyGenerator</con2:className>
+                                            <con2:method>public static java.lang.String GenerateKey(java.lang.String)</con2:method>
+                                            <con2:expr>
+                                                <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">concat($userName,$correlationId,$publicKey)</con1:xqueryText>
+                                            </con2:expr>
+                                            <con2:return-param-as-ref>false</con2:return-param-as-ref>
+                                        </con2:javaCallout>
+                                        <con2:assign varName="bodyEmailReq">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N78de</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
+                                                    <con7:resource ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/xquery/SendEmail/mapGenericEmail"/>
+                                                    <con7:param name="isZipped">
+                                                        <con7:path>0</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailCC">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="subject">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','subject','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailTo">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsTo','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="publicKey">
+                                                        <con7:path>$finalPublicKey</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="body">
+                                                        <con7:path>$emailMessage</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="priority">
+                                                        <con7:path>'1'</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="isHtml">
+                                                        <con7:path>0</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="correlationId">
+                                                        <con7:path>$correlationId</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailFrom">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','emailFrom','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailBCC">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientBCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="username">
+                                                        <con7:path>$userName</con7:path>
+                                                    </con7:param>
+                                                </con7:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:replace varName="body" contents-only="true">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N78dd</con7:id>
+                                            <con2:expr>
+                                                <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
+                                                    <con7:resource ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/xquery/SendEmail/mapGenericEmail"/>
+                                                    <con7:param name="isZipped">
+                                                        <con7:path>0</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailCC">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="subject">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','subject','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailTo">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsTo','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="publicKey">
+                                                        <con7:path>$finalPublicKey</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="body">
+                                                        <con7:path>$emailMessage</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="priority">
+                                                        <con7:path>'1'</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="isHtml">
+                                                        <con7:path>0</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="correlationId">
+                                                        <con7:path>$correlationId</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailFrom">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','emailFrom','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="emailBCC">
+                                                        <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientBCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                    </con7:param>
+                                                    <con7:param name="username">
+                                                        <con7:path>$userName</con7:path>
+                                                    </con7:param>
+                                                </con7:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con3:outboundTransform>
+                                </con3:route>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con3:route xmlns:con5="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con6="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7860</con7:id>
+                                <con3:service ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/cvs.email" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                <con3:operation>SendEmail</con3:operation>
+                                <con3:outboundTransform>
+                                    <con2:assign varName="case">
+                                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N785f</con7:id>
+                                        <con2:expr>
+                                            <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'1'</con7:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con6:assign varName="steps">
+                                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N785e</con7:id>
+                                        <con2:expr>
+                                            <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">'- Get Transaction By ID Success 
+- Update MOMA Transfer Success 
+X Create FT Returned RECORDSTATUS 
+- Delete FT Success 
+- Create FT (reverse for sender) Success
+X Update Moma Transfer API Error'</con7:xqueryText>
+                                        </con2:expr>
+                                    </con6:assign>
+                                    <con6:assign varName="emailMessage">
+                                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N785d</con7:id>
+                                        <con2:expr>
+                                            <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
+                                                <con7:resource ref="core/Xquery/interpolate"/>
+                                                <con7:param name="template">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','message','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="values">
+                                                    <con7:path>($correlationId, $steps, fn:concat(fn-bea:serialize($originalResponse), '
+',fn-bea:serialize($updateAlternaRes)))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="index">
+                                                    <con7:path>(1,2,3)</con7:path>
+                                                </con7:param>
+                                            </con7:xqueryTransform>
+                                        </con2:expr>
+                                    </con6:assign>
+                                    <con2:assign varName="userName">
+                                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N785c</con7:id>
+                                        <con2:expr>
+                                            <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">dvm:lookup('core/dvm/AlternaParams','Id','1', 'Username','N/A')</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="publicKey">
+                                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N785b</con7:id>
+                                        <con2:expr>
+                                            <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">dvm:lookup('core/dvm/AlternaParams','Id','1', 'PublicKey','N/A')</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:javaCallout varName="finalPublicKey">
+                                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N785a</con7:id>
+                                        <con2:archive ref="core/JavaLib/osbUtils"/>
+                                        <con2:className>lb.com.sgbl.utils.keyGenerator.PublicKeyGenerator</con2:className>
+                                        <con2:method>public static java.lang.String GenerateKey(java.lang.String)</con2:method>
+                                        <con2:expr>
+                                            <con1:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">concat($userName,$correlationId,$publicKey)</con1:xqueryText>
+                                        </con2:expr>
+                                        <con2:return-param-as-ref>false</con2:return-param-as-ref>
+                                    </con2:javaCallout>
+                                    <con2:assign varName="bodyEmailReq">
+                                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7859</con7:id>
+                                        <con2:expr>
+                                            <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
+                                                <con7:resource ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/xquery/SendEmail/mapGenericEmail"/>
+                                                <con7:param name="isZipped">
+                                                    <con7:path>0</con7:path>
+                                                </con7:param>
+                                                <con7:param name="emailCC">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="subject">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','subject','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="emailTo">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsTo','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="publicKey">
+                                                    <con7:path>$finalPublicKey</con7:path>
+                                                </con7:param>
+                                                <con7:param name="body">
+                                                    <con7:path>$emailMessage</con7:path>
+                                                </con7:param>
+                                                <con7:param name="priority">
+                                                    <con7:path>'1'</con7:path>
+                                                </con7:param>
+                                                <con7:param name="isHtml">
+                                                    <con7:path>0</con7:path>
+                                                </con7:param>
+                                                <con7:param name="correlationId">
+                                                    <con7:path>$correlationId</con7:path>
+                                                </con7:param>
+                                                <con7:param name="emailFrom">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','emailFrom','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="emailBCC">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientBCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="username">
+                                                    <con7:path>$userName</con7:path>
+                                                </con7:param>
+                                            </con7:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:replace varName="body" contents-only="true">
+                                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-a008298.4456f626.0.1a09e9bcc5f.N7858</con7:id>
+                                        <con2:expr>
+                                            <con7:xqueryTransform xmlns:con7="http://www.bea.com/wli/sb/stages/config">
+                                                <con7:resource ref="Alterna.chn.app/cvs.Alterna/cvs.Alterna.Email/xquery/SendEmail/mapGenericEmail"/>
+                                                <con7:param name="isZipped">
+                                                    <con7:path>0</con7:path>
+                                                </con7:param>
+                                                <con7:param name="emailCC">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="subject">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','subject','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="emailTo">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientsTo','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="publicKey">
+                                                    <con7:path>$finalPublicKey</con7:path>
+                                                </con7:param>
+                                                <con7:param name="body">
+                                                    <con7:path>$emailMessage</con7:path>
+                                                </con7:param>
+                                                <con7:param name="priority">
+                                                    <con7:path>'1'</con7:path>
+                                                </con7:param>
+                                                <con7:param name="isHtml">
+                                                    <con7:path>0</con7:path>
+                                                </con7:param>
+                                                <con7:param name="correlationId">
+                                                    <con7:path>$correlationId</con7:path>
+                                                </con7:param>
+                                                <con7:param name="emailFrom">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','emailFrom','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="emailBCC">
+                                                    <con7:path>dvm:lookupValue('core/dvm/Emails/Email_MOMA','key','recepientBCC','value','',('case',$case,'service','MOMA'))</con7:path>
+                                                </con7:param>
+                                                <con7:param name="username">
+                                                    <con7:path>$userName</con7:path>
+                                                </con7:param>
+                                            </con7:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:replace>
+                                </con3:outboundTransform>
+                            </con3:route>
+                        </con2:default>
+                    </con2:ifThenElse>
                 </con:actions>
             </con:stage>
             <con:stage id="_StageId-a008298.N4e5bf517.0.1a0246198fa.N631a" name="Reverse Lima Accruals" errorHandler="error-a008298.N4e5bf517.0.1a0246198fa.N62fb">
@@ -6693,7 +7066,7 @@ X Update MOMA Transfer API Error '</con7:xqueryText>
                                                             ', $limaRes//*:returnDescription/text())</con7:path>
                                                     </con7:param>
                                                     <con7:param name="index">
-                                                        <con7:path>(1,2)</con7:path>
+                                                        <con7:path>(1,2,3)</con7:path>
                                                     </con7:param>
                                                 </con7:xqueryTransform>
                                             </con2:expr>
@@ -6879,7 +7252,7 @@ X Update MOMA Transfer API Error '</con7:xqueryText>
                                                             ', fn-bea:serialize($updateAlternaRes)))</con7:path>
                                                     </con7:param>
                                                     <con7:param name="index">
-                                                        <con7:path>(1,2)</con7:path>
+                                                        <con7:path>(1,2,3)</con7:path>
                                                     </con7:param>
                                                 </con7:xqueryTransform>
                                             </con2:expr>
@@ -7138,7 +7511,7 @@ X Update MOMA Transfer API Error '</con7:xqueryText>
                                                 ',fn-bea:serialize($limaRes))</con7:path>
                                         </con7:param>
                                         <con7:param name="index">
-                                            <con7:path>(1,2)</con7:path>
+                                            <con7:path>(1,2,3)</con7:path>
                                         </con7:param>
                                     </con7:xqueryTransform>
                                 </con2:expr>
