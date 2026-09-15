@@ -1,72 +1,79 @@
 USE [Alterna_AccountStatementManagement]
 GO
-/****** Object:  StoredProcedure [dbo].[usp_GetDocumentReference]    Script Date: 9/15/2026 10:18:18 AM ******/
+
 SET ANSI_NULLS ON
 GO
+
 SET QUOTED_IDENTIFIER ON
 GO
+
 ALTER PROCEDURE [dbo].[usp_GetDocumentReference]
     @P__SearchKey NVARCHAR(255) = NULL,
     @P__CreatedFrom DATETIME2(3) = NULL,
     @P__CreatedTo DATETIME2(3) = NULL,
     @P__IsActive BIT = NULL,
-	@P__PageNumber INT = 1,
+    @P__PageNumber INT = 1,
     @P__PageSize INT = 10,
     @P__TotalRecords INT OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
-    
-	SELECT @P__TotalRecords = COUNT(*) 
-    FROM [dbo].[t_DocumentReference]
-	WHERE 
-		(
-			@P__SearchKey IS NULL OR 
-				(
-					([CustomerId] LIKE '%' + @P__SearchKey + '%') OR 
-					([ExternalId] LIKE '%' + @P__SearchKey + '%') OR 
-					([AccountNumber] LIKE '%' + @P__SearchKey + '%') OR 
-					([DocumentCuk] LIKE '%' + @P__SearchKey + '%')
-				)
-			AND (@P__IsActive IS NULL OR [IsActive] = @P__IsActive)
-			AND (@P__CreatedFrom IS NULL OR [CreatedDate] >=  @P__CreatedFrom)
-			AND (@P__CreatedTo IS NULL OR [CreatedDate] <= @P__CreatedTo)
-		);
 
-	SELECT 
-		DR.[Id],
-		DR.[CustomerId],
-		DR.[ExternalId],
-		DR.[AccessPolicyId],
-		AP.[PolicyName],
-		DR.[AccountNumber],
-		DR.[DocumentCuk],
-		DR.[TokenHash],
-		DR.[ExpiredDate],
-		DR.[RevokedDate],
-		DR.[RevokedBy],
-		DR.[RevokedReason],
-		DR.[IsActive],
-		DR.[CreatedDate],
-		DR.[CreatedBy],
-		DR.[LastModifiedDate],
-		DR.[LastModifiedBy]
-	FROM [dbo].[t_DocumentReference] AS DR
-	JOIN t_AccessPolicy AS AP ON DR.AccessPolicyId = AP.Id
-	WHERE
-		(
-			@P__SearchKey IS NULL OR 
-				(
-					(DR.[CustomerId] LIKE '%' + @P__SearchKey + '%') OR 
-					(DR.[ExternalId] LIKE '%' + @P__SearchKey + '%') OR 
-					(DR.[AccountNumber] LIKE '%' + @P__SearchKey + '%') OR 
-					(DR.[DocumentCuk] LIKE '%' + @P__SearchKey + '%')
-				)
-			AND (@P__IsActive IS NULL OR DR.[IsActive] = @P__IsActive)
-			AND (@P__CreatedFrom IS NULL OR DR.[CreatedDate] >=  @P__CreatedFrom)
-			AND (@P__CreatedTo IS NULL OR DR.[CreatedDate] <= @P__CreatedTo)
-		)
-	ORDER BY CreatedDate DESC
-	OFFSET (@P__PageNumber - 1) * @P__PageSize ROWS
+    -- Treat an empty or whitespace-only search as no search.
+    SET @P__SearchKey = NULLIF(LTRIM(RTRIM(@P__SearchKey)), N'');
+
+    SELECT @P__TotalRecords = COUNT(*)
+    FROM dbo.t_DocumentReference AS DR
+    INNER JOIN dbo.t_AccessPolicy AS AP
+        ON DR.AccessPolicyId = AP.Id
+    WHERE
+        (
+            @P__SearchKey IS NULL
+            OR DR.CustomerId LIKE N'%' + @P__SearchKey + N'%'
+            OR DR.ExternalId LIKE N'%' + @P__SearchKey + N'%'
+            OR DR.AccountNumber LIKE N'%' + @P__SearchKey + N'%'
+            OR DR.DocumentCuk LIKE N'%' + @P__SearchKey + N'%'
+        )
+        AND (@P__IsActive IS NULL OR DR.IsActive = @P__IsActive)
+        AND (@P__CreatedFrom IS NULL OR DR.CreatedDate >= @P__CreatedFrom)
+        AND (@P__CreatedTo IS NULL OR DR.CreatedDate <= @P__CreatedTo);
+
+    SELECT
+        DR.Id,
+        DR.CustomerId,
+        DR.ExternalId,
+        DR.AccessPolicyId,
+        AP.PolicyName,
+        DR.AccountNumber,
+        DR.DocumentCuk,
+        DR.TokenHash,
+        DR.ExpiredDate,
+        DR.RevokedDate,
+        DR.RevokedBy,
+        DR.RevokedReason,
+        DR.IsActive,
+        DR.CreatedDate,
+        DR.CreatedBy,
+        DR.LastModifiedDate,
+        DR.LastModifiedBy
+    FROM dbo.t_DocumentReference AS DR
+    INNER JOIN dbo.t_AccessPolicy AS AP
+        ON DR.AccessPolicyId = AP.Id
+    WHERE
+        (
+            @P__SearchKey IS NULL
+            OR DR.CustomerId LIKE N'%' + @P__SearchKey + N'%'
+            OR DR.ExternalId LIKE N'%' + @P__SearchKey + N'%'
+            OR DR.AccountNumber LIKE N'%' + @P__SearchKey + N'%'
+            OR DR.DocumentCuk LIKE N'%' + @P__SearchKey + N'%'
+        )
+        AND (@P__IsActive IS NULL OR DR.IsActive = @P__IsActive)
+        AND (@P__CreatedFrom IS NULL OR DR.CreatedDate >= @P__CreatedFrom)
+        AND (@P__CreatedTo IS NULL OR DR.CreatedDate <= @P__CreatedTo)
+    ORDER BY
+        DR.CreatedDate DESC,
+        DR.Id DESC
+    OFFSET (@P__PageNumber - 1) * @P__PageSize ROWS
     FETCH NEXT @P__PageSize ROWS ONLY;
 END
+GO
