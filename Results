@@ -1,4 +1,3 @@
---- Contents of: C:\Users\pabouserhal\Desktop\Send Money Jars\20260731\SendMoney.20260427.jar ---
 ExportInfo
 Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/wsdl/VisaDirect.WSDL
 Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/ErrorResponse.XMLSchema
@@ -109,30 +108,6 @@ chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pi
 Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/ARReq.XMLSchema
 chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.CPFReq.XMLSchema
 chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.AISRequest.XMLSchema
-
---- Contents of: C:\Users\pabouserhal\Desktop\Send Money Jars\20260731\VisaDirectConfigs.jar ---
-ExportInfo
 core/dvm/VisaDirectConfigs.DVM
-
---- Contents of: C:\Users\pabouserhal\Desktop\Send Money Jars\20260908_1\SendMoney.jar ---
-ExportInfo
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/wsdl/SendMoney.Pipeline
-
---- Contents of: C:\Users\pabouserhal\Desktop\Send Money Jars\20260909\SendMoney.jar ---
-ExportInfo
 core/dvm/VisaDirectPilotPhaseExternalIds.DVM
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/Query.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/FX.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/FTA.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/ValidateTransfer.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/AliasDirectory.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/CPF.Pipeline
-
---- Contents of: C:\Users\pabouserhal\Desktop\Send Money Jars\20260911\SendMoney-Mantis-23250.jar ---
-ExportInfo
 chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MasterCardSend/pipeline/PostTransfer.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/CPF.Pipeline
-
---- Contents of: C:\Users\pabouserhal\Desktop\Send Money Jars\20260915\SendMoney-VisaDirectPilotPhaseExternalIds.jar ---
-ExportInfo
-core/dvm/VisaDirectPilotPhaseExternalIds.DVM
