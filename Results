@@ -1,113 +1,1035 @@
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/wsdl/VisaDirect.BusinessService
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/wsdl/VisaDirect.WADL
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/wsdl/VisaDirect.WSDL
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/AIReq.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/AIRes.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/ARReq.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/ARRes.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/CPFReq.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/CPFRes.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/ErrorResponse.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/FTAReq.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/FTARes.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/FXReq.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/FXRes.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/QueryRes.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/SaveVisaDirectTransactionReq.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/SaveVisaDirectTransactionRes.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/UpdateTransactionReq.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/UpdateTransactionRes.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/ValidateAllTransactionLimitsReq.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/ValidateAllTransactionLimitsRes.XMLSchema
-Backend.svc/BackBase/BackBase.Transfers/Backbase.Transfers.VisaDirect/xsd/VisaDirectDTOs.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MasterCardSend/pipeline/PostTransfer.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/wsdl/SendMoney.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/wsdl/SendMoney.ProxyService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/wsdl/SendMoney.WADL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/wsdl/SendMoney.WSDL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/AIS/mapAISMoneySend.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/AIS/mapAISMoneySendRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/AIS/mapAISVisa.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/AIS/mapAISVisaRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/AliasDirectory/mapAliasDirectoryRequest.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/AliasDirectory/mapAliasDirectoryResponse.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/FX/mapFXRequest.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/FX/mapFXResponse.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/postTransfer/mapPostTransferMoneySend.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/postTransfer/mapPostTransferMoneySendRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/postTransfer/mapPostTransferVisa.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/postTransfer/mapPostTransferVisaRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/validateTransfer/mapValidateTransferMoneySend.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/validateTransfer/mapValidateTransferMoneySendRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/validateTransfer/mapValidateTransferVisa.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xquery/validateTransfer/mapValidateTransferVisaRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.AISRequest.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.AISResponse.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.AliasDirectoryRequest.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.AliasDirectoryResponse.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.FXRequest.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.FXResponse.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.PostTransferReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.PostTransferRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.ValidateTransferReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.SendMoney/xsd/cvs.ValidateTransferRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/AliasDirectory.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/CPF.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/FTA.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/FX.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/Query.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/ReverseT24Transfer.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/pipeline/ValidateTransfer.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/VisaDirect.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/VisaDirect.ProxyService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/wsdl/VisaDirect.WADL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/wsdl/VisaDirect.WSDL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/AliasDirectory/mapAliasDirectoryExceptionRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/AliasDirectory/mapAliasDirectoryInquiryReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/AliasDirectory/mapAliasDirectoryRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/AliasDirectory/mapAliasDirectoryResolveReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/AliasDirectory/mapMasterCardAISReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/common/mapCreateFTTWS.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/common/mapRejectTransferReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/common/mapReverseFtReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/common/mapReverseFtRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/common/mapUpdateTransferInformationReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/CPF/mapCPFExceptionRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/CPF/mapCPFReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/CPF/mapCPFRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/CPF/mapFtWithinReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/CPF/mapGetSenderInfoReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/CPF/mapSaveTransferReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/CPF/mapUpdateTransferInformationReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/CPF/mapValidateLimitsReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/FTA/mapFTAExceptionRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/FTA/mapFTAReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/FTA/mapFTARes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/FX/mapFXExceptionRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/FX/mapFXReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/FX/mapFxRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/Query/mapQueryExceptionRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/Query/mapQueryRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/ValidateTransfer/mapGetCommissionReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/ValidateTransfer/mapValidateTransferExceptionRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/ValidateTransfer/mapValidateTransferReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xquery/ValidateTransfer/mapValidateTransferRes.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.AliasDirectoryReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.AliasDirectoryRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.CPFReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.CPFRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.FTAReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.FTARes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.FXReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.FXRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.QueryReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.QueryRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.ReverseFTReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.ReverseFTRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.ValidateTransferReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.VisaDirect/xsd/cvs.ValidateTransferRes.XMLSchema
-core/dvm/Emails/Email_Visa.DVM
-core/dvm/InternalBankAccountsBeneficiaries.dvm.DVM
-core/dvm/VisaDirectConfigs.DVM
-core/dvm/VisaDirectPilotPhaseExternalIds.DVM
-ExportInfo
+### azure-pipelines-build-front.yml
+name: AASM_FRONT_$(SourceBranchName)_rc$(Rev:r)
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: 'Azure Templates/Azure Templates'
+      ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+      - release/*
+  paths:
+    exclude:
+      - '*.yml'
+
+pr: none
+
+variables:
+  - group: OWASP_SECRETS
+
+stages:
+  - stage: Build_Frontend
+    displayName: 'Build Angular & Publish Artifact'
+    jobs:
+      - template: pipelines/build-angular-webapp.yml@templates
+        parameters:
+          jobName: 'BuildFrontend'
+          jobDisplayName: 'Build Alterna Account Statement Management Frontend'
+          buildPool: 'Build Pool'
+          buildAgentName: 'UAT-ALTERNA-DK1'
+          workingDirectory: '.'
+          nodeVersion: '22.x'
+          installCommand: 'ci'
+          runTests: false
+          buildCommand: 'npx ng build'
+          # Verify this against projects.<project>.architect.build.options.outputPath in angular.json.
+          distFolder: 'dist/AlternaAccountStatementManagement/browser'
+          zipName: 'Alterna-Account-Statement-Management-Frontend.zip'
+          artifactName: 'alterna-account-statement-management-front-drop'
+          publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish'
+          runDependencyCheck: false
+          dependencyCheckProjectName: 'Alterna-Account-Statement-Management-Frontend'
+          dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+          dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
+          dependencyCheckAdditionalArguments: ''
+
+
+
+
+### azure-pipelines-release.yml
+name: AASM_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+  - name: targetEnvironment
+    type: string
+    default: SIT
+    values:
+      - SIT
+      - UAT
+      - PROD
+    displayName: 'Target Environment'
+
+  - name: deployBackend
+    type: boolean
+    default: false
+    displayName: 'Deploy Backend'
+
+  - name: deployFrontend
+    type: boolean
+    default: false
+    displayName: 'Deploy Frontend'
+
+  - name: deployDatabase
+    type: boolean
+    default: false
+    displayName: 'Deploy Database'
+
+  - name: backendBuildNumber
+    type: string
+    default: '__EMPTY__'
+    displayName: 'Backend Build Number'
+
+  - name: frontendBuildNumber
+    type: string
+    default: '__EMPTY__'
+    displayName: 'Frontend Build Number'
+
+  - name: dbBuildNumber
+    type: string
+    default: '__EMPTY__'
+    displayName: 'Database Build Number'
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: 'Azure Templates/Azure Templates'
+      ref: refs/heads/main
+
+trigger: none
+pr: none
+
+variables:
+  - name: deploymentPool
+    value: 'Deployment Pool'
+
+  - name: buildSourceBranchRegex
+    value: '^refs/heads/(release|hotfix)/'
+
+  - name: backendArtifactName
+    value: 'alterna-account-statement-management-api-drop'
+
+  - name: frontendArtifactName
+    value: 'alterna-account-statement-management-front-drop'
+
+  - name: dbArtifactName
+    value: 'alterna-account-statement-management-db-drop'
+
+  - name: backendZipName
+    value: 'Alterna-Account-Statement-Management-Backend.zip'
+
+  - name: frontendZipName
+    value: 'Alterna-Account-Statement-Management-Frontend.zip'
+
+  - name: backendSiteName
+    value: 'AlternaAccountStatementManagement'
+
+  - name: backendAppPoolName
+    value: 'AlternaAccountStatementManagement'
+
+  - name: backendTargetPath
+    value: 'C:\inetpub\wwwroot\AlternaAccountStatementManagement-BN1'
+
+  - name: frontendSiteName
+    value: 'AlternaAccountStatementManagement'
+
+  - name: frontendAppPoolName
+    value: 'AlternaAccountStatementManagement'
+
+  - name: frontendTargetPath
+    value: 'C:\inetpub\wwwroot\'
+
+  # SIT
+  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+      - group: SIT_BACK_END_VARIABLE_GROUP
+
+      - name: environmentName
+        value: 'SIT'
+
+      - name: backendPipelineName
+        value: 'BUILD - API - Alterna Account Statement Management'
+
+      - name: frontendPipelineName
+        value: 'BUILD - FRONT - Alterna Account Statement Management'
+
+      - name: dbPipelineName
+        value: 'BUILD - DB - Alterna Account Statement Management'
+
+      - name: resolveAgentName
+        value: 'SIT-ALTERNA-BN1'
+
+      - name: backendAgentName
+        value: 'SIT-ALTERNA-BN1'
+
+      - name: frontendAgentName
+        value: 'SIT-ALTERNA-FN1'
+
+      - name: dbAgentName
+        value: 'SIT-ALTERNA-BN1'
+
+      - name: approvalNotifyUsers
+        value: 'SGBL\pabouserhal'
+
+      - name: approvalInstructions
+        value: 'Approve SIT Alterna Account Statement Management deployment.'
+
+      # Replace after confirming the IIS binding and application health endpoint.
+      - name: backendHealthCheckUrl
+        value: 'http://localhost/health'
+
+      # Replace after confirming the IIS binding. For Angular, / or /appsettings.json can be used.
+      - name: frontendHealthCheckUrl
+        value: 'http://localhost/'
+
+      - name: backupRoot
+        value: 'C:\DeployBackups\SIT\AlternaAccountStatementManagement'
+
+  # UAT
+  - ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+      - group: UAT_BACK_END_VARIABLE_GROUP
+
+      - name: environmentName
+        value: 'UAT'
+
+      - name: backendPipelineName
+        value: 'BUILD - API - Alterna Account Statement Management'
+
+      - name: frontendPipelineName
+        value: 'BUILD - FRONT - Alterna Account Statement Management'
+
+      - name: dbPipelineName
+        value: 'BUILD - DB - Alterna Account Statement Management'
+
+      - name: resolveAgentName
+        value: 'UAT-ALTERNA-BN1' # Verify before first UAT run.
+
+      - name: backendAgentName
+        value: 'UAT-ALTERNA-BN1' # Verify before first UAT run.
+
+      - name: frontendAgentName
+        value: 'UAT-ALTERNA-FN1' # Verify before first UAT run.
+
+      - name: dbAgentName
+        value: 'UAT-ALTERNA-BN1' # Verify before first UAT run.
+
+      - name: approvalNotifyUsers
+        value: 'SGBL\pabouserhal'
+
+      - name: approvalInstructions
+        value: 'Approve UAT Alterna Account Statement Management deployment.'
+
+      - name: backendHealthCheckUrl
+        value: 'http://localhost/health' # Replace after confirming the UAT IIS binding.
+
+      - name: frontendHealthCheckUrl
+        value: 'http://localhost/' # Replace after confirming the UAT IIS binding.
+
+      - name: backupRoot
+        value: 'C:\DeployBackups\UAT\AlternaAccountStatementManagement'
+
+  # PROD
+  - ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+      - group: PROD_BACK_END_VARIABLE_GROUP
+
+      - name: environmentName
+        value: 'PROD'
+
+      - name: backendPipelineName
+        value: 'BUILD - API - Alterna Account Statement Management'
+
+      - name: frontendPipelineName
+        value: 'BUILD - FRONT - Alterna Account Statement Management'
+
+      - name: dbPipelineName
+        value: 'BUILD - DB - Alterna Account Statement Management'
+
+      - name: resolveAgentName
+        value: 'PROD-ALTERNA-BN1' # Verify before first PROD run.
+
+      - name: backendAgentName
+        value: 'PROD-ALTERNA-BN1' # Verify before first PROD run.
+
+      - name: frontendAgentName
+        value: 'PROD-ALTERNA-FN1' # Verify before first PROD run.
+
+      - name: dbAgentName
+        value: 'PROD-ALTERNA-BN1' # Verify before first PROD run.
+
+      - name: approvalNotifyUsers
+        value: 'SGBL\pabouserhal'
+
+      - name: approvalInstructions
+        value: 'Approve PROD Alterna Account Statement Management deployment.'
+
+      - name: backendHealthCheckUrl
+        value: 'http://localhost/health' # Replace after confirming the PROD IIS binding.
+
+      - name: frontendHealthCheckUrl
+        value: 'http://localhost/' # Replace after confirming the PROD IIS binding.
+
+      - name: backupRoot
+        value: 'C:\DeployBackups\PROD\AlternaAccountStatementManagement'
+
+stages:
+  - stage: Resolve_Selected_Builds
+    displayName: 'Resolve selected build numbers'
+    jobs:
+      - job: ResolveBuildNumbers
+        displayName: 'Resolve pipeline names and build numbers'
+        pool:
+          name: '$(deploymentPool)'
+          demands:
+            - Agent.Name -equals $(resolveAgentName)
+        steps:
+          - checkout: none
+
+          - powershell: |
+              $ErrorActionPreference = 'Stop'
+
+              $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+              $projectName = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+              $apiVersion = '7.1'
+              $allowedBranchPattern = '$(buildSourceBranchRegex)'
+
+              $headers = @{
+                Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+              }
+
+              $deployBackend = "${{ parameters.deployBackend }}".ToLower() -eq 'true'
+              $deployFrontend = "${{ parameters.deployFrontend }}".ToLower() -eq 'true'
+              $deployDb = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
+
+              if (-not ($deployBackend -or $deployFrontend -or $deployDb)) {
+                throw 'At least one deployment target must be selected: Backend, Frontend, or Database.'
+              }
+
+              function Normalize-BuildNumber {
+                param([string]$BuildNumber)
+
+                if ($BuildNumber -eq '__EMPTY__') {
+                  return ''
+                }
+
+                return $BuildNumber
+              }
+
+              function Resolve-DefinitionIdByName {
+                param(
+                  [string]$Label,
+                  [string]$PipelineName
+                )
+
+                if ([string]::IsNullOrWhiteSpace($PipelineName)) {
+                  throw "$Label pipeline name is empty."
+                }
+
+                $encodedName = [System.Uri]::EscapeDataString($PipelineName)
+                $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
+                  $collectionUri,
+                  $projectName,
+                  $encodedName,
+                  $apiVersion
+
+                Write-Host "Resolving $Label pipeline name [$PipelineName]"
+                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+                if (-not $response.value -or $response.count -lt 1) {
+                  throw "No pipeline definition found for $Label with name [$PipelineName]."
+                }
+
+                $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
+
+                if ($exactMatches.Count -eq 0) {
+                  throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
+                }
+
+                if ($exactMatches.Count -gt 1) {
+                  throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
+                }
+
+                $definition = $exactMatches[0]
+
+                Write-Host "$Label definition resolved:"
+                Write-Host "  Definition ID   = $($definition.id)"
+                Write-Host "  Definition Name = $($definition.name)"
+
+                return $definition.id
+              }
+
+              function Resolve-Build {
+                param(
+                  [string]$Label,
+                  [string]$PipelineName,
+                  [string]$BuildNumber
+                )
+
+                $BuildNumber = Normalize-BuildNumber -BuildNumber $BuildNumber
+
+                if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
+                  throw "$Label build number is required because deployment of $Label was selected."
+                }
+
+                $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
+                $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
+
+                $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
+                  $collectionUri,
+                  $projectName,
+                  $definitionId,
+                  $encodedBuildNumber,
+                  $apiVersion
+
+                Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
+                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+
+                if (-not $response.value -or $response.count -lt 1) {
+                  throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
+                }
+
+                $build = $response.value[0]
+
+                if ($build.sourceBranch -notmatch $allowedBranchPattern) {
+                  throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)]. Only release/* or hotfix/* builds can be deployed."
+                }
+
+                Write-Host "$Label build resolved:"
+                Write-Host "  Build ID         = $($build.id)"
+                Write-Host "  Build Number     = $($build.buildNumber)"
+                Write-Host "  Definition ID    = $definitionId"
+                Write-Host "  Definition Name  = $PipelineName"
+                Write-Host "  Branch           = $($build.sourceBranch)"
+
+                Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
+                Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
+                Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+                Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
+              }
+
+              if ($deployBackend) {
+                Resolve-Build -Label 'Backend' -PipelineName '$(backendPipelineName)' -BuildNumber '${{ parameters.backendBuildNumber }}'
+              } else {
+                Write-Host '##vso[task.setvariable variable=BackendPipelineDefinitionId;isOutput=true]'
+                Write-Host '##vso[task.setvariable variable=BackendBuildId;isOutput=true]'
+                Write-Host '##vso[task.setvariable variable=BackendResolvedBuildNumber;isOutput=true]'
+                Write-Host '##vso[task.setvariable variable=BackendSourceBranch;isOutput=true]'
+              }
+
+              if ($deployFrontend) {
+                Resolve-Build -Label 'Frontend' -PipelineName '$(frontendPipelineName)' -BuildNumber '${{ parameters.frontendBuildNumber }}'
+              } else {
+                Write-Host '##vso[task.setvariable variable=FrontendPipelineDefinitionId;isOutput=true]'
+                Write-Host '##vso[task.setvariable variable=FrontendBuildId;isOutput=true]'
+                Write-Host '##vso[task.setvariable variable=FrontendResolvedBuildNumber;isOutput=true]'
+                Write-Host '##vso[task.setvariable variable=FrontendSourceBranch;isOutput=true]'
+              }
+
+              if ($deployDb) {
+                Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
+              } else {
+                Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
+                Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
+                Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
+                Write-Host '##vso[task.setvariable variable=DbSourceBranch;isOutput=true]'
+              }
+            name: Resolve
+            displayName: 'Resolve pipeline names and build numbers'
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - stage: Generate_DB_Preview
+    displayName: 'Generate DB preview for $(environmentName)'
+    dependsOn:
+      - Resolve_Selected_Builds
+    condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployDatabase }}', 'true'))
+    variables:
+      DbPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId']]
+      DbBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId']]
+      DbSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch']]
+    jobs:
+      - template: pipelines/generate-db-preview.yml@templates
+        parameters:
+          jobName: 'GenerateDbPreview'
+          jobDisplayName: 'Generate preview SQL and deploy report'
+          deployPool: '$(deploymentPool)'
+          deployAgentName: '$(dbAgentName)'
+          artifactProject: '$(System.TeamProject)'
+          artifactDefinitionId: '$(DbPipelineDefinitionId)'
+          artifactBuildId: '$(DbBuildId)'
+          artifactName: '$(dbArtifactName)'
+          previewArtifactName: 'db-preview-$(environmentName)'
+          targetConnectionString: '$(GlobalSettings.ConnString)'
+
+  - stage: Approval_Release
+    displayName: 'Approval for $(environmentName) release'
+    dependsOn:
+      - Resolve_Selected_Builds
+      - ${{ if eq(parameters.deployDatabase, true) }}:
+          - Generate_DB_Preview
+    condition: succeeded()
+    jobs:
+      - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+          - job: NoApprovalRequired
+            displayName: 'No approval required for SIT'
+            pool:
+              name: '$(deploymentPool)'
+              demands:
+                - Agent.Name -equals $(resolveAgentName)
+            steps:
+              - checkout: none
+              - powershell: |
+                  Write-Host 'SIT selected. No manual approval is required.'
+                displayName: 'Skip manual approval'
+
+      - ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
+          - job: WaitForBusinessApproval
+            displayName: 'Wait for Business Approval'
+            pool: server
+            timeoutInMinutes: 1500
+            steps:
+              - task: ManualValidation@0
+                timeoutInMinutes: 1440
+                inputs:
+                  notifyUsers: '$(approvalNotifyUsers)'
+                  instructions: '$(approvalInstructions)'
+                  onTimeout: 'reject'
+
+  - ${{ if or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true)) }}:
+      - stage: Deploy_Applications
+        displayName: 'Deploy applications to $(environmentName)'
+        dependsOn:
+          - Resolve_Selected_Builds
+          - Approval_Release
+        condition: succeeded()
+        variables:
+          BackendPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendPipelineDefinitionId']]
+          BackendBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendBuildId']]
+          BackendSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendSourceBranch']]
+          FrontendPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendPipelineDefinitionId']]
+          FrontendBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendBuildId']]
+          FrontendSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendSourceBranch']]
+        jobs:
+          - ${{ if eq(parameters.deployBackend, true) }}:
+              - template: pipelines/deploy-iis.yml@templates
+                parameters:
+                  jobDependsOn: []
+                  jobCondition: succeeded()
+                  deploymentName: 'DeployBackend'
+                  deploymentDisplayName: 'Deploy Backend to ${{ parameters.targetEnvironment }} (IIS)'
+                  environmentName: '${{ parameters.targetEnvironment }}'
+                  deployPool: '$(deploymentPool)'
+                  deployAgentName: '$(backendAgentName)'
+                  ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+                    variableGroup: 'SIT_BACK_END_VARIABLE_GROUP'
+                  ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+                    variableGroup: 'UAT_BACK_END_VARIABLE_GROUP'
+                  ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+                    variableGroup: 'PROD_BACK_END_VARIABLE_GROUP'
+                  componentName: 'BACKEND'
+                  artifactName: '$(backendArtifactName)'
+                  artifactBuildType: 'specific'
+                  artifactProject: '$(System.TeamProject)'
+                  artifactDefinitionId: '$(BackendPipelineDefinitionId)'
+                  artifactBuildId: '$(BackendBuildId)'
+                  artifactBranch: '$(BackendSourceBranch)'
+                  zipName: '$(backendZipName)'
+                  siteName: '$(backendSiteName)'
+                  appPoolName: '$(backendAppPoolName)'
+                  iisTargetPath: '$(backendTargetPath)'
+                  cleanTargetBeforeCopy: true
+                  cleanExcludeCsv: ''
+                  enableJsonTransform: true
+                  jsonFiles: '**/appsettings.json'
+                  enableXmlConfigTransform: false
+                  xmlConfigFiles: []
+                  xmlVariableValues: {}
+                  enableCustomXmlEdits: false
+                  customXmlEdits: []
+                  customXmlVariableValues: {}
+                  # Enable after replacing backendHealthCheckUrl with a confirmed URL.
+                  enableHealthCheck: false
+                  healthCheckUrl: '$(backendHealthCheckUrl)'
+                  healthCheckExpectedStatusCode: '200'
+                  healthCheckRetries: 6
+                  healthCheckDelaySeconds: 10
+                  enableRollbackOnHealthCheckFailure: true
+                  enableLocalBackup: true
+                  backupRoot: '$(backupRoot)'
+                  backupPath: '$(backupRoot)\BACKEND\$(Build.BuildId)'
+
+          - ${{ if eq(parameters.deployFrontend, true) }}:
+              - template: pipelines/deploy-iis.yml@templates
+                parameters:
+                  ${{ if eq(parameters.deployBackend, true) }}:
+                    jobDependsOn:
+                      - DeployBackend
+                  ${{ if eq(parameters.deployBackend, false) }}:
+                    jobDependsOn: []
+                  jobCondition: succeeded()
+                  deploymentName: 'DeployFrontend'
+                  deploymentDisplayName: 'Deploy Frontend to ${{ parameters.targetEnvironment }} (IIS)'
+                  environmentName: '${{ parameters.targetEnvironment }}'
+                  deployPool: '$(deploymentPool)'
+                  deployAgentName: '$(frontendAgentName)'
+                  ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+                    variableGroup: 'SIT_FRONT_END_VARIABLE_GROUP'
+                  ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+                    variableGroup: 'UAT_FRONT_END_VARIABLE_GROUP'
+                  ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+                    variableGroup: 'PROD_FRONT_END_VARIABLE_GROUP'
+                  componentName: 'FRONTEND'
+                  artifactName: '$(frontendArtifactName)'
+                  artifactBuildType: 'specific'
+                  artifactProject: '$(System.TeamProject)'
+                  artifactDefinitionId: '$(FrontendPipelineDefinitionId)'
+                  artifactBuildId: '$(FrontendBuildId)'
+                  artifactBranch: '$(FrontendSourceBranch)'
+                  zipName: '$(frontendZipName)'
+                  siteName: '$(frontendSiteName)'
+                  appPoolName: '$(frontendAppPoolName)'
+                  iisTargetPath: '$(frontendTargetPath)'
+                  # C:\inetpub\wwwroot\ is broad. Keep this false unless the whole root belongs only to this site.
+                  cleanTargetBeforeCopy: false
+                  cleanExcludeCsv: ''
+                  enableJsonTransform: true
+                  jsonFiles: '**/appsettings.json'
+                  enableXmlConfigTransform: false
+                  xmlConfigFiles: []
+                  xmlVariableValues: {}
+                  enableCustomXmlEdits: false
+                  customXmlEdits: []
+                  customXmlVariableValues: {}
+                  # Enable after replacing frontendHealthCheckUrl with a confirmed URL.
+                  enableHealthCheck: false
+                  healthCheckUrl: '$(frontendHealthCheckUrl)'
+                  healthCheckExpectedStatusCode: '200'
+                  healthCheckRetries: 6
+                  healthCheckDelaySeconds: 10
+                  enableRollbackOnHealthCheckFailure: true
+                  enableLocalBackup: true
+                  backupRoot: '$(backupRoot)'
+                  backupPath: '$(backupRoot)\FRONTEND\$(Build.BuildId)'
+
+  - ${{ if and(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true)) }}:
+      - stage: Rollback_Backend_After_Frontend_Failure
+        displayName: 'Rollback Backend because Frontend failed'
+        dependsOn:
+          - Deploy_Applications
+        condition: and(always(), eq(dependencies.Deploy_Applications.outputs['DeployBackend.DeployBackend.publishSuccessOutcome.DeploymentHealthy'], 'true'), ne(dependencies.Deploy_Applications.outputs['DeployFrontend.DeployFrontend.publishSuccessOutcome.DeploymentHealthy'], 'true'))
+        jobs:
+          - template: pipelines/rollback-iis.yml@templates
+            parameters:
+              deploymentName: 'RollbackBackendAfterFrontendFailure'
+              deploymentDisplayName: 'Rollback Backend from local backup because Frontend failed'
+              environmentName: '${{ parameters.targetEnvironment }}'
+              deployPool: '$(deploymentPool)'
+              deployAgentName: '$(backendAgentName)'
+              siteName: '$(backendSiteName)'
+              appPoolName: '$(backendAppPoolName)'
+              iisTargetPath: '$(backendTargetPath)'
+              backupPath: '$(backupRoot)\BACKEND\$(Build.BuildId)'
+              cleanExcludeCsv: ''
+
+  - ${{ if or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true)) }}:
+      - stage: Tag_APP_LKG
+        displayName: 'Tag successful application builds as LKG'
+        dependsOn:
+          - Resolve_Selected_Builds
+          - Deploy_Applications
+        condition: succeeded('Deploy_Applications')
+        variables:
+          BackendBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendBuildId']]
+          BackendPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendPipelineDefinitionId']]
+          FrontendBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendBuildId']]
+          FrontendPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendPipelineDefinitionId']]
+        jobs:
+          - job: TagApplicationBuilds
+            displayName: 'Tag Frontend / Backend builds'
+            pool:
+              name: '$(deploymentPool)'
+              demands:
+                - Agent.Name -equals $(resolveAgentName)
+            steps:
+              - checkout: none
+
+              - ${{ if eq(parameters.deployBackend, true) }}:
+                  - template: pipelines/tag-builds.yml@templates
+                    parameters:
+                      tagTargets:
+                        - name: 'Alterna Account Statement Management Backend'
+                          buildId: '$(BackendBuildId)'
+                          definitionId: '$(BackendPipelineDefinitionId)'
+                          deployedTag: 'DEPLOYED-$(environmentName)-AASM-BACKEND'
+                          lkgTag: 'LKG-$(environmentName)-AASM-BACKEND'
+                          makeLkgUnique: true
+
+              - ${{ if eq(parameters.deployFrontend, true) }}:
+                  - template: pipelines/tag-builds.yml@templates
+                    parameters:
+                      tagTargets:
+                        - name: 'Alterna Account Statement Management Frontend'
+                          buildId: '$(FrontendBuildId)'
+                          definitionId: '$(FrontendPipelineDefinitionId)'
+                          deployedTag: 'DEPLOYED-$(environmentName)-AASM-FRONTEND'
+                          lkgTag: 'LKG-$(environmentName)-AASM-FRONTEND'
+                          makeLkgUnique: true
+
+  - ${{ if and(eq(parameters.deployDatabase, true), or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true))) }}:
+      - stage: Deploy_DB_After_Apps
+        displayName: 'Deploy DB to $(environmentName) after applications'
+        dependsOn:
+          - Resolve_Selected_Builds
+          - Approval_Release
+          - Tag_APP_LKG
+        condition: and(succeeded('Approval_Release'), succeeded('Tag_APP_LKG'))
+        variables:
+          DbPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId']]
+          DbBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId']]
+          DbSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch']]
+        jobs:
+          - template: pipelines/deploy-database.yml@templates
+            parameters:
+              deploymentName: 'DeployDb'
+              deploymentDisplayName: 'Deploy Alterna Account Statement Management database'
+              environmentName: '${{ parameters.targetEnvironment }}'
+              deployPool: '$(deploymentPool)'
+              deployAgentName: '$(dbAgentName)'
+              artifactName: '$(dbArtifactName)'
+              artifactBuildType: 'specific'
+              artifactProject: '$(System.TeamProject)'
+              artifactDefinitionId: '$(DbPipelineDefinitionId)'
+              artifactBuildId: '$(DbBuildId)'
+              artifactBranch: '$(DbSourceBranch)'
+              targetConnectionString: '$(GlobalSettings.ConnString)'
+              dacpacFileName: 'DatabaseProjectAlterna_AccountStatementManagement.dacpac'
+              artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
+
+  - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployBackend, false), eq(parameters.deployFrontend, false)) }}:
+      - stage: Deploy_DB_Only
+        displayName: 'Deploy DB to $(environmentName)'
+        dependsOn:
+          - Resolve_Selected_Builds
+          - Approval_Release
+        condition: succeeded('Approval_Release')
+        variables:
+          DbPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId']]
+          DbBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId']]
+          DbSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch']]
+        jobs:
+          - template: pipelines/deploy-database.yml@templates
+            parameters:
+              deploymentName: 'DeployDb'
+              deploymentDisplayName: 'Deploy Alterna Account Statement Management database'
+              environmentName: '${{ parameters.targetEnvironment }}'
+              deployPool: '$(deploymentPool)'
+              deployAgentName: '$(dbAgentName)'
+              artifactName: '$(dbArtifactName)'
+              artifactBuildType: 'specific'
+              artifactProject: '$(System.TeamProject)'
+              artifactDefinitionId: '$(DbPipelineDefinitionId)'
+              artifactBuildId: '$(DbBuildId)'
+              artifactBranch: '$(DbSourceBranch)'
+              targetConnectionString: '$(GlobalSettings.ConnString)'
+              dacpacFileName: 'DatabaseProjectAlterna_AccountStatementManagement.dacpac'
+              artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
+
+
+### azure-pipelines-build-db.yml
+name: AASM_DB_$(SourceBranchName)_rc$(Rev:r)
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: 'Azure Templates/Azure Templates'
+      ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+      - release/*
+  paths:
+    include:
+      - DatabaseProjectAlterna_AccountStatementManagement/**
+
+pr: none
+
+stages:
+  - stage: Build_DB
+    displayName: 'Build DB'
+    jobs:
+      - template: pipelines/build-database-project.yml@templates
+        parameters:
+          jobName: 'BuildDb'
+          jobDisplayName: 'Build Alterna Account Statement Management database project'
+          buildPool: 'Build Pool'
+          buildAgentName: 'UAT-ALTERNA-DK1'
+          # Verify the folder/project name against the repository.
+          sqlProjectPath: 'DatabaseProjectAlterna_AccountStatementManagement/DatabaseProjectAlterna_AccountStatementManagement.sqlproj'
+          artifactName: 'alterna-account-statement-management-db-drop'
+          dacpacFileName: 'DatabaseProjectAlterna_AccountStatementManagement.dacpac'
+
+
+
+### azure-pipelines-preview-db.yml
+name: AASM_DB_PREVIEW_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+  - name: targetEnvironment
+    type: string
+    default: SIT
+    values:
+      - SIT
+      - UAT
+      - PROD
+    displayName: 'Target Environment'
+
+  - name: dbBuildNumber
+    type: string
+    default: ''
+    displayName: 'DB Build Number'
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: 'Azure Templates/Azure Templates'
+      ref: refs/heads/main
+
+trigger: none
+pr: none
+
+variables:
+  - name: deploymentPool
+    value: 'Deployment Pool'
+
+  - name: dbPipelineName
+    value: 'BUILD - DB - Alterna Account Statement Management'
+
+  - name: dbArtifactName
+    value: 'alterna-account-statement-management-db-drop'
+
+  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
+      - group: SIT_BACK_END_VARIABLE_GROUP
+      - name: environmentName
+        value: 'SIT'
+      - name: dbAgentName
+        value: 'SIT-ALTERNA-BN1'
+
+  - ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
+      - group: UAT_BACK_END_VARIABLE_GROUP
+      - name: environmentName
+        value: 'UAT'
+      - name: dbAgentName
+        value: 'UAT-ALTERNA-BN1' # Verify before first UAT run.
+
+  - ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
+      - group: PROD_BACK_END_VARIABLE_GROUP
+      - name: environmentName
+        value: 'PROD'
+      - name: dbAgentName
+        value: 'PROD-ALTERNA-BN1' # Verify before first PROD run.
+
+stages:
+  - stage: Resolve_DB_Build
+    displayName: 'Resolve DB build'
+    jobs:
+      - job: ResolveDbBuild
+        displayName: 'Resolve DB build number'
+        pool:
+          name: '$(deploymentPool)'
+          demands:
+            - Agent.Name -equals $(dbAgentName)
+        steps:
+          - checkout: none
+
+          - powershell: |
+              $ErrorActionPreference = 'Stop'
+
+              if ([string]::IsNullOrWhiteSpace('${{ parameters.dbBuildNumber }}')) {
+                throw 'dbBuildNumber is required.'
+              }
+
+              $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
+              $projectName = [System.Uri]::EscapeDataString("$(System.TeamProject)")
+              $apiVersion = '7.1'
+
+              $headers = @{
+                Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
+              }
+
+              $pipelineName = '$(dbPipelineName)'
+              $encodedName = [System.Uri]::EscapeDataString($pipelineName)
+
+              $definitionsUri = "{0}/{1}/_apis/build/definitions?name={2}&api-version={3}" -f `
+                $collectionUri, $projectName, $encodedName, $apiVersion
+
+              $definitions = Invoke-RestMethod -Method Get -Uri $definitionsUri -Headers $headers
+              $exactMatches = @($definitions.value | Where-Object { $_.name -eq $pipelineName })
+
+              if ($exactMatches.Count -eq 0) {
+                throw "Could not resolve pipeline definition for [$pipelineName]."
+              }
+
+              if ($exactMatches.Count -gt 1) {
+                throw "More than one exact pipeline definition match was found for [$pipelineName]."
+              }
+
+              $definition = $exactMatches[0]
+              $buildNumber = [System.Uri]::EscapeDataString('${{ parameters.dbBuildNumber }}')
+
+              $buildsUri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
+                $collectionUri, $projectName, $definition.id, $buildNumber, $apiVersion
+
+              $builds = Invoke-RestMethod -Method Get -Uri $buildsUri -Headers $headers
+              $build = @($builds.value) | Select-Object -First 1
+
+              if (-not $build) {
+                throw "No successful DB build found for build number [${{ parameters.dbBuildNumber }}]."
+              }
+
+              Write-Host 'Resolved build:'
+              Write-Host "  Definition ID = $($definition.id)"
+              Write-Host "  Build ID      = $($build.id)"
+              Write-Host "  Build Number  = $($build.buildNumber)"
+              Write-Host "  Source Branch = $($build.sourceBranch)"
+
+              Write-Host "##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]$($definition.id)"
+              Write-Host "##vso[task.setvariable variable=DbBuildId;isOutput=true]$($build.id)"
+              Write-Host "##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
+            name: Resolve
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - stage: Generate_DB_Preview
+    displayName: 'Generate DB preview for $(environmentName)'
+    dependsOn:
+      - Resolve_DB_Build
+    condition: succeeded('Resolve_DB_Build')
+    variables:
+      DbPipelineDefinitionId: $[stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbPipelineDefinitionId']]
+      DbBuildId: $[stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbBuildId']]
+    jobs:
+      - template: pipelines/generate-db-preview.yml@templates
+        parameters:
+          jobName: 'GeneratePreview'
+          jobDisplayName: 'Generate DB preview for $(environmentName)'
+          deployPool: '$(deploymentPool)'
+          deployAgentName: '$(dbAgentName)'
+          artifactProject: '$(System.TeamProject)'
+          artifactDefinitionId: '$(DbPipelineDefinitionId)'
+          artifactBuildId: '$(DbBuildId)'
+          artifactName: '$(dbArtifactName)'
+          previewArtifactName: 'db-preview-$(environmentName)'
+          # This must resolve to Alterna_AccountStatementManagement in each environment.
+          targetConnectionString: '$(GlobalSettings.ConnString)'
+
+
+
+### azure-pipelines-build-api.yml
+name: AASM_API_$(SourceBranchName)_rc$(Rev:r)
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: 'Azure Templates/Azure Templates'
+      ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+      - release/*
+  paths:
+    exclude:
+      - '*.yml'
+      - global.json
+      - nuget.config
+
+pr: none
+
+variables:
+  - group: OWASP_SECRETS
+
+stages:
+  - stage: Build_API
+    displayName: 'Build API & Publish Artifact'
+    jobs:
+      - template: pipelines/build-dotnet-core-webapi.yml@templates
+        parameters:
+          jobName: 'BuildBackend'
+          jobDisplayName: 'Build Alterna Account Statement Management Backend'
+          buildPool: 'Build Pool'
+          buildAgentName: 'UAT-ALTERNA-DK1'
+          buildConfiguration: 'Release'
+          restoreProjects: '**/*.csproj'
+          runTests: false
+          testProjects: ''
+          # Verify the project filename if the API project uses an .Api or .Backend suffix.
+          publishProject: '**/AlternaAccountStatementManagement.csproj'
+          nugetConfigPath: 'nuget.config'
+          zipName: 'Alterna-Account-Statement-Management-Backend.zip'
+          artifactName: 'alterna-account-statement-management-api-drop'
+          publishOutputFolder: '$(Build.ArtifactStagingDirectory)\AlternaAccountStatementManagement'
+          runDependencyCheck: false
+          dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
+          dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
+          dependencyCheckProjectName: 'Alterna-Account-Statement-Management-Backend'
+          dependencyCheckAdditionalArguments: ''
+
+
+### README.md
+# Alterna Account Statement Management pipelines
+
+This package contains the five Azure DevOps YAML definitions adapted from the Alterna Telecom pipelines.
+
+| Azure DevOps pipeline name | YAML file |
+| --- | --- |
+| BUILD - FRONT - Alterna Account Statement Management | `azure-pipelines-build-front.yml` |
+| BUILD - API - Alterna Account Statement Management | `azure-pipelines-build-api.yml` |
+| PREVIEW DB CHANGES - Alterna Account Statement Management | `azure-pipelines-preview-db.yml` |
+| BUILD - DB - Alterna Account Statement Management | `azure-pipelines-build-db.yml` |
+| RELEASE - Alterna Account Statement Management | `azure-pipelines-release.yml` |
+
+The top-level `name:` in each YAML controls the run/build number. Create or rename the Azure DevOps pipeline definition itself using the exact names in the table because the preview and release pipelines resolve build definitions by that exact display name.
+
+## Values already configured
+
+- Backend IIS site and application pool: `AlternaAccountStatementManagement`
+- Backend path: `C:\inetpub\wwwroot\AlternaAccountStatementManagement-BN1`
+- Frontend IIS site and application pool: `AlternaAccountStatementManagement`
+- Frontend path: `C:\inetpub\wwwroot\`
+- Database: `Alterna_AccountStatementManagement` through `$(GlobalSettings.ConnString)`
+- Pipeline run prefix: `AASM`
+- Build, artifact, ZIP, backup, and LKG tag names are consistent across all five pipelines.
+
+## Verify before the first run
+
+1. In `azure-pipelines-build-front.yml`, confirm `distFolder` against the Angular `outputPath`. It is currently `dist/AlternaAccountStatementManagement/browser`.
+2. In `azure-pipelines-build-api.yml`, confirm the API project filename. It is currently matched as `**/AlternaAccountStatementManagement.csproj`.
+3. In both database files and the release file, confirm the SQL project folder, `.sqlproj`, and `.dacpac` names. They currently use `DatabaseProjectAlterna_AccountStatementManagement`.
+4. Confirm all UAT and PROD agent names. The values follow the Alterna convention and are marked in the YAML.
+5. Confirm that `GlobalSettings.ConnString` in each backend variable group targets `Alterna_AccountStatementManagement` for the selected environment.
+6. Replace the backend and frontend health-check URLs for SIT, UAT, and PROD. Health checks are intentionally disabled until those URLs are confirmed; enable them afterward in both IIS deployment template calls.
+7. Confirm that the backend and frontend are deployed on different servers. IIS cannot have two sites with the same name on the same server.
+
+## Frontend path safety
+
+The frontend target is the entire `C:\inetpub\wwwroot\` directory. Therefore, `cleanTargetBeforeCopy` is set to `false` for the frontend. Setting it to `true` may remove other sites or files under `wwwroot`.
+
+If this server is dedicated to this application, the cleaner long-term configuration is a dedicated path such as `C:\inetpub\wwwroot\AlternaAccountStatementManagement`, followed by setting `cleanTargetBeforeCopy: true`.
+
+## Azure DevOps permissions
+
+The preview and release pipelines call the Azure DevOps Build REST API through `$(System.AccessToken)`, and the release also tags builds. Ensure the pipeline's build service identity can:
+
+- view builds and build definitions;
+- download artifacts;
+- add and remove build tags;
+- read the shared `Azure Templates/Azure Templates` repository;
+- read the referenced variable groups.
+
+The release pipeline accepts builds only from `release/*` or `hotfix/*` branches, matching the source pipeline design.
