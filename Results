@@ -1,1035 +1,3847 @@
-### azure-pipelines-build-front.yml
-name: AASM_FRONT_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-      - release/*
-  paths:
-    exclude:
-      - '*.yml'
-
-pr: none
-
-variables:
-  - group: OWASP_SECRETS
-
-stages:
-  - stage: Build_Frontend
-    displayName: 'Build Angular & Publish Artifact'
-    jobs:
-      - template: pipelines/build-angular-webapp.yml@templates
-        parameters:
-          jobName: 'BuildFrontend'
-          jobDisplayName: 'Build Alterna Account Statement Management Frontend'
-          buildPool: 'Build Pool'
-          buildAgentName: 'UAT-ALTERNA-DK1'
-          workingDirectory: '.'
-          nodeVersion: '22.x'
-          installCommand: 'ci'
-          runTests: false
-          buildCommand: 'npx ng build'
-          # Verify this against projects.<project>.architect.build.options.outputPath in angular.json.
-          distFolder: 'dist/AlternaAccountStatementManagement/browser'
-          zipName: 'Alterna-Account-Statement-Management-Frontend.zip'
-          artifactName: 'alterna-account-statement-management-front-drop'
-          publishOutputFolder: '$(Build.ArtifactStagingDirectory)\publish'
-          runDependencyCheck: false
-          dependencyCheckProjectName: 'Alterna-Account-Statement-Management-Frontend'
-          dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-          dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-          dependencyCheckAdditionalArguments: ''
-
-
-
-
-### azure-pipelines-release.yml
-name: AASM_REL_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
-
-parameters:
-  - name: targetEnvironment
-    type: string
-    default: SIT
-    values:
-      - SIT
-      - UAT
-      - PROD
-    displayName: 'Target Environment'
-
-  - name: deployBackend
-    type: boolean
-    default: false
-    displayName: 'Deploy Backend'
-
-  - name: deployFrontend
-    type: boolean
-    default: false
-    displayName: 'Deploy Frontend'
-
-  - name: deployDatabase
-    type: boolean
-    default: false
-    displayName: 'Deploy Database'
-
-  - name: backendBuildNumber
-    type: string
-    default: '__EMPTY__'
-    displayName: 'Backend Build Number'
-
-  - name: frontendBuildNumber
-    type: string
-    default: '__EMPTY__'
-    displayName: 'Frontend Build Number'
-
-  - name: dbBuildNumber
-    type: string
-    default: '__EMPTY__'
-    displayName: 'Database Build Number'
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger: none
-pr: none
-
-variables:
-  - name: deploymentPool
-    value: 'Deployment Pool'
-
-  - name: buildSourceBranchRegex
-    value: '^refs/heads/(release|hotfix)/'
-
-  - name: backendArtifactName
-    value: 'alterna-account-statement-management-api-drop'
-
-  - name: frontendArtifactName
-    value: 'alterna-account-statement-management-front-drop'
-
-  - name: dbArtifactName
-    value: 'alterna-account-statement-management-db-drop'
-
-  - name: backendZipName
-    value: 'Alterna-Account-Statement-Management-Backend.zip'
-
-  - name: frontendZipName
-    value: 'Alterna-Account-Statement-Management-Frontend.zip'
-
-  - name: backendSiteName
-    value: 'AlternaAccountStatementManagement'
-
-  - name: backendAppPoolName
-    value: 'AlternaAccountStatementManagement'
-
-  - name: backendTargetPath
-    value: 'C:\inetpub\wwwroot\AlternaAccountStatementManagement-BN1'
-
-  - name: frontendSiteName
-    value: 'AlternaAccountStatementManagement'
-
-  - name: frontendAppPoolName
-    value: 'AlternaAccountStatementManagement'
-
-  - name: frontendTargetPath
-    value: 'C:\inetpub\wwwroot\'
-
-  # SIT
-  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-      - group: SIT_BACK_END_VARIABLE_GROUP
-
-      - name: environmentName
-        value: 'SIT'
-
-      - name: backendPipelineName
-        value: 'BUILD - API - Alterna Account Statement Management'
-
-      - name: frontendPipelineName
-        value: 'BUILD - FRONT - Alterna Account Statement Management'
-
-      - name: dbPipelineName
-        value: 'BUILD - DB - Alterna Account Statement Management'
-
-      - name: resolveAgentName
-        value: 'SIT-ALTERNA-BN1'
-
-      - name: backendAgentName
-        value: 'SIT-ALTERNA-BN1'
-
-      - name: frontendAgentName
-        value: 'SIT-ALTERNA-FN1'
-
-      - name: dbAgentName
-        value: 'SIT-ALTERNA-BN1'
-
-      - name: approvalNotifyUsers
-        value: 'SGBL\pabouserhal'
-
-      - name: approvalInstructions
-        value: 'Approve SIT Alterna Account Statement Management deployment.'
-
-      # Replace after confirming the IIS binding and application health endpoint.
-      - name: backendHealthCheckUrl
-        value: 'http://localhost/health'
-
-      # Replace after confirming the IIS binding. For Angular, / or /appsettings.json can be used.
-      - name: frontendHealthCheckUrl
-        value: 'http://localhost/'
-
-      - name: backupRoot
-        value: 'C:\DeployBackups\SIT\AlternaAccountStatementManagement'
-
-  # UAT
-  - ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-      - group: UAT_BACK_END_VARIABLE_GROUP
-
-      - name: environmentName
-        value: 'UAT'
-
-      - name: backendPipelineName
-        value: 'BUILD - API - Alterna Account Statement Management'
-
-      - name: frontendPipelineName
-        value: 'BUILD - FRONT - Alterna Account Statement Management'
-
-      - name: dbPipelineName
-        value: 'BUILD - DB - Alterna Account Statement Management'
-
-      - name: resolveAgentName
-        value: 'UAT-ALTERNA-BN1' # Verify before first UAT run.
-
-      - name: backendAgentName
-        value: 'UAT-ALTERNA-BN1' # Verify before first UAT run.
-
-      - name: frontendAgentName
-        value: 'UAT-ALTERNA-FN1' # Verify before first UAT run.
-
-      - name: dbAgentName
-        value: 'UAT-ALTERNA-BN1' # Verify before first UAT run.
-
-      - name: approvalNotifyUsers
-        value: 'SGBL\pabouserhal'
-
-      - name: approvalInstructions
-        value: 'Approve UAT Alterna Account Statement Management deployment.'
-
-      - name: backendHealthCheckUrl
-        value: 'http://localhost/health' # Replace after confirming the UAT IIS binding.
-
-      - name: frontendHealthCheckUrl
-        value: 'http://localhost/' # Replace after confirming the UAT IIS binding.
-
-      - name: backupRoot
-        value: 'C:\DeployBackups\UAT\AlternaAccountStatementManagement'
-
-  # PROD
-  - ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-      - group: PROD_BACK_END_VARIABLE_GROUP
-
-      - name: environmentName
-        value: 'PROD'
-
-      - name: backendPipelineName
-        value: 'BUILD - API - Alterna Account Statement Management'
-
-      - name: frontendPipelineName
-        value: 'BUILD - FRONT - Alterna Account Statement Management'
-
-      - name: dbPipelineName
-        value: 'BUILD - DB - Alterna Account Statement Management'
-
-      - name: resolveAgentName
-        value: 'PROD-ALTERNA-BN1' # Verify before first PROD run.
-
-      - name: backendAgentName
-        value: 'PROD-ALTERNA-BN1' # Verify before first PROD run.
-
-      - name: frontendAgentName
-        value: 'PROD-ALTERNA-FN1' # Verify before first PROD run.
-
-      - name: dbAgentName
-        value: 'PROD-ALTERNA-BN1' # Verify before first PROD run.
-
-      - name: approvalNotifyUsers
-        value: 'SGBL\pabouserhal'
-
-      - name: approvalInstructions
-        value: 'Approve PROD Alterna Account Statement Management deployment.'
-
-      - name: backendHealthCheckUrl
-        value: 'http://localhost/health' # Replace after confirming the PROD IIS binding.
-
-      - name: frontendHealthCheckUrl
-        value: 'http://localhost/' # Replace after confirming the PROD IIS binding.
-
-      - name: backupRoot
-        value: 'C:\DeployBackups\PROD\AlternaAccountStatementManagement'
-
-stages:
-  - stage: Resolve_Selected_Builds
-    displayName: 'Resolve selected build numbers'
-    jobs:
-      - job: ResolveBuildNumbers
-        displayName: 'Resolve pipeline names and build numbers'
-        pool:
-          name: '$(deploymentPool)'
-          demands:
-            - Agent.Name -equals $(resolveAgentName)
-        steps:
-          - checkout: none
-
-          - powershell: |
-              $ErrorActionPreference = 'Stop'
-
-              $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-              $projectName = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-              $apiVersion = '7.1'
-              $allowedBranchPattern = '$(buildSourceBranchRegex)'
-
-              $headers = @{
-                Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-              }
-
-              $deployBackend = "${{ parameters.deployBackend }}".ToLower() -eq 'true'
-              $deployFrontend = "${{ parameters.deployFrontend }}".ToLower() -eq 'true'
-              $deployDb = "${{ parameters.deployDatabase }}".ToLower() -eq 'true'
-
-              if (-not ($deployBackend -or $deployFrontend -or $deployDb)) {
-                throw 'At least one deployment target must be selected: Backend, Frontend, or Database.'
-              }
-
-              function Normalize-BuildNumber {
-                param([string]$BuildNumber)
-
-                if ($BuildNumber -eq '__EMPTY__') {
-                  return ''
-                }
-
-                return $BuildNumber
-              }
-
-              function Resolve-DefinitionIdByName {
-                param(
-                  [string]$Label,
-                  [string]$PipelineName
-                )
-
-                if ([string]::IsNullOrWhiteSpace($PipelineName)) {
-                  throw "$Label pipeline name is empty."
-                }
-
-                $encodedName = [System.Uri]::EscapeDataString($PipelineName)
-                $uri = "{0}/{1}/_apis/build/definitions?name={2}&includeAllProperties=false&includeLatestBuilds=false&api-version={3}" -f `
-                  $collectionUri,
-                  $projectName,
-                  $encodedName,
-                  $apiVersion
-
-                Write-Host "Resolving $Label pipeline name [$PipelineName]"
-                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-                if (-not $response.value -or $response.count -lt 1) {
-                  throw "No pipeline definition found for $Label with name [$PipelineName]."
-                }
-
-                $exactMatches = @($response.value | Where-Object { $_.name -eq $PipelineName })
-
-                if ($exactMatches.Count -eq 0) {
-                  throw "No exact pipeline definition match found for $Label with name [$PipelineName]."
-                }
-
-                if ($exactMatches.Count -gt 1) {
-                  throw "More than one exact pipeline definition match was found for [$PipelineName]. Make the pipeline name unique."
-                }
-
-                $definition = $exactMatches[0]
-
-                Write-Host "$Label definition resolved:"
-                Write-Host "  Definition ID   = $($definition.id)"
-                Write-Host "  Definition Name = $($definition.name)"
-
-                return $definition.id
-              }
-
-              function Resolve-Build {
-                param(
-                  [string]$Label,
-                  [string]$PipelineName,
-                  [string]$BuildNumber
-                )
-
-                $BuildNumber = Normalize-BuildNumber -BuildNumber $BuildNumber
-
-                if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
-                  throw "$Label build number is required because deployment of $Label was selected."
-                }
-
-                $definitionId = Resolve-DefinitionIdByName -Label $Label -PipelineName $PipelineName
-                $encodedBuildNumber = [System.Uri]::EscapeDataString($BuildNumber)
-
-                $uri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-                  $collectionUri,
-                  $projectName,
-                  $definitionId,
-                  $encodedBuildNumber,
-                  $apiVersion
-
-                Write-Host "Resolving $Label build number [$BuildNumber] using pipeline definition [$definitionId]"
-                $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
-
-                if (-not $response.value -or $response.count -lt 1) {
-                  throw "No succeeded build found for $Label with build number [$BuildNumber] in pipeline [$PipelineName]."
-                }
-
-                $build = $response.value[0]
-
-                if ($build.sourceBranch -notmatch $allowedBranchPattern) {
-                  throw "$Label build [$BuildNumber] was resolved, but it belongs to branch [$($build.sourceBranch)]. Only release/* or hotfix/* builds can be deployed."
-                }
-
-                Write-Host "$Label build resolved:"
-                Write-Host "  Build ID         = $($build.id)"
-                Write-Host "  Build Number     = $($build.buildNumber)"
-                Write-Host "  Definition ID    = $definitionId"
-                Write-Host "  Definition Name  = $PipelineName"
-                Write-Host "  Branch           = $($build.sourceBranch)"
-
-                Write-Host "##vso[task.setvariable variable=${Label}PipelineDefinitionId;isOutput=true]$definitionId"
-                Write-Host "##vso[task.setvariable variable=${Label}BuildId;isOutput=true]$($build.id)"
-                Write-Host "##vso[task.setvariable variable=${Label}ResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-                Write-Host "##vso[task.setvariable variable=${Label}SourceBranch;isOutput=true]$($build.sourceBranch)"
-              }
-
-              if ($deployBackend) {
-                Resolve-Build -Label 'Backend' -PipelineName '$(backendPipelineName)' -BuildNumber '${{ parameters.backendBuildNumber }}'
-              } else {
-                Write-Host '##vso[task.setvariable variable=BackendPipelineDefinitionId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=BackendBuildId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=BackendResolvedBuildNumber;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=BackendSourceBranch;isOutput=true]'
-              }
-
-              if ($deployFrontend) {
-                Resolve-Build -Label 'Frontend' -PipelineName '$(frontendPipelineName)' -BuildNumber '${{ parameters.frontendBuildNumber }}'
-              } else {
-                Write-Host '##vso[task.setvariable variable=FrontendPipelineDefinitionId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=FrontendBuildId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=FrontendResolvedBuildNumber;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=FrontendSourceBranch;isOutput=true]'
-              }
-
-              if ($deployDb) {
-                Resolve-Build -Label 'Db' -PipelineName '$(dbPipelineName)' -BuildNumber '${{ parameters.dbBuildNumber }}'
-              } else {
-                Write-Host '##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=DbBuildId;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]'
-                Write-Host '##vso[task.setvariable variable=DbSourceBranch;isOutput=true]'
-              }
-            name: Resolve
-            displayName: 'Resolve pipeline names and build numbers'
-            env:
-              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-  - stage: Generate_DB_Preview
-    displayName: 'Generate DB preview for $(environmentName)'
-    dependsOn:
-      - Resolve_Selected_Builds
-    condition: and(succeeded('Resolve_Selected_Builds'), eq('${{ parameters.deployDatabase }}', 'true'))
-    variables:
-      DbPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId']]
-      DbBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId']]
-      DbSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch']]
-    jobs:
-      - template: pipelines/generate-db-preview.yml@templates
-        parameters:
-          jobName: 'GenerateDbPreview'
-          jobDisplayName: 'Generate preview SQL and deploy report'
-          deployPool: '$(deploymentPool)'
-          deployAgentName: '$(dbAgentName)'
-          artifactProject: '$(System.TeamProject)'
-          artifactDefinitionId: '$(DbPipelineDefinitionId)'
-          artifactBuildId: '$(DbBuildId)'
-          artifactName: '$(dbArtifactName)'
-          previewArtifactName: 'db-preview-$(environmentName)'
-          targetConnectionString: '$(GlobalSettings.ConnString)'
-
-  - stage: Approval_Release
-    displayName: 'Approval for $(environmentName) release'
-    dependsOn:
-      - Resolve_Selected_Builds
-      - ${{ if eq(parameters.deployDatabase, true) }}:
-          - Generate_DB_Preview
-    condition: succeeded()
-    jobs:
-      - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-          - job: NoApprovalRequired
-            displayName: 'No approval required for SIT'
-            pool:
-              name: '$(deploymentPool)'
-              demands:
-                - Agent.Name -equals $(resolveAgentName)
-            steps:
-              - checkout: none
-              - powershell: |
-                  Write-Host 'SIT selected. No manual approval is required.'
-                displayName: 'Skip manual approval'
-
-      - ${{ if ne(parameters.targetEnvironment, 'SIT') }}:
-          - job: WaitForBusinessApproval
-            displayName: 'Wait for Business Approval'
-            pool: server
-            timeoutInMinutes: 1500
-            steps:
-              - task: ManualValidation@0
-                timeoutInMinutes: 1440
-                inputs:
-                  notifyUsers: '$(approvalNotifyUsers)'
-                  instructions: '$(approvalInstructions)'
-                  onTimeout: 'reject'
-
-  - ${{ if or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true)) }}:
-      - stage: Deploy_Applications
-        displayName: 'Deploy applications to $(environmentName)'
-        dependsOn:
-          - Resolve_Selected_Builds
-          - Approval_Release
-        condition: succeeded()
-        variables:
-          BackendPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendPipelineDefinitionId']]
-          BackendBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendBuildId']]
-          BackendSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendSourceBranch']]
-          FrontendPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendPipelineDefinitionId']]
-          FrontendBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendBuildId']]
-          FrontendSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendSourceBranch']]
-        jobs:
-          - ${{ if eq(parameters.deployBackend, true) }}:
-              - template: pipelines/deploy-iis.yml@templates
-                parameters:
-                  jobDependsOn: []
-                  jobCondition: succeeded()
-                  deploymentName: 'DeployBackend'
-                  deploymentDisplayName: 'Deploy Backend to ${{ parameters.targetEnvironment }} (IIS)'
-                  environmentName: '${{ parameters.targetEnvironment }}'
-                  deployPool: '$(deploymentPool)'
-                  deployAgentName: '$(backendAgentName)'
-                  ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-                    variableGroup: 'SIT_BACK_END_VARIABLE_GROUP'
-                  ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-                    variableGroup: 'UAT_BACK_END_VARIABLE_GROUP'
-                  ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-                    variableGroup: 'PROD_BACK_END_VARIABLE_GROUP'
-                  componentName: 'BACKEND'
-                  artifactName: '$(backendArtifactName)'
-                  artifactBuildType: 'specific'
-                  artifactProject: '$(System.TeamProject)'
-                  artifactDefinitionId: '$(BackendPipelineDefinitionId)'
-                  artifactBuildId: '$(BackendBuildId)'
-                  artifactBranch: '$(BackendSourceBranch)'
-                  zipName: '$(backendZipName)'
-                  siteName: '$(backendSiteName)'
-                  appPoolName: '$(backendAppPoolName)'
-                  iisTargetPath: '$(backendTargetPath)'
-                  cleanTargetBeforeCopy: true
-                  cleanExcludeCsv: ''
-                  enableJsonTransform: true
-                  jsonFiles: '**/appsettings.json'
-                  enableXmlConfigTransform: false
-                  xmlConfigFiles: []
-                  xmlVariableValues: {}
-                  enableCustomXmlEdits: false
-                  customXmlEdits: []
-                  customXmlVariableValues: {}
-                  # Enable after replacing backendHealthCheckUrl with a confirmed URL.
-                  enableHealthCheck: false
-                  healthCheckUrl: '$(backendHealthCheckUrl)'
-                  healthCheckExpectedStatusCode: '200'
-                  healthCheckRetries: 6
-                  healthCheckDelaySeconds: 10
-                  enableRollbackOnHealthCheckFailure: true
-                  enableLocalBackup: true
-                  backupRoot: '$(backupRoot)'
-                  backupPath: '$(backupRoot)\BACKEND\$(Build.BuildId)'
-
-          - ${{ if eq(parameters.deployFrontend, true) }}:
-              - template: pipelines/deploy-iis.yml@templates
-                parameters:
-                  ${{ if eq(parameters.deployBackend, true) }}:
-                    jobDependsOn:
-                      - DeployBackend
-                  ${{ if eq(parameters.deployBackend, false) }}:
-                    jobDependsOn: []
-                  jobCondition: succeeded()
-                  deploymentName: 'DeployFrontend'
-                  deploymentDisplayName: 'Deploy Frontend to ${{ parameters.targetEnvironment }} (IIS)'
-                  environmentName: '${{ parameters.targetEnvironment }}'
-                  deployPool: '$(deploymentPool)'
-                  deployAgentName: '$(frontendAgentName)'
-                  ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-                    variableGroup: 'SIT_FRONT_END_VARIABLE_GROUP'
-                  ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-                    variableGroup: 'UAT_FRONT_END_VARIABLE_GROUP'
-                  ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-                    variableGroup: 'PROD_FRONT_END_VARIABLE_GROUP'
-                  componentName: 'FRONTEND'
-                  artifactName: '$(frontendArtifactName)'
-                  artifactBuildType: 'specific'
-                  artifactProject: '$(System.TeamProject)'
-                  artifactDefinitionId: '$(FrontendPipelineDefinitionId)'
-                  artifactBuildId: '$(FrontendBuildId)'
-                  artifactBranch: '$(FrontendSourceBranch)'
-                  zipName: '$(frontendZipName)'
-                  siteName: '$(frontendSiteName)'
-                  appPoolName: '$(frontendAppPoolName)'
-                  iisTargetPath: '$(frontendTargetPath)'
-                  # C:\inetpub\wwwroot\ is broad. Keep this false unless the whole root belongs only to this site.
-                  cleanTargetBeforeCopy: false
-                  cleanExcludeCsv: ''
-                  enableJsonTransform: true
-                  jsonFiles: '**/appsettings.json'
-                  enableXmlConfigTransform: false
-                  xmlConfigFiles: []
-                  xmlVariableValues: {}
-                  enableCustomXmlEdits: false
-                  customXmlEdits: []
-                  customXmlVariableValues: {}
-                  # Enable after replacing frontendHealthCheckUrl with a confirmed URL.
-                  enableHealthCheck: false
-                  healthCheckUrl: '$(frontendHealthCheckUrl)'
-                  healthCheckExpectedStatusCode: '200'
-                  healthCheckRetries: 6
-                  healthCheckDelaySeconds: 10
-                  enableRollbackOnHealthCheckFailure: true
-                  enableLocalBackup: true
-                  backupRoot: '$(backupRoot)'
-                  backupPath: '$(backupRoot)\FRONTEND\$(Build.BuildId)'
-
-  - ${{ if and(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true)) }}:
-      - stage: Rollback_Backend_After_Frontend_Failure
-        displayName: 'Rollback Backend because Frontend failed'
-        dependsOn:
-          - Deploy_Applications
-        condition: and(always(), eq(dependencies.Deploy_Applications.outputs['DeployBackend.DeployBackend.publishSuccessOutcome.DeploymentHealthy'], 'true'), ne(dependencies.Deploy_Applications.outputs['DeployFrontend.DeployFrontend.publishSuccessOutcome.DeploymentHealthy'], 'true'))
-        jobs:
-          - template: pipelines/rollback-iis.yml@templates
-            parameters:
-              deploymentName: 'RollbackBackendAfterFrontendFailure'
-              deploymentDisplayName: 'Rollback Backend from local backup because Frontend failed'
-              environmentName: '${{ parameters.targetEnvironment }}'
-              deployPool: '$(deploymentPool)'
-              deployAgentName: '$(backendAgentName)'
-              siteName: '$(backendSiteName)'
-              appPoolName: '$(backendAppPoolName)'
-              iisTargetPath: '$(backendTargetPath)'
-              backupPath: '$(backupRoot)\BACKEND\$(Build.BuildId)'
-              cleanExcludeCsv: ''
-
-  - ${{ if or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true)) }}:
-      - stage: Tag_APP_LKG
-        displayName: 'Tag successful application builds as LKG'
-        dependsOn:
-          - Resolve_Selected_Builds
-          - Deploy_Applications
-        condition: succeeded('Deploy_Applications')
-        variables:
-          BackendBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendBuildId']]
-          BackendPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.BackendPipelineDefinitionId']]
-          FrontendBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendBuildId']]
-          FrontendPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.FrontendPipelineDefinitionId']]
-        jobs:
-          - job: TagApplicationBuilds
-            displayName: 'Tag Frontend / Backend builds'
-            pool:
-              name: '$(deploymentPool)'
-              demands:
-                - Agent.Name -equals $(resolveAgentName)
-            steps:
-              - checkout: none
-
-              - ${{ if eq(parameters.deployBackend, true) }}:
-                  - template: pipelines/tag-builds.yml@templates
-                    parameters:
-                      tagTargets:
-                        - name: 'Alterna Account Statement Management Backend'
-                          buildId: '$(BackendBuildId)'
-                          definitionId: '$(BackendPipelineDefinitionId)'
-                          deployedTag: 'DEPLOYED-$(environmentName)-AASM-BACKEND'
-                          lkgTag: 'LKG-$(environmentName)-AASM-BACKEND'
-                          makeLkgUnique: true
-
-              - ${{ if eq(parameters.deployFrontend, true) }}:
-                  - template: pipelines/tag-builds.yml@templates
-                    parameters:
-                      tagTargets:
-                        - name: 'Alterna Account Statement Management Frontend'
-                          buildId: '$(FrontendBuildId)'
-                          definitionId: '$(FrontendPipelineDefinitionId)'
-                          deployedTag: 'DEPLOYED-$(environmentName)-AASM-FRONTEND'
-                          lkgTag: 'LKG-$(environmentName)-AASM-FRONTEND'
-                          makeLkgUnique: true
-
-  - ${{ if and(eq(parameters.deployDatabase, true), or(eq(parameters.deployBackend, true), eq(parameters.deployFrontend, true))) }}:
-      - stage: Deploy_DB_After_Apps
-        displayName: 'Deploy DB to $(environmentName) after applications'
-        dependsOn:
-          - Resolve_Selected_Builds
-          - Approval_Release
-          - Tag_APP_LKG
-        condition: and(succeeded('Approval_Release'), succeeded('Tag_APP_LKG'))
-        variables:
-          DbPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId']]
-          DbBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId']]
-          DbSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch']]
-        jobs:
-          - template: pipelines/deploy-database.yml@templates
-            parameters:
-              deploymentName: 'DeployDb'
-              deploymentDisplayName: 'Deploy Alterna Account Statement Management database'
-              environmentName: '${{ parameters.targetEnvironment }}'
-              deployPool: '$(deploymentPool)'
-              deployAgentName: '$(dbAgentName)'
-              artifactName: '$(dbArtifactName)'
-              artifactBuildType: 'specific'
-              artifactProject: '$(System.TeamProject)'
-              artifactDefinitionId: '$(DbPipelineDefinitionId)'
-              artifactBuildId: '$(DbBuildId)'
-              artifactBranch: '$(DbSourceBranch)'
-              targetConnectionString: '$(GlobalSettings.ConnString)'
-              dacpacFileName: 'DatabaseProjectAlterna_AccountStatementManagement.dacpac'
-              artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
-
-  - ${{ if and(eq(parameters.deployDatabase, true), eq(parameters.deployBackend, false), eq(parameters.deployFrontend, false)) }}:
-      - stage: Deploy_DB_Only
-        displayName: 'Deploy DB to $(environmentName)'
-        dependsOn:
-          - Resolve_Selected_Builds
-          - Approval_Release
-        condition: succeeded('Approval_Release')
-        variables:
-          DbPipelineDefinitionId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbPipelineDefinitionId']]
-          DbBuildId: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbBuildId']]
-          DbSourceBranch: $[stageDependencies.Resolve_Selected_Builds.ResolveBuildNumbers.outputs['Resolve.DbSourceBranch']]
-        jobs:
-          - template: pipelines/deploy-database.yml@templates
-            parameters:
-              deploymentName: 'DeployDb'
-              deploymentDisplayName: 'Deploy Alterna Account Statement Management database'
-              environmentName: '${{ parameters.targetEnvironment }}'
-              deployPool: '$(deploymentPool)'
-              deployAgentName: '$(dbAgentName)'
-              artifactName: '$(dbArtifactName)'
-              artifactBuildType: 'specific'
-              artifactProject: '$(System.TeamProject)'
-              artifactDefinitionId: '$(DbPipelineDefinitionId)'
-              artifactBuildId: '$(DbBuildId)'
-              artifactBranch: '$(DbSourceBranch)'
-              targetConnectionString: '$(GlobalSettings.ConnString)'
-              dacpacFileName: 'DatabaseProjectAlterna_AccountStatementManagement.dacpac'
-              artifactDownloadPath: '$(Pipeline.Workspace)\db-deploy'
-
-
-### azure-pipelines-build-db.yml
-name: AASM_DB_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-      - release/*
-  paths:
-    include:
-      - DatabaseProjectAlterna_AccountStatementManagement/**
-
-pr: none
-
-stages:
-  - stage: Build_DB
-    displayName: 'Build DB'
-    jobs:
-      - template: pipelines/build-database-project.yml@templates
-        parameters:
-          jobName: 'BuildDb'
-          jobDisplayName: 'Build Alterna Account Statement Management database project'
-          buildPool: 'Build Pool'
-          buildAgentName: 'UAT-ALTERNA-DK1'
-          # Verify the folder/project name against the repository.
-          sqlProjectPath: 'DatabaseProjectAlterna_AccountStatementManagement/DatabaseProjectAlterna_AccountStatementManagement.sqlproj'
-          artifactName: 'alterna-account-statement-management-db-drop'
-          dacpacFileName: 'DatabaseProjectAlterna_AccountStatementManagement.dacpac'
-
-
-
-### azure-pipelines-preview-db.yml
-name: AASM_DB_PREVIEW_${{ parameters.targetEnvironment }}_$(Date:yyyyMMdd).$(Rev:r)
-
-parameters:
-  - name: targetEnvironment
-    type: string
-    default: SIT
-    values:
-      - SIT
-      - UAT
-      - PROD
-    displayName: 'Target Environment'
-
-  - name: dbBuildNumber
-    type: string
-    default: ''
-    displayName: 'DB Build Number'
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger: none
-pr: none
-
-variables:
-  - name: deploymentPool
-    value: 'Deployment Pool'
-
-  - name: dbPipelineName
-    value: 'BUILD - DB - Alterna Account Statement Management'
-
-  - name: dbArtifactName
-    value: 'alterna-account-statement-management-db-drop'
-
-  - ${{ if eq(parameters.targetEnvironment, 'SIT') }}:
-      - group: SIT_BACK_END_VARIABLE_GROUP
-      - name: environmentName
-        value: 'SIT'
-      - name: dbAgentName
-        value: 'SIT-ALTERNA-BN1'
-
-  - ${{ if eq(parameters.targetEnvironment, 'UAT') }}:
-      - group: UAT_BACK_END_VARIABLE_GROUP
-      - name: environmentName
-        value: 'UAT'
-      - name: dbAgentName
-        value: 'UAT-ALTERNA-BN1' # Verify before first UAT run.
-
-  - ${{ if eq(parameters.targetEnvironment, 'PROD') }}:
-      - group: PROD_BACK_END_VARIABLE_GROUP
-      - name: environmentName
-        value: 'PROD'
-      - name: dbAgentName
-        value: 'PROD-ALTERNA-BN1' # Verify before first PROD run.
-
-stages:
-  - stage: Resolve_DB_Build
-    displayName: 'Resolve DB build'
-    jobs:
-      - job: ResolveDbBuild
-        displayName: 'Resolve DB build number'
-        pool:
-          name: '$(deploymentPool)'
-          demands:
-            - Agent.Name -equals $(dbAgentName)
-        steps:
-          - checkout: none
-
-          - powershell: |
-              $ErrorActionPreference = 'Stop'
-
-              if ([string]::IsNullOrWhiteSpace('${{ parameters.dbBuildNumber }}')) {
-                throw 'dbBuildNumber is required.'
-              }
-
-              $collectionUri = "$(System.CollectionUri)".TrimEnd('/')
-              $projectName = [System.Uri]::EscapeDataString("$(System.TeamProject)")
-              $apiVersion = '7.1'
-
-              $headers = @{
-                Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"
-              }
-
-              $pipelineName = '$(dbPipelineName)'
-              $encodedName = [System.Uri]::EscapeDataString($pipelineName)
-
-              $definitionsUri = "{0}/{1}/_apis/build/definitions?name={2}&api-version={3}" -f `
-                $collectionUri, $projectName, $encodedName, $apiVersion
-
-              $definitions = Invoke-RestMethod -Method Get -Uri $definitionsUri -Headers $headers
-              $exactMatches = @($definitions.value | Where-Object { $_.name -eq $pipelineName })
-
-              if ($exactMatches.Count -eq 0) {
-                throw "Could not resolve pipeline definition for [$pipelineName]."
-              }
-
-              if ($exactMatches.Count -gt 1) {
-                throw "More than one exact pipeline definition match was found for [$pipelineName]."
-              }
-
-              $definition = $exactMatches[0]
-              $buildNumber = [System.Uri]::EscapeDataString('${{ parameters.dbBuildNumber }}')
-
-              $buildsUri = "{0}/{1}/_apis/build/builds?definitions={2}&buildNumber={3}&statusFilter=completed&resultFilter=succeeded&`$top=1&queryOrder=finishTimeDescending&api-version={4}" -f `
-                $collectionUri, $projectName, $definition.id, $buildNumber, $apiVersion
-
-              $builds = Invoke-RestMethod -Method Get -Uri $buildsUri -Headers $headers
-              $build = @($builds.value) | Select-Object -First 1
-
-              if (-not $build) {
-                throw "No successful DB build found for build number [${{ parameters.dbBuildNumber }}]."
-              }
-
-              Write-Host 'Resolved build:'
-              Write-Host "  Definition ID = $($definition.id)"
-              Write-Host "  Build ID      = $($build.id)"
-              Write-Host "  Build Number  = $($build.buildNumber)"
-              Write-Host "  Source Branch = $($build.sourceBranch)"
-
-              Write-Host "##vso[task.setvariable variable=DbPipelineDefinitionId;isOutput=true]$($definition.id)"
-              Write-Host "##vso[task.setvariable variable=DbBuildId;isOutput=true]$($build.id)"
-              Write-Host "##vso[task.setvariable variable=DbResolvedBuildNumber;isOutput=true]$($build.buildNumber)"
-            name: Resolve
-            env:
-              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-  - stage: Generate_DB_Preview
-    displayName: 'Generate DB preview for $(environmentName)'
-    dependsOn:
-      - Resolve_DB_Build
-    condition: succeeded('Resolve_DB_Build')
-    variables:
-      DbPipelineDefinitionId: $[stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbPipelineDefinitionId']]
-      DbBuildId: $[stageDependencies.Resolve_DB_Build.ResolveDbBuild.outputs['Resolve.DbBuildId']]
-    jobs:
-      - template: pipelines/generate-db-preview.yml@templates
-        parameters:
-          jobName: 'GeneratePreview'
-          jobDisplayName: 'Generate DB preview for $(environmentName)'
-          deployPool: '$(deploymentPool)'
-          deployAgentName: '$(dbAgentName)'
-          artifactProject: '$(System.TeamProject)'
-          artifactDefinitionId: '$(DbPipelineDefinitionId)'
-          artifactBuildId: '$(DbBuildId)'
-          artifactName: '$(dbArtifactName)'
-          previewArtifactName: 'db-preview-$(environmentName)'
-          # This must resolve to Alterna_AccountStatementManagement in each environment.
-          targetConnectionString: '$(GlobalSettings.ConnString)'
-
-
-
-### azure-pipelines-build-api.yml
-name: AASM_API_$(SourceBranchName)_rc$(Rev:r)
-
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: 'Azure Templates/Azure Templates'
-      ref: refs/heads/main
-
-trigger:
-  branches:
-    include:
-      - release/*
-  paths:
-    exclude:
-      - '*.yml'
-      - global.json
-      - nuget.config
-
-pr: none
-
-variables:
-  - group: OWASP_SECRETS
-
-stages:
-  - stage: Build_API
-    displayName: 'Build API & Publish Artifact'
-    jobs:
-      - template: pipelines/build-dotnet-core-webapi.yml@templates
-        parameters:
-          jobName: 'BuildBackend'
-          jobDisplayName: 'Build Alterna Account Statement Management Backend'
-          buildPool: 'Build Pool'
-          buildAgentName: 'UAT-ALTERNA-DK1'
-          buildConfiguration: 'Release'
-          restoreProjects: '**/*.csproj'
-          runTests: false
-          testProjects: ''
-          # Verify the project filename if the API project uses an .Api or .Backend suffix.
-          publishProject: '**/AlternaAccountStatementManagement.csproj'
-          nugetConfigPath: 'nuget.config'
-          zipName: 'Alterna-Account-Statement-Management-Backend.zip'
-          artifactName: 'alterna-account-statement-management-api-drop'
-          publishOutputFolder: '$(Build.ArtifactStagingDirectory)\AlternaAccountStatementManagement'
-          runDependencyCheck: false
-          dependencyCheckCliPath: 'C:\Tools\dependency-check\dependency-check-12.2.0\bin\dependency-check.bat'
-          dependencyCheckDataPath: 'C:\Tools\dependency-check-data'
-          dependencyCheckProjectName: 'Alterna-Account-Statement-Management-Backend'
-          dependencyCheckAdditionalArguments: ''
-
-
-### README.md
-# Alterna Account Statement Management pipelines
-
-This package contains the five Azure DevOps YAML definitions adapted from the Alterna Telecom pipelines.
-
-| Azure DevOps pipeline name | YAML file |
-| --- | --- |
-| BUILD - FRONT - Alterna Account Statement Management | `azure-pipelines-build-front.yml` |
-| BUILD - API - Alterna Account Statement Management | `azure-pipelines-build-api.yml` |
-| PREVIEW DB CHANGES - Alterna Account Statement Management | `azure-pipelines-preview-db.yml` |
-| BUILD - DB - Alterna Account Statement Management | `azure-pipelines-build-db.yml` |
-| RELEASE - Alterna Account Statement Management | `azure-pipelines-release.yml` |
-
-The top-level `name:` in each YAML controls the run/build number. Create or rename the Azure DevOps pipeline definition itself using the exact names in the table because the preview and release pipelines resolve build definitions by that exact display name.
-
-## Values already configured
-
-- Backend IIS site and application pool: `AlternaAccountStatementManagement`
-- Backend path: `C:\inetpub\wwwroot\AlternaAccountStatementManagement-BN1`
-- Frontend IIS site and application pool: `AlternaAccountStatementManagement`
-- Frontend path: `C:\inetpub\wwwroot\`
-- Database: `Alterna_AccountStatementManagement` through `$(GlobalSettings.ConnString)`
-- Pipeline run prefix: `AASM`
-- Build, artifact, ZIP, backup, and LKG tag names are consistent across all five pipelines.
-
-## Verify before the first run
-
-1. In `azure-pipelines-build-front.yml`, confirm `distFolder` against the Angular `outputPath`. It is currently `dist/AlternaAccountStatementManagement/browser`.
-2. In `azure-pipelines-build-api.yml`, confirm the API project filename. It is currently matched as `**/AlternaAccountStatementManagement.csproj`.
-3. In both database files and the release file, confirm the SQL project folder, `.sqlproj`, and `.dacpac` names. They currently use `DatabaseProjectAlterna_AccountStatementManagement`.
-4. Confirm all UAT and PROD agent names. The values follow the Alterna convention and are marked in the YAML.
-5. Confirm that `GlobalSettings.ConnString` in each backend variable group targets `Alterna_AccountStatementManagement` for the selected environment.
-6. Replace the backend and frontend health-check URLs for SIT, UAT, and PROD. Health checks are intentionally disabled until those URLs are confirmed; enable them afterward in both IIS deployment template calls.
-7. Confirm that the backend and frontend are deployed on different servers. IIS cannot have two sites with the same name on the same server.
-
-## Frontend path safety
-
-The frontend target is the entire `C:\inetpub\wwwroot\` directory. Therefore, `cleanTargetBeforeCopy` is set to `false` for the frontend. Setting it to `true` may remove other sites or files under `wwwroot`.
-
-If this server is dedicated to this application, the cleaner long-term configuration is a dedicated path such as `C:\inetpub\wwwroot\AlternaAccountStatementManagement`, followed by setting `cleanTargetBeforeCopy: true`.
-
-## Azure DevOps permissions
-
-The preview and release pipelines call the Azure DevOps Build REST API through `$(System.AccessToken)`, and the release also tags builds. Ensure the pipeline's build service identity can:
-
-- view builds and build definitions;
-- download artifacts;
-- add and remove build tags;
-- read the shared `Azure Templates/Azure Templates` repository;
-- read the referenced variable groups.
-
-The release pipeline accepts builds only from `release/*` or `hotfix/*` branches, matching the source pipeline design.
+This is the disassembler code
+Original language: VB6
+Architecture: X64
+Only one form named Form1
+Tool used: VB Decompiler Lite v26.4
+
+Form_Load_4059B0
+  loc_004059B0: push ebp
+  loc_004059B1: mov ebp, esp
+  loc_004059B3: sub esp, 0000000Ch
+  loc_004059B6: push 00401326h ; __vbaExceptHandler
+  loc_004059BB: mov eax, fs:[00000000h]
+  loc_004059C1: push eax
+  loc_004059C2: mov fs:[00000000h], esp
+  loc_004059C9: sub esp, 00000124h
+  loc_004059CF: push ebx
+  loc_004059D0: push esi
+  loc_004059D1: push edi
+  loc_004059D2: mov var_C, esp
+  loc_004059D5: mov var_8, 004011D0h
+  loc_004059DC: mov esi, arg_8
+  loc_004059DF: mov eax, esi
+  loc_004059E1: and eax, 00000001h
+  loc_004059E4: mov var_4, eax
+  loc_004059E7: and esi, FFFFFFFEh
+  loc_004059EA: push esi
+  loc_004059EB: mov arg_8, esi
+  loc_004059EE: mov ecx, [esi]
+  loc_004059F0: call [ecx+00000004h]
+  loc_004059F3: mov eax, [004093B4h]
+  loc_004059F8: xor edi, edi
+  loc_004059FA: cmp eax, edi
+  loc_004059FC: mov var_18, edi
+  loc_004059FF: mov var_20, edi
+  loc_00405A02: mov var_24, edi
+  loc_00405A05: mov var_28, edi
+  loc_00405A08: mov var_2C, edi
+  loc_00405A0B: mov var_30, edi
+  loc_00405A0E: mov var_34, edi
+  loc_00405A11: mov var_38, edi
+  loc_00405A14: mov var_3C, edi
+  loc_00405A17: mov var_40, edi
+  loc_00405A1A: mov var_44, edi
+  loc_00405A1D: mov var_48, edi
+  loc_00405A20: mov var_4C, edi
+  loc_00405A23: mov var_50, edi
+  loc_00405A26: mov var_54, edi
+  loc_00405A29: mov var_64, edi
+  loc_00405A2C: mov var_74, edi
+  loc_00405A2F: mov var_84, edi
+  loc_00405A35: mov var_94, edi
+  loc_00405A3B: mov var_A4, edi
+  loc_00405A41: mov var_B4, edi
+  loc_00405A47: mov var_C4, edi
+  loc_00405A4D: mov var_D4, edi
+  loc_00405A53: mov var_E8, edi
+  loc_00405A59: mov var_EC, edi
+  loc_00405A5F: jnz 00405A71h
+  loc_00405A61: push 004093B4h
+  loc_00405A66: push 00402F74h
+  loc_00405A6B: call [00401100h] ; __vbaNew2
+  loc_00405A71: mov ebx, [004093B4h]
+  loc_00405A77: lea eax, var_50
+  loc_00405A7A: push eax
+  loc_00405A7B: push ebx
+  loc_00405A7C: mov edx, [ebx]
+  loc_00405A7E: call [edx+00000014h]
+  loc_00405A81: cmp eax, edi
+  loc_00405A83: fnclex
+  loc_00405A85: jge 00405A96h
+  loc_00405A87: push 00000014h
+  loc_00405A89: push 00402F64h
+  loc_00405A8E: push ebx
+  loc_00405A8F: push eax
+  loc_00405A90: call [00401040h] ; __vbaHresultCheckObj
+  loc_00405A96: mov eax, var_50
+  loc_00405A99: lea edx, var_30
+  loc_00405A9C: push edx
+  loc_00405A9D: push eax
+  loc_00405A9E: mov ecx, [eax]
+  loc_00405AA0: mov ebx, eax
+  loc_00405AA2: call [ecx+00000050h]
+  loc_00405AA5: cmp eax, edi
+  loc_00405AA7: fnclex
+  loc_00405AA9: jge 00405ABAh
+  loc_00405AAB: push 00000050h
+  loc_00405AAD: push 00403148h
+  loc_00405AB2: push ebx
+  loc_00405AB3: push eax
+  loc_00405AB4: call [00401040h] ; __vbaHresultCheckObj
+  loc_00405ABA: mov edx, var_30
+  loc_00405ABD: lea ecx, var_2C
+  loc_00405AC0: mov var_30, edi
+  loc_00405AC3: call [00401170h] ; __vbaStrMove
+  loc_00405AC9: lea ecx, var_50
+  loc_00405ACC: call [00401194h] ; __vbaFreeObj
+  loc_00405AD2: lea ecx, var_B4
+  loc_00405AD8: push 00000001h
+  loc_00405ADA: lea edx, var_64
+  loc_00405ADD: lea eax, var_2C
+  loc_00405AE0: push ecx
+  loc_00405AE1: push edx
+  loc_00405AE2: mov var_AC, eax
+  loc_00405AE8: mov var_B4, 00004008h
+  loc_00405AF2: call [00401178h] ; rtcRightCharVar
+  loc_00405AF8: mov eax, var_2C
+  loc_00405AFB: mov ebx, [00401034h] ; __vbaStrCat
+  loc_00405B01: push eax
+  loc_00405B02: push 0040315Ch ; "\"
+  loc_00405B07: call ebx
+  loc_00405B09: lea ecx, var_2C
+  loc_00405B0C: mov var_8C, eax
+  loc_00405B12: lea edx, var_64
+  loc_00405B15: mov var_CC, ecx
+  loc_00405B1B: lea eax, var_C4
+  loc_00405B21: push edx
+  loc_00405B22: lea ecx, var_74
+  loc_00405B25: push eax
+  loc_00405B26: push ecx
+  loc_00405B27: mov var_94, 00000008h
+  loc_00405B31: mov var_D4, 00004008h
+  loc_00405B3B: mov var_BC, 0040315Ch ; "\"
+  loc_00405B45: mov var_C4, 00008008h
+  loc_00405B4F: call [0040113Ch] ; __vbaVarCmpEq
+  loc_00405B55: mov edx, eax
+  loc_00405B57: lea ecx, var_84
+  loc_00405B5D: call [0040100Ch] ; __vbaVarMove
+  loc_00405B63: lea edx, var_94
+  loc_00405B69: lea eax, var_D4
+  loc_00405B6F: push edx
+  loc_00405B70: lea ecx, var_84
+  loc_00405B76: push eax
+  loc_00405B77: lea edx, var_A4
+  loc_00405B7D: push ecx
+  loc_00405B7E: push edx
+  loc_00405B7F: call [00401118h] ; rtcImmediateIf
+  loc_00405B85: lea eax, var_A4
+  loc_00405B8B: push eax
+  loc_00405B8C: call [00401014h] ; __vbaStrVarMove
+  loc_00405B92: mov edx, eax
+  loc_00405B94: lea ecx, var_2C
+  loc_00405B97: call [00401170h] ; __vbaStrMove
+  loc_00405B9D: lea ecx, var_A4
+  loc_00405BA3: lea edx, var_94
+  loc_00405BA9: push ecx
+  loc_00405BAA: lea eax, var_84
+  loc_00405BB0: push edx
+  loc_00405BB1: lea ecx, var_64
+  loc_00405BB4: push eax
+  loc_00405BB5: push ecx
+  loc_00405BB6: push 00000004h
+  loc_00405BB8: call [0040101Ch] ; __vbaFreeVarList
+  loc_00405BBE: add esp, 00000014h
+  loc_00405BC1: lea edx, var_64
+  loc_00405BC4: push edi
+  loc_00405BC5: push 00403164h ; "Scripting.FileSystemObject"
+  loc_00405BCA: push edx
+  loc_00405BCB: call [004010E0h] ; rtcCreateObject2
+  loc_00405BD1: lea eax, var_64
+  loc_00405BD4: push eax
+  loc_00405BD5: call [00401094h] ; __vbaObjVar
+  loc_00405BDB: lea ecx, var_20
+  loc_00405BDE: push eax
+  loc_00405BDF: push ecx
+  loc_00405BE0: call [00401060h] ; __vbaObjSetAddref
+  loc_00405BE6: lea ecx, var_64
+  loc_00405BE9: call [00401010h] ; __vbaFreeVar
+  loc_00405BEF: mov edx, var_2C
+  loc_00405BF2: push edx
+  loc_00405BF3: push 004031A0h ; "ServerName.txt"
+  loc_00405BF8: call ebx
+  loc_00405BFA: sub esp, 00000010h
+  loc_00405BFD: mov ecx, 00000008h
+  loc_00405C02: mov edx, esp
+  loc_00405C04: mov var_64, ecx
+  loc_00405C07: mov var_5C, eax
+  loc_00405C0A: push 00000001h
+  loc_00405C0C: mov [edx], ecx
+  loc_00405C0E: mov ecx, var_60
+  loc_00405C11: push 004031C0h ; "FileExists"
+  loc_00405C16: mov [edx+00000004h], ecx
+  loc_00405C19: mov ecx, var_20
+  loc_00405C1C: push ecx
+  loc_00405C1D: mov [edx+00000008h], eax
+  loc_00405C20: mov eax, var_58
+  loc_00405C23: mov [edx+0000000Ch], eax
+  loc_00405C26: lea edx, var_74
+  loc_00405C29: push edx
+  loc_00405C2A: call [00401164h] ; __vbaLateMemCallLd
+  loc_00405C30: add esp, 00000020h
+  loc_00405C33: push eax
+  loc_00405C34: lea eax, var_84
+  loc_00405C3A: push eax
+  loc_00405C3B: call [00401120h] ; __vbaVarNot
+  loc_00405C41: push eax
+  loc_00405C42: call [00401078h] ; __vbaBoolVarNull
+  loc_00405C48: lea ecx, var_74
+  loc_00405C4B: lea edx, var_64
+  loc_00405C4E: push ecx
+  loc_00405C4F: push edx
+  loc_00405C50: push 00000002h
+  loc_00405C52: mov di, ax
+  loc_00405C55: call [0040101Ch] ; __vbaFreeVarList
+  loc_00405C5B: add esp, 0000000Ch
+  loc_00405C5E: test di, di
+  loc_00405C61: jz 00405D17h
+  loc_00405C67: mov edi, [0040114Ch] ; __vbaVarDup
+  loc_00405C6D: mov ecx, 0000000Ah
+  loc_00405C72: mov eax, 80020004h
+  loc_00405C77: mov var_94, ecx
+  loc_00405C7D: mov var_84, ecx
+  loc_00405C83: lea edx, var_C4
+  loc_00405C89: lea ecx, var_74
+  loc_00405C8C: mov var_8C, eax
+  loc_00405C92: mov var_7C, eax
+  loc_00405C95: mov var_BC, 004032FCh ; "OpenEXCEL - Server Name"
+  loc_00405C9F: mov var_C4, 00000008h
+  loc_00405CA9: call edi
+  loc_00405CAB: lea edx, var_B4
+  loc_00405CB1: lea ecx, var_64
+  loc_00405CB4: mov var_AC, 004031FCh ; "Anomalie!!!!! Le fichier de paramétrage ServerName.txt qui contient le nom de program exécutable de Reuters n'est pas trouvé"
+  loc_00405CBE: mov var_B4, 00000008h
+  loc_00405CC8: call edi
+  loc_00405CCA: lea eax, var_94
+  loc_00405CD0: lea ecx, var_84
+  loc_00405CD6: push eax
+  loc_00405CD7: lea edx, var_74
+  loc_00405CDA: push ecx
+  loc_00405CDB: push edx
+  loc_00405CDC: lea eax, var_64
+  loc_00405CDF: push 00000040h
+  loc_00405CE1: push eax
+  loc_00405CE2: call [00401050h] ; rtcMsgBox
+  loc_00405CE8: mov ecx, eax
+  loc_00405CEA: call [00401098h] ; __vbaI2I4
+  loc_00405CF0: lea ecx, var_94
+  loc_00405CF6: lea edx, var_84
+  loc_00405CFC: push ecx
+  loc_00405CFD: lea eax, var_74
+  loc_00405D00: push edx
+  loc_00405D01: lea ecx, var_64
+  loc_00405D04: push eax
+  loc_00405D05: push ecx
+  loc_00405D06: push 00000004h
+  loc_00405D08: call [0040101Ch] ; __vbaFreeVarList
+  loc_00405D0E: add esp, 00000014h
+  loc_00405D11: call [00401020h] ; __vbaEnd
+  loc_00405D17: mov edx, var_2C
+  loc_00405D1A: push edx
+  loc_00405D1B: push 004031A0h ; "ServerName.txt"
+  loc_00405D20: call ebx
+  loc_00405D22: mov edx, eax
+  loc_00405D24: lea ecx, var_30
+  loc_00405D27: call [00401170h] ; __vbaStrMove
+  loc_00405D2D: push eax
+  loc_00405D2E: push 00000004h
+  loc_00405D30: push FFFFFFFFh
+  loc_00405D32: push 00000001h
+  loc_00405D34: call [004010FCh] ; __vbaFileOpen
+  loc_00405D3A: lea ecx, var_30
+  loc_00405D3D: call [00401198h] ; __vbaFreeStr
+  loc_00405D43: mov ebx, [00401104h] ; rtcEndOfFile
+  loc_00405D49: mov edi, [00401018h] ; __vbaLineInputStr
+  loc_00405D4F: push 00000004h
+  loc_00405D51: call ebx
+  loc_00405D53: test ax, ax
+  loc_00405D56: push 00000004h
+  loc_00405D58: jnz 00405D6Eh
+  loc_00405D5A: lea eax, var_24
+  loc_00405D5D: push eax
+  loc_00405D5E: call edi
+  loc_00405D60: mov edx, var_24
+  loc_00405D63: lea ecx, [esi+00000034h]
+  loc_00405D66: call [00401114h] ; __vbaStrCopy
+  loc_00405D6C: jmp 00405D4Fh
+  loc_00405D6E: call [00401088h] ; __vbaFileClose
+  loc_00405D74: push 00000000h
+  loc_00405D76: lea ecx, var_64
+  loc_00405D79: push 00403330h ; "Excel.Application"
+  loc_00405D7E: push ecx
+  loc_00405D7F: call [004010E0h] ; rtcCreateObject2
+  loc_00405D85: lea edx, var_64
+  loc_00405D88: push edx
+  loc_00405D89: call [00401094h] ; __vbaObjVar
+  loc_00405D8F: push eax
+  loc_00405D90: push 00409024h
+  loc_00405D95: call [00401060h] ; __vbaObjSetAddref
+  loc_00405D9B: lea ecx, var_64
+  loc_00405D9E: call [00401010h] ; __vbaFreeVar
+  loc_00405DA4: mov eax, [esi+00000038h]
+  loc_00405DA7: lea edi, [esi+00000038h]
+  loc_00405DAA: test eax, eax
+  loc_00405DAC: jnz 00405DBAh
+  loc_00405DAE: push edi
+  loc_00405DAF: push 00403118h
+  loc_00405DB4: call [00401100h] ; __vbaNew2
+  loc_00405DBA: mov ebx, [edi]
+  loc_00405DBC: push FFFFFFFFh
+  loc_00405DBE: push 004033B0h
+  loc_00405DC3: push 004033B0h
+  loc_00405DC8: mov eax, [ebx]
+  loc_00405DCA: push 00403358h ; "Provider=IBMDA400; Data Source=s06fe4e5;"
+  loc_00405DCF: push ebx
+  loc_00405DD0: call [eax+00000050h]
+  loc_00405DD3: test eax, eax
+  loc_00405DD5: fnclex
+  loc_00405DD7: jge 00405DE8h
+  loc_00405DD9: push 00000050h
+  loc_00405DDB: push 00403128h
+  loc_00405DE0: push ebx
+  loc_00405DE1: push eax
+  loc_00405DE2: call [00401040h] ; __vbaHresultCheckObj
+  loc_00405DE8: mov eax, [esi+0000003Ch]
+  loc_00405DEB: lea ebx, [esi+0000003Ch]
+  loc_00405DEE: test eax, eax
+  loc_00405DF0: jnz 00405DFEh
+  loc_00405DF2: push ebx
+  loc_00405DF3: push 004033C4h
+  loc_00405DF8: call [00401100h] ; __vbaNew2
+  loc_00405DFE: mov eax, [edi]
+  loc_00405E00: mov ebx, [ebx]
+  loc_00405E02: test eax, eax
+  loc_00405E04: jnz 00405E12h
+  loc_00405E06: push edi
+  loc_00405E07: push 00403118h
+  loc_00405E0C: call [00401100h] ; __vbaNew2
+  loc_00405E12: mov ecx, [edi]
+  loc_00405E14: mov edx, [ebx]
+  loc_00405E16: push 00403108h
+  loc_00405E1B: push ecx
+  loc_00405E1C: mov var_124, edx
+  loc_00405E22: call [00401174h] ; __vbaCastObj
+  loc_00405E28: lea edx, var_50
+  loc_00405E2B: push eax
+  loc_00405E2C: push edx
+  loc_00405E2D: call [0040104Ch] ; __vbaObjSet
+  loc_00405E33: push eax
+  loc_00405E34: mov eax, var_124
+  loc_00405E3A: push ebx
+  loc_00405E3B: call [eax+00000024h]
+  loc_00405E3E: test eax, eax
+  loc_00405E40: fnclex
+  loc_00405E42: jge 00405E53h
+  loc_00405E44: push 00000024h
+  loc_00405E46: push 004031D8h
+  loc_00405E4B: push ebx
+  loc_00405E4C: push eax
+  loc_00405E4D: call [00401040h] ; __vbaHresultCheckObj
+  loc_00405E53: lea ecx, var_50
+  loc_00405E56: call [00401194h] ; __vbaFreeObj
+  loc_00405E5C: mov ecx, [esi]
+  loc_00405E5E: push esi
+  loc_00405E5F: call [ecx+00000310h]
+  loc_00405E65: lea edx, var_50
+  loc_00405E68: push eax
+  loc_00405E69: push edx
+  loc_00405E6A: call [0040104Ch] ; __vbaObjSet
+  loc_00405E70: mov edi, eax
+  loc_00405E72: lea eax, var_64
+  loc_00405E75: push eax
+  loc_00405E76: call [00401150h] ; rtcGetTimeVar
+  loc_00405E7C: mov ebx, [edi]
+  loc_00405E7E: lea ecx, var_64
+  loc_00405E81: lea edx, var_30
+  loc_00405E84: push ecx
+  loc_00405E85: push edx
+  loc_00405E86: call [004010E8h] ; __vbaStrVarVal
+  loc_00405E8C: push eax
+  loc_00405E8D: push edi
+  loc_00405E8E: call [ebx+000000A4h]
+  loc_00405E94: test eax, eax
+  loc_00405E96: fnclex
+  loc_00405E98: jge 00405EB0h
+  loc_00405E9A: mov ebx, [00401040h] ; __vbaHresultCheckObj
+  loc_00405EA0: push 000000A4h
+  loc_00405EA5: push 00402FBCh
+  loc_00405EAA: push edi
+  loc_00405EAB: push eax
+  loc_00405EAC: call ebx
+  loc_00405EAE: jmp 00405EB6h
+  loc_00405EB0: mov ebx, [00401040h] ; __vbaHresultCheckObj
+  loc_00405EB6: lea ecx, var_30
+  loc_00405EB9: call [00401198h] ; __vbaFreeStr
+  loc_00405EBF: lea ecx, var_50
+  loc_00405EC2: call [00401194h] ; __vbaFreeObj
+  loc_00405EC8: lea ecx, var_64
+  loc_00405ECB: call [00401010h] ; __vbaFreeVar
+  loc_00405ED1: mov eax, [esi]
+  loc_00405ED3: push 45D45800h
+  loc_00405ED8: push esi
+  loc_00405ED9: call [eax+0000008Ch]
+  loc_00405EDF: test eax, eax
+  loc_00405EE1: fnclex
+  loc_00405EE3: jge 00405EF3h
+  loc_00405EE5: push 0000008Ch
+  loc_00405EEA: push 00402C80h
+  loc_00405EEF: push esi
+  loc_00405EF0: push eax
+  loc_00405EF1: call ebx
+  loc_00405EF3: mov ecx, [esi]
+  loc_00405EF5: push 45CAF800h
+  loc_00405EFA: push esi
+  loc_00405EFB: call [ecx+00000084h]
+  loc_00405F01: test eax, eax
+  loc_00405F03: fnclex
+  loc_00405F05: jge 00405F15h
+  loc_00405F07: push 00000084h
+  loc_00405F0C: push 00402C80h
+  loc_00405F11: push esi
+  loc_00405F12: push eax
+  loc_00405F13: call ebx
+  loc_00405F15: mov eax, [004093B4h]
+  loc_00405F1A: test eax, eax
+  loc_00405F1C: jnz 00405F2Eh
+  loc_00405F1E: push 004093B4h
+  loc_00405F23: push 00402F74h
+  loc_00405F28: call [00401100h] ; __vbaNew2
+  loc_00405F2E: mov edi, [004093B4h]
+  loc_00405F34: lea eax, var_50
+  loc_00405F37: push eax
+  loc_00405F38: push edi
+  loc_00405F39: mov edx, [edi]
+  loc_00405F3B: call [edx+00000018h]
+  loc_00405F3E: test eax, eax
+  loc_00405F40: fnclex
+  loc_00405F42: jge 00405F4Fh
+  loc_00405F44: push 00000018h
+  loc_00405F46: push 00402F64h
+  loc_00405F4B: push edi
+  loc_00405F4C: push eax
+  loc_00405F4D: call ebx
+  loc_00405F4F: mov eax, var_50
+  loc_00405F52: lea edx, var_E8
+  loc_00405F58: push edx
+  loc_00405F59: push eax
+  loc_00405F5A: mov ecx, [eax]
+  loc_00405F5C: mov edi, eax
+  loc_00405F5E: call [ecx+00000050h]
+  loc_00405F61: test eax, eax
+  loc_00405F63: fnclex
+  loc_00405F65: jge 00405F72h
+  loc_00405F67: push 00000050h
+  loc_00405F69: push 004031E8h
+  loc_00405F6E: push edi
+  loc_00405F6F: push eax
+  loc_00405F70: call ebx
+  loc_00405F72: mov eax, [esi]
+  loc_00405F74: lea ecx, var_EC
+  loc_00405F7A: push ecx
+  loc_00405F7B: push esi
+  loc_00405F7C: call [eax+00000088h]
+  loc_00405F82: test eax, eax
+  loc_00405F84: fnclex
+  loc_00405F86: jge 00405F96h
+  loc_00405F88: push 00000088h
+  loc_00405F8D: push 00402C80h
+  loc_00405F92: push esi
+  loc_00405F93: push eax
+  loc_00405F94: call ebx
+  loc_00405F96: fld real4 ptr var_E8
+  loc_00405F9C: fsub st0, real4 ptr var_EC
+  loc_00405FA2: mov edx, [esi]
+  loc_00405FA4: push ecx
+  loc_00405FA5: fmul st0, real4 ptr [004011CCh]
+  loc_00405FAB: cmp [00409000h], 00000000h
+  loc_00405FB2: jnz 00405FBCh
+  loc_00405FB4: fdiv st0, real4 ptr [004011C8h]
+  loc_00405FBA: jmp 00405FC7h
+  loc_00405FBC: push [004011C8h]
+  loc_00405FC2: call 00401338h ; _adj_fdiv_m32
+  loc_00405FC7: fnstsw ax
+  loc_00405FC9: test al, 0Dh
+  loc_00405FCB: jnz 004068A3h
+  loc_00405FD1: fstp real4 ptr [esp]
+  loc_00405FD4: push esi
+  loc_00405FD5: call [edx+0000007Ch]
+  loc_00405FD8: test eax, eax
+  loc_00405FDA: fnclex
+  loc_00405FDC: jge 00405FE9h
+  loc_00405FDE: push 0000007Ch
+  loc_00405FE0: push 00402C80h
+  loc_00405FE5: push esi
+  loc_00405FE6: push eax
+  loc_00405FE7: call ebx
+  loc_00405FE9: lea ecx, var_50
+  loc_00405FEC: call [00401194h] ; __vbaFreeObj
+  loc_00405FF2: mov eax, [004093B4h]
+  loc_00405FF7: test eax, eax
+  loc_00405FF9: jnz 0040600Bh
+  loc_00405FFB: push 004093B4h
+  loc_00406000: push 00402F74h
+  loc_00406005: call [00401100h] ; __vbaNew2
+  loc_0040600B: mov edi, [004093B4h]
+  loc_00406011: lea ecx, var_50
+  loc_00406014: push ecx
+  loc_00406015: push edi
+  loc_00406016: mov eax, [edi]
+  loc_00406018: call [eax+00000018h]
+  loc_0040601B: test eax, eax
+  loc_0040601D: fnclex
+  loc_0040601F: jge 0040602Ch
+  loc_00406021: push 00000018h
+  loc_00406023: push 00402F64h
+  loc_00406028: push edi
+  loc_00406029: push eax
+  loc_0040602A: call ebx
+  loc_0040602C: mov eax, var_50
+  loc_0040602F: lea ecx, var_E8
+  loc_00406035: push ecx
+  loc_00406036: push eax
+  loc_00406037: mov edx, [eax]
+  loc_00406039: mov edi, eax
+  loc_0040603B: call [edx+00000098h]
+  loc_00406041: test eax, eax
+  loc_00406043: fnclex
+  loc_00406045: jge 00406055h
+  loc_00406047: push 00000098h
+  loc_0040604C: push 004031E8h
+  loc_00406051: push edi
+  loc_00406052: push eax
+  loc_00406053: call ebx
+  loc_00406055: mov edx, [esi]
+  loc_00406057: lea eax, var_EC
+  loc_0040605D: push eax
+  loc_0040605E: push esi
+  loc_0040605F: call [edx+00000080h]
+  loc_00406065: test eax, eax
+  loc_00406067: fnclex
+  loc_00406069: jge 00406079h
+  loc_0040606B: push 00000080h
+  loc_00406070: push 00402C80h
+  loc_00406075: push esi
+  loc_00406076: push eax
+  loc_00406077: call ebx
+  loc_00406079: fld real4 ptr var_E8
+  loc_0040607F: fsub st0, real4 ptr var_EC
+  loc_00406085: mov ecx, [esi]
+  loc_00406087: push ecx
+  loc_00406088: fmul st0, real4 ptr [004011CCh]
+  loc_0040608E: cmp [00409000h], 00000000h
+  loc_00406095: jnz 0040609Fh
+  loc_00406097: fdiv st0, real4 ptr [004011C8h]
+  loc_0040609D: jmp 004060AAh
+  loc_0040609F: push [004011C8h]
+  loc_004060A5: call 00401338h ; _adj_fdiv_m32
+  loc_004060AA: fnstsw ax
+  loc_004060AC: test al, 0Dh
+  loc_004060AE: jnz 004068A3h
+  loc_004060B4: fstp real4 ptr [esp]
+  loc_004060B7: push esi
+  loc_004060B8: call [ecx+00000074h]
+  loc_004060BB: test eax, eax
+  loc_004060BD: fnclex
+  loc_004060BF: jge 004060CCh
+  loc_004060C1: push 00000074h
+  loc_004060C3: push 00402C80h
+  loc_004060C8: push esi
+  loc_004060C9: push eax
+  loc_004060CA: call ebx
+  loc_004060CC: lea ecx, var_50
+  loc_004060CF: call [00401194h] ; __vbaFreeObj
+  loc_004060D5: mov edi, [00401148h] ; __vbaStrToAnsi
+  loc_004060DB: mov eax, 00000001h
+  loc_004060E0: mov [esi+00000046h], 0000h
+  loc_004060E6: mov var_18, eax
+  loc_004060E9: mov ecx, 0000001Eh
+  loc_004060EE: cmp ax, cx
+  loc_004060F1: jg 00406441h
+  loc_004060F7: lea eax, var_B4
+  loc_004060FD: lea ecx, var_64
+  loc_00406100: lea edx, var_18
+  loc_00406103: push eax
+  loc_00406104: push ecx
+  loc_00406105: mov var_BC, 00402F88h ; "Text"
+  loc_0040610F: mov var_C4, 00000008h
+  loc_00406119: mov var_AC, edx
+  loc_0040611F: mov var_B4, 00004002h
+  loc_00406129: call [00401158h] ; rtcVarStrFromVar
+  loc_0040612F: lea edx, var_64
+  loc_00406132: lea eax, var_74
+  loc_00406135: push edx
+  loc_00406136: push eax
+  loc_00406137: call [0040106Ch] ; rtcTrimVar
+  loc_0040613D: lea ecx, var_C4
+  loc_00406143: lea edx, var_74
+  loc_00406146: push ecx
+  loc_00406147: lea eax, var_84
+  loc_0040614D: push edx
+  loc_0040614E: push eax
+  loc_0040614F: call [004010ECh] ; __vbaVarCat
+  loc_00406155: push eax
+  loc_00406156: call [00401014h] ; __vbaStrVarMove
+  loc_0040615C: mov edx, eax
+  loc_0040615E: lea ecx, var_28
+  loc_00406161: call [00401170h] ; __vbaStrMove
+  loc_00406167: lea ecx, var_84
+  loc_0040616D: lea edx, var_74
+  loc_00406170: push ecx
+  loc_00406171: lea eax, var_64
+  loc_00406174: push edx
+  loc_00406175: push eax
+  loc_00406176: push 00000003h
+  loc_00406178: call [0040101Ch] ; __vbaFreeVarList
+  loc_0040617E: add esp, 00000010h
+  loc_00406181: lea ebx, [esi+00000052h]
+  loc_00406184: push 00402C28h
+  loc_00406189: push 004030D4h ; "OpExcel.ini"
+  loc_0040618E: call [00401034h] ; __vbaStrCat
+  loc_00406194: mov edx, eax
+  loc_00406196: lea ecx, var_48
+  loc_00406199: call [00401170h] ; __vbaStrMove
+  loc_0040619F: lea ecx, var_4C
+  loc_004061A2: push eax
+  loc_004061A3: push ecx
+  loc_004061A4: call edi
+  loc_004061A6: push eax
+  loc_004061A7: push 00000003h
+  loc_004061A9: push ebx
+  loc_004061AA: push 00000003h
+  loc_004061AC: call [00401070h] ; __vbaStrFixstr
+  loc_004061B2: mov edx, eax
+  loc_004061B4: lea ecx, var_3C
+  loc_004061B7: call [00401170h] ; __vbaStrMove
+  loc_004061BD: lea edx, var_40
+  loc_004061C0: push eax
+  loc_004061C1: push edx
+  loc_004061C2: call edi
+  loc_004061C4: push eax
+  loc_004061C5: lea eax, var_38
+  loc_004061C8: push 004033B0h
+  loc_004061CD: push eax
+  loc_004061CE: call edi
+  loc_004061D0: mov ecx, var_28
+  loc_004061D3: push eax
+  loc_004061D4: lea edx, var_34
+  loc_004061D7: push ecx
+  loc_004061D8: push edx
+  loc_004061D9: call edi
+  loc_004061DB: push eax
+  loc_004061DC: lea eax, var_30
+  loc_004061DF: push 00402F98h ; "OpenExcel"
+  loc_004061E4: push eax
+  loc_004061E5: call edi
+  loc_004061E7: push eax
+  loc_004061E8: call 00403068h ; GetPrivateProfileString(%x1e, %x2e, %x3e, %x4e, %x5e, %x6e)
+  loc_004061ED: mov var_E8, eax
+  loc_004061F3: call [0040103Ch] ; __vbaSetSystemError
+  loc_004061F9: mov ecx, var_34
+  loc_004061FC: push ecx
+  loc_004061FD: lea edx, var_28
+  loc_00406200: push edx
+  loc_00406201: call [004010CCh] ; __vbaStrToUnicode
+  loc_00406207: mov eax, var_40
+  loc_0040620A: lea ecx, var_44
+  loc_0040620D: push eax
+  loc_0040620E: push ecx
+  loc_0040620F: call [004010CCh] ; __vbaStrToUnicode
+  loc_00406215: push eax
+  loc_00406216: push ebx
+  loc_00406217: push 00000003h
+  loc_00406219: call [00401038h] ; __vbaLsetFixstr
+  loc_0040621F: mov ecx, var_E8
+  loc_00406225: call [00401098h] ; __vbaI2I4
+  loc_0040622B: mov [esi+00000050h], ax
+  loc_0040622F: lea edx, var_4C
+  loc_00406232: lea eax, var_48
+  loc_00406235: push edx
+  loc_00406236: lea ecx, var_44
+  loc_00406239: push eax
+  loc_0040623A: lea edx, var_40
+  loc_0040623D: push ecx
+  loc_0040623E: lea eax, var_3C
+  loc_00406241: push edx
+  loc_00406242: lea ecx, var_38
+  loc_00406245: push eax
+  loc_00406246: lea edx, var_34
+  loc_00406249: push ecx
+  loc_0040624A: lea eax, var_30
+  loc_0040624D: push edx
+  loc_0040624E: push eax
+  loc_0040624F: push 00000008h
+  loc_00406251: call [0040111Ch] ; __vbaFreeStrList
+  loc_00406257: add esp, 00000024h
+  loc_0040625A: cmp [esi+00000050h], 0000h
+  loc_0040625F: jz 0040642Ah ; Unknown_46F80()
+  loc_00406265: mov ecx, [esi]
+  loc_00406267: push esi
+  loc_00406268: call [ecx+00000300h]
+  loc_0040626E: lea edx, var_50
+  loc_00406271: push eax
+  loc_00406272: push edx
+  loc_00406273: call [0040104Ch] ; __vbaObjSet
+  loc_00406279: mov ecx, [eax]
+  loc_0040627B: lea edx, var_54
+  loc_0040627E: push edx
+  loc_0040627F: mov edx, var_18
+  loc_00406282: push edx
+  loc_00406283: push eax
+  loc_00406284: mov var_F8, eax
+  loc_0040628A: call [ecx+00000040h]
+  loc_0040628D: test eax, eax
+  loc_0040628F: fnclex
+  loc_00406291: jge 004062A8h
+  loc_00406293: mov ecx, var_F8
+  loc_00406299: push 00000040h
+  loc_0040629B: push 00402FACh
+  loc_004062A0: push ecx
+  loc_004062A1: push eax
+  loc_004062A2: call [00401040h] ; __vbaHresultCheckObj
+  loc_004062A8: mov edx, var_54
+  loc_004062AB: push ebx
+  loc_004062AC: push 00000003h
+  loc_004062AE: mov var_100, edx
+  loc_004062B4: call [00401070h] ; __vbaStrFixstr
+  loc_004062BA: mov edx, eax
+  loc_004062BC: lea ecx, var_30
+  loc_004062BF: call [00401170h] ; __vbaStrMove
+  loc_004062C5: movsx ecx, [esi+00000050h]
+  loc_004062C9: lea eax, var_30
+  loc_004062CC: lea edx, var_B4
+  loc_004062D2: mov var_AC, eax
+  loc_004062D8: push ecx
+  loc_004062D9: lea eax, var_64
+  loc_004062DC: push edx
+  loc_004062DD: push eax
+  loc_004062DE: mov var_B4, 00004008h
+  loc_004062E8: call [00401168h] ; rtcLeftCharVar
+  loc_004062EE: mov ecx, var_30
+  loc_004062F1: push ecx
+  loc_004062F2: push ebx
+  loc_004062F3: push 00000003h
+  loc_004062F5: call [00401038h] ; __vbaLsetFixstr
+  loc_004062FB: mov edx, var_100
+  loc_00406301: lea eax, var_64
+  loc_00406304: lea ecx, var_34
+  loc_00406307: push eax
+  loc_00406308: mov ebx, [edx]
+  loc_0040630A: push ecx
+  loc_0040630B: call [004010E8h] ; __vbaStrVarVal
+  loc_00406311: mov edx, ebx
+  loc_00406313: mov ebx, var_100
+  loc_00406319: push eax
+  loc_0040631A: push ebx
+  loc_0040631B: call [edx+000000A4h]
+  loc_00406321: test eax, eax
+  loc_00406323: fnclex
+  loc_00406325: jge 00406339h
+  loc_00406327: push 000000A4h
+  loc_0040632C: push 00402FBCh
+  loc_00406331: push ebx
+  loc_00406332: push eax
+  loc_00406333: call [00401040h] ; __vbaHresultCheckObj
+  loc_00406339: lea eax, var_34
+  loc_0040633C: lea ecx, var_30
+  loc_0040633F: push eax
+  loc_00406340: push ecx
+  loc_00406341: push 00000002h
+  loc_00406343: call [0040111Ch] ; __vbaFreeStrList
+  loc_00406349: lea edx, var_54
+  loc_0040634C: lea eax, var_50
+  loc_0040634F: push edx
+  loc_00406350: push eax
+  loc_00406351: push 00000002h
+  loc_00406353: call [00401028h] ; __vbaFreeObjList
+  loc_00406359: add esp, 00000018h
+  loc_0040635C: lea ecx, var_64
+  loc_0040635F: call [00401010h] ; __vbaFreeVar
+  loc_00406365: mov ecx, [esi]
+  loc_00406367: push esi
+  loc_00406368: call [ecx+00000300h]
+  loc_0040636E: lea edx, var_50
+  loc_00406371: push eax
+  loc_00406372: push edx
+  loc_00406373: call [0040104Ch] ; __vbaObjSet
+  loc_00406379: mov edx, var_18
+  loc_0040637C: mov ebx, eax
+  loc_0040637E: lea ecx, var_54
+  loc_00406381: mov eax, [ebx]
+  loc_00406383: push ecx
+  loc_00406384: push edx
+  loc_00406385: push ebx
+  loc_00406386: call [eax+00000040h]
+  loc_00406389: test eax, eax
+  loc_0040638B: fnclex
+  loc_0040638D: jge 0040639Eh
+  loc_0040638F: push 00000040h
+  loc_00406391: push 00402FACh
+  loc_00406396: push ebx
+  loc_00406397: push eax
+  loc_00406398: call [00401040h] ; __vbaHresultCheckObj
+  loc_0040639E: mov eax, var_54
+  loc_004063A1: lea edx, var_30
+  loc_004063A4: push edx
+  loc_004063A5: push eax
+  loc_004063A6: mov ecx, [eax]
+  loc_004063A8: mov ebx, eax
+  loc_004063AA: call [ecx+000000A0h]
+  loc_004063B0: test eax, eax
+  loc_004063B2: fnclex
+  loc_004063B4: jge 004063C8h
+  loc_004063B6: push 000000A0h
+  loc_004063BB: push 00402FBCh
+  loc_004063C0: push ebx
+  loc_004063C1: push eax
+  loc_004063C2: call [00401040h] ; __vbaHresultCheckObj
+  loc_004063C8: mov eax, var_30
+  loc_004063CB: push eax
+  loc_004063CC: call [0040119Ch] ; rtcR8ValFromBstr
+  loc_004063D2: movsx ecx, [esi+00000046h]
+  loc_004063D6: fstp real8 ptr var_F4
+  loc_004063DC: mov var_12C, ecx
+  loc_004063E2: fild real4 ptr var_12C
+  loc_004063E8: fstp real8 ptr var_134
+  loc_004063EE: fld real8 ptr var_134
+  loc_004063F4: fadd st0, real8 ptr var_F4
+  loc_004063FA: fnstsw ax
+  loc_004063FC: test al, 0Dh
+  loc_004063FE: jnz 004068A3h
+  loc_00406404: call [0040115Ch] ; __vbaFpI2
+  loc_0040640A: lea ecx, var_30
+  loc_0040640D: mov [esi+00000046h], ax
+  loc_00406411: call [00401198h] ; __vbaFreeStr
+  loc_00406417: lea edx, var_54
+  loc_0040641A: lea eax, var_50
+  loc_0040641D: push edx
+  loc_0040641E: push eax
+  loc_0040641F: push 00000002h
+  loc_00406421: call [00401028h] ; __vbaFreeObjList
+  loc_00406427: add esp, 0000000Ch
+  loc_0040642A: mov eax, 00000001h
+  loc_0040642F: add ax, var_18
+  loc_00406433: jo 004068A8h
+  loc_00406439: mov var_18, eax
+  loc_0040643C: jmp 004060E9h
+  loc_00406441: cmp [esi+00000046h], 0000h
+  loc_00406446: jnz 00406522h
+  loc_0040644C: mov ecx, 0000000Ah
+  loc_00406451: mov eax, 80020004h
+  loc_00406456: mov var_94, ecx
+  loc_0040645C: mov var_84, ecx
+  loc_00406462: mov var_74, ecx
+  loc_00406465: lea edx, var_B4
+  loc_0040646B: lea ecx, var_64
+  loc_0040646E: mov var_8C, eax
+  loc_00406474: mov var_7C, eax
+  loc_00406477: mov var_6C, eax
+  loc_0040647A: mov var_AC, 004033DCh ; "Program cannot be run, The cumulative time must be grater then zero"
+  loc_00406484: mov var_B4, 00000008h
+  loc_0040648E: call [0040114Ch] ; __vbaVarDup
+  loc_00406494: lea ecx, var_94
+  loc_0040649A: lea edx, var_84
+  loc_004064A0: push ecx
+  loc_004064A1: lea eax, var_74
+  loc_004064A4: push edx
+  loc_004064A5: push eax
+  loc_004064A6: lea ecx, var_64
+  loc_004064A9: push 00000000h
+  loc_004064AB: push ecx
+  loc_004064AC: call [00401050h] ; rtcMsgBox
+  loc_004064B2: lea edx, var_94
+  loc_004064B8: lea eax, var_84
+  loc_004064BE: push edx
+  loc_004064BF: lea ecx, var_74
+  loc_004064C2: push eax
+  loc_004064C3: lea edx, var_64
+  loc_004064C6: push ecx
+  loc_004064C7: push edx
+  loc_004064C8: push 00000004h
+  loc_004064CA: call [0040101Ch] ; __vbaFreeVarList
+  loc_004064D0: mov eax, [004093B4h]
+  loc_004064D5: add esp, 00000014h
+  loc_004064D8: test eax, eax
+  loc_004064DA: jnz 004064ECh
+  loc_004064DC: push 004093B4h
+  loc_004064E1: push 00402F74h
+  loc_004064E6: call [00401100h] ; __vbaNew2
+  loc_004064EC: mov edi, [004093B4h]
+  loc_004064F2: lea eax, var_50
+  loc_004064F5: push esi
+  loc_004064F6: push eax
+  loc_004064F7: mov ebx, [edi]
+  loc_004064F9: call [00401060h] ; __vbaObjSetAddref
+  loc_004064FF: push eax
+  loc_00406500: push edi
+  loc_00406501: call [ebx+00000010h]
+  loc_00406504: test eax, eax
+  loc_00406506: fnclex
+  loc_00406508: jge 00406519h
+  loc_0040650A: push 00000010h
+  loc_0040650C: push 00402F64h
+  loc_00406511: push edi
+  loc_00406512: push eax
+  loc_00406513: call [00401040h] ; __vbaHresultCheckObj
+  loc_00406519: lea ecx, var_50
+  loc_0040651C: call [00401194h] ; __vbaFreeObj
+  loc_00406522: sub esp, 00000010h
+  loc_00406525: mov ecx, 0000000Bh
+  loc_0040652A: mov edx, esp
+  loc_0040652C: mov var_B4, ecx
+  loc_00406532: or eax, FFFFFFFFh
+  loc_00406535: mov edi, [00401164h] ; __vbaLateMemCallLd
+  loc_0040653B: mov [edx], ecx
+  loc_0040653D: mov ecx, var_B0
+  loc_00406543: mov var_AC, eax
+  loc_00406549: push 0040347Ch ; "Visible"
+  loc_0040654E: mov [edx+00000004h], ecx
+  loc_00406551: mov ecx, [00409024h]
+  loc_00406557: push 00000000h
+  loc_00406559: push 00403464h ; "Application"
+  loc_0040655E: mov [edx+00000008h], eax
+  loc_00406561: mov eax, var_A8
+  loc_00406567: push ecx
+  loc_00406568: mov [edx+0000000Ch], eax
+  loc_0040656B: lea edx, var_64
+  loc_0040656E: push edx
+  loc_0040656F: call edi
+  loc_00406571: add esp, 00000010h
+  loc_00406574: push eax
+  loc_00406575: call [004010A0h] ; __vbaVarLateMemSt
+  loc_0040657B: lea ecx, var_64
+  loc_0040657E: call [00401010h] ; __vbaFreeVar
+  loc_00406584: push 004034ACh
+  loc_00406589: mov ecx, 00004008h
+  loc_0040658E: sub esp, 00000010h
+  loc_00406591: mov var_B4, ecx
+  loc_00406597: mov edx, esp
+  loc_00406599: lea eax, [esi+00000034h]
+  loc_0040659C: mov var_AC, eax
+  loc_004065A2: push 00000001h
+  loc_004065A4: mov [edx], ecx
+  loc_004065A6: mov ecx, var_B0
+  loc_004065AC: push 004034A0h ; "Open"
+  loc_004065B1: push 00000000h
+  loc_004065B3: mov [edx+00000004h], ecx
+  loc_004065B6: mov ecx, [00409024h]
+  loc_004065BC: push 0040348Ch ; "Workbooks"
+  loc_004065C1: push ecx
+  loc_004065C2: mov [edx+00000008h], eax
+  loc_004065C5: mov eax, var_A8
+  loc_004065CB: mov [edx+0000000Ch], eax
+  loc_004065CE: lea edx, var_64
+  loc_004065D1: push edx
+  loc_004065D2: call edi
+  loc_004065D4: mov ebx, [00401160h] ; __vbaVarLateMemCallLd
+  loc_004065DA: add esp, 00000010h
+  loc_004065DD: push eax
+  loc_004065DE: lea eax, var_74
+  loc_004065E1: push eax
+  loc_004065E2: call ebx
+  loc_004065E4: add esp, 00000020h
+  loc_004065E7: push eax
+  loc_004065E8: call [004010A8h] ; __vbaCastObjVar
+  loc_004065EE: push eax
+  loc_004065EF: push 00409028h
+  loc_004065F4: call [0040104Ch] ; __vbaObjSet
+  loc_004065FA: lea ecx, var_74
+  loc_004065FD: lea edx, var_64
+  loc_00406600: push ecx
+  loc_00406601: push edx
+  loc_00406602: push 00000002h
+  loc_00406604: call [0040101Ch] ; __vbaFreeVarList
+  loc_0040660A: lea edi, [esi+00000058h]
+  loc_0040660D: add esp, 0000000Ch
+  loc_00406610: mov edx, 004034C0h ; "Ric1"
+  loc_00406615: mov ecx, edi
+  loc_00406617: mov [esi+00000044h], 0001h
+  loc_0040661D: call [00401114h] ; __vbaStrCopy
+  loc_00406623: mov eax, [edi]
+  loc_00406625: push 00402C28h
+  loc_0040662A: push eax
+  loc_0040662B: call [00401034h] ; __vbaStrCat
+  loc_00406631: mov ecx, 00000008h
+  loc_00406636: mov edx, 00000003h
+  loc_0040663B: mov var_5C, eax
+  loc_0040663E: mov var_64, ecx
+  loc_00406641: mov var_BC, edx
+  loc_00406647: push 004034ACh
+  loc_0040664C: mov var_C4, 00000002h
+  loc_00406656: sub esp, 00000010h
+  loc_00406659: mov edi, esp
+  loc_0040665B: sub esp, 00000010h
+  loc_0040665E: mov [edi], ecx
+  loc_00406660: mov ecx, var_60
+  loc_00406663: mov [edi+00000004h], ecx
+  loc_00406666: mov ecx, esp
+  loc_00406668: push 00000002h
+  loc_0040666A: push 004034A0h ; "Open"
+  loc_0040666F: mov [edi+00000008h], eax
+  loc_00406672: mov eax, var_58
+  loc_00406675: push 00000000h
+  loc_00406677: push 0040348Ch ; "Workbooks"
+  loc_0040667C: mov [edi+0000000Ch], eax
+  loc_0040667F: mov eax, var_C4
+  loc_00406685: mov [ecx], eax
+  loc_00406687: mov eax, var_C0
+  loc_0040668D: mov [ecx+00000004h], eax
+  loc_00406690: mov eax, [00409024h]
+  loc_00406695: push eax
+  loc_00406696: mov [ecx+00000008h], edx
+  loc_00406699: mov edx, var_B8
+  loc_0040669F: mov [ecx+0000000Ch], edx
+  loc_004066A2: lea ecx, var_74
+  loc_004066A5: push ecx
+  loc_004066A6: call [00401164h] ; __vbaLateMemCallLd
+  loc_004066AC: add esp, 00000010h
+  loc_004066AF: lea edx, var_84
+  loc_004066B5: push eax
+  loc_004066B6: push edx
+  loc_004066B7: call ebx
+  loc_004066B9: add esp, 00000030h
+  loc_004066BC: push eax
+  loc_004066BD: call [004010A8h] ; __vbaCastObjVar
+  loc_004066C3: mov ebx, [0040104Ch] ; __vbaObjSet
+  loc_004066C9: push eax
+  loc_004066CA: push 00409028h
+  loc_004066CF: call ebx
+  loc_004066D1: lea eax, var_84
+  loc_004066D7: lea ecx, var_74
+  loc_004066DA: push eax
+  loc_004066DB: lea edx, var_64
+  loc_004066DE: push ecx
+  loc_004066DF: push edx
+  loc_004066E0: push 00000003h
+  loc_004066E2: call [0040101Ch] ; __vbaFreeVarList
+  loc_004066E8: mov eax, [esi]
+  loc_004066EA: add esp, 00000010h
+  loc_004066ED: push esi
+  loc_004066EE: call [eax+000002FCh]
+  loc_004066F4: lea ecx, var_50
+  loc_004066F7: push eax
+  loc_004066F8: push ecx
+  loc_004066F9: call ebx
+  loc_004066FB: mov edi, eax
+  loc_004066FD: lea eax, var_54
+  loc_00406700: push eax
+  loc_00406701: push 00000001h
+  loc_00406703: mov edx, [edi]
+  loc_00406705: push edi
+  loc_00406706: call [edx+00000040h]
+  loc_00406709: test eax, eax
+  loc_0040670B: fnclex
+  loc_0040670D: jge 0040671Eh
+  loc_0040670F: push 00000040h
+  loc_00406711: push 00402FACh
+  loc_00406716: push edi
+  loc_00406717: push eax
+  loc_00406718: call [00401040h] ; __vbaHresultCheckObj
+  loc_0040671E: mov edi, var_54
+  loc_00406721: lea ecx, var_64
+  loc_00406724: push ecx
+  loc_00406725: mov var_100, edi
+  loc_0040672B: call [00401150h] ; rtcGetTimeVar
+  loc_00406731: mov edi, [edi]
+  loc_00406733: lea edx, var_64
+  loc_00406736: lea eax, var_30
+  loc_00406739: push edx
+  loc_0040673A: push eax
+  loc_0040673B: call [004010E8h] ; __vbaStrVarVal
+  loc_00406741: mov ecx, edi
+  loc_00406743: mov edi, var_100
+  loc_00406749: push eax
+  loc_0040674A: push edi
+  loc_0040674B: call [ecx+000000A4h]
+  loc_00406751: test eax, eax
+  loc_00406753: fnclex
+  loc_00406755: jge 00406769h
+  loc_00406757: push 000000A4h
+  loc_0040675C: push 00402FBCh
+  loc_00406761: push edi
+  loc_00406762: push eax
+  loc_00406763: call [00401040h] ; __vbaHresultCheckObj
+  loc_00406769: mov edi, [00401198h] ; __vbaFreeStr
+  loc_0040676F: lea ecx, var_30
+  loc_00406772: call edi
+  loc_00406774: lea edx, var_54
+  loc_00406777: lea eax, var_50
+  loc_0040677A: push edx
+  loc_0040677B: push eax
+  loc_0040677C: push 00000002h
+  loc_0040677E: call [00401028h] ; __vbaFreeObjList
+  loc_00406784: add esp, 0000000Ch
+  loc_00406787: lea ecx, var_64
+  loc_0040678A: call [00401010h] ; __vbaFreeVar
+  loc_00406790: mov ecx, [esi]
+  loc_00406792: push esi
+  loc_00406793: call [ecx+00000304h]
+  loc_00406799: lea edx, var_50
+  loc_0040679C: push eax
+  loc_0040679D: push edx
+  loc_0040679E: call ebx
+  loc_004067A0: mov esi, eax
+  loc_004067A2: push FFFFFFFFh
+  loc_004067A4: push esi
+  loc_004067A5: mov eax, [esi]
+  loc_004067A7: call [eax+0000005Ch]
+  loc_004067AA: test eax, eax
+  loc_004067AC: fnclex
+  loc_004067AE: jge 004067BFh
+  loc_004067B0: push 0000005Ch
+  loc_004067B2: push 004034CCh
+  loc_004067B7: push esi
+  loc_004067B8: push eax
+  loc_004067B9: call [00401040h] ; __vbaHresultCheckObj
+  loc_004067BF: lea ecx, var_50
+  loc_004067C2: call [00401194h] ; __vbaFreeObj
+  loc_004067C8: push 00402C28h
+  loc_004067CD: push 00402C70h ; "Erreurs"
+  loc_004067D2: call [00401034h] ; __vbaStrCat
+  loc_004067D8: mov edx, eax
+  loc_004067DA: lea ecx, var_30
+  loc_004067DD: call [00401170h] ; __vbaStrMove
+  loc_004067E3: push eax
+  loc_004067E4: push 00000002h
+  loc_004067E6: push FFFFFFFFh
+  loc_004067E8: push 00000002h
+  loc_004067EA: call [004010FCh] ; __vbaFileOpen
+  loc_004067F0: lea ecx, var_30
+  loc_004067F3: call edi
+  loc_004067F5: mov var_4, 00000000h
+  loc_004067FC: fwait
+  loc_004067FD: push 00406884h
+  loc_00406802: jmp 00406865h
+  loc_00406804: lea ecx, var_4C
+  loc_00406807: lea edx, var_48
+  loc_0040680A: push ecx
+  loc_0040680B: lea eax, var_44
+  loc_0040680E: push edx
+  loc_0040680F: lea ecx, var_40
+  loc_00406812: push eax
+  loc_00406813: lea edx, var_3C
+  loc_00406816: push ecx
+  loc_00406817: lea eax, var_38
+  loc_0040681A: push edx
+  loc_0040681B: lea ecx, var_34
+  loc_0040681E: push eax
+  loc_0040681F: lea edx, var_30
+  loc_00406822: push ecx
+  loc_00406823: push edx
+  loc_00406824: push 00000008h
+  loc_00406826: call [0040111Ch] ; __vbaFreeStrList
+  loc_0040682C: lea eax, var_54
+  loc_0040682F: lea ecx, var_50
+  loc_00406832: push eax
+  loc_00406833: push ecx
+  loc_00406834: push 00000002h
+  loc_00406836: call [00401028h] ; __vbaFreeObjList
+  loc_0040683C: lea edx, var_A4
+  loc_00406842: lea eax, var_94
+  loc_00406848: push edx
+  loc_00406849: lea ecx, var_84
+  loc_0040684F: push eax
+  loc_00406850: lea edx, var_74
+  loc_00406853: push ecx
+  loc_00406854: lea eax, var_64
+  loc_00406857: push edx
+  loc_00406858: push eax
+  loc_00406859: push 00000005h
+  loc_0040685B: call [0040101Ch] ; __vbaFreeVarList
+  loc_00406861: add esp, 00000048h
+  loc_00406864: ret
+  loc_00406865: lea ecx, var_20
+  loc_00406868: call [00401194h] ; __vbaFreeObj
+  loc_0040686E: mov esi, [00401198h] ; __vbaFreeStr
+  loc_00406874: lea ecx, var_24
+  loc_00406877: call __vbaFreeStr
+  loc_00406879: lea ecx, var_28
+  loc_0040687C: call __vbaFreeStr
+  loc_0040687E: lea ecx, var_2C
+  loc_00406881: call __vbaFreeStr
+  loc_00406883: ret
+  loc_00406884: mov eax, arg_8
+  loc_00406887: push eax
+  loc_00406888: mov ecx, [eax]
+  loc_0040688A: call [ecx+00000008h]
+  loc_0040688D: mov eax, var_4
+  loc_00406890: mov ecx, var_14
+  loc_00406893: pop edi
+  loc_00406894: pop esi
+  loc_00406895: mov fs:[00000000h], ecx
+  loc_0040689C: pop ebx
+  loc_0040689D: mov esp, ebp
+  loc_0040689F: pop ebp
+  loc_004068A0: retn 0004h
+
+Form_Unload_405630
+  loc_00405630: push ebp
+  loc_00405631: mov ebp, esp
+  loc_00405633: sub esp, 0000000Ch
+  loc_00405636: push 00401326h ; __vbaExceptHandler
+  loc_0040563B: mov eax, fs:[00000000h]
+  loc_00405641: push eax
+  loc_00405642: mov fs:[00000000h], esp
+  loc_00405649: sub esp, 0000009Ch
+  loc_0040564F: push ebx
+  loc_00405650: push esi
+  loc_00405651: push edi
+  loc_00405652: mov var_C, esp
+  loc_00405655: mov var_8, 004011B8h
+  loc_0040565C: mov esi, arg_8
+  loc_0040565F: mov eax, esi
+  loc_00405661: and eax, 00000001h
+  loc_00405664: mov var_4, eax
+  loc_00405667: and esi, FFFFFFFEh
+  loc_0040566A: push esi
+  loc_0040566B: mov arg_8, esi
+  loc_0040566E: mov ecx, [esi]
+  loc_00405670: call [ecx+00000004h]
+  loc_00405673: mov edi, [00401148h] ; __vbaStrToAnsi
+  loc_00405679: xor ebx, ebx
+  loc_0040567B: add esi, 0000004Ah
+  loc_0040567E: mov var_18, ebx
+  loc_00405681: mov var_1C, ebx
+  loc_00405684: mov var_20, ebx
+  loc_00405687: mov var_24, ebx
+  loc_0040568A: mov var_28, ebx
+  loc_0040568D: mov var_2C, ebx
+  loc_00405690: mov var_30, ebx
+  loc_00405693: mov var_34, ebx
+  loc_00405696: mov var_38, ebx
+  loc_00405699: mov var_3C, ebx
+  loc_0040569C: mov var_4C, ebx
+  loc_0040569F: mov var_5C, ebx
+  loc_004056A2: mov var_6C, ebx
+  loc_004056A5: mov var_7C, ebx
+  loc_004056A8: mov var_8C, ebx
+  loc_004056AE: mov [esi], 0001h
+  loc_004056B3: mov eax, 0000001Eh
+  loc_004056B8: cmp [esi], ax
+  loc_004056BB: jg 00405871h
+  loc_004056C1: lea edx, var_7C
+  loc_004056C4: lea eax, var_4C
+  loc_004056C7: push edx
+  loc_004056C8: push eax
+  loc_004056C9: mov var_84, 00402F88h ; "Text"
+  loc_004056D3: mov var_8C, 00000008h
+  loc_004056DD: mov var_74, esi
+  loc_004056E0: mov var_7C, 00004002h
+  loc_004056E7: call [00401158h] ; rtcVarStrFromVar
+  loc_004056ED: lea ecx, var_4C
+  loc_004056F0: lea edx, var_5C
+  loc_004056F3: push ecx
+  loc_004056F4: push edx
+  loc_004056F5: call [0040106Ch] ; rtcTrimVar
+  loc_004056FB: lea eax, var_8C
+  loc_00405701: lea ecx, var_5C
+  loc_00405704: push eax
+  loc_00405705: lea edx, var_6C
+  loc_00405708: push ecx
+  loc_00405709: push edx
+  loc_0040570A: call [004010ECh] ; __vbaVarCat
+  loc_00405710: push eax
+  loc_00405711: call [00401014h] ; __vbaStrVarMove
+  loc_00405717: mov edx, eax
+  loc_00405719: lea ecx, var_18
+  loc_0040571C: call [00401170h] ; __vbaStrMove
+  loc_00405722: lea eax, var_6C
+  loc_00405725: lea ecx, var_5C
+  loc_00405728: push eax
+  loc_00405729: lea edx, var_4C
+  loc_0040572C: push ecx
+  loc_0040572D: push edx
+  loc_0040572E: push 00000003h
+  loc_00405730: call [0040101Ch] ; __vbaFreeVarList
+  loc_00405736: mov eax, arg_8
+  loc_00405739: add esp, 00000010h
+  loc_0040573C: mov ecx, [eax]
+  loc_0040573E: push eax
+  loc_0040573F: call [ecx+00000300h]
+  loc_00405745: lea edx, var_38
+  loc_00405748: push eax
+  loc_00405749: push edx
+  loc_0040574A: call [0040104Ch] ; __vbaObjSet
+  loc_00405750: mov dx, [esi]
+  loc_00405753: mov ebx, eax
+  loc_00405755: lea ecx, var_3C
+  loc_00405758: mov eax, [ebx]
+  loc_0040575A: push ecx
+  loc_0040575B: push edx
+  loc_0040575C: push ebx
+  loc_0040575D: call [eax+00000040h]
+  loc_00405760: test eax, eax
+  loc_00405762: fnclex
+  loc_00405764: jge 00405775h
+  loc_00405766: push 00000040h
+  loc_00405768: push 00402FACh
+  loc_0040576D: push ebx
+  loc_0040576E: push eax
+  loc_0040576F: call [00401040h] ; __vbaHresultCheckObj
+  loc_00405775: mov eax, var_3C
+  loc_00405778: lea edx, var_1C
+  loc_0040577B: push edx
+  loc_0040577C: push eax
+  loc_0040577D: mov ecx, [eax]
+  loc_0040577F: mov ebx, eax
+  loc_00405781: call [ecx+000000A0h]
+  loc_00405787: test eax, eax
+  loc_00405789: fnclex
+  loc_0040578B: jge 0040579Fh
+  loc_0040578D: push 000000A0h
+  loc_00405792: push 00402FBCh
+  loc_00405797: push ebx
+  loc_00405798: push eax
+  loc_00405799: call [00401040h] ; __vbaHresultCheckObj
+  loc_0040579F: push 00402C28h
+  loc_004057A4: push 004030D4h ; "OpExcel.ini"
+  loc_004057A9: call [00401034h] ; __vbaStrCat
+  loc_004057AF: mov edx, eax
+  loc_004057B1: lea ecx, var_2C
+  loc_004057B4: call [00401170h] ; __vbaStrMove
+  loc_004057BA: push eax
+  loc_004057BB: lea eax, var_30
+  loc_004057BE: push eax
+  loc_004057BF: call edi
+  loc_004057C1: mov ecx, var_1C
+  loc_004057C4: push eax
+  loc_004057C5: lea edx, var_28
+  loc_004057C8: push ecx
+  loc_004057C9: push edx
+  loc_004057CA: call edi
+  loc_004057CC: push eax
+  loc_004057CD: mov eax, var_18
+  loc_004057D0: lea ecx, var_24
+  loc_004057D3: push eax
+  loc_004057D4: push ecx
+  loc_004057D5: call edi
+  loc_004057D7: push eax
+  loc_004057D8: lea edx, var_20
+  loc_004057DB: push 00402F98h ; "OpenExcel"
+  loc_004057E0: push edx
+  loc_004057E1: call edi
+  loc_004057E3: push eax
+  loc_004057E4: call 00403014h ; WritePrivateProfileString(%x1e, %x2e, %x3e, %x4e)
+  loc_004057E9: mov ebx, eax
+  loc_004057EB: call [0040103Ch] ; __vbaSetSystemError
+  loc_004057F1: mov eax, var_24
+  loc_004057F4: lea ecx, var_18
+  loc_004057F7: push eax
+  loc_004057F8: push ecx
+  loc_004057F9: call [004010CCh] ; __vbaStrToUnicode
+  loc_004057FF: push ebx
+  loc_00405800: call [00401008h] ; __vbaStrI4
+  loc_00405806: mov edx, eax
+  loc_00405808: lea ecx, var_34
+  loc_0040580B: call [00401170h] ; __vbaStrMove
+  loc_00405811: mov edx, eax
+  loc_00405813: mov eax, arg_8
+  loc_00405816: lea ecx, [eax+0000004Ch]
+  loc_00405819: call [00401114h] ; __vbaStrCopy
+  loc_0040581F: lea ecx, var_34
+  loc_00405822: lea edx, var_30
+  loc_00405825: push ecx
+  loc_00405826: lea eax, var_2C
+  loc_00405829: push edx
+  loc_0040582A: lea ecx, var_28
+  loc_0040582D: push eax
+  loc_0040582E: lea edx, var_1C
+  loc_00405831: push ecx
+  loc_00405832: lea eax, var_24
+  loc_00405835: push edx
+  loc_00405836: lea ecx, var_20
+  loc_00405839: push eax
+  loc_0040583A: push ecx
+  loc_0040583B: push 00000007h
+  loc_0040583D: call [0040111Ch] ; __vbaFreeStrList
+  loc_00405843: lea edx, var_3C
+  loc_00405846: lea eax, var_38
+  loc_00405849: push edx
+  loc_0040584A: push eax
+  loc_0040584B: push 00000002h
+  loc_0040584D: call [00401028h] ; __vbaFreeObjList
+  loc_00405853: mov cx, [esi]
+  loc_00405856: mov eax, 00000001h
+  loc_0040585B: add esp, 0000002Ch
+  loc_0040585E: add cx, ax
+  loc_00405861: jo 0040599Ch
+  loc_00405867: mov [esi], cx
+  loc_0040586A: xor ebx, ebx
+  loc_0040586C: jmp 004056B3h
+  loc_00405871: push 00000002h
+  loc_00405873: call [00401088h] ; __vbaFileClose
+  loc_00405879: mov edx, [00409024h]
+  loc_0040587F: push ebx
+  loc_00405880: push 004030ECh ; "Quit"
+  loc_00405885: push edx
+  loc_00405886: call [00401140h] ; __vbaLateMemCall
+  loc_0040588C: mov eax, arg_8
+  loc_0040588F: add esp, 0000000Ch
+  loc_00405892: lea esi, [eax+00000038h]
+  loc_00405895: mov eax, [eax+00000038h]
+  loc_00405898: cmp eax, ebx
+  loc_0040589A: jnz 004058A8h
+  loc_0040589C: push esi
+  loc_0040589D: push 00403118h
+  loc_004058A2: call [00401100h] ; __vbaNew2
+  loc_004058A8: mov edi, [esi]
+  loc_004058AA: push edi
+  loc_004058AB: mov ecx, [edi]
+  loc_004058AD: call [ecx+0000003Ch]
+  loc_004058B0: cmp eax, ebx
+  loc_004058B2: fnclex
+  loc_004058B4: jge 004058C5h
+  loc_004058B6: push 0000003Ch
+  loc_004058B8: push 00403128h
+  loc_004058BD: push edi
+  loc_004058BE: push eax
+  loc_004058BF: call [00401040h] ; __vbaHresultCheckObj
+  loc_004058C5: mov edi, [00401174h] ; __vbaCastObj
+  loc_004058CB: push 00403108h
+  loc_004058D0: push ebx
+  loc_004058D1: call edi
+  loc_004058D3: lea edx, var_38
+  loc_004058D6: push eax
+  loc_004058D7: push edx
+  loc_004058D8: call [0040104Ch] ; __vbaObjSet
+  loc_004058DE: push eax
+  loc_004058DF: push esi
+  loc_004058E0: mov esi, [00401060h] ; __vbaObjSetAddref
+  loc_004058E6: call __vbaObjSetAddref
+  loc_004058E8: lea ecx, var_38
+  loc_004058EB: call [00401194h] ; __vbaFreeObj
+  loc_004058F1: push 00403138h
+  loc_004058F6: push ebx
+  loc_004058F7: call edi
+  loc_004058F9: push eax
+  loc_004058FA: lea eax, var_38
+  loc_004058FD: push eax
+  loc_004058FE: call [0040104Ch] ; __vbaObjSet
+  loc_00405904: mov ecx, arg_8
+  loc_00405907: push eax
+  loc_00405908: add ecx, 0000003Ch
+  loc_0040590B: push ecx
+  loc_0040590C: call __vbaObjSetAddref
+  loc_0040590E: lea ecx, var_38
+  loc_00405911: call [00401194h] ; __vbaFreeObj
+  loc_00405917: call [00401020h] ; __vbaEnd
+  loc_0040591D: mov var_4, ebx
+  loc_00405920: push 0040597Dh
+  loc_00405925: jmp 00405973h
+  loc_00405927: lea edx, var_34
+  loc_0040592A: lea eax, var_30
+  loc_0040592D: push edx
+  loc_0040592E: lea ecx, var_2C
+  loc_00405931: push eax
+  loc_00405932: lea edx, var_28
+  loc_00405935: push ecx
+  loc_00405936: lea eax, var_24
+  loc_00405939: push edx
+  loc_0040593A: lea ecx, var_20
+  loc_0040593D: push eax
+  loc_0040593E: lea edx, var_1C
+  loc_00405941: push ecx
+  loc_00405942: push edx
+  loc_00405943: push 00000007h
+  loc_00405945: call [0040111Ch] ; __vbaFreeStrList
+  loc_0040594B: lea eax, var_3C
+  loc_0040594E: lea ecx, var_38
+  loc_00405951: push eax
+  loc_00405952: push ecx
+  loc_00405953: push 00000002h
+  loc_00405955: call [00401028h] ; __vbaFreeObjList
+  loc_0040595B: lea edx, var_6C
+  loc_0040595E: lea eax, var_5C
+  loc_00405961: push edx
+  loc_00405962: lea ecx, var_4C
+  loc_00405965: push eax
+  loc_00405966: push ecx
+  loc_00405967: push 00000003h
+  loc_00405969: call [0040101Ch] ; __vbaFreeVarList
+  loc_0040596F: add esp, 0000003Ch
+  loc_00405972: ret
+  loc_00405973: lea ecx, var_18
+  loc_00405976: call [00401198h] ; __vbaFreeStr
+  loc_0040597C: ret
+  loc_0040597D: mov eax, arg_8
+  loc_00405980: push eax
+  loc_00405981: mov edx, [eax]
+  loc_00405983: call [edx+00000008h]
+  loc_00405986: mov eax, var_4
+  loc_00405989: mov ecx, var_14
+  loc_0040598C: pop edi
+  loc_0040598D: pop esi
+  loc_0040598E: mov fs:[00000000h], ecx
+  loc_00405995: pop ebx
+  loc_00405996: mov esp, ebp
+  loc_00405998: pop ebp
+  loc_00405999: retn 0008h
+
+Timer2_Timer_4068B0
+  loc_004068B0: push ebp
+  loc_004068B1: mov ebp, esp
+  loc_004068B3: sub esp, 0000000Ch
+  loc_004068B6: push 00401326h ; __vbaExceptHandler
+  loc_004068BB: mov eax, fs:[00000000h]
+  loc_004068C1: push eax
+  loc_004068C2: mov fs:[00000000h], esp
+  loc_004068C9: sub esp, 000000E8h
+  loc_004068CF: push ebx
+  loc_004068D0: push esi
+  loc_004068D1: push edi
+  loc_004068D2: mov var_C, esp
+  loc_004068D5: mov var_8, 004011F0h
+  loc_004068DC: mov esi, arg_8
+  loc_004068DF: mov eax, esi
+  loc_004068E1: and eax, 00000001h
+  loc_004068E4: mov var_4, eax
+  loc_004068E7: and esi, FFFFFFFEh
+  loc_004068EA: push esi
+  loc_004068EB: mov arg_8, esi
+  loc_004068EE: mov ecx, [esi]
+  loc_004068F0: call [ecx+00000004h]
+  loc_004068F3: mov ebx, [00401040h] ; __vbaHresultCheckObj
+  loc_004068F9: xor edi, edi
+  loc_004068FB: mov var_20, edi
+  loc_004068FE: mov var_24, edi
+  loc_00406901: mov var_28, edi
+  loc_00406904: mov var_2C, edi
+  loc_00406907: mov var_3C, edi
+  loc_0040690A: mov var_4C, edi
+  loc_0040690D: mov var_5C, edi
+  loc_00406910: mov var_6C, edi
+  loc_00406913: mov var_7C, edi
+  loc_00406916: mov var_8C, edi
+  loc_0040691C: mov var_9C, edi
+  loc_00406922: mov [esi+00000046h], di
+  loc_00406926: mov [esi+0000004Ah], 0001h
+  loc_0040692C: mov eax, 0000001Eh
+  loc_00406931: cmp [esi+0000004Ah], ax
+  loc_00406935: jg 00406A16h
+  loc_0040693B: mov edx, [esi]
+  loc_0040693D: push esi
+  loc_0040693E: call [edx+00000300h]
+  loc_00406944: push eax
+  loc_00406945: lea eax, var_28
+  loc_00406948: push eax
+  loc_00406949: call [0040104Ch] ; __vbaObjSet
+  loc_0040694F: mov edi, eax
+  loc_00406951: mov ax, [esi+0000004Ah]
+  loc_00406955: lea edx, var_2C
+  loc_00406958: mov ecx, [edi]
+  loc_0040695A: push edx
+  loc_0040695B: push eax
+  loc_0040695C: push edi
+  loc_0040695D: call [ecx+00000040h]
+  loc_00406960: test eax, eax
+  loc_00406962: fnclex
+  loc_00406964: jge 00406971h
+  loc_00406966: push 00000040h
+  loc_00406968: push 00402FACh
+  loc_0040696D: push edi
+  loc_0040696E: push eax
+  loc_0040696F: call ebx
+  loc_00406971: mov eax, var_2C
+  loc_00406974: lea edx, var_20
+  loc_00406977: push edx
+  loc_00406978: push eax
+  loc_00406979: mov ecx, [eax]
+  loc_0040697B: mov edi, eax
+  loc_0040697D: call [ecx+000000A0h]
+  loc_00406983: test eax, eax
+  loc_00406985: fnclex
+  loc_00406987: jge 00406997h
+  loc_00406989: push 000000A0h
+  loc_0040698E: push 00402FBCh
+  loc_00406993: push edi
+  loc_00406994: push eax
+  loc_00406995: call ebx
+  loc_00406997: mov eax, var_20
+  loc_0040699A: push eax
+  loc_0040699B: call [0040119Ch] ; rtcR8ValFromBstr
+  loc_004069A1: movsx ecx, [esi+00000046h]
+  loc_004069A5: fstp real8 ptr var_B4
+  loc_004069AB: mov var_DC, ecx
+  loc_004069B1: fild real4 ptr var_DC
+  loc_004069B7: fstp real8 ptr var_E4
+  loc_004069BD: fld real8 ptr var_E4
+  loc_004069C3: fadd st0, real8 ptr var_B4
+  loc_004069C9: fnstsw ax
+  loc_004069CB: test al, 0Dh
+  loc_004069CD: jnz 00407AAEh
+  loc_004069D3: call [0040115Ch] ; __vbaFpI2
+  loc_004069D9: lea ecx, var_20
+  loc_004069DC: mov [esi+00000046h], ax
+  loc_004069E0: call [00401198h] ; __vbaFreeStr
+  loc_004069E6: lea edx, var_2C
+  loc_004069E9: lea eax, var_28
+  loc_004069EC: push edx
+  loc_004069ED: push eax
+  loc_004069EE: push 00000002h
+  loc_004069F0: call [00401028h] ; __vbaFreeObjList
+  loc_004069F6: mov cx, [esi+0000004Ah]
+  loc_004069FA: mov eax, 00000001h
+  loc_004069FF: add esp, 0000000Ch
+  loc_00406A02: add cx, ax
+  loc_00406A05: jo 00407AB3h
+  loc_00406A0B: mov [esi+0000004Ah], cx
+  loc_00406A0F: xor edi, edi
+  loc_00406A11: jmp 0040692Ch
+  loc_00406A16: cmp [esi+00000046h], di
+  loc_00406A1A: jnz 00406AE1h
+  loc_00406A20: mov ecx, 80020004h
+  loc_00406A25: mov eax, 0000000Ah
+  loc_00406A2A: mov var_64, ecx
+  loc_00406A2D: mov var_54, ecx
+  loc_00406A30: mov var_44, ecx
+  loc_00406A33: lea edx, var_7C
+  loc_00406A36: lea ecx, var_3C
+  loc_00406A39: mov var_6C, eax
+  loc_00406A3C: mov var_5C, eax
+  loc_00406A3F: mov var_4C, eax
+  loc_00406A42: mov var_74, 004033DCh ; "Program cannot be run, The cumulative time must be grater then zero"
+  loc_00406A49: mov var_7C, 00000008h
+  loc_00406A50: call [0040114Ch] ; __vbaVarDup
+  loc_00406A56: lea edx, var_6C
+  loc_00406A59: lea eax, var_5C
+  loc_00406A5C: push edx
+  loc_00406A5D: lea ecx, var_4C
+  loc_00406A60: push eax
+  loc_00406A61: push ecx
+  loc_00406A62: lea edx, var_3C
+  loc_00406A65: push edi
+  loc_00406A66: push edx
+  loc_00406A67: call [00401050h] ; rtcMsgBox
+  loc_00406A6D: lea eax, var_6C
+  loc_00406A70: lea ecx, var_5C
+  loc_00406A73: push eax
+  loc_00406A74: lea edx, var_4C
+  loc_00406A77: push ecx
+  loc_00406A78: lea eax, var_3C
+  loc_00406A7B: push edx
+  loc_00406A7C: push eax
+  loc_00406A7D: push 00000004h
+  loc_00406A7F: call [0040101Ch] ; __vbaFreeVarList
+  loc_00406A85: mov eax, [004093B4h]
+  loc_00406A8A: add esp, 00000014h
+  loc_00406A8D: cmp eax, edi
+  loc_00406A8F: jnz 00406AA1h
+  loc_00406A91: push 004093B4h
+  loc_00406A96: push 00402F74h
+  loc_00406A9B: call [00401100h] ; __vbaNew2
+  loc_00406AA1: mov edi, [004093B4h]
+  loc_00406AA7: lea ecx, var_28
+  loc_00406AAA: push esi
+  loc_00406AAB: push ecx
+  loc_00406AAC: mov ebx, [edi]
+  loc_00406AAE: call [00401060h] ; __vbaObjSetAddref
+  loc_00406AB4: push eax
+  loc_00406AB5: push edi
+  loc_00406AB6: call [ebx+00000010h]
+  loc_00406AB9: test eax, eax
+  loc_00406ABB: fnclex
+  loc_00406ABD: jge 00406AD2h
+  loc_00406ABF: mov ebx, [00401040h] ; __vbaHresultCheckObj
+  loc_00406AC5: push 00000010h
+  loc_00406AC7: push 00402F64h
+  loc_00406ACC: push edi
+  loc_00406ACD: push eax
+  loc_00406ACE: call ebx
+  loc_00406AD0: jmp 00406AD8h
+  loc_00406AD2: mov ebx, [00401040h] ; __vbaHresultCheckObj
+  loc_00406AD8: lea ecx, var_28
+  loc_00406ADB: call [00401194h] ; __vbaFreeObj
+  loc_00406AE1: mov edx, [esi]
+  loc_00406AE3: push esi
+  loc_00406AE4: call [edx+00000300h]
+  loc_00406AEA: push eax
+  loc_00406AEB: lea eax, var_28
+  loc_00406AEE: push eax
+  loc_00406AEF: call [0040104Ch] ; __vbaObjSet
+  loc_00406AF5: mov edi, eax
+  loc_00406AF7: mov ax, [esi+00000044h]
+  loc_00406AFB: lea edx, var_2C
+  loc_00406AFE: mov ecx, [edi]
+  loc_00406B00: push edx
+  loc_00406B01: push eax
+  loc_00406B02: push edi
+  loc_00406B03: call [ecx+00000040h]
+  loc_00406B06: test eax, eax
+  loc_00406B08: fnclex
+  loc_00406B0A: jge 00406B17h
+  loc_00406B0C: push 00000040h
+  loc_00406B0E: push 00402FACh
+  loc_00406B13: push edi
+  loc_00406B14: push eax
+  loc_00406B15: call ebx
+  loc_00406B17: mov eax, var_2C
+  loc_00406B1A: lea edx, var_20
+  loc_00406B1D: push edx
+  loc_00406B1E: push eax
+  loc_00406B1F: mov ecx, [eax]
+  loc_00406B21: mov edi, eax
+  loc_00406B23: call [ecx+000000A0h]
+  loc_00406B29: test eax, eax
+  loc_00406B2B: fnclex
+  loc_00406B2D: jge 00406B3Dh
+  loc_00406B2F: push 000000A0h
+  loc_00406B34: push 00402FBCh
+  loc_00406B39: push edi
+  loc_00406B3A: push eax
+  loc_00406B3B: call ebx
+  loc_00406B3D: mov eax, var_20
+  loc_00406B40: push eax
+  loc_00406B41: call [0040119Ch] ; rtcR8ValFromBstr
+  loc_00406B47: movsx ecx, [esi+00000048h]
+  loc_00406B4B: fstp real8 ptr var_B4
+  loc_00406B51: mov var_E8, ecx
+  loc_00406B57: fild real4 ptr var_E8
+  loc_00406B5D: fstp real8 ptr var_F0
+  loc_00406B63: fld real8 ptr var_B4
+  loc_00406B69: call [0040107Ch] ; __vbaFpR8
+  loc_00406B6F: fcomp real8 ptr var_F0
+  loc_00406B75: fnstsw ax
+  loc_00406B77: test ah, 40h
+  loc_00406B7A: jz 00406B83h
+  loc_00406B7C: mov eax, 00000001h
+  loc_00406B81: jmp 00406B85h
+  loc_00406B83: xor eax, eax
+  loc_00406B85: neg eax
+  loc_00406B87: lea ecx, var_20
+  loc_00406B8A: mov edi, eax
+  loc_00406B8C: call [00401198h] ; __vbaFreeStr
+  loc_00406B92: lea edx, var_2C
+  loc_00406B95: lea eax, var_28
+  loc_00406B98: push edx
+  loc_00406B99: push eax
+  loc_00406B9A: push 00000002h
+  loc_00406B9C: call [00401028h] ; __vbaFreeObjList
+  loc_00406BA2: add esp, 0000000Ch
+  loc_00406BA5: test di, di
+  loc_00406BA8: jz 00407A35h
+  loc_00406BAE: mov ecx, [esi]
+  loc_00406BB0: push esi
+  loc_00406BB1: call [ecx+00000304h]
+  loc_00406BB7: lea edx, var_28
+  loc_00406BBA: push eax
+  loc_00406BBB: push edx
+  loc_00406BBC: call [0040104Ch] ; __vbaObjSet
+  loc_00406BC2: mov edi, eax
+  loc_00406BC4: push 00000000h
+  loc_00406BC6: push edi
+  loc_00406BC7: mov eax, [edi]
+  loc_00406BC9: call [eax+0000005Ch]
+  loc_00406BCC: test eax, eax
+  loc_00406BCE: fnclex
+  loc_00406BD0: jge 00406BDDh
+  loc_00406BD2: push 0000005Ch
+  loc_00406BD4: push 004034CCh
+  loc_00406BD9: push edi
+  loc_00406BDA: push eax
+  loc_00406BDB: call ebx
+  loc_00406BDD: lea ecx, var_28
+  loc_00406BE0: call [00401194h] ; __vbaFreeObj
+  loc_00406BE6: cmp [esi+00000044h], 0001h
+  loc_00406BEB: jnz 00406C1Dh
+  loc_00406BED: push 00402C28h
+  loc_00406BF2: push 00402C58h ; "Ratricpf"
+  loc_00406BF7: call [00401034h] ; __vbaStrCat
+  loc_00406BFD: mov edx, eax
+  loc_00406BFF: mov ecx, 0040902Ch
+  loc_00406C04: call [00401170h] ; __vbaStrMove
+  loc_00406C0A: mov ecx, [0040902Ch]
+  loc_00406C10: push ecx
+  loc_00406C11: push 00000001h
+  loc_00406C13: push FFFFFFFFh
+  loc_00406C15: push 00000002h
+  loc_00406C17: call [004010FCh] ; __vbaFileOpen
+  loc_00406C1D: mov eax, [00409028h]
+  loc_00406C22: lea ecx, var_28
+  loc_00406C25: push ecx
+  loc_00406C26: push eax
+  loc_00406C27: mov edx, [eax]
+  loc_00406C29: call [edx+0000020Ch]
+  loc_00406C2F: test eax, eax
+  loc_00406C31: fnclex
+  loc_00406C33: jge 00406C49h
+  loc_00406C35: mov edx, [00409028h]
+  loc_00406C3B: push 0000020Ch
+  loc_00406C40: push 004034ACh
+  loc_00406C45: push edx
+  loc_00406C46: push eax
+  loc_00406C47: call ebx
+  loc_00406C49: lea ebx, var_2C
+  loc_00406C4C: mov eax, var_28
+  loc_00406C4F: push ebx
+  loc_00406C50: mov edx, 00000008h
+  loc_00406C55: sub esp, 00000010h
+  loc_00406C58: mov var_7C, edx
+  loc_00406C5B: mov ebx, esp
+  loc_00406C5D: mov ecx, 00402C44h ; "Sheet1"
+  loc_00406C62: mov var_74, ecx
+  loc_00406C65: mov edi, [eax]
+  loc_00406C67: mov [ebx], edx
+  loc_00406C69: mov edx, var_78
+  loc_00406C6C: push eax
+  loc_00406C6D: mov var_BC, eax
+  loc_00406C73: mov [ebx+00000004h], edx
+  loc_00406C76: mov [ebx+00000008h], ecx
+  loc_00406C79: mov ecx, var_70
+  loc_00406C7C: mov [ebx+0000000Ch], ecx
+  loc_00406C7F: call [edi+00000064h]
+  loc_00406C82: test eax, eax
+  loc_00406C84: fnclex
+  loc_00406C86: jge 00406C9Dh
+  loc_00406C88: mov edx, var_BC
+  loc_00406C8E: push 00000064h
+  loc_00406C90: push 004034DCh
+  loc_00406C95: push edx
+  loc_00406C96: push eax
+  loc_00406C97: call [00401040h] ; __vbaHresultCheckObj
+  loc_00406C9D: mov eax, var_2C
+  loc_00406CA0: push 004034ECh
+  loc_00406CA5: push eax
+  loc_00406CA6: call [00401174h] ; __vbaCastObj
+  loc_00406CAC: push eax
+  loc_00406CAD: push 00409034h
+  loc_00406CB2: call [0040104Ch] ; __vbaObjSet
+  loc_00406CB8: lea ecx, var_2C
+  loc_00406CBB: lea edx, var_28
+  loc_00406CBE: push ecx
+  loc_00406CBF: mov ebx, 00000002h
+  loc_00406CC4: push edx
+  loc_00406CC5: push ebx
+  loc_00406CC6: call [00401028h] ; __vbaFreeObjList
+  loc_00406CCC: mov edi, 00000001h
+  loc_00406CD1: add esp, 0000000Ch
+  loc_00406CD4: mov [esi+00000060h], di
+  loc_00406CD8: mov eax, [00409034h]
+  loc_00406CDD: lea edx, var_28
+  loc_00406CE0: mov var_74, di
+  loc_00406CE4: mov var_7C, ebx
+  loc_00406CE7: mov ecx, [eax]
+  loc_00406CE9: push edx
+  loc_00406CEA: push eax
+  loc_00406CEB: call [ecx+000000D0h]
+  loc_00406CF1: test eax, eax
+  loc_00406CF3: fnclex
+  loc_00406CF5: jge 00406D0Fh
+  loc_00406CF7: mov ecx, [00409034h]
+  loc_00406CFD: push 000000D0h
+  loc_00406D02: push 004034ECh
+  loc_00406D07: push ecx
+  loc_00406D08: push eax
+  loc_00406D09: call [00401040h] ; __vbaHresultCheckObj
+  loc_00406D0F: mov eax, var_7C
+  loc_00406D12: push 004034FCh
+  loc_00406D17: mov ecx, var_78
+  loc_00406D1A: sub esp, 00000010h
+  loc_00406D1D: mov edx, esp
+  loc_00406D1F: sub esp, 00000010h
+  loc_00406D22: mov [edx], eax
+  loc_00406D24: mov eax, var_74
+  loc_00406D27: mov [edx+00000004h], ecx
+  loc_00406D2A: mov ecx, var_70
+  loc_00406D2D: mov [edx+00000008h], eax
+  loc_00406D30: mov eax, var_90
+  loc_00406D36: mov [edx+0000000Ch], ecx
+  loc_00406D39: mov edx, esp
+  loc_00406D3B: mov ecx, var_28
+  loc_00406D3E: push 00000002h
+  loc_00406D40: mov [edx], ebx
+  loc_00406D42: mov ebx, var_98
+  loc_00406D48: push 00000000h
+  loc_00406D4A: push ecx
+  loc_00406D4B: mov [edx+00000004h], ebx
+  loc_00406D4E: mov [edx+00000008h], edi
+  loc_00406D51: mov edi, [004010B0h] ; __vbaLateIdCallLd
+  loc_00406D57: mov [edx+0000000Ch], eax
+  loc_00406D5A: lea edx, var_3C
+  loc_00406D5D: push edx
+  loc_00406D5E: call edi
+  loc_00406D60: add esp, 00000030h
+  loc_00406D63: push eax
+  loc_00406D64: call [004010A8h] ; __vbaCastObjVar
+  loc_00406D6A: push eax
+  loc_00406D6B: push 00409038h
+  loc_00406D70: call [0040104Ch] ; __vbaObjSet
+  loc_00406D76: lea ecx, var_28
+  loc_00406D79: call [00401194h] ; __vbaFreeObj
+  loc_00406D7F: lea ecx, var_3C
+  loc_00406D82: call [00401010h] ; __vbaFreeVar
+  loc_00406D88: mov eax, [00409038h]
+  loc_00406D8D: push 00000000h
+  loc_00406D8F: push 00000006h
+  loc_00406D91: lea ecx, var_3C
+  loc_00406D94: push eax
+  loc_00406D95: push ecx
+  loc_00406D96: call edi
+  loc_00406D98: add esp, 00000010h
+  loc_00406D9B: lea edx, var_4C
+  loc_00406D9E: push eax
+  loc_00406D9F: push edx
+  loc_00406DA0: call [0040106Ch] ; rtcTrimVar
+  loc_00406DA6: lea eax, var_4C
+  loc_00406DA9: lea ecx, var_7C
+  loc_00406DAC: push eax
+  loc_00406DAD: lea edx, var_5C
+  loc_00406DB0: push ecx
+  loc_00406DB1: push edx
+  loc_00406DB2: mov var_74, 00403510h ; "               "
+  loc_00406DB9: mov var_7C, 00000008h
+  loc_00406DC0: call [00401144h] ; __vbaVarAdd
+  loc_00406DC6: mov edx, eax
+  loc_00406DC8: mov ecx, 00409048h
+  loc_00406DCD: call [0040100Ch] ; __vbaVarMove
+  loc_00406DD3: lea eax, var_4C
+  loc_00406DD6: lea ecx, var_3C
+  loc_00406DD9: push eax
+  loc_00406DDA: push ecx
+  loc_00406DDB: push 00000002h
+  loc_00406DDD: call [0040101Ch] ; __vbaFreeVarList
+  loc_00406DE3: add esp, 0000000Ch
+  loc_00406DE6: lea edx, var_3C
+  loc_00406DE9: push 00409048h
+  loc_00406DEE: push edx
+  loc_00406DEF: call [0040106Ch] ; rtcTrimVar
+  loc_00406DF5: lea eax, var_3C
+  loc_00406DF8: lea ecx, var_7C
+  loc_00406DFB: push eax
+  loc_00406DFC: push ecx
+  loc_00406DFD: mov var_74, 004033B0h
+  loc_00406E04: mov var_7C, 00008008h
+  loc_00406E0B: call [00401138h] ; __vbaVarTstNe
+  loc_00406E11: lea ecx, var_3C
+  loc_00406E14: mov var_B8, ax
+  loc_00406E1B: call [00401010h] ; __vbaFreeVar
+  loc_00406E21: cmp var_B8, 0000h
+  loc_00406E29: jz 0040713Ah
+  loc_00406E2F: mov ax, [esi+00000060h]
+  loc_00406E33: lea ecx, var_28
+  loc_00406E36: add ax, 0001h
+  loc_00406E3A: mov var_7C, 00000002h
+  loc_00406E41: jo 00407AB3h
+  loc_00406E47: mov [esi+00000060h], ax
+  loc_00406E4B: mov var_74, ax
+  loc_00406E4F: mov eax, [00409034h]
+  loc_00406E54: push ecx
+  loc_00406E55: push eax
+  loc_00406E56: mov edx, [eax]
+  loc_00406E58: call [edx+000000D0h]
+  loc_00406E5E: test eax, eax
+  loc_00406E60: fnclex
+  loc_00406E62: jge 00406E7Ch
+  loc_00406E64: mov edx, [00409034h]
+  loc_00406E6A: push 000000D0h
+  loc_00406E6F: push 004034ECh
+  loc_00406E74: push edx
+  loc_00406E75: push eax
+  loc_00406E76: call [00401040h] ; __vbaHresultCheckObj
+  loc_00406E7C: mov ecx, var_7C
+  loc_00406E7F: push 004034FCh
+  loc_00406E84: mov edx, var_78
+  loc_00406E87: sub esp, 00000010h
+  loc_00406E8A: mov eax, esp
+  loc_00406E8C: sub esp, 00000010h
+  loc_00406E8F: mov [eax], ecx
+  loc_00406E91: mov ecx, var_74
+  loc_00406E94: mov [eax+00000004h], edx
+  loc_00406E97: mov edx, var_70
+  loc_00406E9A: mov [eax+00000008h], ecx
+  loc_00406E9D: mov ecx, esp
+  loc_00406E9F: push 00000002h
+  loc_00406EA1: push 00000000h
+  loc_00406EA3: mov [eax+0000000Ch], edx
+  loc_00406EA6: mov eax, 00000002h
+  loc_00406EAB: mov edx, var_90
+  loc_00406EB1: mov [ecx], eax
+  loc_00406EB3: mov eax, 00000001h
+  loc_00406EB8: mov [ecx+00000004h], ebx
+  loc_00406EBB: mov [ecx+00000008h], eax
+  loc_00406EBE: mov eax, var_28
+  loc_00406EC1: push eax
+  loc_00406EC2: mov [ecx+0000000Ch], edx
+  loc_00406EC5: lea ecx, var_3C
+  loc_00406EC8: push ecx
+  loc_00406EC9: call edi
+  loc_00406ECB: add esp, 00000030h
+  loc_00406ECE: push eax
+  loc_00406ECF: call [004010A8h] ; __vbaCastObjVar
+  loc_00406ED5: push eax
+  loc_00406ED6: push 00409038h
+  loc_00406EDB: call [0040104Ch] ; __vbaObjSet
+  loc_00406EE1: lea ecx, var_28
+  loc_00406EE4: call [00401194h] ; __vbaFreeObj
+  loc_00406EEA: lea ecx, var_3C
+  loc_00406EED: call [00401010h] ; __vbaFreeVar
+  loc_00406EF3: mov dx, [esi+00000060h]
+  loc_00406EF7: mov eax, [00409034h]
+  loc_00406EFC: mov var_74, dx
+  loc_00406F00: lea edx, var_28
+  loc_00406F03: mov var_7C, 00000002h
+  loc_00406F0A: mov ecx, [eax]
+  loc_00406F0C: push edx
+  loc_00406F0D: push eax
+  loc_00406F0E: call [ecx+000000D0h]
+  loc_00406F14: test eax, eax
+  loc_00406F16: fnclex
+  loc_00406F18: jge 00406F32h
+  loc_00406F1A: mov ecx, [00409034h]
+  loc_00406F20: push 000000D0h
+  loc_00406F25: push 004034ECh
+  loc_00406F2A: push ecx
+  loc_00406F2B: push eax
+  loc_00406F2C: call [00401040h] ; __vbaHresultCheckObj
+  loc_00406F32: mov eax, var_7C
+  loc_00406F35: push 004034FCh
+  loc_00406F3A: mov ecx, var_78
+  loc_00406F3D: sub esp, 00000010h
+  loc_00406F40: mov edx, esp
+  loc_00406F42: sub esp, 00000010h
+  loc_00406F45: mov [edx], eax
+  loc_00406F47: mov eax, var_74
+  loc_00406F4A: mov [edx+00000004h], ecx
+  loc_00406F4D: mov ecx, var_70
+  loc_00406F50: mov [edx+00000008h], eax
+  loc_00406F53: mov eax, 00000002h
+  loc_00406F58: mov [edx+0000000Ch], ecx
+  loc_00406F5B: mov edx, esp
+  loc_00406F5D: mov ecx, var_28
+  loc_00406F60: push 00000002h
+  loc_00406F62: mov [edx], eax
+  loc_00406F64: push 00000000h
+  loc_00406F66: push ecx
+  loc_00406F67: mov [edx+00000004h], ebx
+  loc_00406F6A: mov [edx+00000008h], eax
+  loc_00406F6D: mov eax, var_90
+  loc_00406F73: mov [edx+0000000Ch], eax
+  loc_00406F76: lea edx, var_3C
+  loc_00406F79: push edx
+  loc_00406F7A: call edi
+  loc_00406F7C: add esp, 00000030h
+  loc_00406F7F: push eax
+  loc_00406F80: call [004010A8h] ; __vbaCastObjVar
+  loc_00406F86: push eax
+  loc_00406F87: push 0040903Ch
+  loc_00406F8C: call [0040104Ch] ; __vbaObjSet
+  loc_00406F92: lea ecx, var_28
+  loc_00406F95: call [00401194h] ; __vbaFreeObj
+  loc_00406F9B: lea ecx, var_3C
+  loc_00406F9E: call [00401010h] ; __vbaFreeVar
+  loc_00406FA4: mov ax, [esi+00000060h]
+  loc_00406FA8: lea edx, var_28
+  loc_00406FAB: mov var_74, ax
+  loc_00406FAF: mov eax, [00409034h]
+  loc_00406FB4: mov var_7C, 00000002h
+  loc_00406FBB: push edx
+  loc_00406FBC: mov ecx, [eax]
+  loc_00406FBE: push eax
+  loc_00406FBF: call [ecx+000000D0h]
+  loc_00406FC5: test eax, eax
+  loc_00406FC7: fnclex
+  loc_00406FC9: jge 00406FE3h
+  loc_00406FCB: mov ecx, [00409034h]
+  loc_00406FD1: push 000000D0h
+  loc_00406FD6: push 004034ECh
+  loc_00406FDB: push ecx
+  loc_00406FDC: push eax
+  loc_00406FDD: call [00401040h] ; __vbaHresultCheckObj
+  loc_00406FE3: mov eax, var_7C
+  loc_00406FE6: push 004034FCh
+  loc_00406FEB: mov ecx, var_78
+  loc_00406FEE: sub esp, 00000010h
+  loc_00406FF1: mov edx, esp
+  loc_00406FF3: sub esp, 00000010h
+  loc_00406FF6: mov [edx], eax
+  loc_00406FF8: mov eax, var_74
+  loc_00406FFB: mov [edx+00000004h], ecx
+  loc_00406FFE: mov ecx, var_70
+  loc_00407001: mov [edx+00000008h], eax
+  loc_00407004: mov eax, 00000002h
+  loc_00407009: mov [edx+0000000Ch], ecx
+  loc_0040700C: mov edx, esp
+  loc_0040700E: mov ecx, var_28
+  loc_00407011: push 00000002h
+  loc_00407013: mov [edx], eax
+  loc_00407015: mov eax, 00000003h
+  loc_0040701A: push 00000000h
+  loc_0040701C: push ecx
+  loc_0040701D: mov [edx+00000004h], ebx
+  loc_00407020: mov [edx+00000008h], eax
+  loc_00407023: mov eax, var_90
+  loc_00407029: mov [edx+0000000Ch], eax
+  loc_0040702C: lea edx, var_3C
+  loc_0040702F: push edx
+  loc_00407030: call edi
+  loc_00407032: add esp, 00000030h
+  loc_00407035: push eax
+  loc_00407036: call [004010A8h] ; __vbaCastObjVar
+  loc_0040703C: push eax
+  loc_0040703D: push 00409040h
+  loc_00407042: call [0040104Ch] ; __vbaObjSet
+  loc_00407048: lea ecx, var_28
+  loc_0040704B: call [00401194h] ; __vbaFreeObj
+  loc_00407051: lea ecx, var_3C
+  loc_00407054: call [00401010h] ; __vbaFreeVar
+  loc_0040705A: mov ax, [esi+00000060h]
+  loc_0040705E: lea edx, var_28
+  loc_00407061: mov var_74, ax
+  loc_00407065: mov eax, [00409034h]
+  loc_0040706A: mov var_7C, 00000002h
+  loc_00407071: push edx
+  loc_00407072: mov ecx, [eax]
+  loc_00407074: push eax
+  loc_00407075: call [ecx+000000D0h]
+  loc_0040707B: test eax, eax
+  loc_0040707D: fnclex
+  loc_0040707F: jge 00407099h
+  loc_00407081: mov ecx, [00409034h]
+  loc_00407087: push 000000D0h
+  loc_0040708C: push 004034ECh
+  loc_00407091: push ecx
+  loc_00407092: push eax
+  loc_00407093: call [00401040h] ; __vbaHresultCheckObj
+  loc_00407099: mov eax, var_7C
+  loc_0040709C: push 004034FCh
+  loc_004070A1: mov ecx, var_78
+  loc_004070A4: sub esp, 00000010h
+  loc_004070A7: mov edx, esp
+  loc_004070A9: sub esp, 00000010h
+  loc_004070AC: mov [edx], eax
+  loc_004070AE: mov eax, var_74
+  loc_004070B1: mov [edx+00000004h], ecx
+  loc_004070B4: mov ecx, var_70
+  loc_004070B7: mov [edx+00000008h], eax
+  loc_004070BA: mov eax, 00000002h
+  loc_004070BF: mov [edx+0000000Ch], ecx
+  loc_004070C2: mov edx, esp
+  loc_004070C4: mov ecx, var_28
+  loc_004070C7: push 00000002h
+  loc_004070C9: mov [edx], eax
+  loc_004070CB: mov eax, 00000004h
+  loc_004070D0: push 00000000h
+  loc_004070D2: push ecx
+  loc_004070D3: mov [edx+00000004h], ebx
+  loc_004070D6: mov [edx+00000008h], eax
+  loc_004070D9: mov eax, var_90
+  loc_004070DF: mov [edx+0000000Ch], eax
+  loc_004070E2: lea edx, var_3C
+  loc_004070E5: push edx
+  loc_004070E6: call edi
+  loc_004070E8: add esp, 00000030h
+  loc_004070EB: push eax
+  loc_004070EC: call [004010A8h] ; __vbaCastObjVar
+  loc_004070F2: push eax
+  loc_004070F3: push 00409044h
+  loc_004070F8: call [0040104Ch] ; __vbaObjSet
+  loc_004070FE: lea ecx, var_28
+  loc_00407101: call [00401194h] ; __vbaFreeObj
+  loc_00407107: lea ecx, var_3C
+  loc_0040710A: call [00401010h] ; __vbaFreeVar
+  loc_00407110: mov eax, [esi]
+  loc_00407112: push esi
+  loc_00407113: call [eax+00000700h]
+  loc_00407119: test eax, eax
+  loc_0040711B: jge 0040712Fh
+  loc_0040711D: push 00000700h
+  loc_00407122: push 00402CB0h
+  loc_00407127: push esi
+  loc_00407128: push eax
+  loc_00407129: call [00401040h] ; __vbaHresultCheckObj
+  loc_0040712F: call [00401068h] ; rtcDoEvents
+  loc_00407135: jmp 00406DE6h
+  loc_0040713A: push 00000409h
+  loc_0040713F: mov ecx, 0000000Ah
+  loc_00407144: sub esp, 00000010h
+  loc_00407147: mov eax, 80020004h
+  loc_0040714C: mov edi, esp
+  loc_0040714E: mov var_84, eax
+  loc_00407154: sub esp, 00000010h
+  loc_00407157: mov var_8C, ecx
+  loc_0040715D: mov [edi], ecx
+  loc_0040715F: mov ecx, esp
+  loc_00407161: sub esp, 00000010h
+  loc_00407164: mov var_7C, 0000000Bh
+  loc_0040716B: mov [edi+00000004h], ebx
+  loc_0040716E: mov edx, [00409028h]
+  loc_00407174: mov var_74, 00000000h
+  loc_0040717B: mov [edi+00000008h], eax
+  loc_0040717E: mov eax, var_90
+  loc_00407184: mov edx, [edx]
+  loc_00407186: mov [edi+0000000Ch], eax
+  loc_00407189: mov eax, var_8C
+  loc_0040718F: mov [ecx], eax
+  loc_00407191: mov eax, var_88
+  loc_00407197: mov [ecx+00000004h], eax
+  loc_0040719A: mov eax, var_84
+  loc_004071A0: mov [ecx+00000008h], eax
+  loc_004071A3: mov eax, var_80
+  loc_004071A6: mov [ecx+0000000Ch], eax
+  loc_004071A9: mov eax, var_7C
+  loc_004071AC: mov ecx, esp
+  loc_004071AE: mov [ecx], eax
+  loc_004071B0: mov eax, var_78
+  loc_004071B3: mov [ecx+00000004h], eax
+  loc_004071B6: mov eax, var_74
+  loc_004071B9: mov [ecx+00000008h], eax
+  loc_004071BC: mov eax, var_70
+  loc_004071BF: mov [ecx+0000000Ch], eax
+  loc_004071C2: mov ecx, [00409028h]
+  loc_004071C8: push ecx
+  loc_004071C9: call [edx+0000006Ch]
+  loc_004071CC: test eax, eax
+  loc_004071CE: fnclex
+  loc_004071D0: jge 004071E7h
+  loc_004071D2: mov edx, [00409028h]
+  loc_004071D8: push 0000006Ch
+  loc_004071DA: push 004034ACh
+  loc_004071DF: push edx
+  loc_004071E0: push eax
+  loc_004071E1: call [00401040h] ; __vbaHresultCheckObj
+  loc_004071E7: mov ax, [esi+00000044h]
+  loc_004071EB: lea ecx, [esi+00000044h]
+  loc_004071EE: add ax, 0001h
+  loc_004071F2: mov di, 001Fh
+  loc_004071F6: jo 00407AB3h
+  loc_004071FC: mov [ecx], ax
+  loc_004071FF: mov [esi+00000048h], 0001h
+  loc_00407205: cwd
+  loc_00407207: idiv di
+  loc_0040720A: mov var_F4, ecx
+  loc_00407210: test dx, dx
+  loc_00407213: mov [ecx], dx
+  loc_00407216: jnz 00407488h
+  loc_0040721C: push 00000001h
+  loc_0040721E: mov [ecx], 0001h
+  loc_00407223: call [00401088h] ; __vbaFileClose
+  loc_00407229: push 00402C28h
+  loc_0040722E: push 00403534h ; "ttt.bat"
+  loc_00407233: call [00401034h] ; __vbaStrCat
+  loc_00407239: mov var_34, eax
+  loc_0040723C: lea eax, var_3C
+  loc_0040723F: push 00000001h
+  loc_00407241: push eax
+  loc_00407242: mov var_3C, 00000008h
+  loc_00407249: call [004010B8h] ; rtcShell
+  loc_0040724F: lea ecx, var_3C
+  loc_00407252: fstp st0
+  loc_00407254: call [00401010h] ; __vbaFreeVar
+  loc_0040725A: mov eax, [esi+0000003Ch]
+  loc_0040725D: lea ebx, [esi+0000003Ch]
+  loc_00407260: test eax, eax
+  loc_00407262: jnz 00407270h
+  loc_00407264: push ebx
+  loc_00407265: push 004033C4h
+  loc_0040726A: call [00401100h] ; __vbaNew2
+  loc_00407270: mov edi, [ebx]
+  loc_00407272: push 00403548h ; "{{CALL CLREUTERF}}"
+  loc_00407277: push edi
+  loc_00407278: mov ecx, [edi]
+  loc_0040727A: call [ecx+00000030h]
+  loc_0040727D: test eax, eax
+  loc_0040727F: fnclex
+  loc_00407281: jge 00407292h
+  loc_00407283: push 00000030h
+  loc_00407285: push 004031D8h
+  loc_0040728A: push edi
+  loc_0040728B: push eax
+  loc_0040728C: call [00401040h] ; __vbaHresultCheckObj
+  loc_00407292: cmp [ebx], 00000000h
+  loc_00407295: jnz 004072A3h
+  loc_00407297: push ebx
+  loc_00407298: push 004033C4h
+  loc_0040729D: call [00401100h] ; __vbaNew2
+  loc_004072A3: mov ebx, [ebx]
+  loc_004072A5: mov ecx, 0000000Ah
+  loc_004072AA: mov eax, 80020004h
+  loc_004072AF: mov var_4C, ecx
+  loc_004072B2: mov var_3C, ecx
+  loc_004072B5: lea ecx, var_3C
+  loc_004072B8: mov var_44, eax
+  loc_004072BB: mov var_34, eax
+  loc_004072BE: call [00401154h] ; __vbaFreeVarg
+  loc_004072C4: mov edx, [ebx]
+  loc_004072C6: lea eax, var_28
+  loc_004072C9: push eax
+  loc_004072CA: lea ecx, var_4C
+  loc_004072CD: push FFFFFFFFh
+  loc_004072CF: lea eax, var_3C
+  loc_004072D2: push ecx
+  loc_004072D3: push eax
+  loc_004072D4: push ebx
+  loc_004072D5: call [edx+00000044h]
+  loc_004072D8: test eax, eax
+  loc_004072DA: fnclex
+  loc_004072DC: jge 004072EDh
+  loc_004072DE: push 00000044h
+  loc_004072E0: push 004031D8h
+  loc_004072E5: push ebx
+  loc_004072E6: push eax
+  loc_004072E7: call [00401040h] ; __vbaHresultCheckObj
+  loc_004072ED: lea ecx, var_28
+  loc_004072F0: call [00401194h] ; __vbaFreeObj
+  loc_004072F6: lea ecx, var_4C
+  loc_004072F9: lea edx, var_3C
+  loc_004072FC: push ecx
+  loc_004072FD: push edx
+  loc_004072FE: push 00000002h
+  loc_00407300: call [0040101Ch] ; __vbaFreeVarList
+  loc_00407306: mov eax, [esi]
+  loc_00407308: add esp, 0000000Ch
+  loc_0040730B: push esi
+  loc_0040730C: call [eax+0000030Ch]
+  loc_00407312: mov edi, [0040104Ch] ; __vbaObjSet
+  loc_00407318: lea ecx, var_28
+  loc_0040731B: push eax
+  loc_0040731C: push ecx
+  loc_0040731D: call edi
+  loc_0040731F: lea edx, var_3C
+  loc_00407322: mov ebx, eax
+  loc_00407324: push edx
+  loc_00407325: mov var_B8, ebx
+  loc_0040732B: call [00401150h] ; rtcGetTimeVar
+  loc_00407331: mov ebx, [ebx]
+  loc_00407333: lea eax, var_3C
+  loc_00407336: lea ecx, var_20
+  loc_00407339: push eax
+  loc_0040733A: push ecx
+  loc_0040733B: call [004010E8h] ; __vbaStrVarVal
+  loc_00407341: mov edx, ebx
+  loc_00407343: mov ebx, var_B8
+  loc_00407349: push eax
+  loc_0040734A: push ebx
+  loc_0040734B: call [edx+000000A4h]
+  loc_00407351: test eax, eax
+  loc_00407353: fnclex
+  loc_00407355: jge 00407369h
+  loc_00407357: push 000000A4h
+  loc_0040735C: push 00402FBCh
+  loc_00407361: push ebx
+  loc_00407362: push eax
+  loc_00407363: call [00401040h] ; __vbaHresultCheckObj
+  loc_00407369: lea ecx, var_20
+  loc_0040736C: call [00401198h] ; __vbaFreeStr
+  loc_00407372: lea ecx, var_28
+  loc_00407375: call [00401194h] ; __vbaFreeObj
+  loc_0040737B: lea ecx, var_3C
+  loc_0040737E: call [00401010h] ; __vbaFreeVar
+  loc_00407384: mov eax, [esi]
+  loc_00407386: push esi
+  loc_00407387: call [eax+00000308h]
+  loc_0040738D: lea ecx, var_2C
+  loc_00407390: push eax
+  loc_00407391: push ecx
+  loc_00407392: call edi
+  loc_00407394: mov edx, [esi]
+  loc_00407396: push esi
+  loc_00407397: mov var_C0, eax
+  loc_0040739D: call [edx+00000308h]
+  loc_004073A3: push eax
+  loc_004073A4: lea eax, var_28
+  loc_004073A7: push eax
+  loc_004073A8: call edi
+  loc_004073AA: mov ebx, eax
+  loc_004073AC: lea edx, var_20
+  loc_004073AF: push edx
+  loc_004073B0: push ebx
+  loc_004073B1: mov ecx, [ebx]
+  loc_004073B3: call [ecx+000000A0h]
+  loc_004073B9: test eax, eax
+  loc_004073BB: fnclex
+  loc_004073BD: jge 004073D1h
+  loc_004073BF: push 000000A0h
+  loc_004073C4: push 00402FBCh
+  loc_004073C9: push ebx
+  loc_004073CA: push eax
+  loc_004073CB: call [00401040h] ; __vbaHresultCheckObj
+  loc_004073D1: mov eax, var_20
+  loc_004073D4: push eax
+  loc_004073D5: call [0040119Ch] ; rtcR8ValFromBstr
+  loc_004073DB: fadd st0, real8 ptr [004011E8h]
+  loc_004073E1: lea ecx, var_3C
+  loc_004073E4: lea edx, var_4C
+  loc_004073E7: push ecx
+  loc_004073E8: push edx
+  loc_004073E9: fstp real8 ptr var_34
+  loc_004073EC: fnstsw ax
+  loc_004073EE: test al, 0Dh
+  loc_004073F0: jnz 00407AAEh
+  loc_004073F6: mov var_3C, 00000005h
+  loc_004073FD: call [00401158h] ; rtcVarStrFromVar
+  loc_00407403: lea eax, var_4C
+  loc_00407406: lea ecx, var_5C
+  loc_00407409: push eax
+  loc_0040740A: push ecx
+  loc_0040740B: call [0040106Ch] ; rtcTrimVar
+  loc_00407411: mov edx, var_C0
+  loc_00407417: lea eax, var_5C
+  loc_0040741A: lea ecx, var_24
+  loc_0040741D: push eax
+  loc_0040741E: mov ebx, [edx]
+  loc_00407420: push ecx
+  loc_00407421: call [004010E8h] ; __vbaStrVarVal
+  loc_00407427: mov edx, ebx
+  loc_00407429: mov ebx, var_C0
+  loc_0040742F: push eax
+  loc_00407430: push ebx
+  loc_00407431: call [edx+000000A4h]
+  loc_00407437: test eax, eax
+  loc_00407439: fnclex
+  loc_0040743B: jge 0040744Fh
+  loc_0040743D: push 000000A4h
+  loc_00407442: push 00402FBCh
+  loc_00407447: push ebx
+  loc_00407448: push eax
+  loc_00407449: call [00401040h] ; __vbaHresultCheckObj
+  loc_0040744F: lea eax, var_24
+  loc_00407452: lea ecx, var_20
+  loc_00407455: push eax
+  loc_00407456: push ecx
+  loc_00407457: push 00000002h
+  loc_00407459: call [0040111Ch] ; __vbaFreeStrList
+  loc_0040745F: lea edx, var_2C
+  loc_00407462: lea eax, var_28
+  loc_00407465: push edx
+  loc_00407466: push eax
+  loc_00407467: push 00000002h
+  loc_00407469: call [00401028h] ; __vbaFreeObjList
+  loc_0040746F: lea ecx, var_5C
+  loc_00407472: lea edx, var_4C
+  loc_00407475: push ecx
+  loc_00407476: lea eax, var_3C
+  loc_00407479: push edx
+  loc_0040747A: push eax
+  loc_0040747B: push 00000003h
+  loc_0040747D: call [0040101Ch] ; __vbaFreeVarList
+  loc_00407483: add esp, 00000028h
+  loc_00407486: jmp 0040748Eh
+  loc_00407488: mov edi, [0040104Ch] ; __vbaObjSet
+  loc_0040748E: mov ecx, [esi]
+  loc_00407490: push esi
+  loc_00407491: call [ecx+00000304h]
+  loc_00407497: lea edx, var_28
+  loc_0040749A: push eax
+  loc_0040749B: push edx
+  loc_0040749C: call edi
+  loc_0040749E: mov ebx, eax
+  loc_004074A0: push FFFFFFFFh
+  loc_004074A2: push ebx
+  loc_004074A3: mov eax, [ebx]
+  loc_004074A5: call [eax+0000005Ch]
+  loc_004074A8: test eax, eax
+  loc_004074AA: fnclex
+  loc_004074AC: jge 004074BDh
+  loc_004074AE: push 0000005Ch
+  loc_004074B0: push 004034CCh
+  loc_004074B5: push ebx
+  loc_004074B6: push eax
+  loc_004074B7: call [00401040h] ; __vbaHresultCheckObj
+  loc_004074BD: lea ecx, var_28
+  loc_004074C0: call [00401194h] ; __vbaFreeObj
+  loc_004074C6: mov ecx, [esi]
+  loc_004074C8: push esi
+  loc_004074C9: call [ecx+00000300h]
+  loc_004074CF: lea edx, var_28
+  loc_004074D2: push eax
+  loc_004074D3: push edx
+  loc_004074D4: call edi
+  loc_004074D6: mov edx, var_F4
+  loc_004074DC: lea ecx, var_2C
+  loc_004074DF: mov ebx, eax
+  loc_004074E1: push ecx
+  loc_004074E2: mov cx, [edx]
+  loc_004074E5: mov eax, [ebx]
+  loc_004074E7: push ecx
+  loc_004074E8: push ebx
+  loc_004074E9: call [eax+00000040h]
+  loc_004074EC: test eax, eax
+  loc_004074EE: fnclex
+  loc_004074F0: jge 00407501h
+  loc_004074F2: push 00000040h
+  loc_004074F4: push 00402FACh
+  loc_004074F9: push ebx
+  loc_004074FA: push eax
+  loc_004074FB: call [00401040h] ; __vbaHresultCheckObj
+  loc_00407501: mov eax, var_2C
+  loc_00407504: lea ecx, var_20
+  loc_00407507: push ecx
+  loc_00407508: push eax
+  loc_00407509: mov edx, [eax]
+  loc_0040750B: mov ebx, eax
+  loc_0040750D: call [edx+000000A0h]
+  loc_00407513: test eax, eax
+  loc_00407515: fnclex
+  loc_00407517: jge 0040752Bh
+  loc_00407519: push 000000A0h
+  loc_0040751E: push 00402FBCh
+  loc_00407523: push ebx
+  loc_00407524: push eax
+  loc_00407525: call [00401040h] ; __vbaHresultCheckObj
+  loc_0040752B: mov edx, var_20
+  loc_0040752E: push edx
+  loc_0040752F: call [0040119Ch] ; rtcR8ValFromBstr
+  loc_00407535: call [0040107Ch] ; __vbaFpR8
+  loc_0040753B: fcomp real8 ptr [004011E0h]
+  loc_00407541: fnstsw ax
+  loc_00407543: test ah, 40h
+  loc_00407546: jz 0040754Fh
+  loc_00407548: mov eax, 00000001h
+  loc_0040754D: jmp 00407551h
+  loc_0040754F: xor eax, eax
+  loc_00407551: neg eax
+  loc_00407553: lea ecx, var_20
+  loc_00407556: mov ebx, eax
+  loc_00407558: call [00401198h] ; __vbaFreeStr
+  loc_0040755E: lea eax, var_2C
+  loc_00407561: lea ecx, var_28
+  loc_00407564: push eax
+  loc_00407565: push ecx
+  loc_00407566: push 00000002h
+  loc_00407568: call [00401028h] ; __vbaFreeObjList
+  loc_0040756E: add esp, 0000000Ch
+  loc_00407571: test bx, bx
+  loc_00407574: jz 00407845h
+  loc_0040757A: mov ecx, var_F4
+  loc_00407580: mov di, 001Fh
+  loc_00407584: mov ax, [ecx]
+  loc_00407587: add ax, 0001h
+  loc_0040758B: jo 00407AB3h
+  loc_00407591: mov [ecx], ax
+  loc_00407594: cwd
+  loc_00407596: idiv di
+  loc_00407599: test dx, dx
+  loc_0040759C: mov [ecx], dx
+  loc_0040759F: jnz 00407834h
+  loc_004075A5: mov edx, ecx
+  loc_004075A7: push 00000001h
+  loc_004075A9: mov [edx], 0001h
+  loc_004075AE: call [00401088h] ; __vbaFileClose
+  loc_004075B4: push 00402C28h
+  loc_004075B9: push 00403534h ; "ttt.bat"
+  loc_004075BE: call [00401034h] ; __vbaStrCat
+  loc_004075C4: mov var_34, eax
+  loc_004075C7: lea eax, var_3C
+  loc_004075CA: push 00000001h
+  loc_004075CC: push eax
+  loc_004075CD: mov var_3C, 00000008h
+  loc_004075D4: call [004010B8h] ; rtcShell
+  loc_004075DA: lea ecx, var_3C
+  loc_004075DD: fstp st0
+  loc_004075DF: call [00401010h] ; __vbaFreeVar
+  loc_004075E5: mov eax, [esi+0000003Ch]
+  loc_004075E8: lea ebx, [esi+0000003Ch]
+  loc_004075EB: test eax, eax
+  loc_004075ED: jnz 004075FBh
+  loc_004075EF: push ebx
+  loc_004075F0: push 004033C4h
+  loc_004075F5: call [00401100h] ; __vbaNew2
+  loc_004075FB: mov edi, [ebx]
+  loc_004075FD: push 00403548h ; "{{CALL CLREUTERF}}"
+  loc_00407602: push edi
+  loc_00407603: mov ecx, [edi]
+  loc_00407605: call [ecx+00000030h]
+  loc_00407608: test eax, eax
+  loc_0040760A: fnclex
+  loc_0040760C: jge 0040761Dh
+  loc_0040760E: push 00000030h
+  loc_00407610: push 004031D8h
+  loc_00407615: push edi
+  loc_00407616: push eax
+  loc_00407617: call [00401040h] ; __vbaHresultCheckObj
+  loc_0040761D: cmp [ebx], 00000000h
+  loc_00407620: jnz 0040762Eh
+  loc_00407622: push ebx
+  loc_00407623: push 004033C4h
+  loc_00407628: call [00401100h] ; __vbaNew2
+  loc_0040762E: mov ebx, [ebx]
+  loc_00407630: mov ecx, 0000000Ah
+  loc_00407635: mov eax, 80020004h
+  loc_0040763A: mov var_4C, ecx
+  loc_0040763D: mov var_3C, ecx
+  loc_00407640: lea ecx, var_3C
+  loc_00407643: mov var_44, eax
+  loc_00407646: mov var_34, eax
+  loc_00407649: call [00401154h] ; __vbaFreeVarg
+  loc_0040764F: mov edx, [ebx]
+  loc_00407651: lea eax, var_28
+  loc_00407654: push eax
+  loc_00407655: lea ecx, var_4C
+  loc_00407658: push FFFFFFFFh
+  loc_0040765A: lea eax, var_3C
+  loc_0040765D: push ecx
+  loc_0040765E: push eax
+  loc_0040765F: push ebx
+  loc_00407660: call [edx+00000044h]
+  loc_00407663: test eax, eax
+  loc_00407665: fnclex
+  loc_00407667: jge 00407678h
+  loc_00407669: push 00000044h
+  loc_0040766B: push 004031D8h
+  loc_00407670: push ebx
+  loc_00407671: push eax
+  loc_00407672: call [00401040h] ; __vbaHresultCheckObj
+  loc_00407678: lea ecx, var_28
+  loc_0040767B: call [00401194h] ; __vbaFreeObj
+  loc_00407681: lea ecx, var_4C
+  loc_00407684: lea edx, var_3C
+  loc_00407687: push ecx
+  loc_00407688: push edx
+  loc_00407689: push 00000002h
+  loc_0040768B: call [0040101Ch] ; __vbaFreeVarList
+  loc_00407691: mov eax, [esi]
+  loc_00407693: add esp, 0000000Ch
+  loc_00407696: push esi
+  loc_00407697: call [eax+0000030Ch]
+  loc_0040769D: lea ecx, var_28
+  loc_004076A0: push eax
+  loc_004076A1: push ecx
+  loc_004076A2: call [0040104Ch] ; __vbaObjSet
+  loc_004076A8: lea edx, var_3C
+  loc_004076AB: mov ebx, eax
+  loc_004076AD: push edx
+  loc_004076AE: call [00401150h] ; rtcGetTimeVar
+  loc_004076B4: mov edi, [ebx]
+  loc_004076B6: lea eax, var_3C
+  loc_004076B9: lea ecx, var_20
+  loc_004076BC: push eax
+  loc_004076BD: push ecx
+  loc_004076BE: call [004010E8h] ; __vbaStrVarVal
+  loc_004076C4: push eax
+  loc_004076C5: push ebx
+  loc_004076C6: call [edi+000000A4h]
+  loc_004076CC: test eax, eax
+  loc_004076CE: fnclex
+  loc_004076D0: jge 004076E4h
+  loc_004076D2: push 000000A4h
+  loc_004076D7: push 00402FBCh
+  loc_004076DC: push ebx
+  loc_004076DD: push eax
+  loc_004076DE: call [00401040h] ; __vbaHresultCheckObj
+  loc_004076E4: lea ecx, var_20
+  loc_004076E7: call [00401198h] ; __vbaFreeStr
+  loc_004076ED: lea ecx, var_28
+  loc_004076F0: call [00401194h] ; __vbaFreeObj
+  loc_004076F6: lea ecx, var_3C
+  loc_004076F9: call [00401010h] ; __vbaFreeVar
+  loc_004076FF: mov edx, [esi]
+  loc_00407701: push esi
+  loc_00407702: call [edx+00000308h]
+  loc_00407708: mov ebx, [0040104Ch] ; __vbaObjSet
+  loc_0040770E: push eax
+  loc_0040770F: lea eax, var_2C
+  loc_00407712: push eax
+  loc_00407713: call ebx
+  loc_00407715: mov ecx, [esi]
+  loc_00407717: push esi
+  loc_00407718: mov edi, eax
+  loc_0040771A: call [ecx+00000308h]
+  loc_00407720: lea edx, var_28
+  loc_00407723: push eax
+  loc_00407724: push edx
+  loc_00407725: call ebx
+  loc_00407727: mov ebx, eax
+  loc_00407729: lea ecx, var_20
+  loc_0040772C: push ecx
+  loc_0040772D: push ebx
+  loc_0040772E: mov eax, [ebx]
+  loc_00407730: call [eax+000000A0h]
+  loc_00407736: test eax, eax
+  loc_00407738: fnclex
+  loc_0040773A: jge 0040774Eh
+  loc_0040773C: push 000000A0h
+  loc_00407741: push 00402FBCh
+  loc_00407746: push ebx
+  loc_00407747: push eax
+  loc_00407748: call [00401040h] ; __vbaHresultCheckObj
+  loc_0040774E: mov edx, var_20
+  loc_00407751: push edx
+  loc_00407752: call [0040119Ch] ; rtcR8ValFromBstr
+  loc_00407758: fadd st0, real8 ptr [004011E8h]
+  loc_0040775E: lea ecx, var_4C
+  loc_00407761: mov var_3C, 00000005h
+  loc_00407768: fstp real8 ptr var_34
+  loc_0040776B: fnstsw ax
+  loc_0040776D: test al, 0Dh
+  loc_0040776F: jnz 00407AAEh
+  loc_00407775: lea eax, var_3C
+  loc_00407778: push eax
+  loc_00407779: push ecx
+  loc_0040777A: call [00401158h] ; rtcVarStrFromVar
+  loc_00407780: lea edx, var_4C
+  loc_00407783: lea eax, var_5C
+  loc_00407786: push edx
+  loc_00407787: push eax
+  loc_00407788: call [0040106Ch] ; rtcTrimVar
+  loc_0040778E: mov ebx, [edi]
+  loc_00407790: lea ecx, var_5C
+  loc_00407793: lea edx, var_24
+  loc_00407796: push ecx
+  loc_00407797: push edx
+  loc_00407798: call [004010E8h] ; __vbaStrVarVal
+  loc_0040779E: push eax
+  loc_0040779F: push edi
+  loc_004077A0: call [ebx+000000A4h]
+  loc_004077A6: test eax, eax
+  loc_004077A8: fnclex
+  loc_004077AA: jge 004077BEh
+  loc_004077AC: push 000000A4h
+  loc_004077B1: push 00402FBCh
+  loc_004077B6: push edi
+  loc_004077B7: push eax
+  loc_004077B8: call [00401040h] ; __vbaHresultCheckObj
+  loc_004077BE: lea eax, var_24
+  loc_004077C1: lea ecx, var_20
+  loc_004077C4: push eax
+  loc_004077C5: push ecx
+  loc_004077C6: push 00000002h
+  loc_004077C8: call [0040111Ch] ; __vbaFreeStrList
+  loc_004077CE: lea edx, var_2C
+  loc_004077D1: lea eax, var_28
+  loc_004077D4: push edx
+  loc_004077D5: push eax
+  loc_004077D6: push 00000002h
+  loc_004077D8: call [00401028h] ; __vbaFreeObjList
+  loc_004077DE: lea ecx, var_5C
+  loc_004077E1: lea edx, var_4C
+  loc_004077E4: push ecx
+  loc_004077E5: lea eax, var_3C
+  loc_004077E8: push edx
+  loc_004077E9: push eax
+  loc_004077EA: push 00000003h
+  loc_004077EC: call [0040101Ch] ; __vbaFreeVarList
+  loc_004077F2: lea eax, [esi+00000044h]
+  loc_004077F5: add esp, 00000028h
+  loc_004077F8: mov var_F4, eax
+  loc_004077FE: cmp [eax], 0001h
+  loc_00407802: jnz 00407834h
+  loc_00407804: push 00402C28h
+  loc_00407809: push 00402C58h ; "Ratricpf"
+  loc_0040780E: call [00401034h] ; __vbaStrCat
+  loc_00407814: mov edx, eax
+  loc_00407816: mov ecx, 0040902Ch
+  loc_0040781B: call [00401170h] ; __vbaStrMove
+  loc_00407821: mov ecx, [0040902Ch]
+  loc_00407827: push ecx
+  loc_00407828: push 00000001h
+  loc_0040782A: push FFFFFFFFh
+  loc_0040782C: push 00000002h
+  loc_0040782E: call [004010FCh] ; __vbaFileOpen
+  loc_00407834: call [00401068h] ; rtcDoEvents
+  loc_0040783A: mov edi, [0040104Ch] ; __vbaObjSet
+  loc_00407840: jmp 004074C6h
+  loc_00407845: mov edx, var_F4
+  loc_0040784B: lea eax, var_7C
+  loc_0040784E: lea ecx, var_3C
+  loc_00407851: push eax
+  loc_00407852: push ecx
+  loc_00407853: mov var_84, 00403574h ; "Ric"
+  loc_0040785D: mov var_8C, 00000008h
+  loc_00407867: mov var_74, edx
+  loc_0040786A: mov var_7C, 00004002h
+  loc_00407871: call [00401158h] ; rtcVarStrFromVar
+  loc_00407877: lea edx, var_3C
+  loc_0040787A: lea eax, var_4C
+  loc_0040787D: push edx
+  loc_0040787E: push eax
+  loc_0040787F: call [0040106Ch] ; rtcTrimVar
+  loc_00407885: lea ecx, var_8C
+  loc_0040788B: lea edx, var_4C
+  loc_0040788E: push ecx
+  loc_0040788F: lea eax, var_5C
+  loc_00407892: push edx
+  loc_00407893: push eax
+  loc_00407894: lea ebx, [esi+00000058h]
+  loc_00407897: call [004010ECh] ; __vbaVarCat
+  loc_0040789D: push eax
+  loc_0040789E: call [00401014h] ; __vbaStrVarMove
+  loc_004078A4: mov edx, eax
+  loc_004078A6: lea ecx, var_20
+  loc_004078A9: call [00401170h] ; __vbaStrMove
+  loc_004078AF: mov edx, eax
+  loc_004078B1: mov ecx, ebx
+  loc_004078B3: call [00401114h] ; __vbaStrCopy
+  loc_004078B9: lea ecx, var_20
+  loc_004078BC: call [00401198h] ; __vbaFreeStr
+  loc_004078C2: lea ecx, var_5C
+  loc_004078C5: lea edx, var_4C
+  loc_004078C8: push ecx
+  loc_004078C9: lea eax, var_3C
+  loc_004078CC: push edx
+  loc_004078CD: push eax
+  loc_004078CE: push 00000003h
+  loc_004078D0: call [0040101Ch] ; __vbaFreeVarList
+  loc_004078D6: mov ecx, [ebx]
+  loc_004078D8: add esp, 00000010h
+  loc_004078DB: push 00402C28h
+  loc_004078E0: push ecx
+  loc_004078E1: call [00401034h] ; __vbaStrCat
+  loc_004078E7: push 004034ACh
+  loc_004078EC: mov ecx, 00000008h
+  loc_004078F1: sub esp, 00000010h
+  loc_004078F4: mov var_3C, ecx
+  loc_004078F7: mov ebx, esp
+  loc_004078F9: mov var_34, eax
+  loc_004078FC: sub esp, 00000010h
+  loc_004078FF: mov var_8C, 00000002h
+  loc_00407909: mov [ebx], ecx
+  loc_0040790B: mov ecx, var_38
+  loc_0040790E: mov edx, 00000003h
+  loc_00407913: mov [ebx+00000004h], ecx
+  loc_00407916: mov ecx, esp
+  loc_00407918: mov var_84, edx
+  loc_0040791E: push 00000002h
+  loc_00407920: mov [ebx+00000008h], eax
+  loc_00407923: mov eax, var_30
+  loc_00407926: push 004034A0h ; "Open"
+  loc_0040792B: push 00000000h
+  loc_0040792D: mov [ebx+0000000Ch], eax
+  loc_00407930: mov eax, var_8C
+  loc_00407936: mov [ecx], eax
+  loc_00407938: mov eax, var_88
+  loc_0040793E: push 0040348Ch ; "Workbooks"
+  loc_00407943: mov [ecx+00000004h], eax
+  loc_00407946: mov eax, [00409024h]
+  loc_0040794B: push eax
+  loc_0040794C: mov [ecx+00000008h], edx
+  loc_0040794F: mov edx, var_80
+  loc_00407952: mov [ecx+0000000Ch], edx
+  loc_00407955: lea ecx, var_4C
+  loc_00407958: push ecx
+  loc_00407959: call [00401164h] ; __vbaLateMemCallLd
+  loc_0040795F: add esp, 00000010h
+  loc_00407962: push eax
+  loc_00407963: lea edx, var_5C
+  loc_00407966: push edx
+  loc_00407967: call [00401160h] ; __vbaVarLateMemCallLd
+  loc_0040796D: add esp, 00000030h
+  loc_00407970: push eax
+  loc_00407971: call [004010A8h] ; __vbaCastObjVar
+  loc_00407977: push eax
+  loc_00407978: push 00409028h
+  loc_0040797D: call edi
+  loc_0040797F: lea eax, var_5C
+  loc_00407982: lea ecx, var_4C
+  loc_00407985: push eax
+  loc_00407986: lea edx, var_3C
+  loc_00407989: push ecx
+  loc_0040798A: push edx
+  loc_0040798B: push 00000003h
+  loc_0040798D: call [0040101Ch] ; __vbaFreeVarList
+  loc_00407993: mov eax, [esi]
+  loc_00407995: add esp, 00000010h
+  loc_00407998: push esi
+  loc_00407999: call [eax+000002FCh]
+  loc_0040799F: lea ecx, var_28
+  loc_004079A2: push eax
+  loc_004079A3: push ecx
+  loc_004079A4: call edi
+  loc_004079A6: mov ecx, var_F4
+  loc_004079AC: mov esi, eax
+  loc_004079AE: lea eax, var_2C
+  loc_004079B1: mov edx, [esi]
+  loc_004079B3: push eax
+  loc_004079B4: mov ax, [ecx]
+  loc_004079B7: push eax
+  loc_004079B8: push esi
+  loc_004079B9: call [edx+00000040h]
+  loc_004079BC: test eax, eax
+  loc_004079BE: fnclex
+  loc_004079C0: jge 004079D1h
+  loc_004079C2: push 00000040h
+  loc_004079C4: push 00402FACh
+  loc_004079C9: push esi
+  loc_004079CA: push eax
+  loc_004079CB: call [00401040h] ; __vbaHresultCheckObj
+  loc_004079D1: mov esi, var_2C
+  loc_004079D4: lea ecx, var_3C
+  loc_004079D7: push ecx
+  loc_004079D8: call [00401150h] ; rtcGetTimeVar
+  loc_004079DE: mov edi, [esi]
+  loc_004079E0: lea edx, var_3C
+  loc_004079E3: lea eax, var_20
+  loc_004079E6: push edx
+  loc_004079E7: push eax
+  loc_004079E8: call [004010E8h] ; __vbaStrVarVal
+  loc_004079EE: push eax
+  loc_004079EF: push esi
+  loc_004079F0: call [edi+000000A4h]
+  loc_004079F6: test eax, eax
+  loc_004079F8: fnclex
+  loc_004079FA: jge 00407A0Eh
+  loc_004079FC: push 000000A4h
+  loc_00407A01: push 00402FBCh
+  loc_00407A06: push esi
+  loc_00407A07: push eax
+  loc_00407A08: call [00401040h] ; __vbaHresultCheckObj
+  loc_00407A0E: lea ecx, var_20
+  loc_00407A11: call [00401198h] ; __vbaFreeStr
+  loc_00407A17: lea ecx, var_2C
+  loc_00407A1A: lea edx, var_28
+  loc_00407A1D: push ecx
+  loc_00407A1E: push edx
+  loc_00407A1F: push 00000002h
+  loc_00407A21: call [00401028h] ; __vbaFreeObjList
+  loc_00407A27: add esp, 0000000Ch
+  loc_00407A2A: lea ecx, var_3C
+  loc_00407A2D: call [00401010h] ; __vbaFreeVar
+  loc_00407A33: jmp 00407A43h
+  loc_00407A35: mov ax, [esi+00000048h]
+  loc_00407A39: add ax, 0001h
+  loc_00407A3D: jo 00407AB3h
+  loc_00407A3F: mov [esi+00000048h], ax
+  loc_00407A43: mov var_4, 00000000h
+  loc_00407A4A: fwait
+  loc_00407A4B: push 00407A8Fh
+  loc_00407A50: jmp 00407A8Eh
+  loc_00407A52: lea ecx, var_24
+  loc_00407A55: lea edx, var_20
+  loc_00407A58: push ecx
+  loc_00407A59: push edx
+  loc_00407A5A: push 00000002h
+  loc_00407A5C: call [0040111Ch] ; __vbaFreeStrList
+  loc_00407A62: lea eax, var_2C
+  loc_00407A65: lea ecx, var_28
+  loc_00407A68: push eax
+  loc_00407A69: push ecx
+  loc_00407A6A: push 00000002h
+  loc_00407A6C: call [00401028h] ; __vbaFreeObjList
+  loc_00407A72: lea edx, var_6C
+  loc_00407A75: lea eax, var_5C
+  loc_00407A78: push edx
+  loc_00407A79: lea ecx, var_4C
+  loc_00407A7C: push eax
+  loc_00407A7D: lea edx, var_3C
+  loc_00407A80: push ecx
+  loc_00407A81: push edx
+  loc_00407A82: push 00000004h
+  loc_00407A84: call [0040101Ch] ; __vbaFreeVarList
+  loc_00407A8A: add esp, 0000002Ch
+  loc_00407A8D: ret
+  loc_00407A8E: ret
+  loc_00407A8F: mov eax, arg_8
+  loc_00407A92: push eax
+  loc_00407A93: mov ecx, [eax]
+  loc_00407A95: call [ecx+00000008h]
+  loc_00407A98: mov eax, var_4
+  loc_00407A9B: mov ecx, var_14
+  loc_00407A9E: pop edi
+  loc_00407A9F: pop esi
+  loc_00407AA0: mov fs:[00000000h], ecx
+  loc_00407AA7: pop ebx
+  loc_00407AA8: mov esp, ebp
+  loc_00407AAA: pop ebp
+  loc_00407AAB: retn 0004h
+
+Command1_Click_405560
+  loc_00405560: push ebp
+  loc_00405561: mov ebp, esp
+  loc_00405563: sub esp, 0000000Ch
+  loc_00405566: push 00401326h ; __vbaExceptHandler
+  loc_0040556B: mov eax, fs:[00000000h]
+  loc_00405571: push eax
+  loc_00405572: mov fs:[00000000h], esp
+  loc_00405579: sub esp, 00000018h
+  loc_0040557C: push ebx
+  loc_0040557D: push esi
+  loc_0040557E: push edi
+  loc_0040557F: mov var_C, esp
+  loc_00405582: mov var_8, 004011A8h
+  loc_00405589: mov edi, arg_8
+  loc_0040558C: mov eax, edi
+  loc_0040558E: and eax, 00000001h
+  loc_00405591: mov var_4, eax
+  loc_00405594: and edi, FFFFFFFEh
+  loc_00405597: push edi
+  loc_00405598: mov arg_8, edi
+  loc_0040559B: mov ecx, [edi]
+  loc_0040559D: call [ecx+00000004h]
+  loc_004055A0: mov eax, [004093B4h]
+  loc_004055A5: xor ebx, ebx
+  loc_004055A7: cmp eax, ebx
+  loc_004055A9: mov var_18, ebx
+  loc_004055AC: jnz 004055BEh
+  loc_004055AE: push 004093B4h
+  loc_004055B3: push 00402F74h
+  loc_004055B8: call [00401100h] ; __vbaNew2
+  loc_004055BE: mov esi, [004093B4h]
+  loc_004055C4: lea eax, var_18
+  loc_004055C7: push edi
+  loc_004055C8: push eax
+  loc_004055C9: mov edx, [esi]
+  loc_004055CB: mov var_2C, edx
+  loc_004055CE: call [00401060h] ; __vbaObjSetAddref
+  loc_004055D4: mov ecx, var_2C
+  loc_004055D7: push eax
+  loc_004055D8: push esi
+  loc_004055D9: call [ecx+00000010h]
+  loc_004055DC: cmp eax, ebx
+  loc_004055DE: fnclex
+  loc_004055E0: jge 004055F1h
+  loc_004055E2: push 00000010h
+  loc_004055E4: push 00402F64h
+  loc_004055E9: push esi
+  loc_004055EA: push eax
+  loc_004055EB: call [00401040h] ; __vbaHresultCheckObj
+  loc_004055F1: lea ecx, var_18
+  loc_004055F4: call [00401194h] ; __vbaFreeObj
+  loc_004055FA: mov var_4, ebx
+  loc_004055FD: push 0040560Fh
+  loc_00405602: jmp 0040560Eh
+  loc_00405604: lea ecx, var_18
+  loc_00405607: call [00401194h] ; __vbaFreeObj
+  loc_0040560D: ret
+  loc_0040560E: ret
+  loc_0040560F: mov eax, arg_8
+  loc_00405612: push eax
+  loc_00405613: mov edx, [eax]
+  loc_00405615: call [edx+00000008h]
+  loc_00405618: mov eax, var_4
+  loc_0040561B: mov ecx, var_14
+  loc_0040561E: pop edi
+  loc_0040561F: pop esi
+  loc_00405620: mov fs:[00000000h], ecx
+  loc_00405627: pop ebx
+  loc_00405628: mov esp, ebp
+  loc_0040562A: pop ebp
+  loc_0040562B: retn 0004h
+
+ShowGets_407AC0
+  loc_00407AC0: push ebp
+  loc_00407AC1: mov ebp, esp
+  loc_00407AC3: sub esp, 00000018h
+  loc_00407AC6: push 00401326h ; __vbaExceptHandler
+  loc_00407ACB: mov eax, fs:[00000000h]
+  loc_00407AD1: push eax
+  loc_00407AD2: mov fs:[00000000h], esp
+  loc_00407AD9: mov eax, 0000019Ch
+  loc_00407ADE: call 00401320h ; __vbaChkstk
+  loc_00407AE3: push ebx
+  loc_00407AE4: push esi
+  loc_00407AE5: push edi
+  loc_00407AE6: mov var_18, esp
+  loc_00407AE9: mov var_14, 00401200h
+  loc_00407AF0: mov var_10, 00000000h
+  loc_00407AF7: mov var_C, 00000000h
+  loc_00407AFE: mov eax, arg_8
+  loc_00407B01: mov ecx, [eax]
+  loc_00407B03: mov edx, arg_8
+  loc_00407B06: push edx
+  loc_00407B07: call [ecx+00000004h]
+  loc_00407B0A: mov var_4, 00000001h
+  loc_00407B11: mov var_4, 00000002h
+  loc_00407B18: push 00000001h
+  loc_00407B1A: call [00401054h] ; __vbaOnError
+  loc_00407B20: mov var_4, 00000003h
+  loc_00407B27: mov var_24, 0000h
+  loc_00407B2D: mov var_4, 00000004h
+  loc_00407B34: push 00000000h
+  loc_00407B36: push 00000006h
+  loc_00407B38: mov eax, [00409038h]
+  loc_00407B3D: push eax
+  loc_00407B3E: lea ecx, var_34
+  loc_00407B41: push ecx
+  loc_00407B42: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407B48: add esp, 00000010h
+  loc_00407B4B: push eax
+  loc_00407B4C: lea edx, var_44
+  loc_00407B4F: push edx
+  loc_00407B50: call [0040106Ch] ; rtcTrimVar
+  loc_00407B56: mov var_13C, 00403510h ; "               "
+  loc_00407B60: mov var_144, 00000008h
+  loc_00407B6A: lea eax, var_44
+  loc_00407B6D: push eax
+  loc_00407B6E: lea ecx, var_144
+  loc_00407B74: push ecx
+  loc_00407B75: lea edx, var_54
+  loc_00407B78: push edx
+  loc_00407B79: call [00401144h] ; __vbaVarAdd
+  loc_00407B7F: mov edx, eax
+  loc_00407B81: mov ecx, 00409048h
+  loc_00407B86: call [0040100Ch] ; __vbaVarMove
+  loc_00407B8C: lea eax, var_44
+  loc_00407B8F: push eax
+  loc_00407B90: lea ecx, var_34
+  loc_00407B93: push ecx
+  loc_00407B94: push 00000002h
+  loc_00407B96: call [0040101Ch] ; __vbaFreeVarList
+  loc_00407B9C: add esp, 0000000Ch
+  loc_00407B9F: mov var_4, 00000005h
+  loc_00407BA6: push 00000000h
+  loc_00407BA8: push 00000006h
+  loc_00407BAA: mov edx, [0040903Ch]
+  loc_00407BB0: push edx
+  loc_00407BB1: lea eax, var_34
+  loc_00407BB4: push eax
+  loc_00407BB5: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407BBB: add esp, 00000010h
+  loc_00407BBE: push eax
+  loc_00407BBF: call [004010A4h] ; rtcVarType
+  loc_00407BC5: xor ecx, ecx
+  loc_00407BC7: cmp eax, 0000000Ah
+  loc_00407BCA: setnz cl
+  loc_00407BCD: neg ecx
+  loc_00407BCF: mov var_1A8, cx
+  loc_00407BD6: lea ecx, var_34
+  loc_00407BD9: call [00401010h] ; __vbaFreeVar
+  loc_00407BDF: movsx edx, var_1A8
+  loc_00407BE6: test edx, edx
+  loc_00407BE8: jz 00407CFEh
+  loc_00407BEE: mov var_4, 00000006h
+  loc_00407BF5: push 00000000h
+  loc_00407BF7: push 00000006h
+  loc_00407BF9: mov eax, [0040903Ch]
+  loc_00407BFE: push eax
+  loc_00407BFF: lea ecx, var_34
+  loc_00407C02: push ecx
+  loc_00407C03: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407C09: add esp, 00000010h
+  loc_00407C0C: push 00000001h
+  loc_00407C0E: lea edx, var_34
+  loc_00407C11: push edx
+  loc_00407C12: lea eax, var_44
+  loc_00407C15: push eax
+  loc_00407C16: call [00401168h] ; rtcLeftCharVar
+  loc_00407C1C: mov var_13C, 00403580h ; "#"
+  loc_00407C26: mov var_144, 00008008h
+  loc_00407C30: lea ecx, var_44
+  loc_00407C33: push ecx
+  loc_00407C34: lea edx, var_144
+  loc_00407C3A: push edx
+  loc_00407C3B: call [00401090h] ; __vbaVarTstEq
+  loc_00407C41: mov var_1A8, ax
+  loc_00407C48: lea eax, var_44
+  loc_00407C4B: push eax
+  loc_00407C4C: lea ecx, var_34
+  loc_00407C4F: push ecx
+  loc_00407C50: push 00000002h
+  loc_00407C52: call [0040101Ch] ; __vbaFreeVarList
+  loc_00407C58: add esp, 0000000Ch
+  loc_00407C5B: movsx edx, var_1A8
+  loc_00407C62: test edx, edx
+  loc_00407C64: jz 00407C7Fh
+  loc_00407C66: mov var_4, 00000007h
+  loc_00407C6D: mov edx, 00403598h ; "                                        "
+  loc_00407C72: mov ecx, 00409058h
+  loc_00407C77: call [00401114h] ; __vbaStrCopy
+  loc_00407C7D: jmp 00407CFCh
+  loc_00407C7F: mov var_4, 00000009h
+  loc_00407C86: push 00000000h
+  loc_00407C88: push 00000006h
+  loc_00407C8A: mov eax, [0040903Ch]
+  loc_00407C8F: push eax
+  loc_00407C90: lea ecx, var_34
+  loc_00407C93: push ecx
+  loc_00407C94: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407C9A: add esp, 00000010h
+  loc_00407C9D: push eax
+  loc_00407C9E: lea edx, var_44
+  loc_00407CA1: push edx
+  loc_00407CA2: call [0040106Ch] ; rtcTrimVar
+  loc_00407CA8: mov var_13C, 00403598h ; "                                        "
+  loc_00407CB2: mov var_144, 00000008h
+  loc_00407CBC: lea eax, var_44
+  loc_00407CBF: push eax
+  loc_00407CC0: lea ecx, var_144
+  loc_00407CC6: push ecx
+  loc_00407CC7: lea edx, var_54
+  loc_00407CCA: push edx
+  loc_00407CCB: call [00401144h] ; __vbaVarAdd
+  loc_00407CD1: push eax
+  loc_00407CD2: call [00401014h] ; __vbaStrVarMove
+  loc_00407CD8: mov edx, eax
+  loc_00407CDA: mov ecx, 00409058h
+  loc_00407CDF: call [00401170h] ; __vbaStrMove
+  loc_00407CE5: lea eax, var_54
+  loc_00407CE8: push eax
+  loc_00407CE9: lea ecx, var_44
+  loc_00407CEC: push ecx
+  loc_00407CED: lea edx, var_34
+  loc_00407CF0: push edx
+  loc_00407CF1: push 00000003h
+  loc_00407CF3: call [0040101Ch] ; __vbaFreeVarList
+  loc_00407CF9: add esp, 00000010h
+  loc_00407CFC: jmp 00407D15h
+  loc_00407CFE: mov var_4, 0000000Ch
+  loc_00407D05: mov edx, 00403598h ; "                                        "
+  loc_00407D0A: mov ecx, 00409058h
+  loc_00407D0F: call [00401114h] ; __vbaStrCopy
+  loc_00407D15: mov var_4, 0000000Eh
+  loc_00407D1C: mov var_24, 0001h
+  loc_00407D22: mov var_4, 0000000Fh
+  loc_00407D29: push 00000000h
+  loc_00407D2B: push 00000006h
+  loc_00407D2D: mov eax, [00409040h]
+  loc_00407D32: push eax
+  loc_00407D33: lea ecx, var_34
+  loc_00407D36: push ecx
+  loc_00407D37: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407D3D: add esp, 00000010h
+  loc_00407D40: push eax
+  loc_00407D41: call [004010A4h] ; rtcVarType
+  loc_00407D47: xor edx, edx
+  loc_00407D49: cmp eax, 0000000Ah
+  loc_00407D4C: setnz dl
+  loc_00407D4F: neg edx
+  loc_00407D51: mov var_1A8, dx
+  loc_00407D58: lea ecx, var_34
+  loc_00407D5B: call [00401010h] ; __vbaFreeVar
+  loc_00407D61: movsx eax, var_1A8
+  loc_00407D68: test eax, eax
+  loc_00407D6A: jz 00407F24h
+  loc_00407D70: mov var_4, 00000010h
+  loc_00407D77: push 00000000h
+  loc_00407D79: push 00000006h
+  loc_00407D7B: mov ecx, [00409040h]
+  loc_00407D81: push ecx
+  loc_00407D82: lea edx, var_34
+  loc_00407D85: push edx
+  loc_00407D86: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407D8C: add esp, 00000010h
+  loc_00407D8F: push 00000001h
+  loc_00407D91: lea eax, var_34
+  loc_00407D94: push eax
+  loc_00407D95: lea ecx, var_44
+  loc_00407D98: push ecx
+  loc_00407D99: call [00401168h] ; rtcLeftCharVar
+  loc_00407D9F: mov var_13C, 00403580h ; "#"
+  loc_00407DA9: mov var_144, 00008008h
+  loc_00407DB3: lea edx, var_44
+  loc_00407DB6: push edx
+  loc_00407DB7: lea eax, var_144
+  loc_00407DBD: push eax
+  loc_00407DBE: call [00401090h] ; __vbaVarTstEq
+  loc_00407DC4: mov var_1A8, ax
+  loc_00407DCB: lea ecx, var_44
+  loc_00407DCE: push ecx
+  loc_00407DCF: lea edx, var_34
+  loc_00407DD2: push edx
+  loc_00407DD3: push 00000002h
+  loc_00407DD5: call [0040101Ch] ; __vbaFreeVarList
+  loc_00407DDB: add esp, 0000000Ch
+  loc_00407DDE: movsx eax, var_1A8
+  loc_00407DE5: test eax, eax
+  loc_00407DE7: jz 00407E1Ah
+  loc_00407DE9: mov var_4, 00000011h
+  loc_00407DF0: mov var_13C, 00000000h
+  loc_00407DFA: mov var_144, 00000002h
+  loc_00407E04: lea edx, var_144
+  loc_00407E0A: mov ecx, 00409070h
+  loc_00407E0F: call [0040100Ch] ; __vbaVarMove
+  loc_00407E15: jmp 00407F22h
+  loc_00407E1A: mov var_4, 00000013h
+  loc_00407E21: mov var_13C, 004033B0h
+  loc_00407E2B: mov var_144, 00008008h
+  loc_00407E35: push 00000000h
+  loc_00407E37: push 00000006h
+  loc_00407E39: mov ecx, [00409040h]
+  loc_00407E3F: push ecx
+  loc_00407E40: lea edx, var_34
+  loc_00407E43: push edx
+  loc_00407E44: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407E4A: add esp, 00000010h
+  loc_00407E4D: push eax
+  loc_00407E4E: lea eax, var_144
+  loc_00407E54: push eax
+  loc_00407E55: call [00401090h] ; __vbaVarTstEq
+  loc_00407E5B: mov var_1A8, ax
+  loc_00407E62: lea ecx, var_34
+  loc_00407E65: call [00401010h] ; __vbaFreeVar
+  loc_00407E6B: movsx ecx, var_1A8
+  loc_00407E72: test ecx, ecx
+  loc_00407E74: jz 00407EA4h
+  loc_00407E76: mov var_4, 00000014h
+  loc_00407E7D: mov var_13C, 00000000h
+  loc_00407E87: mov var_144, 00000002h
+  loc_00407E91: lea edx, var_144
+  loc_00407E97: mov ecx, 00409070h
+  loc_00407E9C: call [0040100Ch] ; __vbaVarMove
+  loc_00407EA2: jmp 00407F22h
+  loc_00407EA4: mov var_4, 00000016h
+  loc_00407EAB: mov var_13C, 000F4240h
+  loc_00407EB5: mov var_144, 00000003h
+  loc_00407EBF: push 00000000h
+  loc_00407EC1: push 00000006h
+  loc_00407EC3: mov edx, [00409040h]
+  loc_00407EC9: push edx
+  loc_00407ECA: lea eax, var_34
+  loc_00407ECD: push eax
+  loc_00407ECE: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407ED4: add esp, 00000010h
+  loc_00407ED7: push eax
+  loc_00407ED8: lea ecx, var_144
+  loc_00407EDE: push ecx
+  loc_00407EDF: lea edx, var_44
+  loc_00407EE2: push edx
+  loc_00407EE3: call [004010C4h] ; __vbaVarMul
+  loc_00407EE9: mov edx, eax
+  loc_00407EEB: mov ecx, 00409070h
+  loc_00407EF0: call [0040100Ch] ; __vbaVarMove
+  loc_00407EF6: lea ecx, var_34
+  loc_00407EF9: call [00401010h] ; __vbaFreeVar
+  loc_00407EFF: mov var_4, 00000017h
+  loc_00407F06: push 00409070h
+  loc_00407F0B: lea eax, var_34
+  loc_00407F0E: push eax
+  loc_00407F0F: call [00401108h] ; __vbaVarInt
+  loc_00407F15: mov edx, eax
+  loc_00407F17: mov ecx, 00409070h
+  loc_00407F1C: call [0040100Ch] ; __vbaVarMove
+  loc_00407F22: jmp 00407F50h
+  loc_00407F24: mov var_4, 0000001Bh
+  loc_00407F2B: mov var_13C, 00000000h
+  loc_00407F35: mov var_144, 00000002h
+  loc_00407F3F: lea edx, var_144
+  loc_00407F45: mov ecx, 00409070h
+  loc_00407F4A: call [0040100Ch] ; __vbaVarMove
+  loc_00407F50: mov var_4, 0000001Dh
+  loc_00407F57: mov var_24, 0002h
+  loc_00407F5D: mov var_4, 0000001Eh
+  loc_00407F64: push 00000000h
+  loc_00407F66: push 00000006h
+  loc_00407F68: mov ecx, [00409044h]
+  loc_00407F6E: push ecx
+  loc_00407F6F: lea edx, var_34
+  loc_00407F72: push edx
+  loc_00407F73: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407F79: add esp, 00000010h
+  loc_00407F7C: push eax
+  loc_00407F7D: call [004010A4h] ; rtcVarType
+  loc_00407F83: xor ecx, ecx
+  loc_00407F85: cmp eax, 0000000Ah
+  loc_00407F88: setnz cl
+  loc_00407F8B: neg ecx
+  loc_00407F8D: mov var_1A8, cx
+  loc_00407F94: lea ecx, var_34
+  loc_00407F97: call [00401010h] ; __vbaFreeVar
+  loc_00407F9D: movsx edx, var_1A8
+  loc_00407FA4: test edx, edx
+  loc_00407FA6: jz 00408132h
+  loc_00407FAC: mov var_4, 0000001Fh
+  loc_00407FB3: push 00000000h
+  loc_00407FB5: push 00000006h
+  loc_00407FB7: mov eax, [00409044h]
+  loc_00407FBC: push eax
+  loc_00407FBD: lea ecx, var_34
+  loc_00407FC0: push ecx
+  loc_00407FC1: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00407FC7: add esp, 00000010h
+  loc_00407FCA: push 00000001h
+  loc_00407FCC: lea edx, var_34
+  loc_00407FCF: push edx
+  loc_00407FD0: lea eax, var_44
+  loc_00407FD3: push eax
+  loc_00407FD4: call [00401168h] ; rtcLeftCharVar
+  loc_00407FDA: mov var_13C, 00403580h ; "#"
+  loc_00407FE4: mov var_144, 00008008h
+  loc_00407FEE: lea ecx, var_44
+  loc_00407FF1: push ecx
+  loc_00407FF2: lea edx, var_144
+  loc_00407FF8: push edx
+  loc_00407FF9: call [00401090h] ; __vbaVarTstEq
+  loc_00407FFF: mov var_1A8, ax
+  loc_00408006: lea eax, var_44
+  loc_00408009: push eax
+  loc_0040800A: lea ecx, var_34
+  loc_0040800D: push ecx
+  loc_0040800E: push 00000002h
+  loc_00408010: call [0040101Ch] ; __vbaFreeVarList
+  loc_00408016: add esp, 0000000Ch
+  loc_00408019: movsx edx, var_1A8
+  loc_00408020: test edx, edx
+  loc_00408022: jz 00408044h
+  loc_00408024: mov var_4, 00000020h
+  loc_0040802B: mov [00409080h], 00000000h
+  loc_00408035: mov [00409084h], 00000000h
+  loc_0040803F: jmp 00408130h
+  loc_00408044: mov var_4, 00000022h
+  loc_0040804B: mov var_13C, 004033B0h
+  loc_00408055: mov var_144, 00008008h
+  loc_0040805F: push 00000000h
+  loc_00408061: push 00000006h
+  loc_00408063: mov eax, [00409044h]
+  loc_00408068: push eax
+  loc_00408069: lea ecx, var_34
+  loc_0040806C: push ecx
+  loc_0040806D: call [004010B0h] ; __vbaLateIdCallLd
+  loc_00408073: add esp, 00000010h
+  loc_00408076: push eax
+  loc_00408077: lea edx, var_144
+  loc_0040807D: push edx
+  loc_0040807E: call [00401090h] ; __vbaVarTstEq
+  loc_00408084: mov var_1A8, ax
+  loc_0040808B: lea ecx, var_34
+  loc_0040808E: call [00401010h] ; __vbaFreeVar
+  loc_00408094: movsx eax, var_1A8
+  loc_0040809B: test eax, eax
+  loc_0040809D: jz 004080BCh
+  loc_0040809F: mov var_4, 00000023h
+  loc_004080A6: mov [00409080h], 00000000h
+  loc_004080B0: mov [00409084h], 00000000h
+  loc_004080BA: jmp 00408130h
+  loc_004080BC: mov var_4, 00000025h
+  loc_004080C3: mov var_13C, 000F4240h
+  loc_004080CD: mov var_144, 00000003h
+  loc_004080D7: push 00000000h
+  loc_004080D9: push 00000006h
+  loc_004080DB: mov ecx, [00409044h]
+  loc_004080E1: push ecx
+  loc_004080E2: lea edx, var_34
+  loc_004080E5: push edx
+  loc_004080E6: call [004010B0h] ; __vbaLateIdCallLd
+  loc_004080EC: add esp, 00000010h
+  loc_004080EF: push eax
+  loc_004080F0: lea eax, var_144
+  loc_004080F6: push eax
+  loc_004080F7: lea ecx, var_44
+  loc_004080FA: push ecx
+  loc_004080FB: call [004010C4h] ; __vbaVarMul
+  loc_00408101: push eax
+  loc_00408102: call [00401128h] ; __vbaR8Var
+  loc_00408108: fstp real8 ptr [00409080h]
+  loc_0040810E: lea ecx, var_34
+  loc_00408111: call [00401010h] ; __vbaFreeVar
+  loc_00408117: mov var_4, 00000026h
+  loc_0040811E: fld real8 ptr [00409080h]
+  loc_00408124: call [0040118Ch] ; __vbaFPInt
+  loc_0040812A: fstp real8 ptr [00409080h]
+  loc_00408130: jmp 0040814Dh
+  loc_00408132: mov var_4, 0000002Ah
+  loc_00408139: mov [00409080h], 00000000h
+  loc_00408143: mov [00409084h], 00000000h
+  loc_0040814D: mov var_4, 0000002Ch
+  loc_00408154: push 00409048h
+  loc_00408159: lea edx, var_34
+  loc_0040815C: push edx
+  loc_0040815D: call [0040106Ch] ; rtcTrimVar
+  loc_00408163: mov var_13C, 004033B0h
+  loc_0040816D: mov var_144, 00008008h
+  loc_00408177: lea eax, var_34
+  loc_0040817A: push eax
+  loc_0040817B: lea ecx, var_144
+  loc_00408181: push ecx
+  loc_00408182: call [00401138h] ; __vbaVarTstNe
+  loc_00408188: mov var_1A8, ax
+  loc_0040818F: lea ecx, var_34
+  loc_00408192: call [00401010h] ; __vbaFreeVar
+  loc_00408198: movsx edx, var_1A8
+  loc_0040819F: test edx, edx
+  loc_004081A1: jz 0040853Dh
+  loc_004081A7: mov var_4, 0000002Dh
+  loc_004081AE: mov var_13C, 004035F0h
+  loc_004081B8: mov var_144, 00000008h
+  loc_004081C2: lea edx, var_144
+  loc_004081C8: lea ecx, var_34
+  loc_004081CB: call [0040114Ch] ; __vbaVarDup
+  loc_004081D1: lea eax, var_34
+  loc_004081D4: push eax
+  loc_004081D5: push 0000000Eh
+  loc_004081D7: lea ecx, var_44
+  loc_004081DA: push ecx
+  loc_004081DB: call [004010DCh] ; rtcStringVar
+  loc_004081E1: lea edx, var_44
+  loc_004081E4: push edx
+  loc_004081E5: push 00409070h
+  loc_004081EA: lea eax, var_54
+  loc_004081ED: push eax
+  loc_004081EE: call [004010ECh] ; __vbaVarCat
+  loc_004081F4: mov edx, eax
+  loc_004081F6: mov ecx, 0040905Ch
+  loc_004081FB: call [0040100Ch] ; __vbaVarMove
+  loc_00408201: lea ecx, var_44
+  loc_00408204: push ecx
+  loc_00408205: lea edx, var_34
+  loc_00408208: push edx
+  loc_00408209: push 00000002h
+  loc_0040820B: call [0040101Ch] ; __vbaFreeVarList
+  loc_00408211: add esp, 0000000Ch
+  loc_00408214: mov var_4, 0000002Eh
+  loc_0040821B: mov var_13C, 004035F0h
+  loc_00408225: mov var_144, 00000008h
+  loc_0040822F: lea edx, var_144
+  loc_00408235: lea ecx, var_34
+  loc_00408238: call [0040114Ch] ; __vbaVarDup
+  loc_0040823E: lea eax, var_34
+  loc_00408241: push eax
+  loc_00408242: push 0000000Eh
+  loc_00408244: lea ecx, var_44
+  loc_00408247: push ecx
+  loc_00408248: call [004010DCh] ; rtcStringVar
+  loc_0040824E: mov edx, [00409080h]
+  loc_00408254: mov var_14C, edx
+  loc_0040825A: mov eax, [00409084h]
+  loc_0040825F: mov var_148, eax
+  loc_00408265: mov var_154, 00000005h
+  loc_0040826F: lea ecx, var_44
+  loc_00408272: push ecx
+  loc_00408273: lea edx, var_154
+  loc_00408279: push edx
+  loc_0040827A: lea eax, var_54
+  loc_0040827D: push eax
+  loc_0040827E: call [004010ECh] ; __vbaVarCat
+  loc_00408284: push eax
+  loc_00408285: call [00401014h] ; __vbaStrVarMove
+  loc_0040828B: mov edx, eax
+  loc_0040828D: mov ecx, 0040906Ch
+  loc_00408292: call [00401170h] ; __vbaStrMove
+  loc_00408298: lea ecx, var_54
+  loc_0040829B: push ecx
+  loc_0040829C: lea edx, var_44
+  loc_0040829F: push edx
+  loc_004082A0: lea eax, var_34
+  loc_004082A3: push eax
+  loc_004082A4: push 00000003h
+  loc_004082A6: call [0040101Ch] ; __vbaFreeVarList
+  loc_004082AC: add esp, 00000010h
+  loc_004082AF: mov var_4, 0000002Fh
+  loc_004082B6: push 0000000Eh
+  loc_004082B8: push 0040905Ch
+  loc_004082BD: lea ecx, var_74
+  loc_004082C0: push ecx
+  loc_004082C1: call [00401178h] ; rtcRightCharVar
+  loc_004082C7: mov var_17C, 0040906Ch
+  loc_004082D1: mov var_184, 00004008h
+  loc_004082DB: push 0000000Eh
+  loc_004082DD: lea edx, var_184
+  loc_004082E3: push edx
+  loc_004082E4: lea eax, var_E4
+  loc_004082EA: push eax
+  loc_004082EB: call [00401178h] ; rtcRightCharVar
+  loc_004082F1: push 0000000Ch
+  loc_004082F3: push 00409048h
+  loc_004082F8: lea ecx, var_34
+  loc_004082FB: push ecx
+  loc_004082FC: call [00401168h] ; rtcLeftCharVar
+  loc_00408302: mov var_13C, 00409058h
+  loc_0040830C: mov var_144, 00004008h
+  loc_00408316: push 00000023h
+  loc_00408318: lea edx, var_144
+  loc_0040831E: push edx
+  loc_0040831F: lea eax, var_44
+  loc_00408322: push eax
+  loc_00408323: call [00401168h] ; rtcLeftCharVar
+  loc_00408329: mov var_14C, 004035F8h
+  loc_00408333: mov var_154, 00000008h
+  loc_0040833D: push 00000008h
+  loc_0040833F: lea ecx, var_74
+  loc_00408342: push ecx
+  loc_00408343: lea edx, var_84
+  loc_00408349: push edx
+  loc_0040834A: call [00401168h] ; rtcLeftCharVar
+  loc_00408350: mov var_15C, 00403600h ; "."
+  loc_0040835A: mov var_164, 00000008h
+  loc_00408364: push 00000006h
+  loc_00408366: push 0040905Ch
+  loc_0040836B: lea eax, var_B4
+  loc_00408371: push eax
+  loc_00408372: call [00401178h] ; rtcRightCharVar
+  loc_00408378: mov var_16C, 004035F8h
+  loc_00408382: mov var_174, 00000008h
+  loc_0040838C: push 00000008h
+  loc_0040838E: lea ecx, var_E4
+  loc_00408394: push ecx
+  loc_00408395: lea edx, var_F4
+  loc_0040839B: push edx
+  loc_0040839C: call [00401168h] ; rtcLeftCharVar
+  loc_004083A2: mov var_18C, 00403600h ; "."
+  loc_004083AC: mov var_194, 00000008h
+  loc_004083B6: mov var_19C, 0040906Ch
+  loc_004083C0: mov var_1A4, 00004008h
+  loc_004083CA: push 00000006h
+  loc_004083CC: lea eax, var_1A4
+  loc_004083D2: push eax
+  loc_004083D3: lea ecx, var_124
+  loc_004083D9: push ecx
+  loc_004083DA: call [00401178h] ; rtcRightCharVar
+  loc_004083E0: lea edx, var_34
+  loc_004083E3: push edx
+  loc_004083E4: lea eax, var_44
+  loc_004083E7: push eax
+  loc_004083E8: lea ecx, var_54
+  loc_004083EB: push ecx
+  loc_004083EC: call [00401144h] ; __vbaVarAdd
+  loc_004083F2: push eax
+  loc_004083F3: lea edx, var_154
+  loc_004083F9: push edx
+  loc_004083FA: lea eax, var_64
+  loc_004083FD: push eax
+  loc_004083FE: call [00401144h] ; __vbaVarAdd
+  loc_00408404: push eax
+  loc_00408405: lea ecx, var_84
+  loc_0040840B: push ecx
+  loc_0040840C: lea edx, var_94
+  loc_00408412: push edx
+  loc_00408413: call [00401144h] ; __vbaVarAdd
+  loc_00408419: push eax
+  loc_0040841A: lea eax, var_164
+  loc_00408420: push eax
+  loc_00408421: lea ecx, var_A4
+  loc_00408427: push ecx
+  loc_00408428: call [00401144h] ; __vbaVarAdd
+  loc_0040842E: push eax
+  loc_0040842F: lea edx, var_B4
+  loc_00408435: push edx
+  loc_00408436: lea eax, var_C4
+  loc_0040843C: push eax
+  loc_0040843D: call [00401144h] ; __vbaVarAdd
+  loc_00408443: push eax
+  loc_00408444: lea ecx, var_174
+  loc_0040844A: push ecx
+  loc_0040844B: lea edx, var_D4
+  loc_00408451: push edx
+  loc_00408452: call [00401144h] ; __vbaVarAdd
+  loc_00408458: push eax
+  loc_00408459: lea eax, var_F4
+  loc_0040845F: push eax
+  loc_00408460: lea ecx, var_104
+  loc_00408466: push ecx
+  loc_00408467: call [00401144h] ; __vbaVarAdd
+  loc_0040846D: push eax
+  loc_0040846E: lea edx, var_194
+  loc_00408474: push edx
+  loc_00408475: lea eax, var_114
+  loc_0040847B: push eax
+  loc_0040847C: call [00401144h] ; __vbaVarAdd
+  loc_00408482: push eax
+  loc_00408483: lea ecx, var_124
+  loc_00408489: push ecx
+  loc_0040848A: lea edx, var_134
+  loc_00408490: push edx
+  loc_00408491: call [00401144h] ; __vbaVarAdd
+  loc_00408497: push eax
+  loc_00408498: call [00401014h] ; __vbaStrVarMove
+  loc_0040849E: push eax
+  loc_0040849F: mov eax, [00409030h]
+  loc_004084A4: push eax
+  loc_004084A5: push 00000000h
+  loc_004084A7: call [004010F0h] ; __vbaLsetFixstrFree
+  loc_004084AD: lea ecx, var_134
+  loc_004084B3: push ecx
+  loc_004084B4: lea edx, var_124
+  loc_004084BA: push edx
+  loc_004084BB: lea eax, var_114
+  loc_004084C1: push eax
+  loc_004084C2: lea ecx, var_104
+  loc_004084C8: push ecx
+  loc_004084C9: lea edx, var_F4
+  loc_004084CF: push edx
+  loc_004084D0: lea eax, var_D4
+  loc_004084D6: push eax
+  loc_004084D7: lea ecx, var_E4
+  loc_004084DD: push ecx
+  loc_004084DE: lea edx, var_C4
+  loc_004084E4: push edx
+  loc_004084E5: lea eax, var_B4
+  loc_004084EB: push eax
+  loc_004084EC: lea ecx, var_A4
+  loc_004084F2: push ecx
+  loc_004084F3: lea edx, var_94
+  loc_004084F9: push edx
+  loc_004084FA: lea eax, var_84
+  loc_00408500: push eax
+  loc_00408501: lea ecx, var_64
+  loc_00408504: push ecx
+  loc_00408505: lea edx, var_74
+  loc_00408508: push edx
+  loc_00408509: lea eax, var_54
+  loc_0040850C: push eax
+  loc_0040850D: lea ecx, var_44
+  loc_00408510: push ecx
+  loc_00408511: lea edx, var_34
+  loc_00408514: push edx
+  loc_00408515: push 00000011h
+  loc_00408517: call [0040101Ch] ; __vbaFreeVarList
+  loc_0040851D: add esp, 00000048h
+  loc_00408520: mov var_4, 00000030h
+  loc_00408527: mov eax, [00409030h]
+  loc_0040852C: push eax
+  loc_0040852D: push 00000001h
+  loc_0040852F: push 00403608h
+  loc_00408534: call [004010D0h] ; __vbaPrintFile
+  loc_0040853A: add esp, 0000000Ch
+  loc_0040853D: jmp 0040871Dh
+  loc_00408542: mov var_4, 00000034h
+  loc_00408549: call [00401130h] ; rtcErrObj
+  loc_0040854F: mov var_2C, eax
+  loc_00408552: mov var_34, 00000009h
+  loc_00408559: lea ecx, var_34
+  loc_0040855C: push ecx
+  loc_0040855D: lea edx, var_44
+  loc_00408560: push edx
+  loc_00408561: call [00401158h] ; rtcVarStrFromVar
+  loc_00408567: call [00401130h] ; rtcErrObj
+  loc_0040856D: mov var_7C, eax
+  loc_00408570: mov var_84, 00000009h
+  loc_0040857A: lea eax, var_84
+  loc_00408580: push eax
+  loc_00408581: lea ecx, var_94
+  loc_00408587: push ecx
+  loc_00408588: call [00401180h] ; rtcVarFromError
+  loc_0040858E: lea edx, var_C4
+  loc_00408594: push edx
+  loc_00408595: call [00401188h] ; rtcGetPresentDate
+  loc_0040859B: lea eax, var_C4
+  loc_004085A1: push eax
+  loc_004085A2: lea ecx, var_D4
+  loc_004085A8: push ecx
+  loc_004085A9: call [00401158h] ; rtcVarStrFromVar
+  loc_004085AF: mov edx, arg_8
+  loc_004085B2: mov eax, [edx+00000058h]
+  loc_004085B5: push eax
+  loc_004085B6: push 004035F8h
+  loc_004085BB: call [00401034h] ; __vbaStrCat
+  loc_004085C1: mov var_4C, eax
+  loc_004085C4: mov var_54, 00000008h
+  loc_004085CB: mov var_13C, 00403610h ; ":"
+  loc_004085D5: mov var_144, 00000008h
+  loc_004085DF: mov var_14C, 004035F8h
+  loc_004085E9: mov var_154, 00000008h
+  loc_004085F3: lea ecx, var_54
+  loc_004085F6: push ecx
+  loc_004085F7: lea edx, var_44
+  loc_004085FA: push edx
+  loc_004085FB: lea eax, var_64
+  loc_004085FE: push eax
+  loc_004085FF: call [00401144h] ; __vbaVarAdd
+  loc_00408605: push eax
+  loc_00408606: lea ecx, var_144
+  loc_0040860C: push ecx
+  loc_0040860D: lea edx, var_74
+  loc_00408610: push edx
+  loc_00408611: call [00401144h] ; __vbaVarAdd
+  loc_00408617: push eax
+  loc_00408618: lea eax, var_94
+  loc_0040861E: push eax
+  loc_0040861F: lea ecx, var_A4
+  loc_00408625: push ecx
+  loc_00408626: call [00401144h] ; __vbaVarAdd
+  loc_0040862C: push eax
+  loc_0040862D: lea edx, var_154
+  loc_00408633: push edx
+  loc_00408634: lea eax, var_B4
+  loc_0040863A: push eax
+  loc_0040863B: call [00401144h] ; __vbaVarAdd
+  loc_00408641: push eax
+  loc_00408642: lea ecx, var_D4
+  loc_00408648: push ecx
+  loc_00408649: lea edx, var_E4
+  loc_0040864F: push edx
+  loc_00408650: call [00401144h] ; __vbaVarAdd
+  loc_00408656: push eax
+  loc_00408657: push 00000002h
+  loc_00408659: push 00403618h
+  loc_0040865E: call [004010D0h] ; __vbaPrintFile
+  loc_00408664: add esp, 0000000Ch
+  loc_00408667: lea eax, var_E4
+  loc_0040866D: push eax
+  loc_0040866E: lea ecx, var_D4
+  loc_00408674: push ecx
+  loc_00408675: lea edx, var_B4
+  loc_0040867B: push edx
+  loc_0040867C: lea eax, var_C4
+  loc_00408682: push eax
+  loc_00408683: lea ecx, var_A4
+  loc_00408689: push ecx
+  loc_0040868A: lea edx, var_94
+  loc_00408690: push edx
+  loc_00408691: lea eax, var_74
+  loc_00408694: push eax
+  loc_00408695: lea ecx, var_84
+  loc_0040869B: push ecx
+  loc_0040869C: lea edx, var_64
+  loc_0040869F: push edx
+  loc_004086A0: lea eax, var_44
+  loc_004086A3: push eax
+  loc_004086A4: lea ecx, var_54
+  loc_004086A7: push ecx
+  loc_004086A8: lea edx, var_34
+  loc_004086AB: push edx
+  loc_004086AC: push 0000000Ch
+  loc_004086AE: call [0040101Ch] ; __vbaFreeVarList
+  loc_004086B4: add esp, 00000034h
+  loc_004086B7: mov var_4, 00000035h
+  loc_004086BE: cmp var_24, 0001h
+  loc_004086C3: jnz 004086F3h
+  loc_004086C5: mov var_4, 00000036h
+  loc_004086CC: mov var_13C, 00000000h
+  loc_004086D6: mov var_144, 00000002h
+  loc_004086E0: lea edx, var_144
+  loc_004086E6: mov ecx, 00409070h
+  loc_004086EB: call [0040100Ch] ; __vbaVarMove
+  loc_004086F1: jmp 0040870Eh
+  loc_004086F3: mov var_4, 00000038h
+  loc_004086FA: mov [00409080h], 00000000h
+  loc_00408704: mov [00409084h], 00000000h
+  loc_0040870E: mov var_4, 0000003Ah
+  loc_00408715: push FFFFFFFFh
+  loc_00408717: call [00401030h] ; __vbaResume
+  loc_0040871D: call [00401048h] ; __vbaExitProc
+  loc_00408723: fwait
+  loc_00408724: push 004087A0h
+  loc_00408729: jmp 0040879Fh
+  loc_0040872B: lea eax, var_134
+  loc_00408731: push eax
+  loc_00408732: lea ecx, var_124
+  loc_00408738: push ecx
+  loc_00408739: lea edx, var_114
+  loc_0040873F: push edx
+  loc_00408740: lea eax, var_104
+  loc_00408746: push eax
+  loc_00408747: lea ecx, var_F4
+  loc_0040874D: push ecx
+  loc_0040874E: lea edx, var_E4
+  loc_00408754: push edx
+  loc_00408755: lea eax, var_D4
+  loc_0040875B: push eax
+  loc_0040875C: lea ecx, var_C4
+  loc_00408762: push ecx
+  loc_00408763: lea edx, var_B4
+  loc_00408769: push edx
+  loc_0040876A: lea eax, var_A4
+  loc_00408770: push eax
+  loc_00408771: lea ecx, var_94
+  loc_00408777: push ecx
+  loc_00408778: lea edx, var_84
+  loc_0040877E: push edx
+  loc_0040877F: lea eax, var_74
+  loc_00408782: push eax
+  loc_00408783: lea ecx, var_64
+  loc_00408786: push ecx
+  loc_00408787: lea edx, var_54
+  loc_0040878A: push edx
+  loc_0040878B: lea eax, var_44
+  loc_0040878E: push eax
+  loc_0040878F: lea ecx, var_34
+  loc_00408792: push ecx
+  loc_00408793: push 00000011h
+  loc_00408795: call [0040101Ch] ; __vbaFreeVarList
+  loc_0040879B: add esp, 00000048h
+  loc_0040879E: ret
+  loc_0040879F: ret
+  loc_004087A0: mov edx, arg_8
+  loc_004087A3: mov eax, [edx]
+  loc_004087A5: mov ecx, arg_8
+  loc_004087A8: push ecx
+  loc_004087A9: call [eax+00000008h]
+  loc_004087AC: mov eax, var_10
+  loc_004087AF: mov ecx, var_20
+  loc_004087B2: mov fs:[00000000h], ecx
+  loc_004087B9: pop edi
+  loc_004087BA: pop esi
+  loc_004087BB: pop ebx
+  loc_004087BC: mov esp, ebp
+  loc_004087BE: pop ebp
+  loc_004087BF: retn 0004h
+
+API
+'VA: 403068
+Private Declare Function GetPrivateProfileString Lib "kernel32" Alias "GetPrivateProfileStringA" (ByVal lpApplicationName As String, ByVal lpKeyName As String, ByVal lpDefault As String, ByVal lpReturnedString As String, ByVal nSize As Long, ByVal lpFileName As String) As Long
+'VA: 403014
+Private Declare Function WritePrivateProfileString Lib "kernel32" Alias "WritePrivateProfileStringA" (ByVal lpApplicationName As String, ByVal lpKeyName As Any, ByVal lpString As Any, ByVal lpFileName As String) As Long
