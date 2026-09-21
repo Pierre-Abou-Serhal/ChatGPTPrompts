@@ -1,67 +1,72 @@
-I have this procedure
-CREATE PROCEDURE [dbo].[usp_Get_Leap_Customers_By_Account_Id_List] 
-	@P__Account_Id_List NVARCHAR(MAX)
-
+ALTER PROCEDURE [dbo].[usp_Get_Leap_Customers_By_Account_Id_List]
+    @P__Account_Id_List NVARCHAR(MAX)
 AS
 BEGIN
-	SET NOCOUNT ON;
+    SET NOCOUNT ON;
 
-	-- Get RelCustomer (LEAP CUstomer ID) having RelCode = 9 from tblCustomer 
-
-
-	WITH IdList AS
-	(
-		SELECT DISTINCT RTRIM(LTRIM(([value]))) AS AccountId
-		FROM STRING_SPLIT(@P__Account_Id_List, ',')
-		WHERE RTRIM([value]) <> ''
-	),
-	RankedData AS
-	(
-		SELECT
-			IdList.AccountId      AS InputedId,
-			ACCOUNT.Id           AS T24AccountId,
-			ARRANGEMENT.Product  AS ProductCode,
-			ARRANGEMENT.ProdEffDate,
-			ROW_NUMBER() OVER (
-				PARTITION BY ACCOUNT.Id
-				ORDER BY ARRANGEMENT.ProdEffDate DESC
-			) AS rn
-		FROM [Alterna.BRef].[dbo].[t_AccountV2] AS ACCOUNT
-		LEFT JOIN t_Arrangement_T24 AS ARRANGEMENT
-			ON ARRANGEMENT.Id = ACCOUNT.ArrangementId
-		INNER JOIN IdList
-			ON ACCOUNT.Id = IdList.AccountId
-		WHERE ARRANGEMENT.ProductStatus='CURRENT'
-		AND ARRANGEMENT.ArrStatus IN ('AUTH', 'RESTORE-AUTH', 'CURRENT')
-	)
-	SELECT
-		InputedId,
-		T24AccountId,
-		ProductCode,
-		ProdEffDate
-	FROM RankedData
-	WHERE rn = 1
-	ORDER BY ProdEffDate DESC;
-
-
-I want to update it so that
-First, I get the RelCustomer column from table
-tblCustomer where tblCustomer.RelationCode = 9 AND tblCustomer.Id IN STRING_SPLIT(@P__Account_Id_List.Substring(2,7), ',')
-Note that  tblCustomer.Id is INT
-Also for each account in @P__Account_Id_List I want to get its currency that is the last three characters of the account
-
-then
-I want to check [t_AccountV2] and t_Arrangement_T24 using the result (RelCustomer) and check against t_AccountV2.Customer where it is equal to the RelCustomer
-LEFT JOIN t_Arrangement_T24 AS ARRANGEMENT
-			ON ARRANGEMENT.Id = ACCOUNT.ArrangementId
-
-WHERE ARRANGEMENT.ProductStatus='CURRENT'
-		AND ARRANGEMENT.ArrStatus IN ('AUTH', 'RESTORE-AUTH', 'CURRENT')
-
-And where the last three characters of t_AccountV2 are the same as the result of the currency of the row of RelCustomer
-
-In the end 
-WHERE rn = 1
-	ORDER BY ProdEffDate DESC;
-
-So only one account per customer return
+    ;WITH IdList AS
+    (
+        SELECT DISTINCT
+            LTRIM(RTRIM([value])) AS AccountId
+        FROM STRING_SPLIT(@P__Account_Id_List, ',')
+        WHERE LTRIM(RTRIM([value])) <> ''
+    ),
+    ParsedAccounts AS
+    (
+        SELECT
+            AccountId AS InputedId,
+            -- Equivalent to C# AccountId.Substring(2, 7).
+            TRY_CONVERT(INT, SUBSTRING(AccountId, 3, 7)) AS CustomerId,
+            RIGHT(AccountId, 3) AS Currency
+        FROM IdList
+    ),
+    RelatedCustomers AS
+    (
+        SELECT DISTINCT
+            INPUT.InputedId,
+            CUSTOMER.RelCustomer,
+            INPUT.Currency
+        FROM ParsedAccounts AS INPUT
+        INNER JOIN [dbo].[tblCustomer] AS CUSTOMER
+            ON CUSTOMER.Id = INPUT.CustomerId
+           AND CUSTOMER.RelationCode = 9
+        WHERE CUSTOMER.RelCustomer IS NOT NULL
+    ),
+    RankedData AS
+    (
+        SELECT
+            RELATED.InputedId,
+            RELATED.RelCustomer,
+            RELATED.Currency,
+            ACCOUNT.Id AS T24AccountId,
+            ARRANGEMENT.Product AS ProductCode,
+            ARRANGEMENT.ProdEffDate,
+            ROW_NUMBER() OVER
+            (
+                PARTITION BY RELATED.RelCustomer
+                ORDER BY
+                    ARRANGEMENT.ProdEffDate DESC,
+                    ACCOUNT.Id,
+                    RELATED.InputedId,
+                    ARRANGEMENT.Product
+            ) AS rn
+        FROM RelatedCustomers AS RELATED
+        INNER JOIN [Alterna.BRef].[dbo].[t_AccountV2] AS ACCOUNT
+            ON ACCOUNT.Customer = RELATED.RelCustomer
+           AND RIGHT(RTRIM(ACCOUNT.Id), 3) = RELATED.Currency
+        LEFT JOIN [dbo].[t_Arrangement_T24] AS ARRANGEMENT
+            ON ARRANGEMENT.Id = ACCOUNT.ArrangementId
+        WHERE ARRANGEMENT.ProductStatus = 'CURRENT'
+          AND ARRANGEMENT.ArrStatus IN ('AUTH', 'RESTORE-AUTH', 'CURRENT')
+    )
+    SELECT
+        InputedId,
+        T24AccountId,
+        ProductCode,
+        ProdEffDate,
+        RelCustomer,
+        Currency
+    FROM RankedData
+    WHERE rn = 1
+    ORDER BY ProdEffDate DESC;
+END;
