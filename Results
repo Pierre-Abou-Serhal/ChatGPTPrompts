@@ -1,3 +1,10 @@
+USE [Alterna.BRef]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_Get_Leap_Customers_By_Account_Id_List]    Script Date: 9/23/2026 11:15:06 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
 ALTER PROCEDURE [dbo].[usp_Get_Leap_Customers_By_Account_Id_List]
     @P__Account_Id_List NVARCHAR(MAX)
 AS
@@ -15,7 +22,6 @@ BEGIN
     (
         SELECT
             AccountId AS InputedId,
-            -- Equivalent to C# AccountId.Substring(2, 7).
             TRY_CONVERT(INT, SUBSTRING(AccountId, 3, 7)) AS CustomerId,
             RIGHT(AccountId, 3) AS Currency
         FROM IdList
@@ -29,6 +35,7 @@ BEGIN
         FROM ParsedAccounts AS INPUT
         INNER JOIN [dbo].[tblCustomer] AS CUSTOMER
             ON CUSTOMER.Id = INPUT.CustomerId
+		   AND CUSTOMER.CompanyBook = 'LB0010307'
            AND CUSTOMER.RelationCode = 9
         WHERE CUSTOMER.RelCustomer IS NOT NULL
     ),
