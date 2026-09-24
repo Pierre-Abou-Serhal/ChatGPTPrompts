@@ -1,6 +1,8 @@
+
+    
+  
 USE [Alterna.BRef]
 GO
-/****** Object:  StoredProcedure [dbo].[usp_Get_Leap_Customers_By_Account_Id_List]    Script Date: 9/24/2026 1:46:13 PM ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -22,30 +24,24 @@ BEGIN
     (
         SELECT
             AccountId AS InputedId,
+            -- Equivalent to C# AccountId.Substring(2, 7).
             TRY_CONVERT(INT, SUBSTRING(AccountId, 3, 7)) AS CustomerId,
             RIGHT(AccountId, 3) AS Currency
         FROM IdList
     ),
-	RelatedCustomers AS
-	(
-		SELECT DISTINCT
-			INPUT.InputedId,
-			CUSTOMER.RelCustomer,
-			INPUT.Currency
-		FROM ParsedAccounts AS INPUT
-		INNER JOIN [dbo].[tblCustomer] AS CUSTOMER
-			ON CUSTOMER.Id = INPUT.CustomerId
-		   AND CUSTOMER.RelationCode = 9
-		WHERE CUSTOMER.RelCustomer IS NOT NULL
-		  AND EXISTS
-		  (
-			  SELECT 1
-			  FROM [dbo].[tblCustomer] AS RELATED_CUSTOMER
-			  WHERE RELATED_CUSTOMER.Id =
-					TRY_CONVERT(INT, CUSTOMER.RelCustomer)
-				AND RELATED_CUSTOMER.CompanyBook = 'LB0010307'
-		  )
-	),
+    RelatedCustomers AS
+    (
+        SELECT DISTINCT
+            INPUT.InputedId,
+            -- Return the related customer's own ID for the account lookup.
+            RELATED_CUSTOMER.Id AS RelCustomer,
+            INPUT.Currency
+        FROM ParsedAccounts AS INPUT
+        INNER JOIN [dbo].[tblCustomer] AS RELATED_CUSTOMER
+            ON TRY_CONVERT(INT, RELATED_CUSTOMER.RelCustomer) = INPUT.CustomerId
+        WHERE RELATED_CUSTOMER.RelationCode = 9
+          AND RELATED_CUSTOMER.CompanyBook = 'LB0010307'
+    ),
     RankedData AS
     (
         SELECT
@@ -66,7 +62,7 @@ BEGIN
             ) AS rn
         FROM RelatedCustomers AS RELATED
         INNER JOIN [Alterna.BRef].[dbo].[t_AccountV2] AS ACCOUNT
-            ON ACCOUNT.Customer = RELATED.RelCustomer
+            ON TRY_CONVERT(INT, ACCOUNT.Customer) = RELATED.RelCustomer
            AND RIGHT(RTRIM(ACCOUNT.Id), 3) = RELATED.Currency
         LEFT JOIN [dbo].[t_Arrangement_T24] AS ARRANGEMENT
             ON ARRANGEMENT.Id = ACCOUNT.ArrangementId
@@ -84,3 +80,4 @@ BEGIN
     WHERE rn = 1
     ORDER BY ProdEffDate DESC;
 END;
+
