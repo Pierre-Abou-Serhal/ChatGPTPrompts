@@ -1,20 +1,23 @@
-RelatedCustomers AS
-(
-    SELECT DISTINCT
-        INPUT.InputedId,
-        CUSTOMER.RelCustomer,
-        INPUT.Currency
-    FROM ParsedAccounts AS INPUT
-    INNER JOIN [dbo].[tblCustomer] AS CUSTOMER
-        ON CUSTOMER.Id = INPUT.CustomerId
-       AND CUSTOMER.RelationCode = 9
-    WHERE CUSTOMER.RelCustomer IS NOT NULL
-      AND EXISTS
-      (
-          SELECT 1
-          FROM [dbo].[tblCustomer] AS RELATED_CUSTOMER
-          WHERE RELATED_CUSTOMER.Id =
-                TRY_CONVERT(INT, CUSTOMER.RelCustomer)
-            AND RELATED_CUSTOMER.CompanyBook = 'LB0010307'
-      )
-),
+I have an MVC page
+.cshtml
+
+I want to have a helper that will return html that I can use to show in a table column a warning icon representing that a customer have posting restriction
+
+Example of one helper that I have that have nothing to do with the feature I want
+
+@helper GradeMeta(decimal mark, decimal total)
+{
+    var pct = CalcPct(mark, total);
+
+    <div class="dc-meta">
+        <span class="dc-pill">
+            <b>Grade</b>
+            <span>@Math.Round(mark, 2) / @Math.Round(total, 2)</span>
+        </span>
+
+        <span class="dc-pill dc-pill--pct @PctClass(pct)">
+            <b>%</b>
+            <span>@pct</span>
+        </span>
+    </div>
+}
