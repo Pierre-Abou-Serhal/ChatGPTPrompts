@@ -1,75 +1,48 @@
-This shows an **amber warning icon** with a tooltip when the customer has a posting restriction. Passing `false` renders nothing. It uses inline SVG, so no icon library is required.
+Use this HTML inside your table column. The CSS draws an **amber warning triangle with an exclamation mark**.
 
-Add this helper to your `.cshtml`:
-
-```cshtml
-@helper PostingRestrictionIcon(bool hasPostingRestriction)
-{
-    if (hasPostingRestriction)
-    {
-        <span class="posting-restriction-icon"
-              title="Customer has a posting restriction"
-              role="img"
-              aria-label="Customer has a posting restriction">
-            <svg xmlns="http://www.w3.org/2000/svg"
-                 viewBox="0 0 24 24"
-                 fill="none"
-                 stroke="currentColor"
-                 stroke-width="1.8"
-                 stroke-linecap="round"
-                 stroke-linejoin="round"
-                 aria-hidden="true"
-                 focusable="false">
-                <path d="M12 3 2 21h20L12 3Z" />
-                <path d="M12 9v5" />
-                <circle cx="12" cy="17" r="1"
-                        fill="currentColor" stroke="none" />
-            </svg>
-        </span>
-    }
-}
+```html
+<td>
+    <span class="posting-restriction-icon"
+          title="Customer has a posting restriction"
+          role="img"
+          aria-label="Customer has a posting restriction"></span>
+</td>
 ```
 
-Add this CSS to your stylesheet, or inside a `<style>` block in the page:
-
 ```css
-.posting-restriction-cell {
-    text-align: center;
-    vertical-align: middle;
-}
-
 .posting-restriction-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    box-sizing: border-box;
-    border: 1px solid #f0d28a;
-    border-radius: 6px;
-    background-color: #fff8e6;
-    color: #925900;
+    position: relative;
+    display: inline-block;
+    width: 24px;
+    height: 22px;
     vertical-align: middle;
     cursor: help;
 }
 
-.posting-restriction-icon svg {
-    display: block;
-    width: 18px;
-    height: 18px;
+.posting-restriction-icon::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-bottom: 22px solid #f5b301;
+}
+
+.posting-restriction-icon::after {
+    content: "!";
+    position: absolute;
+    bottom: 1px;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font: bold 15px/16px Arial, sans-serif;
+    color: #513600;
 }
 ```
 
-Then call it inside your table column, replacing `customer.HasPostingRestriction` with your actual property or condition:
-
-```cshtml
-<td class="posting-restriction-cell">
-    @PostingRestrictionIcon(customer.HasPostingRestriction)
-</td>
-```
-
-This follows the classic MVC `@helper` syntax in your example. **ASP.NET Core MVC does not support `@helper`.** ([learn.microsoft.com][1])
+Render the `<span>` only when the customer has a posting restriction. Hovering over it shows the tooltip.
 
 [](sandbox:/workspace/scratch/b36847eb2ec0/PostingRestrictionIcon.cshtml)
-
-[1]: https://learn.microsoft.com/en-us/aspnet/core/mvc/views/razor?view=aspnetcore-10.0&utm_source=chatgpt.com "Razor syntax reference for ASP.NET Core"
