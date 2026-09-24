@@ -1,235 +1,86 @@
-<dvm name="currencies" xmlns="http://xmlns.oracle.com/dvm">
-  <description>Holds the mappings between the different currency formats for a specific SGBL geographic location(e.g. Lebanon, Jordan, etc.)</description>
-  <columns>
-    <column name="ICBS"/>
-    <column name="ALPHA"/>
-    <column name="ISO"/>
-  </columns>
-  <rows>
-    <row>
-      <cell>001</cell>
-      <cell>LBP</cell>
-      <cell>422</cell>
-    </row>
-    <row>
-      <cell>002</cell>
-      <cell>GBP</cell>
-      <cell>826</cell>
-    </row>
-    <row>
-      <cell>004</cell>
-      <cell>USD</cell>
-      <cell>840</cell>
-    </row>
-    <row>
-      <cell>020</cell>
-      <cell>CHF</cell>
-      <cell>756</cell>
-    </row>
-    <row>
-      <cell>028</cell>
-      <cell>EGP</cell>
-      <cell>818</cell>
-    </row>
-    <row>
-      <cell>044</cell>
-      <cell>SYP</cell>
-      <cell>760</cell>
-    </row>
-    <row>
-      <cell>046</cell>
-      <cell>IQD</cell>
-      <cell>368</cell>
-    </row>
-    <row>
-      <cell>048</cell>
-      <cell>SEK</cell>
-      <cell>752</cell>
-    </row>
-    <row>
-      <cell>050</cell>
-      <cell>NOK</cell>
-      <cell>578</cell>
-    </row>
-    <row>
-      <cell>060</cell>
-      <cell>DKK</cell>
-      <cell>208</cell>
-    </row>
-    <row>
-      <cell>080</cell>
-      <cell>JPY</cell>
-      <cell>392</cell>
-    </row>
-    <row>
-      <cell>073</cell>
-      <cell>CNY</cell>
-      <cell>156</cell>
-    </row>
-    <row>
-      <cell>054</cell>
-      <cell>AUD</cell>
-      <cell>036</cell>
-    </row>
-    <row>
-      <cell>064</cell>
-      <cell>CAD</cell>
-      <cell>124</cell>
-    </row>
-    <row>
-      <cell>072</cell>
-      <cell>SAR</cell>
-      <cell>682</cell>
-    </row>
-    <row>
-      <cell>051</cell>
-      <cell>BHD</cell>
-      <cell>048</cell>
-    </row>
-    <row>
-      <cell>052</cell>
-      <cell>KWD</cell>
-      <cell>414</cell>
-    </row>
-    <row>
-      <cell>053</cell>
-      <cell>AED</cell>
-      <cell>784</cell>
-    </row>
-    <row>
-      <cell>055</cell>
-      <cell>HKD</cell>
-      <cell>344</cell>
-    </row>
-    <row>
-      <cell>058</cell>
-      <cell>XAF</cell>
-      <cell>950</cell>
-    </row>
-    <row>
-      <cell>065</cell>
-      <cell>XAU</cell>
-      <cell>959</cell>
-    </row>
-    <row>
-      <cell>066</cell>
-      <cell>JOD</cell>
-      <cell>400</cell>
-    </row>
-    <row>
-      <cell>070</cell>
-      <cell>QAR</cell>
-      <cell>634</cell>
-    </row>
-    <row>
-      <cell>090</cell>
-      <cell>EUR</cell>
-      <cell>978</cell>
-    </row>
-    <row>
-      <cell>068</cell>
-      <cell>NZD</cell>
-      <cell>554</cell>
-    </row>
-    <row>
-      <cell>045</cell>
-      <cell>TRY</cell>
-      <cell>949</cell>
-    </row>
-    <row>
-      <cell>031</cell>
-      <cell>OMR</cell>
-      <cell>512</cell>
-    </row>
-    <row>
-      <cell>032</cell>
-      <cell>LKR</cell>
-      <cell>144</cell>
-    </row>
-    <row>
-      <cell>034</cell>
-      <cell>BRL</cell>
-      <cell>986</cell>
-    </row>
-    <row>
-      <cell>037</cell>
-      <cell>DZD</cell>
-      <cell>012</cell>
-    </row>
-    <row>
-      <cell>038</cell>
-      <cell>MAD</cell>
-      <cell>504</cell>
-    </row>
-    <row>
-      <cell>039</cell>
-      <cell>MYR</cell>
-      <cell>458</cell>
-    </row>
-    <row>
-      <cell>075</cell>
-      <cell>CZK</cell>
-      <cell>203</cell>
-    </row>
-    <row>
-      <cell>076</cell>
-      <cell>THB</cell>
-      <cell>764</cell>
-    </row>
-    <row>
-      <cell>030</cell>
-      <cell>PTS</cell>
-      <cell>030</cell>
-    </row>
-    <row>
-      <cell>999</cell>
-      <cell>INR</cell>
-      <cell>356</cell>
-    </row>
-    <row>
-      <cell>998</cell>
-      <cell>ARS</cell>
-      <cell>032</cell>
-    </row>
-    <row>
-      <cell>997</cell>
-      <cell>NPR</cell>
-      <cell>524</cell>
-    </row>
-    <row>
-      <cell>996</cell>
-      <cell>PHP</cell>
-      <cell>608</cell>
-    </row>
-    <row>
-      <cell>995</cell>
-      <cell>RUB</cell>
-      <cell>643</cell>
-    </row>
-    <row>
-      <cell>994</cell>
-      <cell>SGD</cell>
-      <cell>702</cell>
-    </row>
-    <row>
-      <cell>993</cell>
-      <cell>ZAR</cell>
-      <cell>710</cell>
-    </row>
-    <row>
-      <cell>992</cell>
-      <cell>PLN</cell>
-      <cell>985</cell>
-    </row>
-    <row>
-      <cell>991</cell>
-      <cell>TWD</cell>
-      <cell>901</cell>
-    </row>
-    <row>
-      <cell>990</cell>
-      <cell>XAG</cell>
-      <cell>961</cell>
-    </row>
-  </rows>
-</dvm>
+USE [Alterna.BRef]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_Get_Leap_Customers_By_Account_Id_List]    Script Date: 9/24/2026 1:46:13 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_Get_Leap_Customers_By_Account_Id_List]
+    @P__Account_Id_List NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    ;WITH IdList AS
+    (
+        SELECT DISTINCT
+            LTRIM(RTRIM([value])) AS AccountId
+        FROM STRING_SPLIT(@P__Account_Id_List, ',')
+        WHERE LTRIM(RTRIM([value])) <> ''
+    ),
+    ParsedAccounts AS
+    (
+        SELECT
+            AccountId AS InputedId,
+            TRY_CONVERT(INT, SUBSTRING(AccountId, 3, 7)) AS CustomerId,
+            RIGHT(AccountId, 3) AS Currency
+        FROM IdList
+    ),
+	RelatedCustomers AS
+	(
+		SELECT DISTINCT
+			INPUT.InputedId,
+			CUSTOMER.RelCustomer,
+			INPUT.Currency
+		FROM ParsedAccounts AS INPUT
+		INNER JOIN [dbo].[tblCustomer] AS CUSTOMER
+			ON CUSTOMER.Id = INPUT.CustomerId
+		   AND CUSTOMER.RelationCode = 9
+		WHERE CUSTOMER.RelCustomer IS NOT NULL
+		  AND EXISTS
+		  (
+			  SELECT 1
+			  FROM [dbo].[tblCustomer] AS RELATED_CUSTOMER
+			  WHERE RELATED_CUSTOMER.Id =
+					TRY_CONVERT(INT, CUSTOMER.RelCustomer)
+				AND RELATED_CUSTOMER.CompanyBook = 'LB0010307'
+		  )
+	),
+    RankedData AS
+    (
+        SELECT
+            RELATED.InputedId,
+            RELATED.RelCustomer,
+            RELATED.Currency,
+            ACCOUNT.Id AS T24AccountId,
+            ARRANGEMENT.Product AS ProductCode,
+            ARRANGEMENT.ProdEffDate,
+            ROW_NUMBER() OVER
+            (
+                PARTITION BY RELATED.RelCustomer
+                ORDER BY
+                    ARRANGEMENT.ProdEffDate DESC,
+                    ACCOUNT.Id,
+                    RELATED.InputedId,
+                    ARRANGEMENT.Product
+            ) AS rn
+        FROM RelatedCustomers AS RELATED
+        INNER JOIN [Alterna.BRef].[dbo].[t_AccountV2] AS ACCOUNT
+            ON ACCOUNT.Customer = RELATED.RelCustomer
+           AND RIGHT(RTRIM(ACCOUNT.Id), 3) = RELATED.Currency
+        LEFT JOIN [dbo].[t_Arrangement_T24] AS ARRANGEMENT
+            ON ARRANGEMENT.Id = ACCOUNT.ArrangementId
+        WHERE ARRANGEMENT.ProductStatus = 'CURRENT'
+          AND ARRANGEMENT.ArrStatus IN ('AUTH', 'RESTORE-AUTH', 'CURRENT')
+    )
+    SELECT
+        InputedId,
+        T24AccountId,
+        ProductCode,
+        ProdEffDate,
+        RelCustomer,
+        Currency
+    FROM RankedData
+    WHERE rn = 1
+    ORDER BY ProdEffDate DESC;
+END;
