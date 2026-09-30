@@ -1,83 +1,328 @@
+This is what we are currently sending to MasterCard
 
-    
-  
-USE [Alterna.BRef]
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-ALTER PROCEDURE [dbo].[usp_Get_Leap_Customers_By_Account_Id_List]
-    @P__Account_Id_List NVARCHAR(MAX)
-AS
-BEGIN
-    SET NOCOUNT ON;
+xquery version "1.0" encoding "utf-8";
 
-    ;WITH IdList AS
-    (
-        SELECT DISTINCT
-            LTRIM(RTRIM([value])) AS AccountId
-        FROM STRING_SPLIT(@P__Account_Id_List, ',')
-        WHERE LTRIM(RTRIM([value])) <> ''
-    ),
-    ParsedAccounts AS
-    (
-        SELECT
-            AccountId AS InputedId,
-            -- Equivalent to C# AccountId.Substring(2, 7).
-            TRY_CONVERT(INT, SUBSTRING(AccountId, 3, 7)) AS CustomerId,
-            RIGHT(AccountId, 3) AS Currency
-        FROM IdList
-    ),
-    RelatedCustomers AS
-    (
-        SELECT DISTINCT
-            INPUT.InputedId,
-            -- Return the related customer's own ID for the account lookup.
-            RELATED_CUSTOMER.Id AS RelCustomer,
-            INPUT.Currency
-        FROM ParsedAccounts AS INPUT
-        INNER JOIN [dbo].[tblCustomer] AS RELATED_CUSTOMER
-            ON TRY_CONVERT(INT, RELATED_CUSTOMER.RelCustomer) = INPUT.CustomerId
-        WHERE RELATED_CUSTOMER.RelationCode = 9
-          AND RELATED_CUSTOMER.CompanyBook = 'LB0010307'
-    ),
-    RankedData AS
-    (
-        SELECT
-            RELATED.InputedId,
-            RELATED.RelCustomer,
-            RELATED.Currency,
-            ACCOUNT.Id AS T24AccountId,
-            ARRANGEMENT.Product AS ProductCode,
-            ARRANGEMENT.ProdEffDate,
-            ROW_NUMBER() OVER
-            (
-                PARTITION BY RELATED.RelCustomer
-                ORDER BY
-                    ARRANGEMENT.ProdEffDate DESC,
-                    ACCOUNT.Id,
-                    RELATED.InputedId,
-                    ARRANGEMENT.Product
-            ) AS rn
-        FROM RelatedCustomers AS RELATED
-        INNER JOIN [Alterna.BRef].[dbo].[t_AccountV2] AS ACCOUNT
-            ON TRY_CONVERT(INT, ACCOUNT.Customer) = RELATED.RelCustomer
-           AND RIGHT(RTRIM(ACCOUNT.Id), 3) = RELATED.Currency
-        LEFT JOIN [dbo].[t_Arrangement_T24] AS ARRANGEMENT
-            ON ARRANGEMENT.Id = ACCOUNT.ArrangementId
-        WHERE ARRANGEMENT.ProductStatus = 'CURRENT'
-          AND ARRANGEMENT.ArrStatus IN ('AUTH', 'RESTORE-AUTH', 'CURRENT')
-    )
-    SELECT
-        InputedId,
-        T24AccountId,
-        ProductCode,
-        ProdEffDate,
-        RelCustomer,
-        Currency
-    FROM RankedData
-    WHERE rn = 1
-    ORDER BY ProdEffDate DESC;
-END;
+(:: OracleAnnotationVersion "1.0" ::)
 
+declare namespace ns2="http://www.sgbl.com.lb/schemas/PostTransferReq";
+(:: import schema at "../../../../../../Backend.svc/BackBase/BackBase.Transfers/BackBase.Transfers.MasterCardSend/xsd/PostTransferReq.xsd" ::)
+declare namespace ns1="http://www.sgbl.com.lb/schemas/cvs.MasterCardSendPostTransferReq";
+(:: import schema at "../../xsd/cvs.MasterCardSendPostTransferReq.xsd" ::)
+declare namespace ns3="http://www.sgbl.com.lb/GetCustomerDataByCustomerIdListRes";
+(:: import schema at "../../../../../../Backend.svc/Alterna.Services/Alterna.DataGateway/xsd/GetCustomerDataByCustomerIdList/bs.GetCustomerDataByCustomerIdListRes.xsd" ::)
+declare namespace cvs = "http://www.sgbl.com.lb/schemas/cvs.MasterCardSendDTOs";
+
+declare namespace dto = "http://www.sgbl.com.lb/schemas/DTOs";
+
+declare namespace cus = "http://www.sgbl.com.lb/CustomerExpectedFields";
+
+declare variable $MasterCardSendPostTransferReq as element() (:: schema-element(ns1:MasterCardSendPostTransferReq) ::) external;
+declare variable $sendInfoRes as element() (:: schema-element(ns3:GetCustomerDataByCustomerIdListRes) ::) external; 
+declare function local:func(
+                            $MasterCardSendPostTransferReq as element() (:: schema-element(ns1:MasterCardSendPostTransferReq) ::),
+                            $sendInfoRes as element() (:: schema-element(ns3:GetCustomerDataByCustomerIdListRes) ::)
+                            ) as element() (:: schema-element(ns2:PostTransferReq) ::) {
+    let $location := if(lower-case(fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:recipientCardCountry))='lbn')then('domestic')else('XB')
+    return
+    <ns2:PostTransferReq>
+        <ns2:payment_transfer>
+            <dto:transfer_reference>{fn:data($MasterCardSendPostTransferReq/ns1:correlationId)}</dto:transfer_reference>
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:paymentType)
+                then <dto:payment_type>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:paymentType)}</dto:payment_type>
+                else ()
+            }
+            
+            <dto:amount>
+            {
+              xs:string(fn-bea:format-number(fn:number(fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:amount)) * 100, '################.##'))
+            }</dto:amount>
+            
+            <dto:currency>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:currency)}</dto:currency>
+            <dto:sender_account_uri>{fn:concat('raw:',fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:senderAccount))}</dto:sender_account_uri>
+            <dto:sender>
+                <dto:first_name>
+                  {
+                    if($sendInfoRes/ns3:Resp/cus:FirstName and fn-bea:trim($sendInfoRes/ns3:Resp/cus:FirstName) != '')
+                    then fn:substring(fn:data($sendInfoRes/ns3:Resp/cus:FirstName), 1, 40)
+                    else (fn:substring(fn:data($sendInfoRes/ns3:Resp/cus:Name1), 1, 40))
+                  }</dto:first_name>
+                <dto:last_name>
+                  {
+                    if($sendInfoRes/ns3:Resp/cus:FamilyName and fn-bea:trim(fn:data($sendInfoRes/ns3:Resp/cus:FamilyName)) != '')
+                    then fn:substring(fn:data($sendInfoRes/ns3:Resp/cus:FamilyName), 1, 40)
+                    else (fn:substring(fn:data($sendInfoRes/ns3:Resp/cus:Name1), 1, 40))
+                  }</dto:last_name>
+                <dto:account_type>{dvmtr:lookupValue('core/dvm/MasterCardConfigs','Name',fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:senderAccountType),'Value','',('Type','accountType'))}</dto:account_type>
+                <dto:address>
+                    <dto:line1>
+                      {
+                        fn:substring(fn:data($sendInfoRes/ns3:Resp/cus:Address), 1, 50)
+                      }
+                      </dto:line1>
+                    <dto:city>
+                      {
+                        fn:substring(fn:data($sendInfoRes/ns3:Resp/cus:TownCountry), 1, 25)
+                      }
+                    </dto:city>
+                    <dto:postal_code>00000</dto:postal_code>
+                    <dto:country>
+                    {
+                      if($sendInfoRes/ns3:Resp/cus:Residence and fn-bea:trim(fn:data($sendInfoRes/ns3:Resp/cus:Residence)) != '')
+                      then dvmtr:lookup('core/dvm/countries','ISO3166-1-Alpha-2',fn:data($sendInfoRes/ns3:Resp/cus:Residence),'ISO3166-1-Alpha-3','LBN')
+                      else ()
+                    }
+                    </dto:country>
+                    {
+                        if (fn:data($sendInfoRes/ns3:Resp/cus:Residence) = 'CAN')
+                        then <dto:country_subdivision>QC</dto:country_subdivision>
+                        else if (fn:data($sendInfoRes/ns3:Resp/cus:Residence) = 'USA')
+                        then <dto:country_subdivision>IL</dto:country_subdivision>
+                        else()
+                    }
+                </dto:address>
+            </dto:sender>
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:additionalMessage)
+                then <dto:additional_message>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:additionalMessage)}</dto:additional_message>
+                else ()
+            }
+            <dto:funding_source>
+            {
+              if(fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:fundingSource)!='') 
+              then fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:fundingSource) 
+              else ('DEBIT')
+            }</dto:funding_source>
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:transactionPurpose)
+                then <dto:transaction_purpose>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:transactionPurpose)}</dto:transaction_purpose>
+                else ()
+            }
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:authentication)
+                then <dto:authentication>
+                    {
+                        if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:authentication/cvs:authenticationValue)
+                        then <dto:authentication_value>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:authentication/cvs:authenticationValue)}</dto:authentication_value>
+                        else ()
+                    }
+                    {
+                        if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:authentication/cvs:authenticationCode)
+                        then <dto:authentication_code>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:authentication/cvs:authenticationCode)}</dto:authentication_code>
+                        else ()
+                    }</dto:authentication>
+                else ()
+            }
+            <dto:recipient_account_uri>{fn:concat('pan:',fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:recipientAccount))}</dto:recipient_account_uri>
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient)
+                then <dto:recipient>
+                    <dto:first_name>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:firstName)}</dto:first_name>
+                    {
+                        if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:middleName)
+                        then <dto:middle_name>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:middleName)}</dto:middle_name>
+                        else ()
+                    }
+                    <dto:last_name>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:lastName)}</dto:last_name>
+                    {
+                        if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:nationality)
+                        then <dto:nationality>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:nationality)}</dto:nationality>
+                        else ()
+                    }
+                    {
+                        if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:dateOfBirth)
+                        then <dto:date_of_birth>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:dateOfBirth)}</dto:date_of_birth>
+                        else ()
+                    }
+                    <dto:account_type>{dvmtr:lookupValue('core/dvm/MasterCardConfigs','Name',fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:recipientAccountType),'Value','',('Type','accountType'))}</dto:account_type>
+                    {
+                        (:if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address)
+                        then <dto:address>
+                            {
+                                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:line1)
+                                then <dto:line1>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:line1)}</dto:line1>
+                                else ()
+                            }
+                            {
+                                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:line2)
+                                then <dto:line2>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:line2)}</dto:line2>
+                                else ()
+                            }
+                            {
+                                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:city)
+                                then <dto:city>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:city)}</dto:city>
+                                else ()
+                            }
+                            {
+                                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:countrySubdivision)
+                                then <dto:country_subdivision>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:countrySubdivision)}</dto:country_subdivision>
+                                else ()
+                            }
+                            {
+                                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:postalCode)
+                                then <dto:postal_code>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:postalCode)}</dto:postal_code>
+                                else ()
+                            }
+                            {
+                                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:country)
+                                then <dto:country>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:address/cvs:country)}</dto:country>
+                                else ()
+                            }</dto:address> :)
+
+                        <dto:address>
+                          {
+                            if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:recipientCardCountry)
+                            then <dto:country>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:recipientCardCountry)}</dto:country>
+                            else ()
+                          }
+                          <dto:postal_code>00000</dto:postal_code>
+                          {
+                              if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:recipientCardCountry/text() = 'CAN')
+                              then <dto:country_subdivision>QC</dto:country_subdivision>
+                              else if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:recipientCardCountry/text() = 'USA')
+                              then <dto:country_subdivision>IL</dto:country_subdivision>
+                              else()
+                          }
+                          
+                        </dto:address>
+                    }
+                    {
+                        if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:phone)
+                        then <dto:phone>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:phone)}</dto:phone>
+                        else ()
+                    }
+                    {
+                        if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:email)
+                        then <dto:email>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:email)}</dto:email>
+                        else ()
+                    }
+                    {
+                        if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:governmentIds)
+                        then <dto:government_ids>
+                            {
+                                for $governmentIdUri1 in $MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:governmentIds/cvs:governmentIdUri
+                                return 
+                                <dto:government_id_uri>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:governmentIds/cvs:governmentIdUri)}</dto:government_id_uri>
+                            }</dto:government_ids>
+                        else ()
+                    }
+                    {
+                        if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:nameOnAccount)
+                        then <dto:name_on_account>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:recipient/cvs:nameOnAccount)}</dto:name_on_account>
+                        else ()
+                    }</dto:recipient>
+                else ()
+            }
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:paymentOriginationCountry)
+                then <dto:payment_origination_country>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:paymentOriginationCountry)}</dto:payment_origination_country>
+                else ()
+            }
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:channel)
+                then 
+                
+                <dto:channel>{
+                  if(lower-case(fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:channel))='web')
+                  then(fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:channel))
+                  else('MOBILE')}
+                </dto:channel>
+                else ()
+            }
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:statementDescriptor)
+                then <dto:statement_descriptor>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:statementDescriptor)}</dto:statement_descriptor>
+                else ()
+            }
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:deviceId)
+                then <dto:device_id>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:deviceId)}</dto:device_id>
+                else ()
+            }
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:location)
+                then <dto:location>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:location)}</dto:location>
+                else ()
+            }
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:fundingTransactionReference)
+                then <dto:funding_transaction_reference>
+                    <dto:network>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:fundingTransactionReference/cvs:network)}</dto:network>
+                    <dto:reference_number>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:fundingTransactionReference/cvs:referenceNumber)}</dto:reference_number></dto:funding_transaction_reference>
+                else ()
+            }
+            <dto:participant>
+                <dto:merchant_category_code>{dvmtr:lookupValue('core/dvm/MasterCardConfigs','Name','MCC','Value','',('Type',fn:concat($location,'_params')))}</dto:merchant_category_code>
+                <dto:interchange_rate_designator>{dvmtr:lookupValue('core/dvm/MasterCardConfigs','Name','IRD','Value','',('Type',fn:concat($location,'_params')))}</dto:interchange_rate_designator>
+                <dto:card_acceptor_id>{dvmtr:lookupValue('core/dvm/MasterCardConfigs','Name','CardAcceptorId','Value','',('Type','params'))}</dto:card_acceptor_id>
+                
+            </dto:participant>
+            {
+                if ($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:transferPriority)
+                then <dto:transfer_priority>{fn:data($MasterCardSendPostTransferReq/ns1:paymentTransfer/cvs:transferPriority)}</dto:transfer_priority>
+                else ()
+            }
+        </ns2:payment_transfer>
+    </ns2:PostTransferReq>
+};
+
+local:func($MasterCardSendPostTransferReq,$sendInfoRes)
+
+
+CardAcceptorId = 00000000000SGBL
+
+
+we recived this email
+
+Dears
+
+I reference to our phone call and to be compliant with MC mandates, please note that we need to ensure that the Edit number 42 is being populated as indicated ibn the below requirements sent by MC :
+Please do the necessary from your side and advise , 
+Remaining at your disposal for any further information 
+Regards 
+
+ The below is from Data Integrity Monitoring Program Guide can be found in Technical specification guide, Guide, Guide > Specification guide
+ 
+Edit 42 Acceptor Contact Data 0100
+Edit Number 42
+Edit Title Acceptor Contact Data 0100
+Name Acceptor Contact Data 0100
+Billing Code 2DC0100
+ 
+Description 
+This edit monitors Authorization Request/0100 messages to ensure that the Acceptor Customer Service Phone Number and Acceptor URL address contains valid values defined and formatted to the specifications in the Mastercard Network Processing Dual Message Authorization System Guide.
+Edit Criteria 
+Mastercard identifies transactions monitored under this edit by these criteria:
+Authorization Request/0100 messages
+ 
+ 
+Mastercard considers transactions noncompliant when any of these subedits apply:
+ 
+a. Data Element (DE) 122 (Additional Data), subelement 001 (Additional Acceptor Data), subfield 003 (Acceptor URL address) is not populated and DE 22 (Point-of-Service [POS] Entry Mode), subfield 1 (POS Terminal PAN Entry Mode) is one of these:
+ 
+09 (PAN/Token entry through electronic commerce containing DSRP cryptogram in DE 55 (Integrated Circuit Card [ICC] System-Related Data)
+10 (Credential on File)
+81 (PAN/Token entry through electronic commerce with optional Identity Check-AAV in DE 48, subelement 43 [UCAF] or DSRP cryptogram in DE 104, subelement 001 [Digital Payment Cryptogram])
+82 (Electronic Commerce PAN Auto Entry through Server [issuer, acquirer, or third-party vendor System])
+b. DE 122, subelement 001, subfield 003 is populated and does not contain a period or does not contain at least one alphanumeric character before the period and at least two alpha characters after the period or contains a space or @ character.
+c. DE 122, subelement 001, subfield 004 (Acceptor Customer Service Phone Number) is not populated and all of these are true:
+DE 122, subelement 001, subfield 003 is not populated
+DE 22, subfield 1 is not equal to 09, 10, 81, or 82
+d. DE 122, subelement 001, subfield 004 is populated and
+DE 43 (Acceptor Name and Location), subfield 5 (Acceptor Country Code) is USA or CAN and DE 122, subelement 001, subfield 004 is not 10 positions with the first three positions being numeric or
+DE 122, subelement 001, subfield 004 is not between five and fifteen numeric characters (excluding Canada and the United States).
+Exclusions:
+Mastercard defined airline travel transactions; DE 18 (Acceptor Business Code [MCC]) equal to 4511 or is within the range 3000 to 3350
+DE 48 (Additional Data: Private Use), subelement 77 (Transaction Type Identifier) is:
+C67 (Mastercard Merchant Presented QR)
+C68 (Mastercard Merchant Presented QR Refund)
+DE 61 (Point-of-Service [POS] Data), subfield 7 (POS Transaction Status) is 8 (Account Status Inquiry Service [ASI])
+DE 121 (Authorizing Agent ID Code) is 000000 (MIP X-Code System)
+
+
+
+We are using Master Card Money Send P2P.
+We are a bank so users can send money to a Master Card account from their bank account
+
+
+What should be medified/added to the payload sent to Master card in order to be compliant with the email
