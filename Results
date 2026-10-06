@@ -1,249 +1,137 @@
-Find me the fiels difference between this list
-Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.bix
-Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.GetTransferReq.xsd
-Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.GetTransferRes.xsd
-Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.UpdateTransferReq.xsd
-Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.UpdateTransferRes.xsd
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.bix
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.wadl
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.wsdl
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getTokenRequest.xsd
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getTokenResponse.xsd
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.bix
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.wadl
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.wsdl
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotificationRequest.xsd
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotificationResponse.xsd
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushIosRequest.xsd
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushIosResponse.xsd
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.bix
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.wadl
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.wsdl
-Backend.svc/IAM_KW/getUserId_KW/bs.GetUserIdBulkRes.xsd
-Backend.svc/IAM_KW/getUserId_KW/getUserId_KW.bix
-Backend.svc/SOGE-TCIB-COMMON-WS/SOGE-TCIB-COMMON-WS.bix
-Backend.svc/SOGE-TCIB-COMMON-WS/SOGE-TCIB-COMMON-WS.wsdl
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1047184856.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1262036143.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1656858346.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1748249434.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1963100721.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-560971565.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_1235979794.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_140093013.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_1937044372.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_48701925.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_534915216.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_749766503.xsd
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_841157591.xsd
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/PushNotifications.pipeline
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/PushNotifications.proxy
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/evs.BackBase.PushNotifications.PushDownstream/evs.PushDownstreamRequest.xsd
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/evs.BackBase.PushNotifications.PushDownstream/evs.PushDownstreamResponse.xsd
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/wsdl/PushNotifications.wsdl
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/wsdl/evs.PushNotificationsOperations.xsd
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/xquery/MapNotEVSToIVS.xqy
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/xquery/MapNotIVSToEVS.xqy
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.pipeline
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.proxy
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/ivs.BackBase.PushNotifications.PushDownstream/ivs.PushDownstreamRequest.xsd
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/ivs.BackBase.PushNotifications.PushDownstream/ivs.PushDownstreamResponse.xsd
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/wsdl/PushNotifications.wsdl
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/wsdl/ivs.PushNotificationsOperations.xsd
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/getTokenRequest.xqy
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/pushAndroidRequest.xqy
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/pushIOSRequest.xqy
-business.svc/ivs.BackBase/ivs.BackBase.Transfers/xquery/TemenosXquery/ElligilbeAccounts/EligibleAccountsMappings/Map_MOMA_Accounts.xqy
-business.svc/ivs.LimitManagement/ivs.LimitManagement.orchestrateTransfer.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.proxy
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.wadl
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts.proxy
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts_file.jca
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xquery/insertAlert/mapPushNotificationReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xsd/getAlerts/cvs.GetAlertsReq.xsd
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xsd/getNumberofUnreadAlerts/cvs.GetNumberOfUnreadAlertsReq.xsd
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.Rest.proxy
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.proxy
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/cvs.BackBase.PushNotifications.PushDownstream/cvs.PushDownstreamRequest.xsd
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/cvs.BackBase.PushNotifications.PushDownstream/cvs.PushDownstreamResponse.xsd
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/PushNotifications.Rest.wadl
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/PushNotifications.wsdl
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/cvs.PushNotificationsOperations.xsd
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/MapNotCVSToEVS.xqy
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/MapNotEVSToCVS.xqy
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/mapPushSingleNotificationReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/getCustomerFromPhoneNumber.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/processTransfer.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/retrieveTransfers.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/submit.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/validate.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.proxy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.wadl
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.wsdl
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetCustomerFromPhoneNumberExc.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetFromPhoneNumberFromT24Req.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetFromPhoneNumberFromT24Res.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapCreateFtTCIBReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapGetCommissionReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapPushSinglePushReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapRejectTransferReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapUpdateStatusAlterna.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapDeleteFtReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapGetRemainingPendingTransfersReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapGetTransferByIdReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapOrchestrateSimpleTransferReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferExc.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferToAlternaReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapGetTransfersReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapGetTransfersResponse.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapretrieveTransfersException.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapCreateWithinFtReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapGetFromPhoneNumberFromT24Req.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapInsertToAlternaReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapOrchestrateSimpleTransferReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapSubmitExc.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapGetCommissionReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapGetFromPhoneNumberFromT24Req.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateExc.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateLimitReq.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateRes.xqy
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/getCustomerFromPhoneNumberReq.xsd
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/getCustomerFromPhoneNumberRes.xsd
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/processTransferReq.xsd
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/processTransferRes.xsd
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/retrieveTransfersReq.xsd
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/retrieveTransfersRes.xsd
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/submitReq.xsd
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/submitRes.xsd
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/validateReq.xsd
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/validateRes.xsd
-
-And this list:
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.BusinessService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapInsertToAlternaReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapGetTransfersReq.Xquery
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/PushNotifications.ProxyService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapSubmitExc.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.Rest.ProxyService
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_534915216.XMLSchema
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/ivs.BackBase.PushNotifications.PushDownstream/ivs.PushDownstreamRequest.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapGetTransferByIdReq.Xquery
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/xquery/MapNotEVSToIVS.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/processTransferReq.XMLSchema
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_48701925.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/mapPushSingleNotificationReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/retrieveTransfersRes.XMLSchema
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotificationResponse.XMLSchema
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getTokenRequest.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapOrchestrateSimpleTransferReq.Xquery
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/PushNotifications.Pipeline
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/wsdl/PushNotifications.WSDL
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.ProxyService
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_749766503.XMLSchema
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/wsdl/PushNotifications.WSDL
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.ProxyService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/retrieveTransfers.Pipeline
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.WSDL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/getCustomerFromPhoneNumber.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapCreateWithinFtReq.Xquery
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/evs.BackBase.PushNotifications.PushDownstream/evs.PushDownstreamRequest.XMLSchema
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getTokenResponse.XMLSchema
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.WADL
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.BusinessService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapGetFromPhoneNumberFromT24Req.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.WADL
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_140093013.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.ProxyService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.WSDL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateExc.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferToAlternaReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/getCustomerFromPhoneNumberReq.XMLSchema
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.WADL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetFromPhoneNumberFromT24Res.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapRejectTransferReq.Xquery
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1963100721.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts.Pipeline
-business.svc/ivs.LimitManagement/ivs.LimitManagement.orchestrateTransfer.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/cvs.BackBase.PushNotifications.PushDownstream/cvs.PushDownstreamRequest.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/MapNotEVSToCVS.Xquery
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-560971565.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.Pipeline
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.Pipeline
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/xquery/MapNotIVSToEVS.Xquery
-Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.GetTransferRes.XMLSchema
-Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.WADL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapCreateFtTCIBReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapretrieveTransfersException.Xquery
-Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.BusinessService
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_841157591.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts_file.JCA
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.Pipeline
-Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.UpdateTransferRes.XMLSchema
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/wsdl/evs.PushNotificationsOperations.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapOrchestrateSimpleTransferReq.Xquery
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/wsdl/ivs.PushNotificationsOperations.XMLSchema
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushIosRequest.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapGetFromPhoneNumberFromT24Req.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xsd/getAlerts/cvs.GetAlertsReq.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/validateRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapGetCommissionReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/processTransferRes.XMLSchema
-Backend.svc/IAM_KW/getUserId_KW/getUserId_KW.BusinessService
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1656858346.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/getCustomerFromPhoneNumberRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xsd/getNumberofUnreadAlerts/cvs.GetNumberOfUnreadAlertsReq.XMLSchema
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1047184856.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/submitReq.XMLSchema
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotificationRequest.XMLSchema
-Backend.svc/SOGE-TCIB-COMMON-WS/SOGE-TCIB-COMMON-WS.WSDL
-business.svc/ivs.BackBase/ivs.BackBase.Transfers/xquery/TemenosXquery/ElligilbeAccounts/EligibleAccountsMappings/Map_MOMA_Accounts.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateRes.Xquery
-Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.WSDL
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/pushIOSRequest.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.WADL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapUpdateStatusAlterna.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetCustomerFromPhoneNumberExc.Xquery
-Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.UpdateTransferReq.XMLSchema
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1748249434.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/MapNotCVSToEVS.Xquery
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushIosResponse.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateLimitReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/processTransfer.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/retrieveTransfersReq.XMLSchema
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.WADL
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts.ProxyService
-Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.BusinessService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferExc.Xquery
-Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.GetTransferReq.XMLSchema
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_1235979794.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapDeleteFtReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapGetTransfersResponse.Xquery
-Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.WSDL
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/PushNotifications.WSDL
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/validateReq.XMLSchema
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/getTokenRequest.Xquery
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/pushAndroidRequest.Xquery
-business.svc/evs.BackBase/evs.BackBase.PushNotifications/evs.BackBase.PushNotifications.PushDownstream/evs.PushDownstreamResponse.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetFromPhoneNumberFromT24Req.Xquery
-Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.WSDL
-Backend.svc/IAM_KW/getUserId_KW/bs.GetUserIdBulkRes.XMLSchema
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_1937044372.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xquery/insertAlert/mapPushNotificationReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/PushNotifications.Rest.WADL
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/cvs.BackBase.PushNotifications.PushDownstream/cvs.PushDownstreamResponse.XMLSchema
-Backend.svc/SOGE-TCIB-COMMON-WS/SOGE-TCIB-COMMON-WS.BusinessService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapGetRemainingPendingTransfersReq.Xquery
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.ProxyService
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/validate.Pipeline
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapPushSinglePushReq.Xquery
-business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/ivs.BackBase.PushNotifications.PushDownstream/ivs.PushDownstreamResponse.XMLSchema
-Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1262036143.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapGetCommissionReq.Xquery
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/submitRes.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/cvs.PushNotificationsOperations.XMLSchema
-chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/submit.Pipeline
+A       Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.bix
+A       Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.wadl
+A       Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.wsdl
+A       Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.GetTransferReq.xsd
+A       Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.GetTransferRes.xsd
+A       Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.UpdateTransferReq.xsd
+A       Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.UpdateTransferRes.xsd
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.bix
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.wadl
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.wsdl
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getTokenRequest.xsd
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getTokenResponse.xsd
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.bix
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.wadl
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.wsdl
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotificationRequest.xsd
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotificationResponse.xsd
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushIosRequest.xsd
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushIosResponse.xsd
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.bix
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.wadl
+A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.wsdl
+M       Backend.svc/IAM_KW/getUserId_KW/bs.GetUserIdBulkRes.xsd
+M       Backend.svc/IAM_KW/getUserId_KW/getUserId_KW.bix
+M       Backend.svc/SOGE-TCIB-COMMON-WS/SOGE-TCIB-COMMON-WS.bix
+M       Backend.svc/SOGE-TCIB-COMMON-WS/SOGE-TCIB-COMMON-WS.wsdl
+A       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1047184856.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1262036143.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1656858346.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1748249434.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1963100721.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-560971565.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_1235979794.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_140093013.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_1937044372.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_48701925.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_534915216.xsd
+A       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_749766503.xsd
+M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_841157591.xsd
+M       business.svc/.settings/oracle.xquery.mapper.jdev.model/ivs.BackBase/ivs.Backbase.Beneficiary/xquery/AddBeneficiary/MapAddBeneficiaryToExternalBeneficiaryReq.xqy.xml
+M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/PushNotifications.pipeline
+M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/PushNotifications.proxy
+M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/evs.BackBase.PushNotifications.PushDownstream/evs.PushDownstreamRequest.xsd
+M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/evs.BackBase.PushNotifications.PushDownstream/evs.PushDownstreamResponse.xsd
+M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/wsdl/PushNotifications.wsdl
+M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/wsdl/evs.PushNotificationsOperations.xsd
+M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/xquery/MapNotEVSToIVS.xqy
+M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/xquery/MapNotIVSToEVS.xqy
+M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.pipeline
+A       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.pipeline.osblayout.json
+M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.proxy
+M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/ivs.BackBase.PushNotifications.PushDownstream/ivs.PushDownstreamRequest.xsd
+M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/ivs.BackBase.PushNotifications.PushDownstream/ivs.PushDownstreamResponse.xsd
+M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/wsdl/PushNotifications.wsdl
+M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/wsdl/ivs.PushNotificationsOperations.xsd
+A       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/getTokenRequest.xqy
+A       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/pushAndroidRequest.xqy
+A       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/pushIOSRequest.xqy
+A       business.svc/ivs.BackBase/ivs.BackBase.Transfers/xquery/TemenosXquery/ElligilbeAccounts/EligibleAccountsMappings/Map_MOMA_Accounts.xqy
+M       business.svc/ivs.LimitManagement/ivs.LimitManagement.orchestrateTransfer.pipeline
+M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.pipeline
+M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.proxy
+M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.wadl
+M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts.pipeline
+M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts.proxy
+M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts_file.jca
+A       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xquery/insertAlert/mapPushNotificationReq.xqy
+M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xsd/getAlerts/cvs.GetAlertsReq.xsd
+M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xsd/getNumberofUnreadAlerts/cvs.GetNumberOfUnreadAlertsReq.xsd
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.Rest.proxy
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.pipeline
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.proxy
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/cvs.BackBase.PushNotifications.PushDownstream/cvs.PushDownstreamRequest.xsd
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/cvs.BackBase.PushNotifications.PushDownstream/cvs.PushDownstreamResponse.xsd
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/PushNotifications.Rest.wadl
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/PushNotifications.wsdl
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/cvs.PushNotificationsOperations.xsd
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/MapNotCVSToEVS.xqy
+M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/MapNotEVSToCVS.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/mapPushSingleNotificationReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/getCustomerFromPhoneNumber.pipeline
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/processTransfer.pipeline
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/retrieveTransfers.pipeline
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/submit.pipeline
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/validate.pipeline
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.pipeline
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.proxy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.wadl
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.wsdl
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetCustomerFromPhoneNumberExc.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetFromPhoneNumberFromT24Req.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetFromPhoneNumberFromT24Res.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapCreateFtTCIBReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapGetCommissionReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapPushSinglePushReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapRejectTransferReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapUpdateStatusAlterna.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapDeleteFtReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapGetRemainingPendingTransfersReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapGetTransferByIdReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapOrchestrateSimpleTransferReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferExc.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferToAlternaReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapGetTransfersReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapGetTransfersResponse.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapretrieveTransfersException.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapCreateWithinFtReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapGetFromPhoneNumberFromT24Req.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapInsertToAlternaReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapOrchestrateSimpleTransferReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapSubmitExc.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapGetCommissionReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapGetFromPhoneNumberFromT24Req.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateExc.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateLimitReq.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateRes.xqy
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/getCustomerFromPhoneNumberReq.xsd
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/getCustomerFromPhoneNumberRes.xsd
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/processTransferReq.xsd
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/processTransferRes.xsd
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/retrieveTransfersReq.xsd
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/retrieveTransfersRes.xsd
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/submitReq.xsd
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/submitRes.xsd
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/validateReq.xsd
+A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/validateRes.xsd
+A       chn.app/cvs.ebExternalUser_KW/EB_EXTERNAL_USER_REST.proxy
+A       chn.app/cvs.ebExternalUser_KW/EB_EXTERNAL_USER_REST.wadl
+M       core/dvm/Dictionary.dvm
+M       core/dvm/ElligibleAccounts.dvm
+A       core/dvm/Emails/Email_MOMA.dvm
+M       core/dvm/InternalBankAccountsBeneficiaries.dvm
+A       core/dvm/MOMABBStatusMapping.dvm
+A       core/dvm/MOMAStatuses.dvm
+A       core/dvm/PushNotifications/MOMA.dvm
+M       core/dvm/eligibleAccountsServices.dvm
+A       core/dvm/pushNotificationConfigs.dvm
