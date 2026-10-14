@@ -1,137 +1,180 @@
-A       Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.bix
-A       Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.wadl
-A       Backend.svc/Alterna.Services/Alterna.MOMA/MOMA.wsdl
-A       Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.GetTransferReq.xsd
-A       Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.GetTransferRes.xsd
-A       Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.UpdateTransferReq.xsd
-A       Backend.svc/Alterna.Services/Alterna.MOMA/xsd/bs.UpdateTransferRes.xsd
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.bix
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.wadl
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getToken.wsdl
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getTokenRequest.xsd
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/GetToken/getTokenResponse.xsd
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.bix
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.wadl
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotification.wsdl
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotificationRequest.xsd
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/PushNotification/PushNotificationResponse.xsd
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushIosRequest.xsd
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushIosResponse.xsd
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.bix
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.wadl
-A       Backend.svc/BackBase/BackBase.pushNotificationServices/pushNotificationIos/pushNotificationIos.wsdl
-M       Backend.svc/IAM_KW/getUserId_KW/bs.GetUserIdBulkRes.xsd
-M       Backend.svc/IAM_KW/getUserId_KW/getUserId_KW.bix
-M       Backend.svc/SOGE-TCIB-COMMON-WS/SOGE-TCIB-COMMON-WS.bix
-M       Backend.svc/SOGE-TCIB-COMMON-WS/SOGE-TCIB-COMMON-WS.wsdl
-A       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1047184856.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1262036143.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1656858346.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1748249434.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-1963100721.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_-560971565.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_1235979794.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_140093013.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_1937044372.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_48701925.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_534915216.xsd
-A       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_749766503.xsd
-M       Backend.svc/SOGE-TCIB-COMMON-WS/XMLSchema_841157591.xsd
-M       business.svc/.settings/oracle.xquery.mapper.jdev.model/ivs.BackBase/ivs.Backbase.Beneficiary/xquery/AddBeneficiary/MapAddBeneficiaryToExternalBeneficiaryReq.xqy.xml
-M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/PushNotifications.pipeline
-M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/PushNotifications.proxy
-M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/evs.BackBase.PushNotifications.PushDownstream/evs.PushDownstreamRequest.xsd
-M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/evs.BackBase.PushNotifications.PushDownstream/evs.PushDownstreamResponse.xsd
-M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/wsdl/PushNotifications.wsdl
-M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/wsdl/evs.PushNotificationsOperations.xsd
-M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/xquery/MapNotEVSToIVS.xqy
-M       business.svc/evs.BackBase/evs.BackBase.PushNotifications/xquery/MapNotIVSToEVS.xqy
-M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.pipeline
-A       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.pipeline.osblayout.json
-M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/PushNotifications.proxy
-M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/ivs.BackBase.PushNotifications.PushDownstream/ivs.PushDownstreamRequest.xsd
-M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/ivs.BackBase.PushNotifications.PushDownstream/ivs.PushDownstreamResponse.xsd
-M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/wsdl/PushNotifications.wsdl
-M       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/wsdl/ivs.PushNotificationsOperations.xsd
-A       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/getTokenRequest.xqy
-A       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/pushAndroidRequest.xqy
-A       business.svc/ivs.BackBase/ivs.BackBase.PushNotifications/xquery/pushIOSRequest.xqy
-A       business.svc/ivs.BackBase/ivs.BackBase.Transfers/xquery/TemenosXquery/ElligilbeAccounts/EligibleAccountsMappings/Map_MOMA_Accounts.xqy
-M       business.svc/ivs.LimitManagement/ivs.LimitManagement.orchestrateTransfer.pipeline
-M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.pipeline
-M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.proxy
-M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/AlertsOperations/AlertOperations.wadl
-M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts.pipeline
-M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts.proxy
-M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/wsdl/ReadAlerts_file.jca
-A       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xquery/insertAlert/mapPushNotificationReq.xqy
-M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xsd/getAlerts/cvs.GetAlertsReq.xsd
-M       chn.app/cvs.BackBase/cvs.BackBase.AlertsServices/xsd/getNumberofUnreadAlerts/cvs.GetNumberOfUnreadAlertsReq.xsd
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.Rest.proxy
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.pipeline
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/PushNotifications.proxy
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/cvs.BackBase.PushNotifications.PushDownstream/cvs.PushDownstreamRequest.xsd
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/cvs.BackBase.PushNotifications.PushDownstream/cvs.PushDownstreamResponse.xsd
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/PushNotifications.Rest.wadl
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/PushNotifications.wsdl
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/wsdl/cvs.PushNotificationsOperations.xsd
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/MapNotCVSToEVS.xqy
-M       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/MapNotEVSToCVS.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.PushNotifications/xquery/mapPushSingleNotificationReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/getCustomerFromPhoneNumber.pipeline
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/processTransfer.pipeline
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/retrieveTransfers.pipeline
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/submit.pipeline
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/pipeline/validate.pipeline
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.pipeline
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.proxy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.wadl
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/wsdl/MOMA.wsdl
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetCustomerFromPhoneNumberExc.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetFromPhoneNumberFromT24Req.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/GetCustomerFromPhoneNumber/mapGetFromPhoneNumberFromT24Res.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapCreateFtTCIBReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapGetCommissionReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapPushSinglePushReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapRejectTransferReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/common/mapUpdateStatusAlterna.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapDeleteFtReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapGetRemainingPendingTransfersReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapGetTransferByIdReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapOrchestrateSimpleTransferReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferExc.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/processTransfer/mapprocessTransferToAlternaReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapGetTransfersReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapGetTransfersResponse.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/retrieveTransfers/mapretrieveTransfersException.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapCreateWithinFtReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapGetFromPhoneNumberFromT24Req.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapInsertToAlternaReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapOrchestrateSimpleTransferReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/submit/mapSubmitExc.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapGetCommissionReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapGetFromPhoneNumberFromT24Req.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateExc.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateLimitReq.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xquery/validate/mapValidateRes.xqy
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/getCustomerFromPhoneNumberReq.xsd
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/getCustomerFromPhoneNumberRes.xsd
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/processTransferReq.xsd
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/processTransferRes.xsd
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/retrieveTransfersReq.xsd
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/retrieveTransfersRes.xsd
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/submitReq.xsd
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/submitRes.xsd
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/validateReq.xsd
-A       chn.app/cvs.BackBase/cvs.BackBase.Transfers/cvs.BackBase.Transfers.MOMA/xsd/validateRes.xsd
-A       chn.app/cvs.ebExternalUser_KW/EB_EXTERNAL_USER_REST.proxy
-A       chn.app/cvs.ebExternalUser_KW/EB_EXTERNAL_USER_REST.wadl
-M       core/dvm/Dictionary.dvm
-M       core/dvm/ElligibleAccounts.dvm
-A       core/dvm/Emails/Email_MOMA.dvm
-M       core/dvm/InternalBankAccountsBeneficiaries.dvm
-A       core/dvm/MOMABBStatusMapping.dvm
-A       core/dvm/MOMAStatuses.dvm
-A       core/dvm/PushNotifications/MOMA.dvm
-M       core/dvm/eligibleAccountsServices.dvm
-A       core/dvm/pushNotificationConfigs.dvm
+From this email thread
+
+wWhat should be done to my PostTransferReq ?
+
+
+
+Dear Pierre
+
+Please find MC response below:
+
+The report shows that SGBL is non-compliant for money send transactions.
+ 
+This is related on what SGBL sends in DE42.
+Mastercard considers transactions noncompliant when any of these subedits apply:
+ 
+ 
+ 
+a. Data Element (DE) 122 (Additional Data), subelement 001 (Additional Acceptor Data), subfield 003 (Acceptor URL address) is not populated and DE 22 (Point-of-Service [POS] Entry Mode), subfield 1 (POS Terminal PAN Entry Mode) is one of these:
+ 
+ 
+ 
+09 (PAN/Token entry through electronic commerce containing DSRP cryptogram in DE 55 (Integrated Circuit Card [ICC] System-Related Data)
+ 
+10 (Credential on File)
+ 
+81 (PAN/Token entry through electronic commerce with optional Identity Check-AAV in DE 48, subelement 43 [UCAF] or DSRP cryptogram in DE 104, subelement 001 [Digital Payment Cryptogram])
+ 
+82 (Electronic Commerce PAN Auto Entry through Server [issuer, acquirer, or third-party vendor System])
+ 
+b. DE 122, subelement 001, subfield 003 is populated and does not contain a period or does not contain at least one alphanumeric character before the period and at least two alpha characters after the period or contains a space or @ character.
+ 
+c. DE 122, subelement 001, subfield 004 (Acceptor Customer Service Phone Number) is not populated and all of these are true:
+ 
+DE 122, subelement 001, subfield 003 is not populated
+ 
+DE 22, subfield 1 is not equal to 09, 10, 81, or 82
+ 
+d. DE 122, subelement 001, subfield 004 is populated and
+ 
+DE 43 (Acceptor Name and Location), subfield 5 (Acceptor Country Code) is USA or CAN and DE 122, subelement 001, subfield 004 is not 10 positions with the first three positions being numeric or
+ 
+DE 122, subelement 001, subfield 004 is not between five and fifteen numeric characters (excluding Canada and the United States).
+ 
+Exclusions:
+ 
+Mastercard defined airline travel transactions; DE 18 (Acceptor Business Code [MCC]) equal to 4511 or is within the range 3000 to 3350
+ 
+DE 48 (Additional Data: Private Use), subelement 77 (Transaction Type Identifier) is:
+ 
+C67 (Mastercard Merchant Presented QR)
+ 
+C68 (Mastercard Merchant Presented QR Refund)
+ 
+DE 61 (Point-of-Service [POS] Data), subfield 7 (POS Transaction Status) is 8 (Account Status Inquiry Service [ASI])
+ 
+DE 121 (Authorizing Agent ID Code) is 000000 (MIP X-Code System)
+ 
+ Sharing a sample,
+DE122S01F03 Acpt URL addr https://win2.ro
+ 
+So similar URL is missing from the sample,
+ 
+For the authorization or financial request, SEND must map the API value to:
+DE122 / SE001 / SF003 = Acceptor URL Address
+The implementation requirement explicitly states that Acceptor URL is mandatory for CNP/e-commerce transactions and that the value is propagated into DE122.001.003.
+ You will need to refer to your operation development team to work on this.
+Regards 
+
+From: Pierre ABOU-SERHAL <Pierre.ABOU-SERHAL@sgbl.com> 
+Sent: Wednesday, September 30, 2026 1:45 PM
+To: Pamela Khoury <Pamela.Khoury@sgbl.com>; Habib KASSAB <Habib.KASSAB@sgbl.com>
+Cc: Pascale GHAOUI <Pascale.GHAOUI@sgbl.com>; Walid ARAB <Walid.ARAB@sgbl.com>; Nadine BASBOUS <Nadine.BASBOUS@sgbl.com>; Camelia ISSA <Camelia.ISSA@sgbl.com>
+Subject: RE: MoneySend for Acquirers - SGBL - Weekly call - MOM 4/16
+
+Dear Pamela, 
+
+From our understanding of the requirements, and since we are using MoneySend in the P2P scenario using REST API, we need to add the following data in the request that is being sent to Master Card when performing a Post Transfer
+
+Could you please confirm with MasterCard the bellow ?
+
+Find highlighted in red the fields that needs to be added.
+Note that card_acceptor_id can still have the same value of “00000000000SGBL”
+
+{
+  "PostTransferReq": {
+    "payment_transfer": {
+      "transfer_reference": "53084740b21e4c07ac0db1e2e0dccc1a",
+      "payment_type": "P2P",
+      "amount": "2500",
+      "currency": "USD",
+      "sender_account_uri": "raw:011234567001840",
+      "sender": {
+        "first_name": "sender",
+        "last_name": "last_name",
+        "account_type": "01",
+        "address": {
+          "line1": "street",
+          "city": "city",
+          "postal_code": "00000",
+          "country": "LBN"
+        }
+      },
+      "funding_source": "DEBIT",
+      "recipient_account_uri": "pan:************0000",
+      "recipient": {
+        "first_name": "recipient",
+        "last_name": "last_name",
+        "account_type": "03",
+        "address": { "country": "LBN", "postal_code": "00000" }
+      },
+      "channel": "MOBILE",
+      "participant": {
+        "merchant_category_code": "6536",
+        "interchange_rate_designator": "MS",
+        "card_acceptor_id": "00000000000SGBL",
+        "customer_service_contact_info": "96103477777",
+        "transfer_acceptor_address": {
+          "line1": "Saloume",
+          "city": "Dekwaneh",
+          "country": "LBN"
+        }
+      }
+    }
+  }
+}
+
+
+
+
+From: Pamela Khoury <Pamela.Khoury@sgbl.com> 
+Sent: Wednesday, September 30, 2026 11:25 AM
+To: Habib KASSAB <Habib.KASSAB@sgbl.com>; Pierre ABOU-SERHAL <Pierre.ABOU-SERHAL@sgbl.com>
+Cc: Pascale GHAOUI <Pascale.GHAOUI@sgbl.com>; Walid ARAB <Walid.ARAB@sgbl.com>; Nadine BASBOUS <Nadine.BASBOUS@sgbl.com>; Camelia ISSA <Camelia.ISSA@sgbl.com>
+Subject: FW: MoneySend for Acquirers - SGBL - Weekly call - MOM 4/16
+
+Dears
+
+I reference to our phone call and to be compliant with MC mandates, please note that we need to ensure that the Edit number 42 is being populated as indicated ibn the below requirements sent by MC :
+Please do the necessary from your side and advise , 
+Remaining at your disposal for any further information 
+Regards 
+
+ The below is from Data Integrity Monitoring Program Guide can be found in Technical specification guide, Guide, Guide > Specification guide
+ 
+Edit 42 Acceptor Contact Data 0100
+Edit Number 42
+Edit Title Acceptor Contact Data 0100
+Name Acceptor Contact Data 0100
+Billing Code 2DC0100
+ 
+Description 
+This edit monitors Authorization Request/0100 messages to ensure that the Acceptor Customer Service Phone Number and Acceptor URL address contains valid values defined and formatted to the specifications in the Mastercard Network Processing Dual Message Authorization System Guide.
+Edit Criteria 
+Mastercard identifies transactions monitored under this edit by these criteria:
+Authorization Request/0100 messages
+ 
+ 
+Mastercard considers transactions noncompliant when any of these subedits apply:
+ 
+a. Data Element (DE) 122 (Additional Data), subelement 001 (Additional Acceptor Data), subfield 003 (Acceptor URL address) is not populated and DE 22 (Point-of-Service [POS] Entry Mode), subfield 1 (POS Terminal PAN Entry Mode) is one of these:
+ 
+09 (PAN/Token entry through electronic commerce containing DSRP cryptogram in DE 55 (Integrated Circuit Card [ICC] System-Related Data)
+10 (Credential on File)
+81 (PAN/Token entry through electronic commerce with optional Identity Check-AAV in DE 48, subelement 43 [UCAF] or DSRP cryptogram in DE 104, subelement 001 [Digital Payment Cryptogram])
+82 (Electronic Commerce PAN Auto Entry through Server [issuer, acquirer, or third-party vendor System])
+b. DE 122, subelement 001, subfield 003 is populated and does not contain a period or does not contain at least one alphanumeric character before the period and at least two alpha characters after the period or contains a space or @ character.
+c. DE 122, subelement 001, subfield 004 (Acceptor Customer Service Phone Number) is not populated and all of these are true:
+DE 122, subelement 001, subfield 003 is not populated
+DE 22, subfield 1 is not equal to 09, 10, 81, or 82
+d. DE 122, subelement 001, subfield 004 is populated and
+DE 43 (Acceptor Name and Location), subfield 5 (Acceptor Country Code) is USA or CAN and DE 122, subelement 001, subfield 004 is not 10 positions with the first three positions being numeric or
+DE 122, subelement 001, subfield 004 is not between five and fifteen numeric characters (excluding Canada and the United States).
+Exclusions:
+Mastercard defined airline travel transactions; DE 18 (Acceptor Business Code [MCC]) equal to 4511 or is within the range 3000 to 3350
+DE 48 (Additional Data: Private Use), subelement 77 (Transaction Type Identifier) is:
+C67 (Mastercard Merchant Presented QR)
+C68 (Mastercard Merchant Presented QR Refund)
+DE 61 (Point-of-Service [POS] Data), subfield 7 (POS Transaction Status) is 8 (Account Status Inquiry Service [ASI])
+DE 121 (Authorizing Agent ID Code) is 000000 (MIP X-Code System)
+ 
