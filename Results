@@ -1,180 +1,31 @@
-From this email thread
+**Mastercard is telling you: “Your transactions are missing the website URL of the payment service provider. Adding a phone number and a physical address does not fix the missing URL.”**
 
-wWhat should be done to my PostTransferReq ?
+For your project, that would normally be an approved **SGBL website URL**, which Mastercard SEND must put into **`DE122.001.003`** in the network transaction.
 
+Your proposed request contains:
 
+| Field | What it provides | Does it provide the missing URL? |
+|---|---|---|
+| `card_acceptor_id` | Identifies the acceptor | No |
+| `customer_service_contact_info` | Customer service phone number | No |
+| `transfer_acceptor_address` | Physical address | No |
 
-Dear Pierre
+Under the rules in their email, **the URL is mandatory when the network transaction’s DE22 entry mode is `09`, `10`, `81`, or `82`**. A phone number cannot replace the URL for those transactions.
 
-Please find MC response below:
+**There is also a naming confusion in the email:** **Edit 42** is the compliance check. **DE42** is a transaction field identifying the acceptor. The missing URL they describe belongs in **DE122**, so this finding does not establish that your `card_acceptor_id` needs changing.
 
-The report shows that SGBL is non-compliant for money send transactions.
- 
-This is related on what SGBL sends in DE42.
-Mastercard considers transactions noncompliant when any of these subedits apply:
- 
- 
- 
-a. Data Element (DE) 122 (Additional Data), subelement 001 (Additional Acceptor Data), subfield 003 (Acceptor URL address) is not populated and DE 22 (Point-of-Service [POS] Entry Mode), subfield 1 (POS Terminal PAN Entry Mode) is one of these:
- 
- 
- 
-09 (PAN/Token entry through electronic commerce containing DSRP cryptogram in DE 55 (Integrated Circuit Card [ICC] System-Related Data)
- 
-10 (Credential on File)
- 
-81 (PAN/Token entry through electronic commerce with optional Identity Check-AAV in DE 48, subelement 43 [UCAF] or DSRP cryptogram in DE 104, subelement 001 [Digital Payment Cryptogram])
- 
-82 (Electronic Commerce PAN Auto Entry through Server [issuer, acquirer, or third-party vendor System])
- 
-b. DE 122, subelement 001, subfield 003 is populated and does not contain a period or does not contain at least one alphanumeric character before the period and at least two alpha characters after the period or contains a space or @ character.
- 
-c. DE 122, subelement 001, subfield 004 (Acceptor Customer Service Phone Number) is not populated and all of these are true:
- 
-DE 122, subelement 001, subfield 003 is not populated
- 
-DE 22, subfield 1 is not equal to 09, 10, 81, or 82
- 
-d. DE 122, subelement 001, subfield 004 is populated and
- 
-DE 43 (Acceptor Name and Location), subfield 5 (Acceptor Country Code) is USA or CAN and DE 122, subelement 001, subfield 004 is not 10 positions with the first three positions being numeric or
- 
-DE 122, subelement 001, subfield 004 is not between five and fifteen numeric characters (excluding Canada and the United States).
- 
-Exclusions:
- 
-Mastercard defined airline travel transactions; DE 18 (Acceptor Business Code [MCC]) equal to 4511 or is within the range 3000 to 3350
- 
-DE 48 (Additional Data: Private Use), subelement 77 (Transaction Type Identifier) is:
- 
-C67 (Mastercard Merchant Presented QR)
- 
-C68 (Mastercard Merchant Presented QR Refund)
- 
-DE 61 (Point-of-Service [POS] Data), subfield 7 (POS Transaction Status) is 8 (Account Status Inquiry Service [ASI])
- 
-DE 121 (Authorizing Agent ID Code) is 000000 (MIP X-Code System)
- 
- Sharing a sample,
-DE122S01F03 Acpt URL addr https://win2.ro
- 
-So similar URL is missing from the sample,
- 
-For the authorization or financial request, SEND must map the API value to:
-DE122 / SE001 / SF003 = Acceptor URL Address
-The implementation requirement explicitly states that Acceptor URL is mandatory for CNP/e-commerce transactions and that the value is propagated into DE122.001.003.
- You will need to refer to your operation development team to work on this.
-Regards 
+**What should you change in `PostTransferReq`?**
 
-From: Pierre ABOU-SERHAL <Pierre.ABOU-SERHAL@sgbl.com> 
-Sent: Wednesday, September 30, 2026 1:45 PM
-To: Pamela Khoury <Pamela.Khoury@sgbl.com>; Habib KASSAB <Habib.KASSAB@sgbl.com>
-Cc: Pascale GHAOUI <Pascale.GHAOUI@sgbl.com>; Walid ARAB <Walid.ARAB@sgbl.com>; Nadine BASBOUS <Nadine.BASBOUS@sgbl.com>; Camelia ISSA <Camelia.ISSA@sgbl.com>
-Subject: RE: MoneySend for Acquirers - SGBL - Weekly call - MOM 4/16
+You need to supply the acceptor URL through the **supported API field or configuration that Mastercard SEND maps to `DE122.001.003`**.
 
-Dear Pamela, 
+However, **their response does not tell you the JSON field name or where to place it**. I checked the published [P2P API specification](https://static.developer.mastercard.com/content/mastercard-send-person-to-person/swagger/send-payment-transfer-api-swagger.yaml), linked from Mastercard’s API reference, and found no explicit acceptor-URL property. That gap needs clarification before you can produce a correct updated request. [developer.mastercard.com](https://developer.mastercard.com/mastercard-send-person-to-person/documentation/api-reference/payment-transfer/?utm_source=chatgpt.com)
 
-From our understanding of the requirements, and since we are using MoneySend in the P2P scenario using REST API, we need to add the following data in the request that is being sent to Master Card when performing a Post Transfer
+Keep `customer_service_contact_info` as a phone number. Mastercard documents it as numeric, with a maximum of 13 digits outside the US and Canada; usage may also require Mastercard configuration. **Do not replace its value with a URL.** [static.developer.mastercard.com](https://static.developer.mastercard.com/content/mastercard-send/release-notes/mastercard-send-release-notes-22.R1.pdf?utm_source=chatgpt.com)
 
-Could you please confirm with MasterCard the bellow ?
+The next steps are:
 
-Find highlighted in red the fields that needs to be added.
-Note that card_acceptor_id can still have the same value of “00000000000SGBL”
+1. **Ask Mastercard for the exact JSON property and path** supported by your P2P API version—or confirm whether the URL must be configured against your partner profile.
+2. Supply SGBL’s approved URL through that mechanism.
+3. Run a test and have Mastercard confirm that **`DE122.001.003` actually contains the URL** and the Edit 42 finding is resolved.
 
-{
-  "PostTransferReq": {
-    "payment_transfer": {
-      "transfer_reference": "53084740b21e4c07ac0db1e2e0dccc1a",
-      "payment_type": "P2P",
-      "amount": "2500",
-      "currency": "USD",
-      "sender_account_uri": "raw:011234567001840",
-      "sender": {
-        "first_name": "sender",
-        "last_name": "last_name",
-        "account_type": "01",
-        "address": {
-          "line1": "street",
-          "city": "city",
-          "postal_code": "00000",
-          "country": "LBN"
-        }
-      },
-      "funding_source": "DEBIT",
-      "recipient_account_uri": "pan:************0000",
-      "recipient": {
-        "first_name": "recipient",
-        "last_name": "last_name",
-        "account_type": "03",
-        "address": { "country": "LBN", "postal_code": "00000" }
-      },
-      "channel": "MOBILE",
-      "participant": {
-        "merchant_category_code": "6536",
-        "interchange_rate_designator": "MS",
-        "card_acceptor_id": "00000000000SGBL",
-        "customer_service_contact_info": "96103477777",
-        "transfer_acceptor_address": {
-          "line1": "Saloume",
-          "city": "Dekwaneh",
-          "country": "LBN"
-        }
-      }
-    }
-  }
-}
-
-
-
-
-From: Pamela Khoury <Pamela.Khoury@sgbl.com> 
-Sent: Wednesday, September 30, 2026 11:25 AM
-To: Habib KASSAB <Habib.KASSAB@sgbl.com>; Pierre ABOU-SERHAL <Pierre.ABOU-SERHAL@sgbl.com>
-Cc: Pascale GHAOUI <Pascale.GHAOUI@sgbl.com>; Walid ARAB <Walid.ARAB@sgbl.com>; Nadine BASBOUS <Nadine.BASBOUS@sgbl.com>; Camelia ISSA <Camelia.ISSA@sgbl.com>
-Subject: FW: MoneySend for Acquirers - SGBL - Weekly call - MOM 4/16
-
-Dears
-
-I reference to our phone call and to be compliant with MC mandates, please note that we need to ensure that the Edit number 42 is being populated as indicated ibn the below requirements sent by MC :
-Please do the necessary from your side and advise , 
-Remaining at your disposal for any further information 
-Regards 
-
- The below is from Data Integrity Monitoring Program Guide can be found in Technical specification guide, Guide, Guide > Specification guide
- 
-Edit 42 Acceptor Contact Data 0100
-Edit Number 42
-Edit Title Acceptor Contact Data 0100
-Name Acceptor Contact Data 0100
-Billing Code 2DC0100
- 
-Description 
-This edit monitors Authorization Request/0100 messages to ensure that the Acceptor Customer Service Phone Number and Acceptor URL address contains valid values defined and formatted to the specifications in the Mastercard Network Processing Dual Message Authorization System Guide.
-Edit Criteria 
-Mastercard identifies transactions monitored under this edit by these criteria:
-Authorization Request/0100 messages
- 
- 
-Mastercard considers transactions noncompliant when any of these subedits apply:
- 
-a. Data Element (DE) 122 (Additional Data), subelement 001 (Additional Acceptor Data), subfield 003 (Acceptor URL address) is not populated and DE 22 (Point-of-Service [POS] Entry Mode), subfield 1 (POS Terminal PAN Entry Mode) is one of these:
- 
-09 (PAN/Token entry through electronic commerce containing DSRP cryptogram in DE 55 (Integrated Circuit Card [ICC] System-Related Data)
-10 (Credential on File)
-81 (PAN/Token entry through electronic commerce with optional Identity Check-AAV in DE 48, subelement 43 [UCAF] or DSRP cryptogram in DE 104, subelement 001 [Digital Payment Cryptogram])
-82 (Electronic Commerce PAN Auto Entry through Server [issuer, acquirer, or third-party vendor System])
-b. DE 122, subelement 001, subfield 003 is populated and does not contain a period or does not contain at least one alphanumeric character before the period and at least two alpha characters after the period or contains a space or @ character.
-c. DE 122, subelement 001, subfield 004 (Acceptor Customer Service Phone Number) is not populated and all of these are true:
-DE 122, subelement 001, subfield 003 is not populated
-DE 22, subfield 1 is not equal to 09, 10, 81, or 82
-d. DE 122, subelement 001, subfield 004 is populated and
-DE 43 (Acceptor Name and Location), subfield 5 (Acceptor Country Code) is USA or CAN and DE 122, subelement 001, subfield 004 is not 10 positions with the first three positions being numeric or
-DE 122, subelement 001, subfield 004 is not between five and fifteen numeric characters (excluding Canada and the United States).
-Exclusions:
-Mastercard defined airline travel transactions; DE 18 (Acceptor Business Code [MCC]) equal to 4511 or is within the range 3000 to 3350
-DE 48 (Additional Data: Private Use), subelement 77 (Transaction Type Identifier) is:
-C67 (Mastercard Merchant Presented QR)
-C68 (Mastercard Merchant Presented QR Refund)
-DE 61 (Point-of-Service [POS] Data), subfield 7 (POS Transaction Status) is 8 (Account Status Inquiry Service [ASI])
-DE 121 (Authorizing Agent ID Code) is 000000 (MIP X-Code System)
- 
+The precise clarification you need is: **Which field in our P2P Payment Transfer REST request maps to `DE122.001.003`? Please provide a corrected request example, or confirm the required partner configuration.**
