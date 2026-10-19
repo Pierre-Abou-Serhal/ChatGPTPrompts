@@ -1,56 +1,47 @@
-oldCustomerId,oldExternalId,oldCompany,PrintCard,branchCode,branchName,GIVENNAMES,FATHERNAME,FAMILYNAME,DATEOFBIRTH,EMAIL1,MOFIRSTNAME,MOLASTNAME,BIRTHCNT,NATIONALITY,BIRTHREGISTER,LEGALID,LEGALDOCNAME,LEGALISSDATE,LEGALEXPDATE,GENDER,MARITALSTATUS,SPLASTNAME,SPFIRSTNAME,HLDOTHMATH,OTHRNAT,PEP,BNRGTOWNR,MOTACOPEN,SRCFUNDS,FINDETS,SRCWEALTH,ESTWEALTH,RESIDENCE,CUSCITY,CITY,STREET,CUSBUILDING,FLOORNO,DEPARTMENT,PROVINCE,EMPLOYMENTSTATUS,SALARYDOM,CLIENTFUNC,OCCUPATION,JOBTITLE,EMPLOYERSNAME,EMPLOYMENTSTART,NETMONTHLYIN,NETMONTHLYOUT,FINTWNCTY,FINLOC,FINCITY,FINSTREET,FINBLD,FINFLRNO,FINDEPT,FINPROV,CRSTAXRES_1,CRSTAXRES_2,CRSTAXRES_3,CRSTAXRES_4,CRSTAXID_1,CRSTAXID_2,CRSTAXID_3,CRSTAXID_4,CRSTAXDT_1,CRSTAXDT_2,CRSTAXDT_3,CRSTAXDT_4,PACKAGEID,HAVETINNB_1,HAVETINNB_2,HAVETINNB_3,HAVETINNB_4,GREENCARDNB,GREENCARDHOLD,ISOCODE,MOBCOUNTRYCODE,MOBAREACODE,MOBNUMBER,birthRegistrationNumber,landLineCountryCode_1,landLineCountryCode_2,landLineCountryCode_3,landLineCountryCode_4,landLineAreaCode_1,landLineAreaCode_2,landLineAreaCode_3,landLineAreaCode_4,landLineNumber_1,landLineNumber_2,landLineNumber_3,landLineNumber_4
-74709,KASSAB74709,LB0010200,Yes,LB0010307,Leap Head Office,GEORGES,ELIAS,KASSAB,19731205,,THERESE,SALIBY,LB,LB,11053,14178598,3,19980709,21000101,MALE,MARRIED,ACHKAR,SANAA,No,,No,Yes,Domiciliation group,5,Employment,DE SON SALAIRE,1,LB,11053,,MINCHAR ST,ELIAS KASSAB BLD,RC,,,ACTIVE,Private Sec-Salary Not Domiciliated,,532,EMPLOYEE,FOOD & DESIGN (CATHERING),20180101,0,,LB,11001,BAABDA,PRINCIPALE,YARZE COUNTRY CLUB,RC,,,LB,,,,ENG SIGNE,,,,20250812,,,,DIGITALPACKAGE,Yes,No,No,No,,,LB,961,3,417668,41,961,,,,5,0,0,0,262434,,,
-74722,ASSAF74722,LB0010200,Yes,LB0010307,Leap Head Office,ASSAF,NAYEF,GEBRANE,19720312,,NOUHAD,FARES,LB,LB,24038,49530824,3,20090216,21000101,MALE,MARRIED,EID,RANIA,No,,No,Yes,Domiciliation group,5,Employment,DE SON SALAIRE,1,LB,11037,,BOTOM ST,FRANCIS KARAM BLD,2,,,ACTIVE,Private Sec-Salary Not Domiciliated,,532,EMPLOYEE,FOOD & DESING (CATHERING),20150101,0,,LB,11001,BAABDA,PRINCIPALE,YARZE COUNTRY CLUB,RDC,,,LB,,,,ENG SIGNE,,,,20250814,,,,DIGITALPACKAGE,Yes,No,No,No,,,LB,961,3,748406,31,961,,,,71,0,0,0,201975,,,
-
-From this data, I want to create an xml like the following:
-
 <bul:BulkPrintCardReq xmlns:bul="http://www.sgbl.com.lb/schemas/BulkPrintCardReq">
-    <!-- First Request -->
     <bul:requests>
-        <bul:customerId>987654</bul:customerId>
-        <bul:externalId>EXT-100293</bul:externalId>
-        <bul:correlationId>corr-aaaa-1111</bul:correlationId>
-        <bul:cardIssueId>5544</bul:cardIssueId>
-        <bul:firstName>Jean</bul:firstName>
-        <bul:lastName>Khoury</bul:lastName>
-        <bul:phoneNumber>96170123456</bul:phoneNumber>
-        <bul:email>j.khoury@email.com.lb</bul:email>
+        <bul:customerId>74709</bul:customerId>
+        <bul:externalId>KASSAB74709</bul:externalId>
+        <bul:correlationId/>
+        <bul:cardIssueId/>
+        <bul:firstName>GEORGES</bul:firstName>
+        <bul:lastName>KASSAB</bul:lastName>
+        <bul:phoneNumber>9613417668</bul:phoneNumber>
+        <bul:email/>
         <bul:address>
-            <bul:addressType>HOME</bul:addressType>
-            <bul:branchCode>10</bul:branchCode>
-            <bul:branchName>Achrafieh Main Branch</bul:branchName>
-            <bul:country>Lebanon</bul:country>
-            <bul:city>Beirut</bul:city>
-            <bul:street>Sursock Street</bul:street>
-            <bul:building>Sursock Tower</bul:building>
-            <bul:floor>4th Floor</bul:floor>
+            <bul:addressType/>
+            <bul:branchCode>LB0010307</bul:branchCode>
+            <bul:branchName>Leap Head Office</bul:branchName>
+            <bul:country>LB</bul:country>
+            <bul:city/>
+            <bul:street>MINCHAR ST</bul:street>
+            <bul:building>ELIAS KASSAB BLD</bul:building>
+            <bul:floor>RC</bul:floor>
         </bul:address>
-        <bul:channel>MOBILE_APP</bul:channel>
-        <bul:platform>IOS</bul:platform>
+        <bul:channel/>
+        <bul:platform/>
     </bul:requests>
 
-    <!-- Second Request -->
     <bul:requests>
-        <bul:customerId>456123</bul:customerId>
-        <bul:externalId>EXT-100294</bul:externalId>
-        <bul:correlationId>corr-bbbb-2222</bul:correlationId>
-        <bul:cardIssueId>5545</bul:cardIssueId>
-        <bul:firstName>Rania</bul:firstName>
-        <bul:lastName>Haddad</bul:lastName>
-        <bul:phoneNumber>96103987654</bul:phoneNumber>
-        <bul:email>r.haddad@email.com.lb</bul:email>
+        <bul:customerId>74722</bul:customerId>
+        <bul:externalId>ASSAF74722</bul:externalId>
+        <bul:correlationId/>
+        <bul:cardIssueId/>
+        <bul:firstName>ASSAF</bul:firstName>
+        <bul:lastName>GEBRANE</bul:lastName>
+        <bul:phoneNumber>9613748406</bul:phoneNumber>
+        <bul:email/>
         <bul:address>
-            <bul:addressType>BRANCH</bul:addressType>
-            <bul:branchCode>25</bul:branchCode>
-            <bul:branchName>Hamra Branch</bul:branchName>
-            <bul:country>Lebanon</bul:country>
-            <bul:city>Beirut</bul:city>
-            <bul:street>Hamra Main Street</bul:street>
-            <bul:building>Maktabi Building</bul:building>
-            <bul:floor>Ground Floor</bul:floor>
+            <bul:addressType/>
+            <bul:branchCode>LB0010307</bul:branchCode>
+            <bul:branchName>Leap Head Office</bul:branchName>
+            <bul:country>LB</bul:country>
+            <bul:city/>
+            <bul:street>BOTOM ST</bul:street>
+            <bul:building>FRANCIS KARAM BLD</bul:building>
+            <bul:floor>2</bul:floor>
         </bul:address>
-        <bul:channel>WEB_PORTAL</bul:channel>
-        <bul:platform>DESKTOP</bul:platform>
+        <bul:channel/>
+        <bul:platform/>
     </bul:requests>
-
 </bul:BulkPrintCardReq>
