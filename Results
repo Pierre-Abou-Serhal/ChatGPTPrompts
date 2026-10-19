@@ -1,31 +1,56 @@
-**Mastercard is telling you: “Your transactions are missing the website URL of the payment service provider. Adding a phone number and a physical address does not fix the missing URL.”**
+oldCustomerId,oldExternalId,oldCompany,PrintCard,branchCode,branchName,GIVENNAMES,FATHERNAME,FAMILYNAME,DATEOFBIRTH,EMAIL1,MOFIRSTNAME,MOLASTNAME,BIRTHCNT,NATIONALITY,BIRTHREGISTER,LEGALID,LEGALDOCNAME,LEGALISSDATE,LEGALEXPDATE,GENDER,MARITALSTATUS,SPLASTNAME,SPFIRSTNAME,HLDOTHMATH,OTHRNAT,PEP,BNRGTOWNR,MOTACOPEN,SRCFUNDS,FINDETS,SRCWEALTH,ESTWEALTH,RESIDENCE,CUSCITY,CITY,STREET,CUSBUILDING,FLOORNO,DEPARTMENT,PROVINCE,EMPLOYMENTSTATUS,SALARYDOM,CLIENTFUNC,OCCUPATION,JOBTITLE,EMPLOYERSNAME,EMPLOYMENTSTART,NETMONTHLYIN,NETMONTHLYOUT,FINTWNCTY,FINLOC,FINCITY,FINSTREET,FINBLD,FINFLRNO,FINDEPT,FINPROV,CRSTAXRES_1,CRSTAXRES_2,CRSTAXRES_3,CRSTAXRES_4,CRSTAXID_1,CRSTAXID_2,CRSTAXID_3,CRSTAXID_4,CRSTAXDT_1,CRSTAXDT_2,CRSTAXDT_3,CRSTAXDT_4,PACKAGEID,HAVETINNB_1,HAVETINNB_2,HAVETINNB_3,HAVETINNB_4,GREENCARDNB,GREENCARDHOLD,ISOCODE,MOBCOUNTRYCODE,MOBAREACODE,MOBNUMBER,birthRegistrationNumber,landLineCountryCode_1,landLineCountryCode_2,landLineCountryCode_3,landLineCountryCode_4,landLineAreaCode_1,landLineAreaCode_2,landLineAreaCode_3,landLineAreaCode_4,landLineNumber_1,landLineNumber_2,landLineNumber_3,landLineNumber_4
+74709,KASSAB74709,LB0010200,Yes,LB0010307,Leap Head Office,GEORGES,ELIAS,KASSAB,19731205,,THERESE,SALIBY,LB,LB,11053,14178598,3,19980709,21000101,MALE,MARRIED,ACHKAR,SANAA,No,,No,Yes,Domiciliation group,5,Employment,DE SON SALAIRE,1,LB,11053,,MINCHAR ST,ELIAS KASSAB BLD,RC,,,ACTIVE,Private Sec-Salary Not Domiciliated,,532,EMPLOYEE,FOOD & DESIGN (CATHERING),20180101,0,,LB,11001,BAABDA,PRINCIPALE,YARZE COUNTRY CLUB,RC,,,LB,,,,ENG SIGNE,,,,20250812,,,,DIGITALPACKAGE,Yes,No,No,No,,,LB,961,3,417668,41,961,,,,5,0,0,0,262434,,,
+74722,ASSAF74722,LB0010200,Yes,LB0010307,Leap Head Office,ASSAF,NAYEF,GEBRANE,19720312,,NOUHAD,FARES,LB,LB,24038,49530824,3,20090216,21000101,MALE,MARRIED,EID,RANIA,No,,No,Yes,Domiciliation group,5,Employment,DE SON SALAIRE,1,LB,11037,,BOTOM ST,FRANCIS KARAM BLD,2,,,ACTIVE,Private Sec-Salary Not Domiciliated,,532,EMPLOYEE,FOOD & DESING (CATHERING),20150101,0,,LB,11001,BAABDA,PRINCIPALE,YARZE COUNTRY CLUB,RDC,,,LB,,,,ENG SIGNE,,,,20250814,,,,DIGITALPACKAGE,Yes,No,No,No,,,LB,961,3,748406,31,961,,,,71,0,0,0,201975,,,
 
-For your project, that would normally be an approved **SGBL website URL**, which Mastercard SEND must put into **`DE122.001.003`** in the network transaction.
+From this data, I want to create an xml like the following:
 
-Your proposed request contains:
+<bul:BulkPrintCardReq xmlns:bul="http://www.sgbl.com.lb/schemas/BulkPrintCardReq">
+    <!-- First Request -->
+    <bul:requests>
+        <bul:customerId>987654</bul:customerId>
+        <bul:externalId>EXT-100293</bul:externalId>
+        <bul:correlationId>corr-aaaa-1111</bul:correlationId>
+        <bul:cardIssueId>5544</bul:cardIssueId>
+        <bul:firstName>Jean</bul:firstName>
+        <bul:lastName>Khoury</bul:lastName>
+        <bul:phoneNumber>96170123456</bul:phoneNumber>
+        <bul:email>j.khoury@email.com.lb</bul:email>
+        <bul:address>
+            <bul:addressType>HOME</bul:addressType>
+            <bul:branchCode>10</bul:branchCode>
+            <bul:branchName>Achrafieh Main Branch</bul:branchName>
+            <bul:country>Lebanon</bul:country>
+            <bul:city>Beirut</bul:city>
+            <bul:street>Sursock Street</bul:street>
+            <bul:building>Sursock Tower</bul:building>
+            <bul:floor>4th Floor</bul:floor>
+        </bul:address>
+        <bul:channel>MOBILE_APP</bul:channel>
+        <bul:platform>IOS</bul:platform>
+    </bul:requests>
 
-| Field | What it provides | Does it provide the missing URL? |
-|---|---|---|
-| `card_acceptor_id` | Identifies the acceptor | No |
-| `customer_service_contact_info` | Customer service phone number | No |
-| `transfer_acceptor_address` | Physical address | No |
+    <!-- Second Request -->
+    <bul:requests>
+        <bul:customerId>456123</bul:customerId>
+        <bul:externalId>EXT-100294</bul:externalId>
+        <bul:correlationId>corr-bbbb-2222</bul:correlationId>
+        <bul:cardIssueId>5545</bul:cardIssueId>
+        <bul:firstName>Rania</bul:firstName>
+        <bul:lastName>Haddad</bul:lastName>
+        <bul:phoneNumber>96103987654</bul:phoneNumber>
+        <bul:email>r.haddad@email.com.lb</bul:email>
+        <bul:address>
+            <bul:addressType>BRANCH</bul:addressType>
+            <bul:branchCode>25</bul:branchCode>
+            <bul:branchName>Hamra Branch</bul:branchName>
+            <bul:country>Lebanon</bul:country>
+            <bul:city>Beirut</bul:city>
+            <bul:street>Hamra Main Street</bul:street>
+            <bul:building>Maktabi Building</bul:building>
+            <bul:floor>Ground Floor</bul:floor>
+        </bul:address>
+        <bul:channel>WEB_PORTAL</bul:channel>
+        <bul:platform>DESKTOP</bul:platform>
+    </bul:requests>
 
-Under the rules in their email, **the URL is mandatory when the network transaction’s DE22 entry mode is `09`, `10`, `81`, or `82`**. A phone number cannot replace the URL for those transactions.
-
-**There is also a naming confusion in the email:** **Edit 42** is the compliance check. **DE42** is a transaction field identifying the acceptor. The missing URL they describe belongs in **DE122**, so this finding does not establish that your `card_acceptor_id` needs changing.
-
-**What should you change in `PostTransferReq`?**
-
-You need to supply the acceptor URL through the **supported API field or configuration that Mastercard SEND maps to `DE122.001.003`**.
-
-However, **their response does not tell you the JSON field name or where to place it**. I checked the published [P2P API specification](https://static.developer.mastercard.com/content/mastercard-send-person-to-person/swagger/send-payment-transfer-api-swagger.yaml), linked from Mastercard’s API reference, and found no explicit acceptor-URL property. That gap needs clarification before you can produce a correct updated request. [developer.mastercard.com](https://developer.mastercard.com/mastercard-send-person-to-person/documentation/api-reference/payment-transfer/?utm_source=chatgpt.com)
-
-Keep `customer_service_contact_info` as a phone number. Mastercard documents it as numeric, with a maximum of 13 digits outside the US and Canada; usage may also require Mastercard configuration. **Do not replace its value with a URL.** [static.developer.mastercard.com](https://static.developer.mastercard.com/content/mastercard-send/release-notes/mastercard-send-release-notes-22.R1.pdf?utm_source=chatgpt.com)
-
-The next steps are:
-
-1. **Ask Mastercard for the exact JSON property and path** supported by your P2P API version—or confirm whether the URL must be configured against your partner profile.
-2. Supply SGBL’s approved URL through that mechanism.
-3. Run a test and have Mastercard confirm that **`DE122.001.003` actually contains the URL** and the Edit 42 finding is resolved.
-
-The precise clarification you need is: **Which field in our P2P Payment Transfer REST request maps to `DE122.001.003`? Please provide a corrected request example, or confirm the required partner configuration.**
+</bul:BulkPrintCardReq>
