@@ -1,11 +1,11 @@
-git diff --name-only --diff-filter=M -z |
-while IFS= read -r -d '' file; do
-    if git --literal-pathspecs diff --quiet --no-ext-diff --no-textconv \
-        --ignore-cr-at-eol -- "$file"; then
+f='Alterna.business.svc/classes/pom.xml'
 
-        git --literal-pathspecs restore --worktree -- "$file" || break
-        printf 'Cleared: %s\n' "$file"
-    fi
-done
+git status --short -- "$f"
+git diff --raw --no-ext-diff --no-textconv -- "$f"
+git diff --cached --raw --no-ext-diff --no-textconv -- "$f"
+git ls-files --eol -- "$f"
 
-git status --short
+# Content identifiers: committed, staged, and current working file
+git rev-parse "HEAD:$f"
+git rev-parse ":$f"
+git hash-object --path="$f" -- "$f"
