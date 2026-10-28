@@ -1,462 +1,132 @@
-#Requires -Version 5.1
-<#
-.SYNOPSIS
-Merges unencrypted OSB 12.2.1.0.0 configuration JARs, oldest to newest.
-
-.DESCRIPTION
-Reads YYYYMMDD and YYYYMMDD_number folders directly below RootFolder.
-Scans for JARs recursively inside those dated folders. Sorts by folder date,
-numeric suffix, then LastWriteTimeUtc and relative filename. Later files win
-by their exact, case-sensitive path inside the JAR, never by ZIP timestamps.
-Use -SameFolderOrder Name to order JARs by relative filename instead.
-
-JARs directly in RootFolder require -RootJarDate YYYYMMDD. They are treated
-as suffix 0 on that date. The specified output JAR is always excluded.
-
-Merges ExportInfo exportedItemInfo records together with their resource files.
-If the same OSB resource (typeId + instanceId) has a newer jarentryname, keeps
-the newer entry and metadata and removes its superseded archive path. If a
-newer resource reuses an existing path, the newer file and identity win.
-Sets projectLevelExport=false: this is a cumulative resource union and does
-not infer deletions or reproduce complete-project replacement semantics.
-Keeps the newest JAR's global metadata; does not change productversion.
-Rejects encrypted exports, signed archives, incompatible versions, malformed
-metadata, and duplicate ZIP paths or resource identities within one input JAR.
-
-Uses built-in .NET compression; no Java, 7-Zip, or Oracle installation needed.
-Input JARs are opened read-only and are never extracted or modified.
-Builds a temporary JAR beside the output, verifies its contents, and only then
-publishes it. An existing output requires -Force and is replaced atomically.
-
-.EXAMPLE
-.\Merge-OsbJars.ps1 -RootFolder 'D:\OSB\Exports' -WhatIf
-
-.EXAMPLE
-.\Merge-OsbJars.ps1 -RootFolder 'D:\OSB\Exports' -OutputJar 'D:\OSB\Merged.jar'
-
-.EXAMPLE
-.\Merge-OsbJars.ps1 -RootFolder 'D:\OSB\Exports' -RootJarDate '20260101' -Force
-
-.NOTES
-Designed for Windows PowerShell 5.1 and OSB 12.2.1.0.0 v2 configuration JARs.
-An import in JDeveloper remains the final compatibility/dependency check.
-#>
-[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Low')]
-param(
-    [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
-    [string] $RootFolder,
-
-    [string] $OutputJar,
-
-    [ValidatePattern('^\d{8}$')]
-    [string] $RootJarDate,
-
-    [ValidateSet('LastWriteTime', 'Name')]
-    [string] $SameFolderOrder = 'LastWriteTime',
-
-    [switch] $Force
-)
-
-Set-StrictMode -Version 2.0
-$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.IO.Compression
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-
-$script:OsbNamespace = 'http://www.bea.com/wli/config/importexport'
-
-function ConvertTo-FolderDate {
-    param([string] $Text)
-    $parsed = [datetime]::MinValue
-    if (-not [datetime]::TryParseExact($Text, 'yyyyMMdd',
-            [Globalization.CultureInfo]::InvariantCulture,
-            [Globalization.DateTimeStyles]::None, [ref] $parsed)) {
-        throw "Invalid folder date '$Text'. Expected a real date in YYYYMMDD format."
-    }
-    return $parsed
-}
-
-function Get-OsbProperties {
-    param([System.Xml.XmlElement] $Node)
-    # A list, not a dictionary: extrefs legitimately occurs more than once.
-    return @($Node.SelectNodes(
-        '*[local-name()="properties" and namespace-uri()="http://www.bea.com/wli/config/importexport"]/*[local-name()="property" and namespace-uri()="http://www.bea.com/wli/config/importexport"]'))
-}
-
-function Get-OsbProperty {
-    param([System.Xml.XmlElement] $Node, [string] $Name)
-    $found = @(Get-OsbProperties $Node | Where-Object { $_.GetAttribute('name') -ceq $Name })
-    if ($found.Count -gt 1) { throw "Duplicate '$Name' property in ExportInfo." }
-    if ($found.Count -eq 1) { return $found[0].GetAttribute('value') }
-    return $null
-}
-
-function Assert-EntryName {
-    param([string] $Name)
-    if ([string]::IsNullOrEmpty($Name) -or $Name.Contains('\') -or
-        $Name.StartsWith('/') -or $Name.Contains(':') -or
-        $Name -cmatch '(^|/)(\.|\.\.)(/|$)') {
-        throw "Unsupported ZIP entry path '$Name'."
-    }
-}
-
-function Get-ResourceKey {
-    param([System.Xml.XmlElement] $Node)
-    $typeId = $Node.GetAttribute('typeId')
-    $instanceId = $Node.GetAttribute('instanceId')
-    if ([string]::IsNullOrEmpty($typeId) -or [string]::IsNullOrEmpty($instanceId)) {
-        throw 'ExportInfo resource is missing typeId or instanceId.'
-    }
-    return $typeId + [char] 0 + $instanceId
-}
-
-function Get-StreamHash {
-    param([System.IO.Stream] $Stream)
-    $sha = [Security.Cryptography.SHA256]::Create()
-    try { return [BitConverter]::ToString($sha.ComputeHash($Stream)) }
-    finally { $sha.Dispose() }
-}
-
-$rootItem = Get-Item -LiteralPath $RootFolder
-if (-not $rootItem.PSIsContainer -or $rootItem.PSProvider.Name -ne 'FileSystem') {
-    throw 'RootFolder must be a filesystem directory.'
-}
-$root = $rootItem.FullName
-if ([string]::IsNullOrWhiteSpace($OutputJar)) {
-    $OutputJar = Join-Path $root 'MergedOSB.jar'
-}
-$output = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputJar)
-if ([IO.Path]::GetExtension($output) -ine '.jar') { throw 'OutputJar must end with .jar.' }
-if (Test-Path -LiteralPath $output) {
-    if ((Get-Item -LiteralPath $output).PSIsContainer) { throw 'OutputJar is a directory.' }
-    if (-not $Force) { throw "Output exists: '$output'. Use -Force to replace it." }
-}
-
-# Build the input order before opening or writing archives.
-$candidates = New-Object 'System.Collections.Generic.List[object]'
-$rootJars = @(Get-ChildItem -LiteralPath $root -File -Filter '*.jar' |
-    Where-Object { -not [string]::Equals($_.FullName, $output, [StringComparison]::OrdinalIgnoreCase) })
-if ($rootJars.Count -gt 0) {
-    if ([string]::IsNullOrWhiteSpace($RootJarDate)) {
-        throw 'JARs exist directly in RootFolder. Supply -RootJarDate YYYYMMDD, or move them into dated folders.'
-    }
-    $date = ConvertTo-FolderDate $RootJarDate
-    foreach ($file in $rootJars) {
-        $candidates.Add([pscustomobject]@{
-            Date = $date; Suffix = [uint64] 0; Folder = ''; File = $file
-            RelativeName = $file.Name; Time = $file.LastWriteTimeUtc
-        })
-    }
-}
-
-foreach ($folder in Get-ChildItem -LiteralPath $root -Directory) {
-    if ($folder.Name -notmatch '^(?<date>\d{8})(?:_(?<suffix>\d+))?$') {
-        Write-Warning "Skipping non-date folder: $($folder.FullName)"
-        continue
-    }
-    $date = ConvertTo-FolderDate $Matches['date']
-    $suffix = [uint64] 0
-    if ($Matches['suffix'] -and -not [uint64]::TryParse($Matches['suffix'], [ref] $suffix)) {
-        throw "Folder suffix is too large: $($folder.Name)"
-    }
-    foreach ($file in Get-ChildItem -LiteralPath $folder.FullName -File -Filter '*.jar' -Recurse) {
-        if ([string]::Equals($file.FullName, $output, [StringComparison]::OrdinalIgnoreCase)) { continue }
-        $candidates.Add([pscustomobject]@{
-            Date = $date; Suffix = $suffix; Folder = $folder.Name; File = $file
-            RelativeName = $file.FullName.Substring($folder.FullName.Length + 1)
-            Time = $file.LastWriteTimeUtc
-        })
-    }
-}
-if ($candidates.Count -eq 0) { throw "No input JARs found in '$root'." }
-
-# Use ordinal comparisons so the same names sort identically on every PC.
-$comparison = [System.Comparison[object]] {
-    param($a, $b)
-    $c = $a.Date.CompareTo($b.Date)
-    if ($c -ne 0) { return $c }
-    $c = $a.Suffix.CompareTo($b.Suffix)
-    if ($c -ne 0) { return $c }
-    $c = [StringComparer]::Ordinal.Compare($a.Folder, $b.Folder)
-    if ($c -ne 0) { return $c }
-    if ($SameFolderOrder -eq 'LastWriteTime') {
-        $c = $a.Time.CompareTo($b.Time)
-        if ($c -ne 0) { return $c }
-    }
-    return [StringComparer]::Ordinal.Compare($a.RelativeName, $b.RelativeName)
-}
-$candidates.Sort($comparison)
-Write-Host 'Merge order (last wins):'
-for ($i = 0; $i -lt $candidates.Count; $i++) {
-    Write-Host ('  {0,4}. {1}' -f ($i + 1), $candidates[$i].File.FullName)
-}
-
-$archives = New-Object 'System.Collections.Generic.List[object]'
-$files = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
-$resources = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
-$identityPaths = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)
-$pathIdentities = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)
-$latestDocument = $null
-$overwrites = 0
-$relocations = 0
-$tempFile = $null
-
-try {
-    foreach ($candidate in $candidates) {
-        $source = $candidate.File.FullName
-        $archive = [IO.Compression.ZipFile]::OpenRead($source)
-        $archives.Add($archive) # Kept open/read-locked until the merge finishes.
-        try {
-            $entries = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
-            foreach ($entry in $archive.Entries) {
-                Assert-EntryName $entry.FullName
-                if ($entry.FullName.EndsWith('/')) { continue }
-                if ($entries.ContainsKey($entry.FullName)) { throw "Duplicate ZIP entry '$($entry.FullName)'." }
-                if ($entry.FullName -imatch '^META-INF/([^/]+\.(SF|RSA|DSA|EC)|SIG-[^/]+)$') {
-                    throw 'Signed JARs cannot be merged without invalidating their signatures.'
-                }
-                $entries.Add($entry.FullName, $entry)
-            }
-            if (-not $entries.ContainsKey('ExportInfo')) {
-                throw 'Missing root ExportInfo. Expected an OSB configuration JAR, not a Java library JAR.'
-            }
-
-            $settings = New-Object System.Xml.XmlReaderSettings
-            $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
-            $settings.XmlResolver = $null
-            $stream = $entries['ExportInfo'].Open()
-            $reader = $null
-            try {
-                $reader = [Xml.XmlReader]::Create($stream, $settings)
-                $doc = New-Object System.Xml.XmlDocument
-                $doc.XmlResolver = $null
-                $doc.Load($reader)
-            }
-            finally {
-                if ($null -ne $reader) { $reader.Dispose() }
-                $stream.Dispose()
-            }
-            $element = $doc.DocumentElement
-            if ($element.LocalName -cne 'xml-fragment' -or $element.GetAttribute('version') -cne 'v2') {
-                throw 'Unsupported ExportInfo layout. Expected OSB xml-fragment version v2.'
-            }
-            # Select by namespace URI: prefixes may differ between exporters.
-            $globalNodes = @($element.SelectNodes('*[local-name()="properties" and namespace-uri()="http://www.bea.com/wli/config/importexport"]'))
-            if ($globalNodes.Count -ne 1) { throw 'Expected exactly one global properties element in ExportInfo.' }
-            if ((Get-OsbProperty $element 'productname') -cne 'Oracle Service Bus' -or
-                (Get-OsbProperty $element 'productversion') -cne '12.2.1.0.0') {
-                throw 'Expected Oracle Service Bus productversion 12.2.1.0.0. Re-export with the matching OSB version.'
-            }
-            foreach ($property in Get-OsbProperties $element) {
-                if ($property.GetAttribute('name') -imatch 'encrypt|passphrase' -and
-                    -not [string]::IsNullOrWhiteSpace($property.GetAttribute('value'))) {
-                    throw 'Encrypted export metadata found. Re-export without Protect Sensitive Data before merging.'
-                }
-            }
-
-            $jarIdentities = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
-            $jarPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
-            $incomingResources = New-Object 'System.Collections.Generic.List[object]'
-            foreach ($node in $element.ChildNodes) {
-                if ($node.NodeType -ne [Xml.XmlNodeType]::Element) { continue }
-                if ($node.NamespaceURI -cne $script:OsbNamespace) { throw 'Unknown ExportInfo child namespace.' }
-                if ($node.LocalName -ceq 'properties') { continue }
-                if ($node.LocalName -cne 'exportedItemInfo') { throw "Unsupported ExportInfo child '$($node.LocalName)'." }
-                $key = Get-ResourceKey $node
-                $path = Get-OsbProperty $node 'jarentryname'
-                if ([string]::IsNullOrWhiteSpace($path)) { throw 'Resource has no jarentryname property.' }
-                Assert-EntryName $path
-                if ($path -ceq 'ExportInfo' -or $path -imatch '^META-INF/') { throw "Invalid resource path '$path'." }
-                if (-not $entries.ContainsKey($path)) { throw "ExportInfo references missing entry '$path'." }
-                if (-not $jarIdentities.Add($key) -or -not $jarPaths.Add($path)) {
-                    throw "Duplicate resource identity or jarentryname '$path'."
-                }
-                $encrypted = Get-OsbProperty $node 'isencrypted'
-                if ($encrypted -and $encrypted -ine 'false' -and $encrypted -ne '0') {
-                    throw "Encrypted resource '$path'. Re-export without Protect Sensitive Data before merging."
-                }
-                $incomingResources.Add([pscustomobject]@{ Key = $key; Path = $path; Node = $node })
-            }
-
-            # Validate the whole JAR before updating the accumulated index. Keep
-            # prior sources for overwrite reporting even when paths are retired.
-            $priorSources = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)
-            foreach ($pair in $entries.GetEnumerator()) {
-                if ($pair.Key -ceq 'ExportInfo') { continue }
-                if (-not $jarPaths.Contains($pair.Key) -and $pair.Key -inotmatch '^META-INF/') {
-                    throw "Entry '$($pair.Key)' has no matching ExportInfo record."
-                }
-                if ($files.ContainsKey($pair.Key)) {
-                    $priorSources[$pair.Key] = $files[$pair.Key].Source
-                }
-            }
-
-            # An OSB identity and its physical ZIP path are different things.
-            # Retire ALL moved identities before installing this JAR's records,
-            # so two resources can exchange paths regardless of metadata order.
-            foreach ($incoming in $incomingResources) {
-                $key = $incoming.Key
-                $path = $incoming.Path
-                if ($identityPaths.ContainsKey($key) -and $identityPaths[$key] -cne $path) {
-                    $oldPath = $identityPaths[$key]
-                    [void] $files.Remove($oldPath)
-                    [void] $resources.Remove($oldPath)
-                    [void] $pathIdentities.Remove($oldPath)
-                    [void] $identityPaths.Remove($key)
-                    $relocations++
-                    Write-Verbose ("Newer resource entry replaces '{0}' with '{1}' from '{2}'" -f $oldPath, $path, $source)
-                }
-            }
-            foreach ($incoming in $incomingResources) {
-                $key = $incoming.Key
-                $path = $incoming.Path
-                if ($pathIdentities.ContainsKey($path) -and $pathIdentities[$path] -cne $key) {
-                    # Same physical file path: the newest payload AND its
-                    # metadata win. Discard the previous identity's mapping.
-                    [void] $identityPaths.Remove($pathIdentities[$path])
-                    Write-Verbose ("Using newer resource identity for '{0}' from '{1}'" -f $path, $source)
-                }
-                $identityPaths[$key] = $path
-                $pathIdentities[$path] = $key
-                $resources[$path] = $incoming.Node
-            }
-            foreach ($pair in $entries.GetEnumerator()) {
-                if ($pair.Key -ceq 'ExportInfo') { continue }
-                if ($priorSources.ContainsKey($pair.Key)) {
-                    $overwrites++
-                    Write-Verbose ("Replacing '{0}': '{1}' -> '{2}'" -f $pair.Key, $priorSources[$pair.Key], $source)
-                }
-                $files[$pair.Key] = [pscustomobject]@{ Entry = $pair.Value; Source = $source }
-            }
-            $latestDocument = $doc
-        }
-        catch { throw "Input '$source': $($_.Exception.Message)" }
-    }
-    if ($resources.Count -eq 0) { throw 'The input JARs contain no OSB resources.' }
-
-    # Preserve newest global metadata and replace its index with the full union.
-    $merged = $latestDocument.CloneNode($true)
-    $mergedRoot = $merged.DocumentElement
-    foreach ($node in @($mergedRoot.SelectNodes('*[local-name()="exportedItemInfo" and namespace-uri()="http://www.bea.com/wli/config/importexport"]'))) {
-        [void] $mergedRoot.RemoveChild($node)
-    }
-    $global = $mergedRoot.SelectSingleNode('*[local-name()="properties" and namespace-uri()="http://www.bea.com/wli/config/importexport"]')
-    $projectFlag = @((Get-OsbProperties $mergedRoot) | Where-Object { $_.GetAttribute('name') -ceq 'projectLevelExport' })
-    if ($projectFlag.Count -gt 1) { throw 'Duplicate projectLevelExport property.' }
-    if ($projectFlag.Count -eq 0) {
-        $flag = $merged.CreateElement($global.Prefix, 'property', $script:OsbNamespace)
-        $flag.SetAttribute('name', 'projectLevelExport')
-        [void] $global.AppendChild($flag)
-    }
-    else { $flag = $projectFlag[0] }
-    $flag.SetAttribute('value', 'false')
-    $resourcePaths = New-Object 'System.Collections.Generic.List[string]'
-    foreach ($path in $resources.Keys) { $resourcePaths.Add($path) }
-    $resourcePaths.Sort([StringComparer]::Ordinal)
-    foreach ($path in $resourcePaths) {
-        [void] $mergedRoot.AppendChild($merged.ImportNode($resources[$path], $true))
-    }
-
-    Write-Host ("Validated {0} JARs; {1} unique resources; {2} file overwrites; {3} resource entry relocations." -f $candidates.Count, $resources.Count, $overwrites, $relocations)
-    if (-not $PSCmdlet.ShouldProcess($output, 'Create merged OSB configuration JAR')) { return }
-
-    $parent = [IO.Path]::GetDirectoryName($output)
-    [void] [IO.Directory]::CreateDirectory($parent)
-    $tempFile = Join-Path $parent ('.osb-merge-' + [guid]::NewGuid().ToString('N') + '.tmp')
-    $outputStream = [IO.File]::Open($tempFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-    $outputArchive = $null
-    try {
-        $outputArchive = [IO.Compression.ZipArchive]::new($outputStream, [IO.Compression.ZipArchiveMode]::Create, $false)
-        $info = $outputArchive.CreateEntry('ExportInfo', [IO.Compression.CompressionLevel]::Optimal)
-        $xmlSettings = New-Object Xml.XmlWriterSettings
-        $xmlSettings.Encoding = [Text.UTF8Encoding]::new($false)
-        $xmlSettings.Indent = $true
-        $infoStream = $info.Open()
-        $writer = $null
-        try {
-            $writer = [Xml.XmlWriter]::Create($infoStream, $xmlSettings)
-            $merged.Save($writer)
-        }
-        finally {
-            if ($null -ne $writer) { $writer.Dispose() }
-            $infoStream.Dispose()
-        }
-        $names = New-Object 'System.Collections.Generic.List[string]'
-        foreach ($name in $files.Keys) { $names.Add($name) }
-        $names.Sort([StringComparer]::Ordinal)
-        foreach ($name in $names) {
-            $sourceEntry = $files[$name].Entry
-            $targetEntry = $outputArchive.CreateEntry($name, [IO.Compression.CompressionLevel]::Optimal)
-            $targetEntry.LastWriteTime = $sourceEntry.LastWriteTime
-            $inputStream = $sourceEntry.Open()
-            $targetStream = $null
-            try {
-                $targetStream = $targetEntry.Open()
-                $inputStream.CopyTo($targetStream)
-            }
-            finally {
-                if ($null -ne $targetStream) { $targetStream.Dispose() }
-                $inputStream.Dispose()
-            }
-        }
-    }
-    finally {
-        if ($null -ne $outputArchive) { $outputArchive.Dispose() }
-        $outputStream.Dispose()
-    }
-
-    # Read the result back and compare decompressed bytes with every winning file.
-    $check = [IO.Compression.ZipFile]::OpenRead($tempFile)
-    try {
-        if ($check.Entries.Count -ne ($files.Count + 1)) { throw 'Output entry count verification failed.' }
-        foreach ($entry in $check.Entries) {
-            if ($entry.FullName -ceq 'ExportInfo') {
-                $s = $entry.Open()
-                try {
-                    $checkDoc = New-Object Xml.XmlDocument
-                    $checkDoc.XmlResolver = $null
-                    $checkDoc.Load($s)
-                    if ($checkDoc.DocumentElement.OuterXml -cne $merged.DocumentElement.OuterXml) { throw 'ExportInfo verification failed.' }
-                }
-                finally { $s.Dispose() }
-                continue
-            }
-            if (-not $files.ContainsKey($entry.FullName)) { throw "Unexpected output entry '$($entry.FullName)'." }
-            $s = $entry.Open()
-            $original = $null
-            try {
-                $original = $files[$entry.FullName].Entry.Open()
-                if ((Get-StreamHash $s) -cne (Get-StreamHash $original)) {
-                    throw "Content verification failed: '$($entry.FullName)'."
-                }
-            }
-            finally {
-                if ($null -ne $original) { $original.Dispose() }
-                $s.Dispose()
-            }
-        }
-    }
-    finally { $check.Dispose() }
-
-    if ([IO.File]::Exists($output)) {
-        if (-not $Force) { throw 'Output was created during the merge. Use -Force to replace it.' }
-        # PowerShell converts ordinary $null to an empty string for this .NET
-        # parameter. NullString passes a real null (no backup file requested).
-        [IO.File]::Replace($tempFile, $output, [System.Management.Automation.Language.NullString]::Value)
-    }
-    else { [IO.File]::Move($tempFile, $output) }
-    $tempFile = $null
-    Write-Host "Created: $output"
-    [pscustomobject]@{
-        OutputJar = $output
-        InputJars = $candidates.Count
-        Resources = $resources.Count
-        Overwrites = $overwrites
-        RelocatedResources = $relocations
-        Bytes = (Get-Item -LiteralPath $output).Length
-    }
-}
-finally {
-    foreach ($archive in $archives) { $archive.Dispose() }
-    if ($tempFile -and [IO.File]::Exists($tempFile)) { [IO.File]::Delete($tempFile) }
-}
+PS C:\Users\pabouserhal\Desktop\Utilities> .\MergeOSBJars.ps1 -RootFolder 'C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT' -Force
+Merge order (last wins):
+     1. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260116\MoneySend.jar
+     2. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260119\Email_PrintCard.jar
+     3. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260119\PrintCards.20260112.jar
+     4. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260120\Update_Fields_Onboarding.jar
+     5. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260120_1\MoneySend.jar
+     6. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260120_1\FtReversal.jar
+     7. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260126\TopUp.20250910.jar
+     8. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260129\PrintCard.20260112.jar
+     9. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260129\getAddressForPrinting.jar
+    10. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260130\Topup-Custom-Error-Messages.jar
+    11. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260204_1\BalanceAccountFrom.jar
+    12. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260205\kycCustomerDetection.jar
+    13. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260216\IM.KW.Deactivate.User.20260120.jar
+    14. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260216_2\Topup-Validate.jar
+    15. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260218\onboarding - fix mobile number issue.jar
+    16. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260219\GetAddress_PhoneNumber.jar
+    17. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260223\AlternaSendSms.jar
+    18. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260224\deactivateUser.jar
+    19. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260225\Kyc_Customer_Detection\KycCustomerDetection.jar
+    20. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260225\DM_Migration\Dm_Migration.jar
+    21. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260302\UpdateSecondaryAccount.jar
+    22. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260303\Aramex.jar
+    23. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260304\Aramex.jar
+    24. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260309\servicePacks.jar
+    25. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260311\SetPin.jar
+    26. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260331\BulkOnboarding.jar
+    27. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260331_1\CardsChanges.jar
+    28. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260331_1\cardNamesDVM.jar
+    29. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260401\KYC-PUSH-CUSTOMER-T24-FIX.jar
+    30. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260402\BulkOnboarding.jar
+    31. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260402\DVMs.jar
+    32. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260408\DVMs.jar
+    33. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260408\BulkOnboarding.jar
+    34. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260414\BulkOnboarding.jar
+    35. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260415\SendSms.jar
+    36. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260417\DvmSms.jar
+    37. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260417\fixBulkOnboardingexternalServiceAgreementId.jar
+    38. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260421\ReplaceCard.jar
+    39. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260423\rollback.jar
+    40. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260428\CardName.jar
+    41. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260429\TopUp.jar
+    42. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260429_1\CreateCardSpFix.jar
+    43. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260430\TopUp.jar
+    44. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260504\CreateCardSpFix.jar
+    45. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260512\LEAPSms.jar
+    46. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260513\domapi.jar
+    47. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260513\EligibileAccountsTopup.jar
+    48. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260514\ATMStatus.jar
+    49. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260522\BulkOnboardingDocuments.jar
+    50. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260609\AddDepositAccounts.jar
+    51. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260609\deposit.jar
+    52. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260611\Loyalty-Emails.jar
+    53. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260615\createCardFullNameIssue.jar
+    54. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260618\accountstatementOnline.jar
+    55. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260619\depositsChecking.jar
+    56. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260622\RemoveDepositsFromP2A.jar
+    57. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260623\PrincipalStartDate.jar
+    58. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260624\PrincipalStartDateAndMaturityDateEOM.jar
+    59. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260624\DepositAccountsFull.jar
+    60. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260703\AddDepositAccounts.jar
+    61. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260703\OfflineAccountStatement.jar
+    62. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260708\BOfixName.jar
+    63. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260709\AddDepositAccounts.jar
+    64. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260710\updateCardIssueIdOnPrinting.jar
+    65. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260710\pocketFreshP2A.jar
+    66. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260710\PocketFreshFirstDayOfNextMonth.jar
+    67. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260714\addAccountNextMonthIfError.jar
+    68. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260721\Bulk-Onboarding.jar
+    69. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260722\UpdateSMS.jar
+    70. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260722\addAccountPipeline.jar
+    71. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260724\printCardChangeSMS.jar
+    72. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260731\VisaDirectConfigs.jar
+    73. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260731\SendMoney.20260427.jar
+    74. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260812\PatchForMultiCurrencyCreateBulkJob.jar
+    75. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260813\KYC-LinkCustomer-Possible-Duplicate-Fix.jar
+    76. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260817\InternalBankAccountsBeneficiaries-DVM.jar
+    77. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260819\Visa Direct.jar
+    78. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260826\registration.jar
+    79. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260831\AddAccountFixTimezone.jar
+    80. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260903\ExternalBenef.jar
+    81. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260908\MOMA.jar
+    82. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260908\SOGE-TCIB-COMMON-WS.jar
+    83. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260909\SendMoney.jar
+    84. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260911\SendMoney-Mantis-23250.jar
+    85. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260914\2_Multi-Currecy-Cross-Rate-TRY.jar
+    86. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260914\4_pmOptions.jar
+    87. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260914\3_cardName.jar
+    88. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260914\5_MVC_ReplaceCardsControl.jar
+    89. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260914\1_multicurrency.20260707.jar
+    90. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260914\filterMcurCardsLeapNotPlat.jar
+    91. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260914_1\MOMA.jar
+    92. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260914_1\MOMA_InternalBankAccountsBeneficiaries.jar
+    93. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260915\SendMoney-VisaDirectPilotPhaseExternalIds.jar
+    94. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260915_1\MOMA.jar
+    95. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260921\InsertDocumentsFix.jar
+    96. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260922\Multi-Currecy-Cross-Rate-TRY.jar
+    97. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260924\MOMA.jar
+    98. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260924\PushNotificationRealm-moma.jar
+    99. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260928\KYC-ValidateLinkCustomer.jar
+   100. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260929\CRM_MESSAGES_full_UAT.jar
+   101. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260929_1\Topup-Invert-Visa-Mc-internal-accs.jar
+   102. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261001\BranchOnboarding-createOnIAM.jar
+   103. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261001\createVirtualCard.jar
+   104. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261001_1\MOMA.jar
+   105. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261002\SendMoney.jar
+   106. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261002_1\MOMA.jar
+   107. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261002_2\AddAccount.jar
+   108. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261006\updateCardStatusStopMVC.jar
+   109. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261007\IM_SERVICES.jar
+   110. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261007\AccountStatementBB.jar
+   111. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261007_2\AlternaSendSMS.jar
+   112. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261012\FullAccountStatement.jar
+   113. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261013\BulkGetDocuments.jar
+   114. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261014\pushNotifOnAlerts.jar
+   115. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261019\MOMA.jar
+   116. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261019_2\FixAccounts.jar
+   117. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261020\AlertsPushNotif.jar
+   118. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261020\BulkPrintCard.jar
+   119. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261020\pushNotificationConfigs.jar
+   120. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261021\MOMA.jar
+   121. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261027\AddingFromDateAndTodate.jar
+   122. C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20261027_2\CreateVirtualCard.jar
+Input 'C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260204_1\BalanceAccountFrom.jar': Expected Oracle Service Bus productversion 12.2.1.0.0. Re-export with the matching OSB 
+version.
+At C:\Users\pabouserhal\Desktop\Utilities\MergeOSBJars.ps1:333 char:17
++         catch { throw "Input '$source': $($_.Exception.Message)" }
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Input 'C:\Users...ng OSB version.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Input 'C:\Users\pabouserhal\Desktop\OSB Deployments JARS\@UAT\20260204_1\BalanceAccountFrom.jar': Expected Oracle Service Bus productversion 12.2.1.0.0. Re-exp 
+   ort with the matching OSB version.
