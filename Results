@@ -1,28 +1,424 @@
-Hello,
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+Merges unencrypted OSB 12.2.1.0.0 configuration JARs, oldest to newest.
 
-The estimated effort for this SALMA enhancement is **18 person-days**.
+.DESCRIPTION
+Reads YYYYMMDD and YYYYMMDD_number folders directly below RootFolder.
+Scans for JARs recursively inside those dated folders. Sorts by folder date,
+numeric suffix, then LastWriteTimeUtc and relative filename. Later files win
+by their exact, case-sensitive path inside the JAR, never by ZIP timestamps.
+Use -SameFolderOrder Name to order JARs by relative filename instead.
 
-The feature will allow users to configure, for each institution, whether payment descriptions are **read from the uploaded Excel file** or **entered manually in the application**.
+JARs directly in RootFolder require -RootJarDate YYYYMMDD. They are treated
+as suffix 0 on that date. The specified output JAR is always excluded.
 
-The expected behavior is:
+Merges ExportInfo exportedItemInfo records together with their resource files.
+Sets projectLevelExport=false: this is a cumulative resource union and does
+not reproduce deletions, renames, or complete-project replacement semantics.
+Keeps the newest JAR's global metadata; does not change productversion.
+Rejects encrypted exports, signed archives, incompatible versions, malformed
+metadata, duplicate ZIP entries and inconsistent resource identities.
 
-- **Read from Excel:** Users configure which Excel column contains the payment description. The application reads the description for each payment, and manual description entry is disabled in the file validation screen.
-- **Enter manually:** When no description column is configured, the application keeps its current behavior.
-- **Reject incomplete files:** When reading descriptions from Excel is enabled, an empty description cell on any payment row causes the **entire file to be rejected**, with a clear explanation. The file cannot proceed through the application.
-- **Retain descriptions throughout processing:** Each description read from Excel must be saved and carried through all relevant payment processing steps.
+Uses built-in .NET compression; no Java, 7-Zip, or Oracle installation needed.
+Input JARs are opened read-only and are never extracted or modified.
+Builds a temporary JAR beside the output, verifies its contents, and only then
+publishes it. An existing output requires -Force and is replaced atomically.
 
-The proposed effort breakdown is:
+.EXAMPLE
+.\Merge-OsbJars.ps1 -RootFolder 'D:\OSB\Exports' -WhatIf
 
-| Work item | Scope | Person-days |
-|---|---|---:|
-| Requirements and impact review | Confirm the configuration rules and identify all affected screens, services, database structures and processing steps. | 1 |
-| Institution configuration screen | Add the description source option and the configuration of the Excel column to read. | 2 |
-| Backend services | Modify existing endpoints and add the necessary endpoints to manage the configuration and handle payment descriptions. | 3 |
-| Database and processing updates | Update the affected database tables and structures, together with the related processing logic, so descriptions are stored and retained throughout the payment process. | 4 |
-| File validation screen | Apply the institution’s configuration, disable manual description entry when reading from Excel, and preserve the current behavior otherwise. | 2 |
-| Excel checks and file rejection | Read descriptions from the configured column and update the rejection checks to block any file containing a payment with an empty description. | 2 |
-| Testing and corrections | Test both configuration modes, file rejection, description retention throughout processing, and existing functionality. Resolve identified issues. | 3 |
-| Release preparation and handover | Prepare database update scripts, release instructions and a brief explanation of the new configuration. | 1 |
-| **Total estimated effort** | | **18** |
+.EXAMPLE
+.\Merge-OsbJars.ps1 -RootFolder 'D:\OSB\Exports' -OutputJar 'D:\OSB\Merged.jar'
 
-This estimate covers the complete change across the application, database and payment processing flow.
+.EXAMPLE
+.\Merge-OsbJars.ps1 -RootFolder 'D:\OSB\Exports' -RootJarDate '20260101' -Force
+
+.NOTES
+Designed for Windows PowerShell 5.1 and OSB 12.2.1.0.0 v2 configuration JARs.
+An import in JDeveloper remains the final compatibility/dependency check.
+#>
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Low')]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string] $RootFolder,
+
+    [string] $OutputJar,
+
+    [ValidatePattern('^\d{8}$')]
+    [string] $RootJarDate,
+
+    [ValidateSet('LastWriteTime', 'Name')]
+    [string] $SameFolderOrder = 'LastWriteTime',
+
+    [switch] $Force
+)
+
+Set-StrictMode -Version 2.0
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$script:OsbNamespace = 'http://www.bea.com/wli/config/importexport'
+
+function ConvertTo-FolderDate {
+    param([string] $Text)
+    $parsed = [datetime]::MinValue
+    if (-not [datetime]::TryParseExact($Text, 'yyyyMMdd',
+            [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::None, [ref] $parsed)) {
+        throw "Invalid folder date '$Text'. Expected a real date in YYYYMMDD format."
+    }
+    return $parsed
+}
+
+function Get-OsbProperties {
+    param([System.Xml.XmlElement] $Node)
+    # A list, not a dictionary: extrefs legitimately occurs more than once.
+    return @($Node.SelectNodes(
+        '*[local-name()="properties" and namespace-uri()="http://www.bea.com/wli/config/importexport"]/*[local-name()="property" and namespace-uri()="http://www.bea.com/wli/config/importexport"]'))
+}
+
+function Get-OsbProperty {
+    param([System.Xml.XmlElement] $Node, [string] $Name)
+    $found = @(Get-OsbProperties $Node | Where-Object { $_.GetAttribute('name') -ceq $Name })
+    if ($found.Count -gt 1) { throw "Duplicate '$Name' property in ExportInfo." }
+    if ($found.Count -eq 1) { return $found[0].GetAttribute('value') }
+    return $null
+}
+
+function Assert-EntryName {
+    param([string] $Name)
+    if ([string]::IsNullOrEmpty($Name) -or $Name.Contains('\') -or
+        $Name.StartsWith('/') -or $Name.Contains(':') -or
+        $Name -cmatch '(^|/)(\.|\.\.)(/|$)') {
+        throw "Unsupported ZIP entry path '$Name'."
+    }
+}
+
+function Get-ResourceKey {
+    param([System.Xml.XmlElement] $Node)
+    $typeId = $Node.GetAttribute('typeId')
+    $instanceId = $Node.GetAttribute('instanceId')
+    if ([string]::IsNullOrEmpty($typeId) -or [string]::IsNullOrEmpty($instanceId)) {
+        throw 'ExportInfo resource is missing typeId or instanceId.'
+    }
+    return $typeId + [char] 0 + $instanceId
+}
+
+function Get-StreamHash {
+    param([System.IO.Stream] $Stream)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($sha.ComputeHash($Stream)) }
+    finally { $sha.Dispose() }
+}
+
+$rootItem = Get-Item -LiteralPath $RootFolder
+if (-not $rootItem.PSIsContainer -or $rootItem.PSProvider.Name -ne 'FileSystem') {
+    throw 'RootFolder must be a filesystem directory.'
+}
+$root = $rootItem.FullName
+if ([string]::IsNullOrWhiteSpace($OutputJar)) {
+    $OutputJar = Join-Path $root 'MergedOSB.jar'
+}
+$output = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputJar)
+if ([IO.Path]::GetExtension($output) -ine '.jar') { throw 'OutputJar must end with .jar.' }
+if (Test-Path -LiteralPath $output) {
+    if ((Get-Item -LiteralPath $output).PSIsContainer) { throw 'OutputJar is a directory.' }
+    if (-not $Force) { throw "Output exists: '$output'. Use -Force to replace it." }
+}
+
+# Build the input order before opening or writing archives.
+$candidates = New-Object 'System.Collections.Generic.List[object]'
+$rootJars = @(Get-ChildItem -LiteralPath $root -File -Filter '*.jar' |
+    Where-Object { -not [string]::Equals($_.FullName, $output, [StringComparison]::OrdinalIgnoreCase) })
+if ($rootJars.Count -gt 0) {
+    if ([string]::IsNullOrWhiteSpace($RootJarDate)) {
+        throw 'JARs exist directly in RootFolder. Supply -RootJarDate YYYYMMDD, or move them into dated folders.'
+    }
+    $date = ConvertTo-FolderDate $RootJarDate
+    foreach ($file in $rootJars) {
+        $candidates.Add([pscustomobject]@{
+            Date = $date; Suffix = [uint64] 0; Folder = ''; File = $file
+            RelativeName = $file.Name; Time = $file.LastWriteTimeUtc
+        })
+    }
+}
+
+foreach ($folder in Get-ChildItem -LiteralPath $root -Directory) {
+    if ($folder.Name -notmatch '^(?<date>\d{8})(?:_(?<suffix>\d+))?$') {
+        Write-Warning "Skipping non-date folder: $($folder.FullName)"
+        continue
+    }
+    $date = ConvertTo-FolderDate $Matches['date']
+    $suffix = [uint64] 0
+    if ($Matches['suffix'] -and -not [uint64]::TryParse($Matches['suffix'], [ref] $suffix)) {
+        throw "Folder suffix is too large: $($folder.Name)"
+    }
+    foreach ($file in Get-ChildItem -LiteralPath $folder.FullName -File -Filter '*.jar' -Recurse) {
+        if ([string]::Equals($file.FullName, $output, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $candidates.Add([pscustomobject]@{
+            Date = $date; Suffix = $suffix; Folder = $folder.Name; File = $file
+            RelativeName = $file.FullName.Substring($folder.FullName.Length + 1)
+            Time = $file.LastWriteTimeUtc
+        })
+    }
+}
+if ($candidates.Count -eq 0) { throw "No input JARs found in '$root'." }
+
+# Use ordinal comparisons so the same names sort identically on every PC.
+$comparison = [System.Comparison[object]] {
+    param($a, $b)
+    $c = $a.Date.CompareTo($b.Date)
+    if ($c -ne 0) { return $c }
+    $c = $a.Suffix.CompareTo($b.Suffix)
+    if ($c -ne 0) { return $c }
+    $c = [StringComparer]::Ordinal.Compare($a.Folder, $b.Folder)
+    if ($c -ne 0) { return $c }
+    if ($SameFolderOrder -eq 'LastWriteTime') {
+        $c = $a.Time.CompareTo($b.Time)
+        if ($c -ne 0) { return $c }
+    }
+    return [StringComparer]::Ordinal.Compare($a.RelativeName, $b.RelativeName)
+}
+$candidates.Sort($comparison)
+Write-Host 'Merge order (last wins):'
+for ($i = 0; $i -lt $candidates.Count; $i++) {
+    Write-Host ('  {0,4}. {1}' -f ($i + 1), $candidates[$i].File.FullName)
+}
+
+$archives = New-Object 'System.Collections.Generic.List[object]'
+$files = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
+$resources = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
+$identityPaths = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)
+$pathIdentities = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)
+$latestDocument = $null
+$overwrites = 0
+$tempFile = $null
+
+try {
+    foreach ($candidate in $candidates) {
+        $source = $candidate.File.FullName
+        $archive = [IO.Compression.ZipFile]::OpenRead($source)
+        $archives.Add($archive) # Kept open/read-locked until the merge finishes.
+        try {
+            $entries = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
+            foreach ($entry in $archive.Entries) {
+                Assert-EntryName $entry.FullName
+                if ($entry.FullName.EndsWith('/')) { continue }
+                if ($entries.ContainsKey($entry.FullName)) { throw "Duplicate ZIP entry '$($entry.FullName)'." }
+                if ($entry.FullName -imatch '^META-INF/([^/]+\.(SF|RSA|DSA|EC)|SIG-[^/]+)$') {
+                    throw 'Signed JARs cannot be merged without invalidating their signatures.'
+                }
+                $entries.Add($entry.FullName, $entry)
+            }
+            if (-not $entries.ContainsKey('ExportInfo')) {
+                throw 'Missing root ExportInfo. Expected an OSB configuration JAR, not a Java library JAR.'
+            }
+
+            $settings = New-Object System.Xml.XmlReaderSettings
+            $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+            $settings.XmlResolver = $null
+            $stream = $entries['ExportInfo'].Open()
+            $reader = $null
+            try {
+                $reader = [Xml.XmlReader]::Create($stream, $settings)
+                $doc = New-Object System.Xml.XmlDocument
+                $doc.XmlResolver = $null
+                $doc.Load($reader)
+            }
+            finally {
+                if ($null -ne $reader) { $reader.Dispose() }
+                $stream.Dispose()
+            }
+            $element = $doc.DocumentElement
+            if ($element.LocalName -cne 'xml-fragment' -or $element.GetAttribute('version') -cne 'v2') {
+                throw 'Unsupported ExportInfo layout. Expected OSB xml-fragment version v2.'
+            }
+            # Select by namespace URI: prefixes may differ between exporters.
+            $globalNodes = @($element.SelectNodes('*[local-name()="properties" and namespace-uri()="http://www.bea.com/wli/config/importexport"]'))
+            if ($globalNodes.Count -ne 1) { throw 'Expected exactly one global properties element in ExportInfo.' }
+            if ((Get-OsbProperty $element 'productname') -cne 'Oracle Service Bus' -or
+                (Get-OsbProperty $element 'productversion') -cne '12.2.1.0.0') {
+                throw 'Expected Oracle Service Bus productversion 12.2.1.0.0. Re-export with the matching OSB version.'
+            }
+            foreach ($property in Get-OsbProperties $element) {
+                if ($property.GetAttribute('name') -imatch 'encrypt|passphrase' -and
+                    -not [string]::IsNullOrWhiteSpace($property.GetAttribute('value'))) {
+                    throw 'Encrypted export metadata found. Re-export without Protect Sensitive Data before merging.'
+                }
+            }
+
+            $jarIdentities = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+            $jarPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+            foreach ($node in $element.ChildNodes) {
+                if ($node.NodeType -ne [Xml.XmlNodeType]::Element) { continue }
+                if ($node.NamespaceURI -cne $script:OsbNamespace) { throw 'Unknown ExportInfo child namespace.' }
+                if ($node.LocalName -ceq 'properties') { continue }
+                if ($node.LocalName -cne 'exportedItemInfo') { throw "Unsupported ExportInfo child '$($node.LocalName)'." }
+                $key = Get-ResourceKey $node
+                $path = Get-OsbProperty $node 'jarentryname'
+                if ([string]::IsNullOrWhiteSpace($path)) { throw 'Resource has no jarentryname property.' }
+                Assert-EntryName $path
+                if ($path -ceq 'ExportInfo' -or $path -imatch '^META-INF/') { throw "Invalid resource path '$path'." }
+                if (-not $entries.ContainsKey($path)) { throw "ExportInfo references missing entry '$path'." }
+                if (-not $jarIdentities.Add($key) -or -not $jarPaths.Add($path)) {
+                    throw "Duplicate resource identity or jarentryname '$path'."
+                }
+                $encrypted = Get-OsbProperty $node 'isencrypted'
+                if ($encrypted -and $encrypted -ine 'false' -and $encrypted -ne '0') {
+                    throw "Encrypted resource '$path'. Re-export without Protect Sensitive Data before merging."
+                }
+                if ($identityPaths.ContainsKey($key) -and $identityPaths[$key] -cne $path) {
+                    throw "Resource changed jarentryname to '$path'; its identity is inconsistent across exports."
+                }
+                if ($pathIdentities.ContainsKey($path) -and $pathIdentities[$path] -cne $key) {
+                    throw "Resource path '$path' has inconsistent typeId/instanceId across exports."
+                }
+                $identityPaths[$key] = $path
+                $pathIdentities[$path] = $key
+                $resources[$path] = $node
+            }
+            foreach ($pair in $entries.GetEnumerator()) {
+                if ($pair.Key -ceq 'ExportInfo') { continue }
+                if (-not $jarPaths.Contains($pair.Key) -and $pair.Key -inotmatch '^META-INF/') {
+                    throw "Entry '$($pair.Key)' has no matching ExportInfo record."
+                }
+                if ($files.ContainsKey($pair.Key)) {
+                    $overwrites++
+                    Write-Verbose ("Replacing '{0}': '{1}' -> '{2}'" -f $pair.Key, $files[$pair.Key].Source, $source)
+                }
+                $files[$pair.Key] = [pscustomobject]@{ Entry = $pair.Value; Source = $source }
+            }
+            $latestDocument = $doc
+        }
+        catch { throw "Input '$source': $($_.Exception.Message)" }
+    }
+    if ($resources.Count -eq 0) { throw 'The input JARs contain no OSB resources.' }
+
+    # Preserve newest global metadata and replace its index with the full union.
+    $merged = $latestDocument.CloneNode($true)
+    $mergedRoot = $merged.DocumentElement
+    foreach ($node in @($mergedRoot.SelectNodes('*[local-name()="exportedItemInfo" and namespace-uri()="http://www.bea.com/wli/config/importexport"]'))) {
+        [void] $mergedRoot.RemoveChild($node)
+    }
+    $global = $mergedRoot.SelectSingleNode('*[local-name()="properties" and namespace-uri()="http://www.bea.com/wli/config/importexport"]')
+    $projectFlag = @((Get-OsbProperties $mergedRoot) | Where-Object { $_.GetAttribute('name') -ceq 'projectLevelExport' })
+    if ($projectFlag.Count -gt 1) { throw 'Duplicate projectLevelExport property.' }
+    if ($projectFlag.Count -eq 0) {
+        $flag = $merged.CreateElement($global.Prefix, 'property', $script:OsbNamespace)
+        $flag.SetAttribute('name', 'projectLevelExport')
+        [void] $global.AppendChild($flag)
+    }
+    else { $flag = $projectFlag[0] }
+    $flag.SetAttribute('value', 'false')
+    $resourcePaths = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($path in $resources.Keys) { $resourcePaths.Add($path) }
+    $resourcePaths.Sort([StringComparer]::Ordinal)
+    foreach ($path in $resourcePaths) {
+        [void] $mergedRoot.AppendChild($merged.ImportNode($resources[$path], $true))
+    }
+
+    Write-Host ("Validated {0} JARs; {1} unique resources; {2} file overwrites." -f $candidates.Count, $resources.Count, $overwrites)
+    if (-not $PSCmdlet.ShouldProcess($output, 'Create merged OSB configuration JAR')) { return }
+
+    $parent = [IO.Path]::GetDirectoryName($output)
+    [void] [IO.Directory]::CreateDirectory($parent)
+    $tempFile = Join-Path $parent ('.osb-merge-' + [guid]::NewGuid().ToString('N') + '.tmp')
+    $outputStream = [IO.File]::Open($tempFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    $outputArchive = $null
+    try {
+        $outputArchive = [IO.Compression.ZipArchive]::new($outputStream, [IO.Compression.ZipArchiveMode]::Create, $false)
+        $info = $outputArchive.CreateEntry('ExportInfo', [IO.Compression.CompressionLevel]::Optimal)
+        $xmlSettings = New-Object Xml.XmlWriterSettings
+        $xmlSettings.Encoding = [Text.UTF8Encoding]::new($false)
+        $xmlSettings.Indent = $true
+        $infoStream = $info.Open()
+        $writer = $null
+        try {
+            $writer = [Xml.XmlWriter]::Create($infoStream, $xmlSettings)
+            $merged.Save($writer)
+        }
+        finally {
+            if ($null -ne $writer) { $writer.Dispose() }
+            $infoStream.Dispose()
+        }
+        $names = New-Object 'System.Collections.Generic.List[string]'
+        foreach ($name in $files.Keys) { $names.Add($name) }
+        $names.Sort([StringComparer]::Ordinal)
+        foreach ($name in $names) {
+            $sourceEntry = $files[$name].Entry
+            $targetEntry = $outputArchive.CreateEntry($name, [IO.Compression.CompressionLevel]::Optimal)
+            $targetEntry.LastWriteTime = $sourceEntry.LastWriteTime
+            $inputStream = $sourceEntry.Open()
+            $targetStream = $null
+            try {
+                $targetStream = $targetEntry.Open()
+                $inputStream.CopyTo($targetStream)
+            }
+            finally {
+                if ($null -ne $targetStream) { $targetStream.Dispose() }
+                $inputStream.Dispose()
+            }
+        }
+    }
+    finally {
+        if ($null -ne $outputArchive) { $outputArchive.Dispose() }
+        $outputStream.Dispose()
+    }
+
+    # Read the result back and compare decompressed bytes with every winning file.
+    $check = [IO.Compression.ZipFile]::OpenRead($tempFile)
+    try {
+        if ($check.Entries.Count -ne ($files.Count + 1)) { throw 'Output entry count verification failed.' }
+        foreach ($entry in $check.Entries) {
+            if ($entry.FullName -ceq 'ExportInfo') {
+                $s = $entry.Open()
+                try {
+                    $checkDoc = New-Object Xml.XmlDocument
+                    $checkDoc.XmlResolver = $null
+                    $checkDoc.Load($s)
+                    if ($checkDoc.DocumentElement.OuterXml -cne $merged.DocumentElement.OuterXml) { throw 'ExportInfo verification failed.' }
+                }
+                finally { $s.Dispose() }
+                continue
+            }
+            if (-not $files.ContainsKey($entry.FullName)) { throw "Unexpected output entry '$($entry.FullName)'." }
+            $s = $entry.Open()
+            $original = $null
+            try {
+                $original = $files[$entry.FullName].Entry.Open()
+                if ((Get-StreamHash $s) -cne (Get-StreamHash $original)) {
+                    throw "Content verification failed: '$($entry.FullName)'."
+                }
+            }
+            finally {
+                if ($null -ne $original) { $original.Dispose() }
+                $s.Dispose()
+            }
+        }
+    }
+    finally { $check.Dispose() }
+
+    if ([IO.File]::Exists($output)) {
+        if (-not $Force) { throw 'Output was created during the merge. Use -Force to replace it.' }
+        # PowerShell converts ordinary $null to an empty string for this .NET
+        # parameter. NullString passes a real null (no backup file requested).
+        [IO.File]::Replace($tempFile, $output, [System.Management.Automation.Language.NullString]::Value)
+    }
+    else { [IO.File]::Move($tempFile, $output) }
+    $tempFile = $null
+    Write-Host "Created: $output"
+    [pscustomobject]@{
+        OutputJar = $output
+        InputJars = $candidates.Count
+        Resources = $resources.Count
+        Overwrites = $overwrites
+        Bytes = (Get-Item -LiteralPath $output).Length
+    }
+}
+finally {
+    foreach ($archive in $archives) { $archive.Dispose() }
+    if ($tempFile -and [IO.File]::Exists($tempFile)) { [IO.File]::Delete($tempFile) }
+}
