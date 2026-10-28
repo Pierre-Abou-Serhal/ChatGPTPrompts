@@ -1,11 +1,41 @@
-f='Alterna.business.svc/classes/pom.xml'
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$ f='Alterna.business.svc/classes/pom.xml'
 
-git status --short -- "$f"
-git diff --raw --no-ext-diff --no-textconv -- "$f"
-git diff --cached --raw --no-ext-diff --no-textconv -- "$f"
-git ls-files --eol -- "$f"
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$
 
-# Content identifiers: committed, staged, and current working file
-git rev-parse "HEAD:$f"
-git rev-parse ":$f"
-git hash-object --path="$f" -- "$f"
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$ git status --short -- "$f"
+ M Alterna.business.svc/classes/pom.xml
+
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$ git diff --raw --no-ext-diff --no-textconv -- "$f"
+warning: in the working copy of 'Alterna.business.svc/classes/pom.xml', LF will be replaced by CRLF the next time Git touches it
+
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$ git diff --cached --raw --no-ext-diff --no-textconv -- "$f"
+
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$ git ls-files --eol -- "$f"
+i/lf    w/lf    attr/                   Alterna.business.svc/classes/pom.xml
+
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$
+
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$ # Content identifiers: committed, staged, and current working file
+
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$ git rev-parse "HEAD:$f"
+6d78721b83384cdc069dd6ffa79f8abf875f76cc
+
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$ git rev-parse ":$f"
+6d78721b83384cdc069dd6ffa79f8abf875f76cc
+
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$ git hash-object --path="$f" -- "$f"
+6d78721b83384cdc069dd6ffa79f8abf875f76cc
+
+pabouserhal@DEVE-PC2 MINGW64 /d/OSB/SGBL-OSB-T24 (TempDev-To-Delete)
+$
