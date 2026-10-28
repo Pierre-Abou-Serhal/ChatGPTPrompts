@@ -1,47 +1,11 @@
-$ git diff --summary
-warning: in the working copy of 'Alterna.business.svc/classes/pom.xml', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.SyncAddRUFDues/evs.ttvma.SyncAddRUFDuesResponse.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.SyncAddRUFDues/evs.ttvma.syncAddRUFDuesRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.initiateRUFDues/evs.ttvma.getInitiateRUFDuesRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.initiateRUFDues/evs.ttvma.getInitiateRUFDuesResponse.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.memberRUFDues/evs.ttvma.getRUFDuesRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.memberRUFDues/evs.ttvma.getRUFDuesResponse.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.paymentRUFDues/evs.ttvma.paymentRUFDuesRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.paymentRUFDues/evs.ttvma.paymentRUFDuesResponse.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.readyOrderRUFDues/evs.ttvma.readyOrdersRUFDuesRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.readyOrderRUFDues/evs.ttvma.readyOrdersRUFDuesResponse.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.syncInsuranceRUFDues/evs.ttvma.syncInsuranceRUFDuesRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/evs.ttvma.syncInsuranceRUFDues/evs.ttvma.syncInsuranceRUFDuesResponse.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/wsdl/evs.ttvma.operations.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/wsdl/evs.ttvmaServices.wsdl', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/GetInitiateRUFDues/evs.mapEVSToIVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/GetInitiateRUFDues/evs.mapIVSToEVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/GetMemberRUFDues/evs.mapEVSToIVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/GetMemberRUFDues/evs.mapIVSToEVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/PaymentRUFDues/evs.mapEVSToIVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/PaymentRUFDues/evs.mapIVSToEVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/ReadyOrdersRUFDues/evs.mapEVSToIVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/ReadyOrdersRUFDues/evs.mapIVSToEVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/SycInsuranceRUFDues/evs.mapEVSToIVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/SycInsuranceRUFDues/evs.mapIVSToEVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/SyncAddRufDues/evs.mapEVSToIVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/SyncAddRufDues/evs.mapIVSToEVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/exception/evs.getInitiateRUFDuesExceptions.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/exception/evs.getRUFDuesExceptions.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/exception/evs.paymentRUFDuesExceptions.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/exception/evs.readyOrdersRUFDuesExceptions.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/exception/evs.syncAddRUFDuesExceptions.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/xquery/exception/evs.syncInsuranceRUFDuesExceptions.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.NCR/wsdl/evs.NCRChequeImage.wsdl', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.NCR/wsdl/evs.NCRRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.NCR/wsdl/evs.NCRResponse.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.NCR/xquery/mapEVSToIVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/evs.NCR/xquery/mapIVSResToEVS.xqy', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/ivs.Alterna/ivs.Alterna.Authorization/ivs.Alterna.Authorization.deleteUserModuleShortcut/ivs.authorization.deleteUserModuleShortcutRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/ivs.Alterna/ivs.Alterna.Authorization/ivs.Alterna.Authorization.deleteUserModuleShortcut/ivs.authorization.deleteUserModuleShortcutResponse.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/ivs.Alterna/ivs.Alterna.Authorization/ivs.Alterna.Authorization.userSessionByValue/ivs.authorization.deleteUserSessionBySessionValueRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/ivs.Alterna/ivs.Alterna.Authorization/ivs.Alterna.Authorization.userSessionByValue/ivs.authorization.deleteUserSessionBySessionValueResponse.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/ivs.Alterna/ivs.Alterna.Authorization/ivs.Authorization.ActivePublicModules/ivs.authorization.getActivePublicModulesRequest.xsd', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Alterna.business.svc/ivs.Alterna/ivs.Alterna.Authorization/ivs.Authorization.ActivePubl:
+git diff --name-only --diff-filter=M -z |
+while IFS= read -r -d '' file; do
+    if git --literal-pathspecs diff --quiet --no-ext-diff --no-textconv \
+        --ignore-cr-at-eol -- "$file"; then
 
+        git --literal-pathspecs restore --worktree -- "$file" || break
+        printf 'Cleared: %s\n' "$file"
+    fi
+done
 
+git status --short
