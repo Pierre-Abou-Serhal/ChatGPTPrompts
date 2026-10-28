@@ -13,27 +13,53 @@ Use -SameFolderOrder Name to order JARs by relative filename instead.
 JARs directly in RootFolder require -RootJarDate YYYYMMDD. They are treated
 as suffix 0 on that date. The specified output JAR is always excluded.
 
-Merges ExportInfo exportedItemInfo records together with their resource files.
-If the same OSB resource (typeId + instanceId) has a newer jarentryname, keeps
-the newer entry and metadata and removes its superseded archive path. If a
-newer resource reuses an existing path, the newer file and identity win.
-Sets projectLevelExport=false: this is a cumulative resource union and does
-not infer deletions or reproduce complete-project replacement semantics.
-Accepts productversion 12.2.1.0, 12.2.1.3, and 12.2.1.4, with optional final
-.0 (for example, 12.2.1.3.0). Sets the merged ExportInfo productversion to
-12.2.1.0.0 and retains the newest JAR's other global properties.
-This changes the product-version metadata only. It does NOT downgrade resource
-XML schemas, dataclass values, or representationversion fields. Newer features
-may still be incompatible with JDeveloper/OSB 12.2.1.0.0; validate the import.
-Rejects encrypted exports, signed archives, unsupported versions, malformed
-metadata, and duplicate ZIP paths or resource identities within one input JAR.
+Merges ExportInfo exportedItemInfo records together with This can happen when an import changes file permissions or Git’s cached file information. **Clear those entries without discarding your real OSB changes.**
 
-Uses built-in .NET compression; no Java, 7-Zip, or Oracle installation needed.
-Input JARs are opened read-only and are never extracted or modified.
-Builds a temporary JAR beside the output, verifies its contents, and only then
-publishes it. An existing output requires -Force and is replaced atomically.
+Run these commands from your **Git repository folder**.
 
-.EXAMPLE
+**1. Refresh Git’s file information:**
+
+```powershell
+git update-index --refresh
+git status --short
+```
+
+This refreshes the index’s cached information without replacing file contents. Files with actual differences can report `needs update`. [git-update-index Documentation](https://git-scm.com/docs/git-update-index?utm_source=chatgpt.com)
+
+**2. If the files remain, check for permission changes:**
+
+```powershell
+git diff --summary
+```
+
+If you see entries such as:
+
+```text
+mode change 100644 => 100755 path/to/file
+```
+
+run:
+
+```powershell
+git config --local core.fileMode false
+git update-index --refresh
+git status --short
+```
+
+This makes this repository ignore executable-permission differences. **Files with real content changes remain listed.** [git-config Documentation](https://git-scm.com/docs/git-config/2.54.0?utm_source=chatgpt.com)
+
+Then reopen GitHub Desktop.
+
+**If that doesn’t clear them**, send me the following output for one affected file:
+
+```powershell
+git status --short -- 'path/to/file'
+git diff --no-ext-diff --no-textconv -- 'path/to/file'
+git diff --cached --no-ext-diff --no-textconv -- 'path/to/file'
+git ls-files --eol -- 'path/to/file'
+```
+
+That will help distinguish staged changes, line endings, and metadata differences. Avoid **Discard all changes** or `git reset --hard`, since you want to preserve the genuine changes from your import.
 .\Merge-OsbJars.ps1 -RootFolder 'D:\OSB\Exports' -WhatIf
 
 .EXAMPLE
