@@ -1,188 +1,598 @@
-USE [Alterna_AccountStatementManagement]
+-- Audit history for SQL Server 2016 and later.
+-- Run once in the target application database.
+-- This script creates the history tables; it does not install capture triggers.
+USE [Alterna_AccountStatementManagement];
 GO
-/****** Object:  StoredProcedure [dbo].[usp_UpdateAccessPolicy]    Script Date: 11/2/2026 10:44:10 AM ******/
-SET ANSI_NULLS ON
+
+CREATE TABLE dbo.t_ChangeAudit
+(
+    Id BIGINT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_t_ChangeAudit PRIMARY KEY,
+
+    -- Generate once per save and reuse for the policy and its rules.
+    ChangeSetId UNIQUEIDENTIFIER NOT NULL
+        CONSTRAINT DF_t_ChangeAudit_ChangeSetId DEFAULT (NEWID()),
+
+    -- Example: AccessPolicyRule / 12 / Daily access limit.
+    EntityName NVARCHAR(128) NOT NULL,
+    EntityKey NVARCHAR(255) NOT NULL,
+    EntityDisplayName NVARCHAR(255) NOT NULL,
+
+    Action VARCHAR(10) NOT NULL,
+    ChangedBy NVARCHAR(255) NOT NULL,
+    ChangedDate DATETIME2(3) NOT NULL
+        CONSTRAINT DF_t_ChangeAudit_ChangedDate DEFAULT (SYSUTCDATETIME()),
+
+    CONSTRAINT CK_t_ChangeAudit_Action
+        CHECK (Action IN ('INSERT', 'UPDATE', 'DELETE'))
+);
 GO
-SET QUOTED_IDENTIFIER ON
+
+CREATE TABLE dbo.t_ChangeAuditDetail
+(
+    Id BIGINT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_t_ChangeAuditDetail PRIMARY KEY,
+
+    ChangeAuditId BIGINT NOT NULL,
+
+    -- Technical name and friendly label captured at the time of the change.
+    FieldName NVARCHAR(128) NOT NULL,
+    FieldDisplayName NVARCHAR(255) NOT NULL,
+
+    -- Store consistent, unformatted representations. Preserve SQL NULL.
+    OldValue NVARCHAR(MAX) NULL,
+    NewValue NVARCHAR(MAX) NULL,
+
+    CONSTRAINT FK_t_ChangeAuditDetail_t_ChangeAudit
+        FOREIGN KEY (ChangeAuditId)
+        REFERENCES dbo.t_ChangeAudit(Id),
+
+    CONSTRAINT UQ_t_ChangeAuditDetail_AuditField
+        UNIQUE (ChangeAuditId, FieldName)
+);
 GO
-ALTER PROCEDURE [dbo].[usp_UpdateAccessPolicy]
-	@P__AccessPolicyRules dbo.TVP_t_AccessPolicyRule READONLY,
-	@P__PolicyId BIGINT,
-	@P__PolicyCode NVARCHAR(255),
-	@P__PolicyName NVARCHAR(255),
-	@P__IsEnabled BIT,
-	@P__User NVARCHAR(255),
-	@P__Error NVARCHAR(4000) OUTPUT
+
+CREATE INDEX IX_t_ChangeAudit_EntityHistory
+    ON dbo.t_ChangeAudit
+       (EntityName, EntityKey, ChangedDate DESC, Id DESC);
+GO
+
+/*
+CAPTURE RULES
+- Use one header per affected source record and one detail per changed field.
+- Capture only the selected business fields.
+- For INSERT: OldValue = NULL; NewValue = the initial field value.
+- For UPDATE: add details only for actual changes, including NULL transitions.
+  Do not create a header if no selected business field changed.
+- For DELETE: OldValue = the previous field value; NewValue = NULL.
+- Store EntityDisplayName and FieldDisplayName as historical snapshots.
+- Obtain ChangedBy from the authenticated backend user.
+- Generate a fresh ChangeSetId once per save; explicitly pass it to every
+  header belonging to that save. Its default is a fallback for isolated events.
+- Write source changes, headers and details in the same transaction.
+- Use set-based triggers if ordinary direct SQL changes must also be captured.
+  Otherwise the save procedures can insert the audit data.
+- Restrict direct writes by the application to the audit tables through the
+  chosen capture mechanism. The history is append-only for application users.
+- Use the source record's stable unique key as EntityKey. The supplied t_Config
+  has no primary key and permits duplicate inactive SettingName values.
+  Add an immutable Id primary key before identifying config history by row.
+- The stored values are raw strings. The backend can render 1/0 as
+  Enabled/Disabled and seconds as a readable duration for the relevant fields.
+- For setting values, choose formatting by SettingName as well as FieldName.
+
+READ EXAMPLE (run separately)
+DECLARE @EntityName NVARCHAR(128) = N'AccessPolicyRule';
+DECLARE @EntityKey NVARCHAR(255) = N'12';
+
+SELECT
+    A.Id AS ChangeAuditId,
+    A.ChangeSetId,
+    A.EntityName,
+    A.EntityKey,
+    A.EntityDisplayName,
+    A.Action,
+    A.ChangedBy,
+    A.ChangedDate,
+    D.Id AS ChangeAuditDetailId,
+    D.FieldName,
+    D.FieldDisplayName,
+    D.OldValue,
+    D.NewValue
+FROM dbo.t_ChangeAudit AS A
+INNER JOIN dbo.t_ChangeAuditDetail AS D
+    ON D.ChangeAuditId = A.Id
+WHERE A.EntityName = @EntityName
+  AND A.EntityKey = @EntityKey
+ORDER BY A.ChangedDate DESC, A.Id DESC, D.Id ASC;
+
+The backend groups the returned details by ChangeAuditId for the frontend.
+Paginate header records first if adding paging, then retrieve their details.
+*/
+
+
+
+
+*
+    Prerequisite: run AuditHistory_Schema.sql first.
+    SQL Server 2016 compatible; the existing procedures and TVP must exist.
+
+    Auditing is implemented DIRECTLY in these procedures. No audit trigger
+    is required. Changes made outside these procedures are not captured.
+    Use one capture mechanism for these saves to avoid duplicate history.
+
+    - Original procedure parameters and result columns are retained.
+    - The C# DAL MUST begin a transaction and execute the procedure on that
+      transaction's connection. The procedure requires an active transaction.
+    - The DAL owns commit/rollback for business changes and their history.
+      It must also treat a non-NULL @P__Error as a failure before committing.
+    - One ChangeSetId groups policy/rule changes from the same call.
+    - Unchanged business values create no history, even if modification
+      metadata is updated by the save.
+    - Case-only, trailing-space and NULL changes are recorded.
+    - Rule rows omitted from the TVP are retained, as in the original code.
+    - Config is identified by its unchanged SettingName. More than one
+      matching config row is rejected because that key would be ambiguous.
+    - Audit ChangedDate is UTC. Existing business timestamps retain GETDATE().
+    - @P__User must be supplied by the authenticated backend.
+    - Validation failures use @P__Error; unexpected SQL errors are rethrown.
+    - No BEGIN/COMMIT/ROLLBACK/SAVE TRANSACTION is issued by these procedures.
+    - XACT_ABORT ON is retained for server-side error handling. It does not
+      start another transaction. C# must preserve the original exception if
+      a rollback attempt finds the transaction already aborted by SQL Server.
+*/
+USE [Alterna_AccountStatementManagement];
+GO
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+ALTER PROCEDURE dbo.usp_UpdateAccessPolicy
+    @P__AccessPolicyRules dbo.TVP_t_AccessPolicyRule READONLY,
+    @P__PolicyId BIGINT,
+    @P__PolicyCode NVARCHAR(255),
+    @P__PolicyName NVARCHAR(255),
+    @P__IsEnabled BIT,
+    @P__User NVARCHAR(255),
+    @P__Error NVARCHAR(4000) OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
-	SET XACT_ABORT ON;
-
+    SET XACT_ABORT ON;
     SET @P__Error = NULL;
-	
-	IF EXISTS (SELECT 1 FROM @P__AccessPolicyRules WHERE MaximumAccessCount <= 0 OR (WindowSeconds IS NOT NULL AND WindowSeconds <= 0))
-	BEGIN
-		SET @P__Error = 'The document access policy contains an invalid rule.';
-		RETURN;
-	END
 
+    IF @@TRANCOUNT = 0
+    BEGIN
+        SET @P__Error = N'The caller must begin a transaction before executing this procedure.';
+        THROW 50001, 'The caller must begin a transaction before executing this procedure.', 1;
+    END;
 
-	-- Insert new policy + rules
-	IF @P__PolicyId = -1
-	BEGIN
-		INSERT INTO t_AccessPolicy
-		(
-			[PolicyCode],
-			[PolicyName],
-			[IsEnabled],
-			[CreatedBy],
-			[LastModifiedBy]
-		)
-		VALUES
-		(
-			@P__PolicyCode,
-			@P__PolicyName,
-			@P__IsEnabled,
-			@P__User,
-			@P__User
-		);
+    IF NULLIF(LTRIM(RTRIM(@P__User)), N'') IS NULL
+    BEGIN
+        SET @P__Error = N'The user performing the change is required.';
+        RETURN;
+    END;
 
-		SET @P__PolicyId = SCOPE_IDENTITY();
+    IF EXISTS
+    (
+        SELECT 1
+        FROM @P__AccessPolicyRules
+        WHERE MaximumAccessCount <= 0
+           OR (WindowSeconds IS NOT NULL AND WindowSeconds <= 0)
+    )
+    BEGIN
+        SET @P__Error = N'The document access policy contains an invalid rule.';
+        RETURN;
+    END;
 
-		INSERT INTO t_AccessPolicyRule
-		(
-			[AccessPolicyId],
-			[RuleName],
-			[WindowSeconds],
-			[MaximumAccessCount],
-			[IsEnabled],
-			[CreatedBy],
-			[LastModifiedBy]
-		)
-		SELECT
-			@P__PolicyId,
-			[RuleName],
-			[WindowSeconds],
-			[MaximumAccessCount],
-			[IsEnabled],
-			@P__User,
-			@P__User
-		FROM @P__AccessPolicyRules;
-	END
+    DECLARE @ChangeSetId UNIQUEIDENTIFIER = NEWID();
+    DECLARE @AuditDate DATETIME2(3);
 
-	-- Update existing policy + rules
-	ELSE
-	BEGIN
+    -- OUTPUT captures the actual row values at the time of each write.
+    DECLARE @PolicyChanges TABLE
+    (
+        PolicyId BIGINT NOT NULL,
+        Action VARCHAR(10) NOT NULL,
+        OldPolicyCode NVARCHAR(255) NULL,
+        NewPolicyCode NVARCHAR(255) NOT NULL,
+        OldPolicyName NVARCHAR(255) NULL,
+        NewPolicyName NVARCHAR(255) NOT NULL,
+        OldIsEnabled BIT NULL,
+        NewIsEnabled BIT NOT NULL
+    );
 
-		IF NOT EXISTS(SELECT 1 FROM t_AccessPolicy WHERE Id = @P__PolicyId)
-		BEGIN
-			SET @P__Error = 'The document access policy is not found.';
-			RETURN;
-		END
+    DECLARE @RuleChanges TABLE
+    (
+        RuleId BIGINT NOT NULL,
+        Action VARCHAR(10) NOT NULL,
+        OldAccessPolicyId BIGINT NULL,
+        NewAccessPolicyId BIGINT NOT NULL,
+        OldRuleName NVARCHAR(255) NULL,
+        NewRuleName NVARCHAR(255) NOT NULL,
+        OldWindowSeconds INT NULL,
+        NewWindowSeconds INT NULL,
+        OldMaximumAccessCount INT NULL,
+        NewMaximumAccessCount INT NOT NULL,
+        OldIsEnabled BIT NULL,
+        NewIsEnabled BIT NOT NULL
+    );
 
-		UPDATE t_AccessPolicy SET
-			[PolicyCode] = @P__PolicyCode,
-			[PolicyName] = @P__PolicyName,
-			[IsEnabled] = @P__IsEnabled,
-			[LastModifiedBy] = @P__User,
-			[LastModifiedDate] = GETDATE()
-		WHERE Id = @P__PolicyId;
+    DECLARE @FieldChanges TABLE
+    (
+        EntityName NVARCHAR(128) NOT NULL,
+        EntityKey NVARCHAR(255) NOT NULL,
+        EntityDisplayName NVARCHAR(255) NOT NULL,
+        Action VARCHAR(10) NOT NULL,
+        FieldName NVARCHAR(128) NOT NULL,
+        FieldDisplayName NVARCHAR(255) NOT NULL,
+        OldValue NVARCHAR(MAX) NULL,
+        NewValue NVARCHAR(MAX) NULL
+    );
 
-		MERGE INTO t_AccessPolicyRule AS Target
-		USING @P__AccessPolicyRules AS Source
-		ON Target.Id = Source.Id AND Target.AccessPolicyId = @P__PolicyId
-		WHEN MATCHED THEN 
-			UPDATE SET 
-				Target.[RuleName] = Source.RuleName,
-				Target.[WindowSeconds] = Source.WindowSeconds,
-				Target.[MaximumAccessCount] = Source.MaximumAccessCount,
-				Target.[IsEnabled] = Source.IsEnabled,
-				Target.[LastModifiedBy] = @P__User,
-				Target.[LastModifiedDate] = GETDATE()
-		WHEN NOT MATCHED THEN
-			INSERT 
-			(
-				[AccessPolicyId],
-				[RuleName],
-				[WindowSeconds],
-				[MaximumAccessCount],
-				[IsEnabled],
-				[CreatedBy],
-				[LastModifiedBy]
-			)
-			VALUES
-			(
-				@P__PolicyId,
-				Source.RuleName,
-				Source.WindowSeconds,
-				Source.MaximumAccessCount,
-				Source.IsEnabled,
-				@P__User,
-				@P__User
-			);
-	END
+    DECLARE @AuditIds TABLE
+    (
+        ChangeAuditId BIGINT NOT NULL,
+        EntityName NVARCHAR(128) NOT NULL,
+        EntityKey NVARCHAR(255) NOT NULL
+    );
 
-	SELECT 
-		AP.[Id] AS AccessPolicyId,
-		AP.[PolicyCode] AS AccessPolicyCode,
-		AP.[PolicyName] AS AccessPolicyName,
-		AP.[IsEnabled] AS IsAccessPolicyEnabled,
-		AP.[CreatedDate] AS AccessPolicyCreatedDate,
-		AP.[CreatedBy] AS AccessPolicyCreatedBy,
-		AP.[LastModifiedDate] AS AccessPolicyLastModifiedDate,
-		AP.[LastModifiedBy] AS AccessPolicyLastModifiedBy,
-		APR.[Id] AS AccessPolicyRuleId,
-		APR.[AccessPolicyId] AS AccessPolicyRuleAccessPolicyId,
-		APR.[RuleName] AS AccessPolicyRuleName,
-		APR.[WindowSeconds] AS AccessPolicyRuleWindowSeconds,
-		APR.[MaximumAccessCount] AS AccessPolicyRuleMaximumAccessCount,
-		APR.[IsEnabled] AS IsAccessPolicyRuleEnabled,
-		APR.[CreatedDate] AS AccessPolicyRuleCreatedDate,
-		APR.[CreatedBy] AS AccessPolicyRuleCreatedBy,
-		APR.[LastModifiedDate] AS AccessPolicyRuleLastModifiedDate,
-		APR.[LastModifiedBy] AS AccessPolicyRuleLastModifiedBy
-	FROM [dbo].[t_AccessPolicy] AS AP
-	JOIN [dbo].[t_AccessPolicyRule] AS APR ON AP.Id = APR.AccessPolicyId
-	WHERE AP.Id = @P__PolicyId;
+    BEGIN TRY
+        -- Serialize procedure saves for an existing policy until commit.
+        IF @P__PolicyId IS NULL OR (@P__PolicyId <> -1 AND NOT EXISTS
+        (
+            SELECT 1
+            FROM dbo.t_AccessPolicy WITH (UPDLOCK, HOLDLOCK)
+            WHERE Id = @P__PolicyId
+        ))
+        BEGIN
+            SET @P__Error = N'The document access policy is not found.';
+            RETURN;
+        END;
 
-END
+        IF @P__PolicyId = -1
+        BEGIN
+            INSERT INTO dbo.t_AccessPolicy
+                (PolicyCode, PolicyName, IsEnabled, CreatedBy, LastModifiedBy)
+            OUTPUT
+                INSERTED.Id, 'INSERT',
+                NULL, INSERTED.PolicyCode,
+                NULL, INSERTED.PolicyName,
+                NULL, INSERTED.IsEnabled
+            INTO @PolicyChanges
+                (PolicyId, Action, OldPolicyCode, NewPolicyCode,
+                 OldPolicyName, NewPolicyName, OldIsEnabled, NewIsEnabled)
+            VALUES
+                (@P__PolicyCode, @P__PolicyName, @P__IsEnabled,
+                 @P__User, @P__User);
 
+            SET @P__PolicyId = CONVERT(BIGINT, SCOPE_IDENTITY());
 
-USE [Alterna_AccountStatementManagement]
+            INSERT INTO dbo.t_AccessPolicyRule
+                (AccessPolicyId, RuleName, WindowSeconds, MaximumAccessCount,
+                 IsEnabled, CreatedBy, LastModifiedBy)
+            OUTPUT
+                INSERTED.Id, 'INSERT',
+                NULL, INSERTED.AccessPolicyId,
+                NULL, INSERTED.RuleName,
+                NULL, INSERTED.WindowSeconds,
+                NULL, INSERTED.MaximumAccessCount,
+                NULL, INSERTED.IsEnabled
+            INTO @RuleChanges
+                (RuleId, Action, OldAccessPolicyId, NewAccessPolicyId,
+                 OldRuleName, NewRuleName, OldWindowSeconds, NewWindowSeconds,
+                 OldMaximumAccessCount, NewMaximumAccessCount,
+                 OldIsEnabled, NewIsEnabled)
+            SELECT
+                @P__PolicyId, RuleName, WindowSeconds, MaximumAccessCount,
+                IsEnabled, @P__User, @P__User
+            FROM @P__AccessPolicyRules;
+        END
+        ELSE
+        BEGIN
+            UPDATE dbo.t_AccessPolicy
+            SET PolicyCode = @P__PolicyCode,
+                PolicyName = @P__PolicyName,
+                IsEnabled = @P__IsEnabled,
+                LastModifiedBy = @P__User,
+                LastModifiedDate = GETDATE()
+            OUTPUT
+                INSERTED.Id, 'UPDATE',
+                DELETED.PolicyCode, INSERTED.PolicyCode,
+                DELETED.PolicyName, INSERTED.PolicyName,
+                DELETED.IsEnabled, INSERTED.IsEnabled
+            INTO @PolicyChanges
+                (PolicyId, Action, OldPolicyCode, NewPolicyCode,
+                 OldPolicyName, NewPolicyName, OldIsEnabled, NewIsEnabled)
+            WHERE Id = @P__PolicyId;
+
+            MERGE INTO dbo.t_AccessPolicyRule WITH (HOLDLOCK) AS Target
+            USING @P__AccessPolicyRules AS Source
+                ON Target.Id = Source.Id
+               AND Target.AccessPolicyId = @P__PolicyId
+            WHEN MATCHED THEN
+                UPDATE SET
+                    Target.RuleName = Source.RuleName,
+                    Target.WindowSeconds = Source.WindowSeconds,
+                    Target.MaximumAccessCount = Source.MaximumAccessCount,
+                    Target.IsEnabled = Source.IsEnabled,
+                    Target.LastModifiedBy = @P__User,
+                    Target.LastModifiedDate = GETDATE()
+            WHEN NOT MATCHED THEN
+                INSERT
+                    (AccessPolicyId, RuleName, WindowSeconds,
+                     MaximumAccessCount, IsEnabled, CreatedBy, LastModifiedBy)
+                VALUES
+                    (@P__PolicyId, Source.RuleName, Source.WindowSeconds,
+                     Source.MaximumAccessCount, Source.IsEnabled,
+                     @P__User, @P__User)
+            OUTPUT
+                INSERTED.Id, $action,
+                DELETED.AccessPolicyId, INSERTED.AccessPolicyId,
+                DELETED.RuleName, INSERTED.RuleName,
+                DELETED.WindowSeconds, INSERTED.WindowSeconds,
+                DELETED.MaximumAccessCount, INSERTED.MaximumAccessCount,
+                DELETED.IsEnabled, INSERTED.IsEnabled
+            INTO @RuleChanges
+                (RuleId, Action, OldAccessPolicyId, NewAccessPolicyId,
+                 OldRuleName, NewRuleName, OldWindowSeconds, NewWindowSeconds,
+                 OldMaximumAccessCount, NewMaximumAccessCount,
+                 OldIsEnabled, NewIsEnabled);
+        END;
+
+        -- Turn row snapshots into readable field changes.
+        INSERT INTO @FieldChanges
+            (EntityName, EntityKey, EntityDisplayName, Action,
+             FieldName, FieldDisplayName, OldValue, NewValue)
+        SELECT
+            N'AccessPolicy', CONVERT(NVARCHAR(255), P.PolicyId),
+            P.NewPolicyName, P.Action,
+            F.FieldName, F.FieldDisplayName, F.OldValue, F.NewValue
+        FROM @PolicyChanges AS P
+        CROSS APPLY
+        (
+            VALUES
+                (N'PolicyCode', N'Policy code',
+                 CONVERT(NVARCHAR(MAX), P.OldPolicyCode),
+                 CONVERT(NVARCHAR(MAX), P.NewPolicyCode)),
+                (N'PolicyName', N'Policy name',
+                 CONVERT(NVARCHAR(MAX), P.OldPolicyName),
+                 CONVERT(NVARCHAR(MAX), P.NewPolicyName)),
+                (N'IsEnabled', N'Status',
+                 CONVERT(NVARCHAR(MAX), P.OldIsEnabled),
+                 CONVERT(NVARCHAR(MAX), P.NewIsEnabled))
+        ) AS F(FieldName, FieldDisplayName, OldValue, NewValue)
+        WHERE P.Action = 'INSERT'
+           OR (F.OldValue IS NULL AND F.NewValue IS NOT NULL)
+           OR (F.OldValue IS NOT NULL AND F.NewValue IS NULL)
+           OR DATALENGTH(F.OldValue) <> DATALENGTH(F.NewValue)
+           OR CONVERT(VARBINARY(MAX), F.OldValue)
+                <> CONVERT(VARBINARY(MAX), F.NewValue);
+
+        INSERT INTO @FieldChanges
+            (EntityName, EntityKey, EntityDisplayName, Action,
+             FieldName, FieldDisplayName, OldValue, NewValue)
+        SELECT
+            N'AccessPolicyRule', CONVERT(NVARCHAR(255), R.RuleId),
+            R.NewRuleName, R.Action,
+            F.FieldName, F.FieldDisplayName, F.OldValue, F.NewValue
+        FROM @RuleChanges AS R
+        CROSS APPLY
+        (
+            VALUES
+                (N'AccessPolicyId', N'Access policy',
+                 CONVERT(NVARCHAR(MAX), R.OldAccessPolicyId),
+                 CONVERT(NVARCHAR(MAX), R.NewAccessPolicyId)),
+                (N'RuleName', N'Rule name',
+                 CONVERT(NVARCHAR(MAX), R.OldRuleName),
+                 CONVERT(NVARCHAR(MAX), R.NewRuleName)),
+                (N'WindowSeconds', N'Access window (seconds)',
+                 CONVERT(NVARCHAR(MAX), R.OldWindowSeconds),
+                 CONVERT(NVARCHAR(MAX), R.NewWindowSeconds)),
+                (N'MaximumAccessCount', N'Maximum allowed accesses',
+                 CONVERT(NVARCHAR(MAX), R.OldMaximumAccessCount),
+                 CONVERT(NVARCHAR(MAX), R.NewMaximumAccessCount)),
+                (N'IsEnabled', N'Status',
+                 CONVERT(NVARCHAR(MAX), R.OldIsEnabled),
+                 CONVERT(NVARCHAR(MAX), R.NewIsEnabled))
+        ) AS F(FieldName, FieldDisplayName, OldValue, NewValue)
+        WHERE R.Action = 'INSERT'
+           OR (F.OldValue IS NULL AND F.NewValue IS NOT NULL)
+           OR (F.OldValue IS NOT NULL AND F.NewValue IS NULL)
+           OR DATALENGTH(F.OldValue) <> DATALENGTH(F.NewValue)
+           OR CONVERT(VARBINARY(MAX), F.OldValue)
+                <> CONVERT(VARBINARY(MAX), F.NewValue);
+
+        SET @AuditDate = SYSUTCDATETIME();
+
+        -- One header per changed policy/rule, all sharing this save's GUID.
+        INSERT INTO dbo.t_ChangeAudit
+            (ChangeSetId, EntityName, EntityKey, EntityDisplayName,
+             Action, ChangedBy, ChangedDate)
+        OUTPUT INSERTED.Id, INSERTED.EntityName, INSERTED.EntityKey
+        INTO @AuditIds (ChangeAuditId, EntityName, EntityKey)
+        SELECT
+            @ChangeSetId, C.EntityName, C.EntityKey, C.EntityDisplayName,
+            C.Action, @P__User, @AuditDate
+        FROM @FieldChanges AS C
+        GROUP BY
+            C.EntityName, C.EntityKey, C.EntityDisplayName, C.Action;
+
+        INSERT INTO dbo.t_ChangeAuditDetail
+            (ChangeAuditId, FieldName, FieldDisplayName, OldValue, NewValue)
+        SELECT
+            A.ChangeAuditId, C.FieldName, C.FieldDisplayName,
+            C.OldValue, C.NewValue
+        FROM @FieldChanges AS C
+        INNER JOIN @AuditIds AS A
+            ON A.EntityName = C.EntityName
+           AND A.EntityKey = C.EntityKey;
+
+    END TRY
+    BEGIN CATCH
+        SET @P__Error = ERROR_MESSAGE();
+        THROW;
+    END CATCH;
+
+    -- Original result contract.
+    SELECT
+        AP.Id AS AccessPolicyId,
+        AP.PolicyCode AS AccessPolicyCode,
+        AP.PolicyName AS AccessPolicyName,
+        AP.IsEnabled AS IsAccessPolicyEnabled,
+        AP.CreatedDate AS AccessPolicyCreatedDate,
+        AP.CreatedBy AS AccessPolicyCreatedBy,
+        AP.LastModifiedDate AS AccessPolicyLastModifiedDate,
+        AP.LastModifiedBy AS AccessPolicyLastModifiedBy,
+        APR.Id AS AccessPolicyRuleId,
+        APR.AccessPolicyId AS AccessPolicyRuleAccessPolicyId,
+        APR.RuleName AS AccessPolicyRuleName,
+        APR.WindowSeconds AS AccessPolicyRuleWindowSeconds,
+        APR.MaximumAccessCount AS AccessPolicyRuleMaximumAccessCount,
+        APR.IsEnabled AS IsAccessPolicyRuleEnabled,
+        APR.CreatedDate AS AccessPolicyRuleCreatedDate,
+        APR.CreatedBy AS AccessPolicyRuleCreatedBy,
+        APR.LastModifiedDate AS AccessPolicyRuleLastModifiedDate,
+        APR.LastModifiedBy AS AccessPolicyRuleLastModifiedBy
+    FROM dbo.t_AccessPolicy AS AP
+    INNER JOIN dbo.t_AccessPolicyRule AS APR
+        ON AP.Id = APR.AccessPolicyId
+    WHERE AP.Id = @P__PolicyId;
+END;
 GO
-/****** Object:  StoredProcedure [dbo].[usp_UpdateConfig]    Script Date: 11/2/2026 10:44:44 AM ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-ALTER PROCEDURE [dbo].[usp_UpdateConfig]
-	@P__SettingName NVARCHAR(255),
-	@P__SettingValue NVARCHAR(255),
-	@P__SettingDescription NVARCHAR(255),
-	@P__User NVARCHAR(255),
-	@P__Error NVARCHAR(4000) OUTPUT
+
+ALTER PROCEDURE dbo.usp_UpdateConfig
+    @P__SettingName NVARCHAR(255),
+    @P__SettingValue NVARCHAR(255),
+    @P__SettingDescription NVARCHAR(255),
+    @P__User NVARCHAR(255),
+    @P__Error NVARCHAR(4000) OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
-	SET XACT_ABORT ON;
-
+    SET XACT_ABORT ON;
     SET @P__Error = NULL;
-	
-	IF NOT EXISTS (SELECT 1 FROM t_Config WHERE SettingName = @P__SettingName)
-	BEGIN
-		SET @P__Error = 'Config not found';
-		RETURN;
-	END
 
-	UPDATE t_Config SET
-		SettingValue = @P__SettingValue,
-		SettingDescription = @P__SettingDescription,
-		LastModifiedBy = @P__User,
-		LastModifiedDate = GETDATE()
-	WHERE SettingName = @P__SettingName;
+    IF @@TRANCOUNT = 0
+    BEGIN
+        SET @P__Error = N'The caller must begin a transaction before executing this procedure.';
+        THROW 50001, 'The caller must begin a transaction before executing this procedure.', 1;
+    END;
 
-	SELECT * 
-	FROM t_Config
-	WHERE SettingName = @P__SettingName;
+    IF NULLIF(LTRIM(RTRIM(@P__User)), N'') IS NULL
+    BEGIN
+        SET @P__Error = N'The user performing the change is required.';
+        RETURN;
+    END;
 
-END
+    DECLARE @ChangeSetId UNIQUEIDENTIFIER = NEWID();
+    DECLARE @ChangeAuditId BIGINT;
+    DECLARE @ConfigKey NVARCHAR(255);
+    DECLARE @ConfigDisplayName NVARCHAR(255);
+    DECLARE @MatchedConfigs BIGINT;
+
+    DECLARE @ConfigChanges TABLE
+    (
+        SettingName NVARCHAR(255) NOT NULL,
+        OldSettingValue NVARCHAR(255) NOT NULL,
+        NewSettingValue NVARCHAR(255) NOT NULL,
+        OldSettingDescription NVARCHAR(255) NULL,
+        NewSettingDescription NVARCHAR(255) NULL
+    );
+
+    DECLARE @FieldChanges TABLE
+    (
+        FieldName NVARCHAR(128) NOT NULL,
+        FieldDisplayName NVARCHAR(255) NOT NULL,
+        OldValue NVARCHAR(MAX) NULL,
+        NewValue NVARCHAR(MAX) NULL
+    );
+
+    BEGIN TRY
+        -- Validate before writing. HOLDLOCK keeps the matching rows/range
+        -- stable until the DAL commits or rolls back its transaction.
+        SELECT @MatchedConfigs = COUNT_BIG(*)
+        FROM dbo.t_Config WITH (UPDLOCK, HOLDLOCK)
+        WHERE SettingName = @P__SettingName;
+
+        IF @MatchedConfigs = 0
+            SET @P__Error = N'Config not found';
+        ELSE IF @MatchedConfigs > 1
+            SET @P__Error =
+                N'Multiple configs have this SettingName. No changes were saved. A unique config key is required for audit history.';
+
+        IF @P__Error IS NOT NULL
+            RETURN;
+
+        UPDATE C
+        SET SettingValue = @P__SettingValue,
+            SettingDescription = @P__SettingDescription,
+            LastModifiedBy = @P__User,
+            LastModifiedDate = GETDATE()
+        OUTPUT
+            INSERTED.SettingName,
+            DELETED.SettingValue, INSERTED.SettingValue,
+            DELETED.SettingDescription, INSERTED.SettingDescription
+        INTO @ConfigChanges
+            (SettingName, OldSettingValue, NewSettingValue,
+             OldSettingDescription, NewSettingDescription)
+        FROM dbo.t_Config AS C WITH (UPDLOCK, HOLDLOCK)
+        WHERE C.SettingName = @P__SettingName;
+
+        SELECT
+            @ConfigKey = SettingName,
+            @ConfigDisplayName =
+                COALESCE(NULLIF(NewSettingDescription, N''), SettingName)
+        FROM @ConfigChanges;
+
+        INSERT INTO @FieldChanges
+            (FieldName, FieldDisplayName, OldValue, NewValue)
+        SELECT
+            F.FieldName, F.FieldDisplayName, F.OldValue, F.NewValue
+        FROM @ConfigChanges AS C
+        CROSS APPLY
+        (
+            VALUES
+                (N'SettingValue', N'Setting value',
+                 CONVERT(NVARCHAR(MAX), C.OldSettingValue),
+                 CONVERT(NVARCHAR(MAX), C.NewSettingValue)),
+                (N'SettingDescription', N'Setting description',
+                 CONVERT(NVARCHAR(MAX), C.OldSettingDescription),
+                 CONVERT(NVARCHAR(MAX), C.NewSettingDescription))
+        ) AS F(FieldName, FieldDisplayName, OldValue, NewValue)
+        WHERE (F.OldValue IS NULL AND F.NewValue IS NOT NULL)
+           OR (F.OldValue IS NOT NULL AND F.NewValue IS NULL)
+           OR DATALENGTH(F.OldValue) <> DATALENGTH(F.NewValue)
+           OR CONVERT(VARBINARY(MAX), F.OldValue)
+                <> CONVERT(VARBINARY(MAX), F.NewValue);
+
+        IF EXISTS (SELECT 1 FROM @FieldChanges)
+        BEGIN
+            INSERT INTO dbo.t_ChangeAudit
+                (ChangeSetId, EntityName, EntityKey, EntityDisplayName,
+                 Action, ChangedBy, ChangedDate)
+            VALUES
+                (@ChangeSetId, N'Config', @ConfigKey, @ConfigDisplayName,
+                 'UPDATE', @P__User, SYSUTCDATETIME());
+
+            SET @ChangeAuditId = CONVERT(BIGINT, SCOPE_IDENTITY());
+
+            INSERT INTO dbo.t_ChangeAuditDetail
+                (ChangeAuditId, FieldName, FieldDisplayName, OldValue, NewValue)
+            SELECT
+                @ChangeAuditId, FieldName, FieldDisplayName, OldValue, NewValue
+            FROM @FieldChanges;
+        END;
+
+    END TRY
+    BEGIN CATCH
+        SET @P__Error = ERROR_MESSAGE();
+        THROW;
+    END CATCH;
+
+    -- Original result contract.
+    SELECT *
+    FROM dbo.t_Config
+    WHERE SettingName = @P__SettingName;
+END;
+GO
