@@ -1,128 +1,464 @@
-# Remaining scans on document access history
+# Frontend handoff: audit history and remaining scans
 
-This update adds `RemainingScansByRule` to every DocumentAccessAudit returned
-by your existing endpoint. It provides one balance per currently enabled rule
-on the document's currently assigned policy. No new tables or columns are needed.
+**Project:** Account Statement Management  
+**Date:** 2 November 2026  
+**Audience:** Frontend implementation and QA
 
-## Meaning of the balance
+## 1. What to implement
 
-The balance is calculated immediately AFTER the recorded attempt, using that
-entry's CreatedDate and Id. It is not the balance available now.
+| Feature | API action | Frontend work |
+| --- | --- | --- |
+| Access-policy change history | `POST GetAccessPolicyAudit` | Display saves affecting policies and their rules, with readable before/after values. |
+| Configuration change history | `POST GetConfigAudit` | Reuse the same history component for configuration changes. |
+| Remaining scans on document access history | Existing `POST GetDocumentAccessAudit` | Add a per-rule quota section to each existing access-audit row. |
 
-The existing audit table does not store the policy and rule settings used at
-the time of each attempt. Consequently this implementation explicitly returns:
+The two new history endpoints return the **same activity DTO structure**. Build one reusable history component; only the endpoint, filter, and response-list property differ.
+
+The existing document-access endpoint remains a separate feature. Its existing fields and response envelope remain, with two additional properties per entry: `quotaCalculationBasis` and `remainingScansByRule`.
+
+This document describes the prepared backend contract, not confirmation of deployment. Confirm the updated endpoints are available in the integration environment before enabling the UI.
+
+### Existing application conventions to keep
+
+| Item | Implementation instruction |
+| --- | --- |
+| Controller URL prefix | Use the same existing controller base URL as `GetDocumentAccessAudit`. Action names below are relative to that prefix. |
+| Authentication and headers | Use the existing authenticated API client/interceptors. |
+| `baseReq` | Use the existing complete request builder. Examples show only the known `correlationId` field; preserve all other fields required by the application. |
+| `baseResp` | Use the existing success/error-code handler. The configured success code was not supplied; **do not assume it is literally `"200"`**. |
+| Property casing | Examples and TypeScript types use camelCase. Verify one real response; if the API uses PascalCase, adapt consistently at the service boundary. |
+
+## 2. Endpoint contracts
+
+All requests are JSON POST requests. Keep the normal `baseResp` / `req` response envelope.
+
+| Action | Request fields after `baseReq` | Response list | Server paging |
+| --- | --- | --- | --- |
+| `GetAccessPolicyAudit` | Optional `accessPolicyId`; `pageNumber`; `pageSize` | `accessPolicyAudits: ChangeAuditDto[]` | Yes; whole save operations |
+| `GetConfigAudit` | Optional `settingName`; `pageNumber`; `pageSize` | `configAudits: ChangeAuditDto[]` | Yes; whole save operations |
+| `GetDocumentAccessAudit` | Required `documentReferenceId` | `documentAccessAuditList: DocumentAccessAudit[]` | Existing contract is unpaged |
+
+The frontend does not send a database scope or stored-procedure name. Each API endpoint selects its own scope on the backend.
+
+### 2.1 GetAccessPolicyAudit
 
 ```json
-"quotaCalculationBasis": "CurrentPolicyRules"
+{
+  "baseReq": { "correlationId": "fe-policy-audit-001" },
+  "accessPolicyId": 12,
+  "pageNumber": 1,
+  "pageSize": 20
+}
 ```
 
-Historical balances are reconstructed from recorded quota-consuming attempts
-against the CURRENT rule names, windows, maxima, enabled flags, and document
-policy assignment. Changing those settings can change the balances shown for
-older entries. These must not be presented as immutable original-rule snapshots.
-To preserve actual historical balances and settings, capture them at access time
-in the validation procedure; those facts cannot be recovered reliably for old
-rows merely by changing this getter.
+- Omit `accessPolicyId`, or send `null`, for all policy and rule history.
+- If supplied, `accessPolicyId` must be greater than zero.
+- The result includes **rule-only changes**, even when the policy itself was unchanged.
+- Use existing policy-selection data for the optional policy filter.
 
-## Project changes
+### 2.2 GetConfigAudit
 
-| File | Apply |
+```json
+{
+  "baseReq": { "correlationId": "fe-config-audit-001" },
+  "settingName": "DOCUMENT_EXPIRY_IN_DAYS",
+  "pageNumber": 1,
+  "pageSize": 20
+}
+```
+
+- Omit `settingName`, or send `null`, for all config history.
+- A supplied name must be nonempty, not whitespace-only, and at most 255 characters.
+- Clearing the setting filter should send `null`, not an empty string.
+- Send the actual setting key, not its friendly description.
+
+### 2.3 GetDocumentAccessAudit — existing request
+
+```json
+{
+  "baseReq": { "correlationId": "fe-document-audit-001" },
+  "documentReferenceId": 42
+}
+```
+
+The request is unchanged. Do not add the new history endpoints' paging parameters to this call. Retain the existing document-history paging/display behavior.
+
+### 2.4 Response envelope and errors
+
+The policy response has `baseResp`, `req`, and `accessPolicyAudits`. The config response has `baseResp`, `req`, and `configAudits`. The document response retains `baseResp`, `req`, and `documentAccessAuditList`.
+
+The following is an envelope illustration. Values enclosed in `<...>` are placeholders, not literal production values:
+
+```json
+{
+  "baseResp": {
+    "correlationId": "fe-policy-audit-001",
+    "returnCode": "<configured-success-code>",
+    "returnDescription": "<configured-success-description>"
+  },
+  "req": {
+    "baseReq": { "correlationId": "fe-policy-audit-001" },
+    "accessPolicyId": 12,
+    "pageNumber": 1,
+    "pageSize": 20
+  },
+  "accessPolicyAudits": []
+}
+```
+
+Handle both HTTP/network failures and the application's `baseResp.returnCode`. A successful HTTP response alone is not sufficient to decide business success. On failure, retain any already loaded history, show the existing error UI, and offer retry. Do not advance the requested page on a failed load.
+
+**Do not confuse these two levels:** `baseResp.returnCode` describes the API call to retrieve history; a document row's `outcomeCode` describes a past access attempt. A successfully retrieved history can contain denied or expired attempts without the history API call being an error.
+
+## 3. Shared frontend types
+
+Reference the project's existing `BaseRequest` and `BaseResponse` types; do not replace them with reduced definitions. These interfaces describe the camelCase wire contract. IDs/counts are currently serialized as JSON numbers; `entityKey` is a string.
+
+```typescript
+export interface GetAccessPolicyAuditRequest {
+  baseReq: BaseRequest;
+  accessPolicyId?: number | null;
+  pageNumber?: number; // Default: 1
+  pageSize?: number;   // Default: 20; allowed: 1..100
+}
+
+export interface GetConfigAuditRequest {
+  baseReq: BaseRequest;
+  settingName?: string | null;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ChangeAuditDto {
+  changeSetId: string; // GUID; one save operation
+  changedDate: string; // ISO timestamp with UTC offset
+  changedBy: string;
+  summary: string;
+  entities: ChangeAuditEntityDto[];
+}
+
+export interface ChangeAuditEntityDto {
+  changeAuditId: number;
+  entityName: string; // AccessPolicy | AccessPolicyRule | Config
+  entityKey: string;
+  entityLabel: string;
+  entityTypeLabel: string;
+  action: string; // INSERT | UPDATE | DELETE; retain fallback handling
+  actionLabel: string;
+  changes: ChangeAuditFieldDto[];
+}
+
+export interface ChangeAuditFieldDto {
+  fieldName: string;
+  fieldLabel: string;
+  valueType: string; // text | boolean | duration | integer | identifier
+  oldValue: string | null;
+  newValue: string | null;
+  oldDisplayValue: string;
+  newDisplayValue: string;
+}
+
+export interface GetAccessPolicyAuditResponse {
+  baseResp: BaseResponse;
+  req: GetAccessPolicyAuditRequest;
+  accessPolicyAudits: ChangeAuditDto[];
+}
+
+export interface GetConfigAuditResponse {
+  baseResp: BaseResponse;
+  req: GetConfigAuditRequest;
+  configAudits: ChangeAuditDto[];
+}
+
+export interface GetDocumentAccessAuditRequest {
+  baseReq: BaseRequest;
+  documentReferenceId: number;
+}
+
+export interface DocumentAccessAudit {
+  id: number;
+  documentReferenceId: number | null;
+  correlationId: string;
+  presentedTokenHash: string;
+  outcomeCode: string;
+  consumesQuota: boolean;
+  deniedByRuleId: number | null;
+  deniedByRuleName: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdDate: string | null;
+  createdBy: string | null;
+  quotaCalculationBasis: string; // Current value: CurrentPolicyRules
+  remainingScansByRule: DocumentAccessRuleBalance[];
+}
+
+export interface DocumentAccessRuleBalance {
+  accessPolicyId: number;
+  accessPolicyName: string;
+  ruleId: number;
+  ruleName: string;
+  windowSeconds: number | null;
+  maximumAccessCount: number;
+  usedAccessCount: number | null;
+  remainingAccessCount: number | null;
+  isConfigurationValid: boolean;
+  isLimitReached: boolean | null;
+}
+
+export interface GetDocumentAccessAuditResponse {
+  baseResp: BaseResponse;
+  req: GetDocumentAccessAuditRequest;
+  documentAccessAuditList: DocumentAccessAudit[];
+}
+```
+
+## 4. Shared audit-history UI
+
+### Structure and reusable component
+
+Use an Activity history page with Access policies and Configuration tabs. Each tab supplies its `ChangeAuditDto[]` to the same component.
+
+Recommended layout:
+
+1. Activity list: `summary`, `changedBy`, and formatted `changedDate`.
+2. Select or expand an activity to reveal **all** its `entities`.
+3. For each entity, show `entityLabel`, `entityTypeLabel`, and `actionLabel`.
+4. Render a field-comparison table using the display properties below.
+
+| Visible column | API property |
 | --- | --- |
-| `Sql/usp_GetDocumentAccessAudit.sql` | Replace the existing getter with this ALTER script. |
-| `CSharp/Model.cs` | Replace DocumentAccessAudit and add the two related classes in your existing model namespace. |
-| `CSharp/DocumentAccessAuditMapper.cs` | Add this mapper and the appropriate model namespace import. |
-| `CSharp/BAL.GetDocumentAccessAudit.cs.txt` | Replace the member inside your existing BAL class. This is not a standalone C# file. |
+| Field | `fieldLabel` |
+| Previous value | `oldDisplayValue` |
+| New value | `newDisplayValue` |
 
-Your controller, request, response wrapper, and BAL return type remain as supplied:
+Example:
 
-```csharp
-response.DocumentAccessAuditList = await _bal.GetDocumentAccessAudit(request);
+| Field | Previous value | New value |
+| --- | --- | --- |
+| Rule name | Hourly access limit | Daily access limit |
+| Time window | 1 hour | 1 day |
 
-public List<DocumentAccessAudit> DocumentAccessAuditList { get; set; } = [];
+At narrow widths, stack the activity list above the selected details or use expandable rows. Wrap long descriptions and values. Render labels and values as plain text so their exact contents remain visible.
+
+### Rendering rules
+
+- The backend has already grouped the data and formatted the values. Render every item in each `changes` array; do not perform another client-side diff.
+- Use `changeSetId` as the activity key, `changeAuditId` as the entity key, and `fieldName` as the field key within an entity.
+- Do not merge saves because they share a timestamp, user, or entity key. Two edits to the same record are separate activities.
+- Use historical `entityLabel` from the payload, including for records no longer present in current lookup data.
+- Use `actionLabel` for the visible action. Current actions are INSERT → Created, UPDATE → Updated, DELETE → Deleted. Keep a neutral fallback for unknown actions/types.
+- Keep raw `oldValue` / `newValue` available for diagnostics; use the display values for the normal UI. Raw values remain strings even for booleans and numbers.
+- Do not interpret a config setting value of `1` as Enabled or `3600` as 1 hour. Config values are text unless the backend provides more specific display formatting.
+- A rule-name-only edit should show only that field. Its unchanged limits should not be added to the comparison.
+
+The mapper deliberately distinguishes these cases:
+
+| Case | Display value |
+| --- | --- |
+| Missing previous side of an INSERT | Not applicable |
+| Missing new side of a DELETE | Not applicable |
+| Actual NULL rule window | Document lifetime |
+| Other actual NULL | Not provided |
+| Empty string | Empty |
+| Whitespace-only string | Whitespace (N characters) |
+
+On an INSERT, a NULL window can have raw `oldValue = null` and `newValue = null` while its displayed transition is Not applicable → Document lifetime. **Do not hide this row because the raw values are equal.**
+
+### Shared payload example
+
+This example shows the contents of `accessPolicyAudits`; the normal envelope described above surrounds it. One save contains a policy rename and two rule-field changes.
+
+```json
+{
+  "accessPolicyAudits": [
+    {
+      "changeSetId": "b3834a53-394c-4670-9c0f-814f95469761",
+      "changedDate": "2026-11-02T08:30:00+00:00",
+      "changedBy": "Pierre Abou Serhal",
+      "summary": "Pierre Abou Serhal saved changes to 2 items.",
+      "entities": [
+        {
+          "changeAuditId": 1041,
+          "entityName": "AccessPolicy",
+          "entityKey": "12",
+          "entityLabel": "Standard access policy",
+          "entityTypeLabel": "Access policy",
+          "action": "UPDATE",
+          "actionLabel": "Updated",
+          "changes": [
+            {
+              "fieldName": "PolicyName",
+              "fieldLabel": "Policy name",
+              "valueType": "text",
+              "oldValue": "Default access policy",
+              "newValue": "Standard access policy",
+              "oldDisplayValue": "Default access policy",
+              "newDisplayValue": "Standard access policy"
+            }
+          ]
+        },
+        {
+          "changeAuditId": 1042,
+          "entityName": "AccessPolicyRule",
+          "entityKey": "24",
+          "entityLabel": "Daily access limit",
+          "entityTypeLabel": "Access rule",
+          "action": "UPDATE",
+          "actionLabel": "Updated",
+          "changes": [
+            {
+              "fieldName": "RuleName",
+              "fieldLabel": "Rule name",
+              "valueType": "text",
+              "oldValue": "Hourly access limit",
+              "newValue": "Daily access limit",
+              "oldDisplayValue": "Hourly access limit",
+              "newDisplayValue": "Daily access limit"
+            },
+            {
+              "fieldName": "WindowSeconds",
+              "fieldLabel": "Time window",
+              "valueType": "duration",
+              "oldValue": "3600",
+              "newValue": "86400",
+              "oldDisplayValue": "1 hour",
+              "newDisplayValue": "1 day"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
 ```
 
-The BAL now queries `DocumentAccessAuditDbRow`, then groups the flat audit/rule
-rows into DocumentAccessAudit objects. The raw derived rows are not returned
-to the API, so their Quota-prefixed SQL properties do not appear in JSON.
-Use your existing namespaces and update any imports accordingly.
+A config activity uses the same structure under `configAudits`:
 
-This is a different domain from configuration/policy field-change history.
-The shared ChangeAudit model/DTOs/mapper from that feature are unchanged.
-Document-access attempts retain their own existing model and new mapper.
-
-The SQL getter does not begin, commit, or roll back a transaction. The existing
-DAL retains transaction ownership. `usp_GetDocumentCuk` is unchanged.
-
-## Calculation rules
-
-- Only rows with ConsumesQuota = 1 are counted.
-- A granted attempt includes its own consumed scan in its resulting balance.
-- A denied, non-consuming attempt does not increase usage.
-- NULL WindowSeconds means lifetime: count all earlier consuming attempts,
-  including the current one when it consumes quota.
-- A positive window counts timestamps strictly greater than
-  `CreatedDate - WindowSeconds`, matching the validator's exclusive lower bound.
-- The upper boundary includes the current timestamp, but only IDs up to the
-  current audit's ID. This prevents later attempts with the same millisecond
-  timestamp from changing an earlier entry's balance.
-- RemainingAccessCount = max(MaximumAccessCount - UsedAccessCount, 0).
-- Disabled rules are omitted. No enabled rules produces an empty array while
-  retaining the audit entry.
-- Invalid rule limits/windows are returned with IsConfigurationValid = false
-  and NULL counts; the getter does not invent an available quota for them.
-
-Lifetime usage is a running BIGINT SUM. Rolling-window usage uses COUNT_BIG.
-The existing quota index on DocumentReferenceId and CreatedDate, filtered by
-ConsumesQuota = 1, supports those rolling lookups. Large unpaged histories still
-need performance testing; the endpoint remains unpaged to preserve your contract.
-
-Each rule is a separate constraint. Do not add its remaining scans to another
-rule's balance. Quota remaining alone does not override document expiry,
-revocation, disabled policies, or other access-denial conditions.
-
-The original document access writer uses GETDATE(), not SYSUTCDATETIME().
-The mapper preserves CreatedDate as supplied and does not attach a false UTC
-timezone marker. Its original fields and newest-first ordering are preserved.
-
-## Frontend
-
-For each audit entry, show RuleName, UsedAccessCount, MaximumAccessCount and
-RemainingAccessCount. Display NULL windows as Lifetime. If no rules exist,
-display No enabled rules; if IsConfigurationValid is false, display Invalid
-rule configuration. Add a visible note such as Calculated using current rules
-so the reconstructed nature of older balances is clear.
-
-## Verification
-
-Static SQL/C# mapping checks and 19 relational checks using a SQLite adaptation
-of the SQL query were run. They cover the attempt itself, rejected attempts,
-same-timestamp ordering, rolling boundaries, lifetime limits, zero clamping,
-disabled/invalid rules, other-document isolation, and empty rule sets.
-These do not validate SQL Server syntax or engine-specific execution.
-
-No .NET SDK or SQL Server engine is available in this environment. C# compilation,
-mapper execution, and execution against your database have not been performed.
-The supplied console checks have no external NuGet dependencies; run with .NET 8:
-
-```bash
-dotnet run --project Tests/MapperChecks.csproj
+```json
+{
+  "configAudits": [
+    {
+      "changeSetId": "80b19188-187f-472b-8948-dd411f2febda",
+      "changedDate": "2026-11-02T09:00:00+00:00",
+      "changedBy": "Pierre Abou Serhal",
+      "summary": "Pierre Abou Serhal updated configuration setting \"Document expiry in days\".",
+      "entities": [
+        {
+          "changeAuditId": 1043,
+          "entityName": "Config",
+          "entityKey": "DOCUMENT_EXPIRY_IN_DAYS",
+          "entityLabel": "Document expiry in days",
+          "entityTypeLabel": "Configuration setting",
+          "action": "UPDATE",
+          "actionLabel": "Updated",
+          "changes": [
+            {
+              "fieldName": "SettingValue",
+              "fieldLabel": "Setting value",
+              "valueType": "text",
+              "oldValue": "30",
+              "newValue": "60",
+              "oldDisplayValue": "30",
+              "newDisplayValue": "60"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
 ```
 
-The adapted relational checks use only the Python standard library and an
-in-memory SQLite database. They do not connect to your SQL Server:
+### Paging and filtering
 
-```bash
-python3 Tests/QueryChecks.py
+- Default `pageNumber = 1`, `pageSize = 20`; allowed page size is 1–100.
+- A page contains complete save operations, not individual rules or changed fields.
+- The response has **no `totalRecords`, `totalPages`, or `hasMore` field**. Do not build a paginator that requires a fabricated total.
+- Recommended behavior: load page 1, then append additional pages with Load more. When a batch contains fewer than `pageSize` activities, hide Load more.
+- A full batch only means another page might exist. If the next page is empty, retain the displayed history and hide Load more.
+- Reset to page 1 when changing the tab, filter, or page size. Keep policy and config filter states separate.
+- Append with deduplication by `changeSetId`. Preserve server ordering. New activity can shift page-number boundaries; refresh from page 1 to reload the latest history.
+- If a load fails, keep the current data and page state for retry. Ignore stale responses from a previously selected tab/filter.
+- Supported server filters are policy ID and setting name. Date/user/action filters are not part of these request contracts.
+
+## 5. Remaining scans on document-access history
+
+### What the values mean
+
+`remainingScansByRule` contains one entry for each currently enabled rule on the document's currently assigned access policy. Each balance is reconstructed **immediately after that particular recorded attempt**. It is not a live balance as of the time the screen is opened.
+
+Required visible caption:
+
+> Remaining after this attempt · calculated using current rules
+
+Suggested explanatory tooltip/help text:
+
+> These balances are reconstructed at the attempt's time using the document's current policy and enabled rules. Older balances may change if those settings change.
+
+The current backend returns `quotaCalculationBasis = "CurrentPolicyRules"`. These are not immutable snapshots of the rules originally used. In particular, rule names, windows, maxima, enabled flags, and the document's policy assignment can differ from their original values.
+
+### Calculation semantics
+
+| Item | Meaning for the UI |
+| --- | --- |
+| `usedAccessCount` | Number of consuming attempts included in this rule's window, through this audit entry. |
+| `remainingAccessCount` | Remaining quota after this attempt; never negative for valid rules. |
+| `maximumAccessCount` | Current configured maximum for this rule. |
+| `consumesQuota = true` | This attempt itself is included in usage. |
+| `consumesQuota = false` | This attempt adds no usage; older consuming attempts may still leave a rolling window as time advances between attempts. |
+| `windowSeconds = null` | Lifetime of this document reference/link. The maximum still applies; NULL does not mean unlimited scans. |
+| `windowSeconds = 3600` | Rolling 1-hour window ending at this attempt. |
+| `windowSeconds = 86400` | Rolling 24-hour window, not a reset at midnight. |
+
+Only quota-consuming attempts are counted. Attempts at the exact lower window boundary are excluded; the current attempt is included if it consumes quota. The backend resolves identical timestamps using the audit IDs. The frontend should display these values rather than recalculate them from the returned history.
+
+Each rule is a separate constraint: **do not add the remaining counts together**. They apply to this document reference, not a combined customer/account quota.
+
+### Suggested UI
+
+Keep the existing document-access history rows and their outcome badges. Expand a row to show:
+
+| Rule | Window | Used | Maximum | Remaining |
+| --- | --- | --- | --- | --- |
+| Lifetime limit | Document lifetime | 4 | 10 | 6 |
+| Daily access limit | Rolling 24 hours | 2 | 5 | 3 |
+
+Use `ruleId` as the balance row key within an audit entry and the existing audit `id` as the parent row key. Show the policy name once above the balances if useful. There is no need to show technical hashes in the default comparison view.
+
+Optional usage bars can use `usedAccessCount / maximumAccessCount` only when the rule is valid, the count is available, and maximum is positive. Clamp the bar to 0–100%; keep the exact returned numbers visible.
+
+### Zero, NULL, empty and missing states
+
+| Response state | Display |
+| --- | --- |
+| Valid rule with `remainingAccessCount = 0` | 0 remaining — limit reached |
+| Valid rule with a positive remaining count | N remaining |
+| `isConfigurationValid = false` | Invalid rule configuration; show counts as unavailable, not zero |
+| A NULL/missing usage or remaining count | Unavailable; do not coerce to zero |
+| `remainingScansByRule = []` | No enabled rules |
+| Array property absent during a staged rollout | Scan balances unavailable; this is different from a confirmed empty array |
+
+Disabled rules are omitted by the backend. A bad rule configuration can remain in the array with `isConfigurationValid = false`, NULL counts, and `isLimitReached = null`.
+
+Use null checks rather than truthiness. In particular, avoid `remainingAccessCount || "Unavailable"`, because zero is a valid result.
+
+```typescript
+function remainingScanLabel(balance: DocumentAccessRuleBalance): string {
+  if (!balance.isConfigurationValid) return "Invalid rule configuration";
+  if (balance.remainingAccessCount == null) return "Unavailable";
+  return balance.remainingAccessCount === 0
+    ? "0 remaining — limit reached"
+    : `${balance.remainingAccessCount} remaining`;
+}
 ```
 
-The actual DapperDal implementation and full project were not supplied, so build
-and integration-test the code in your project before deploying it.
+The availability of quota does not override an expired/revoked document or a disabled policy. A final permitted attempt can have `outcomeCode = "ACCESS_GRANTED"` and zero scans remaining afterward. **Do not change that past outcome to Denied because its resulting balance is zero.**
 
+Do not run a local countdown or decrement historical balances in the UI. Reload the endpoint on refresh; it remains the source of these calculations.
 
-# Complete integration code
+### Document response example
 
-
-## example-response-data.json
+This illustrates the data-list portion; the existing `baseResp` and `req` envelope is retained.
 
 ```json
 {
@@ -130,7 +466,7 @@ and integration-test the code in your project before deploying it.
     {
       "id": 152,
       "documentReferenceId": 42,
-      "correlationId": "example-correlation-id",
+      "correlationId": "example-attempt-correlation-id",
       "presentedTokenHash": "example-hash",
       "outcomeCode": "ACCESS_GRANTED",
       "consumesQuota": true,
@@ -143,9 +479,9 @@ and integration-test the code in your project before deploying it.
       "quotaCalculationBasis": "CurrentPolicyRules",
       "remainingScansByRule": [
         {
-          "accessPolicyId": 1,
-          "accessPolicyName": "Standard policy",
-          "ruleId": 102,
+          "accessPolicyId": 12,
+          "accessPolicyName": "Standard access policy",
+          "ruleId": 25,
           "ruleName": "Lifetime limit",
           "windowSeconds": null,
           "maximumAccessCount": 10,
@@ -155,10 +491,10 @@ and integration-test the code in your project before deploying it.
           "isLimitReached": false
         },
         {
-          "accessPolicyId": 1,
-          "accessPolicyName": "Standard policy",
-          "ruleId": 101,
-          "ruleName": "Daily limit",
+          "accessPolicyId": 12,
+          "accessPolicyName": "Standard access policy",
+          "ruleId": 24,
+          "ruleName": "Daily access limit",
           "windowSeconds": 86400,
           "maximumAccessCount": 5,
           "usedAccessCount": 2,
@@ -172,289 +508,72 @@ and integration-test the code in your project before deploying it.
 }
 ```
 
+### Past outcome labels
 
-## CSharp/Model.cs
+These labels are suggested UI copy, not changes to the API codes. Preserve `outcomeCode` in the client model and keep a fallback for unfamiliar codes.
 
-```csharp
-using System;
-using System.Collections.Generic;
+| `outcomeCode` | Suggested label |
+| --- | --- |
+| `ACCESS_GRANTED` | Access granted |
+| `INVALID_TOKEN` | Invalid link |
+| `DOCUMENT_REVOKED` | Access revoked |
+| `DOCUMENT_INACTIVE` | Document unavailable |
+| `DOCUMENT_EXPIRED` | Link expired |
+| `POLICY_DISABLED` | Policy disabled |
+| `POLICY_RULE_NOT_CONFIGURED` | No enabled access rules |
+| `POLICY_CONFIGURATION_INVALID` | Invalid policy configuration |
+| `DOCUMENT_LIFETIME_LIMIT_EXCEEDED` | Lifetime limit reached |
+| `ACCESS_LIMIT_EXCEEDED` | Access limit reached |
+| `UNDETERMINED` | Outcome unavailable |
+| Any unknown value | Other outcome; retain the returned code in details |
 
-// Replace the existing DocumentAccessAudit class in its current namespace.
-public class DocumentAccessAudit
-{
-    public long Id { get; set; }
-    public long? DocumentReferenceId { get; set; }
-    public string CorrelationId { get; set; } = string.Empty;
-    public string PresentedTokenHash { get; set; } = string.Empty;
-    public string OutcomeCode { get; set; } = string.Empty;
-    public bool ConsumesQuota { get; set; }
-    public long? DeniedByRuleId { get; set; }
-    public string? DeniedByRuleName { get; set; }
-    public string? IpAddress { get; set; }
-    public string? UserAgent { get; set; }
-    public DateTime? CreatedDate { get; set; }
-    public string? CreatedBy { get; set; }
+Access granted means the backend validation authorized access; it is not proof that a document download completed. Keep historical outcome badges separate from the quota status of each rule.
 
-    // All balances are reconstructed at CreatedDate/Id with current rules.
-    public string QuotaCalculationBasis { get; set; } = "CurrentPolicyRules";
-    public List<DocumentAccessRuleBalance> RemainingScansByRule { get; set; } = [];
-}
+## 6. Dates and loading states
 
-public class DocumentAccessRuleBalance
-{
-    public long AccessPolicyId { get; set; }
-    public string AccessPolicyName { get; set; } = string.Empty;
-    public long RuleId { get; set; }
-    public string RuleName { get; set; } = string.Empty;
-    public int? WindowSeconds { get; set; }
-    public int MaximumAccessCount { get; set; }
-    public long? UsedAccessCount { get; set; }
-    public long? RemainingAccessCount { get; set; }
-    public bool IsConfigurationValid { get; set; }
-    public bool? IsLimitReached => RemainingAccessCount.HasValue
-        ? RemainingAccessCount.Value == 0 : null;
-}
+### Two timestamp contracts
 
-// Flat SQL result: one row for each audit/rule pair. Do not return this
-// derived type directly from the API; the mapper creates the base model.
-public class DocumentAccessAuditDbRow : DocumentAccessAudit
-{
-    public long? QuotaAccessPolicyId { get; set; }
-    public string? QuotaAccessPolicyName { get; set; }
-    public long? QuotaRuleId { get; set; }
-    public string? QuotaRuleName { get; set; }
-    public int? QuotaWindowSeconds { get; set; }
-    public int? QuotaMaximumAccessCount { get; set; }
-    public bool? QuotaIsConfigurationValid { get; set; }
-    public long? QuotaUsedAccessCount { get; set; }
-    public long? QuotaRemainingAccessCount { get; set; }
-}
-```
+| Field | Wire behavior | Frontend handling |
+| --- | --- | --- |
+| Change history `changedDate` | ISO timestamp with UTC offset, e.g. `2026-11-02T08:30:00+00:00` | Convert to the viewer's display timezone using the application's date utilities. |
+| Document history `createdDate` | Existing nullable timestamp; may have no offset, e.g. `2026-11-02T13:00:00` | Keep the existing document-history convention. Do not append `Z` or assume UTC. Confirm the backend/server timezone before adding timezone conversion. |
 
+The new remaining-scan feature does not change the existing document timestamp semantics. For a NULL timestamp, show the standard unavailable placeholder. Preserve the server's newest-first ordering rather than sorting formatted date strings.
 
-## CSharp/BAL.GetDocumentAccessAudit.cs.txt
+### Required states
 
-```csharp
-// Replace this member inside your EXISTING BAL class.
-// Add using System.Data; using Dapper; and your model/mapper namespaces.
+- Initial load: use the application's normal history/table loading placeholder.
+- Empty successful result: show No audit history found for this selection.
+- Tab/filter change: reset that query to page 1; prevent a stale response replacing the newly selected view.
+- Additional page loading: keep existing rows visible and prevent duplicate submissions.
+- Error: use the existing API error handler; retain loaded content and allow retry.
+- Unknown action, entity, field or outcome: show a neutral readable fallback without hiding the entry.
 
-public async Task<List<DocumentAccessAudit>> GetDocumentAccessAudit(
-    GetDocumentAccessAuditRequest request)
-{
-    DapperDal dal = new DapperDal(_globalSettings.ConnString);
-    DynamicParameters parameters = new();
-    parameters.Add("P__DocumentReferenceId", request.DocumentReferenceId, DbType.Int64);
+## 7. Frontend acceptance checklist
 
-    IEnumerable<DocumentAccessAuditDbRow> rows =
-        await dal.ExecuteQueryAsync<DocumentAccessAuditDbRow>(
-            "dbo.usp_GetDocumentAccessAudit",
-            parameters,
-            CommandType.StoredProcedure,
-            DapperDal.CommandDirection.Select);
+- [ ] Both new actions use the existing base URL, auth headers, full `baseReq`, and application success/error handling.
+- [ ] The policy filter includes rule-only changes. Clearing either filter sends `null` or omits the filter.
+- [ ] Both new endpoints use the same history component and TypeScript DTOs.
+- [ ] One save affecting a policy and multiple rules appears as one activity containing all affected entities.
+- [ ] Two saves by the same user at the same time remain separate when their change-set IDs differ.
+- [ ] Rule-name-only edits show the previous/new name without adding unchanged count/window fields.
+- [ ] NULL windows and initial creation values render correctly; no client-side diff discards a creation row with equal raw NULL values.
+- [ ] Config values such as `1` and `3600` remain text instead of being reinterpreted as status/duration.
+- [ ] Load more works without total counts; an empty final page does not clear existing history.
+- [ ] All document-access entries remain visible, including denied attempts and entries with no enabled rules.
+- [ ] Every returned rule balance is displayed, including lifetime and rolling rules, without adding their remaining counts together.
+- [ ] Zero remaining, unavailable counts, invalid rules, empty arrays, and missing arrays have distinct displays.
+- [ ] An allowed final scan remains Access granted even when its resulting quota is zero.
+- [ ] A denied attempt does not get treated as an error retrieving the history page.
+- [ ] Positive quota does not turn an expired/revoked historical outcome into an allowed one.
+- [ ] The CurrentPolicyRules explanation is visible; the UI does not describe these balances as original historical rule snapshots or live balances.
+- [ ] Offset-aware audit timestamps and existing document timestamps follow their different contracts.
+- [ ] Long labels/descriptions remain readable on narrow screens, and all interactive rows/tabs work by keyboard.
 
-    return DocumentAccessAuditMapper.ToModels(rows);
-}
-```
+## 8. Integration notes for backend coordination
 
+Before integration sign-off, confirm the deployed action prefix, actual JSON casing, and configured application success code. Use real endpoint responses to verify the new fields are deployed; backend compilation and SQL Server integration execution were not confirmed by the preparation of these contracts.
 
-## CSharp/DocumentAccessAuditMapper.cs
+One existing-data limitation affects policy filtering: if a legacy rule was deleted without any persisted parent-policy relationship, its old audit records may be present in unfiltered history but unavailable under a particular policy filter. Do not guess the association on the frontend or hide returned history because a current lookup record is missing.
 
-```csharp
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
-// Add the model namespace if this file lives in a separate namespace.
-public static class DocumentAccessAuditMapper
-{
-    public static List<DocumentAccessAudit> ToModels(IEnumerable<DocumentAccessAuditDbRow> rows)
-    {
-        ArgumentNullException.ThrowIfNull(rows);
-
-        return rows
-            .GroupBy(row => row.Id)
-            .OrderByDescending(group => group.First().CreatedDate)
-            .ThenByDescending(group => group.Key)
-            .Select(group =>
-            {
-                DocumentAccessAuditDbRow row = group.First();
-
-                return new DocumentAccessAudit
-                {
-                    Id = row.Id,
-                    DocumentReferenceId = row.DocumentReferenceId,
-                    CorrelationId = row.CorrelationId,
-                    PresentedTokenHash = row.PresentedTokenHash,
-                    OutcomeCode = row.OutcomeCode,
-                    ConsumesQuota = row.ConsumesQuota,
-                    DeniedByRuleId = row.DeniedByRuleId,
-                    DeniedByRuleName = row.DeniedByRuleName,
-                    IpAddress = row.IpAddress,
-                    UserAgent = row.UserAgent,
-                    // Existing procedure uses GETDATE(), so preserve the
-                    // source clock value; do not relabel it as UTC.
-                    CreatedDate = row.CreatedDate,
-                    CreatedBy = row.CreatedBy,
-                    QuotaCalculationBasis = "CurrentPolicyRules",
-                    RemainingScansByRule = group
-                        .Where(rule => rule.QuotaRuleId.HasValue)
-                        .GroupBy(rule => rule.QuotaRuleId!.Value)
-                        .Select(rule => rule.First())
-                        .OrderBy(rule => rule.QuotaWindowSeconds.HasValue ? 1 : 0)
-                        .ThenBy(rule => rule.QuotaWindowSeconds)
-                        .ThenBy(rule => rule.QuotaRuleId)
-                        .Select(rule => new DocumentAccessRuleBalance
-                        {
-                            AccessPolicyId = rule.QuotaAccessPolicyId
-                                ?? throw new InvalidOperationException("A quota rule has no policy ID."),
-                            AccessPolicyName = rule.QuotaAccessPolicyName ?? string.Empty,
-                            RuleId = rule.QuotaRuleId!.Value,
-                            RuleName = rule.QuotaRuleName ?? string.Empty,
-                            WindowSeconds = rule.QuotaWindowSeconds,
-                            MaximumAccessCount = rule.QuotaMaximumAccessCount
-                                ?? throw new InvalidOperationException("A quota rule has no maximum count."),
-                            UsedAccessCount = rule.QuotaUsedAccessCount,
-                            RemainingAccessCount = rule.QuotaRemainingAccessCount,
-                            IsConfigurationValid = rule.QuotaIsConfigurationValid == true
-                        }).ToList()
-                };
-            }).ToList();
-    }
-}
-```
-
-
-## Sql/usp_GetDocumentAccessAudit.sql
-
-```sql
-USE [Alterna_AccountStatementManagement];
-GO
-SET ANSI_NULLS ON;
-GO
-SET QUOTED_IDENTIFIER ON;
-GO
-
-ALTER PROCEDURE dbo.usp_GetDocumentAccessAudit
-    @P__DocumentReferenceId BIGINT
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    /*
-      Balances are reconstructed AFTER each recorded attempt, using the
-      document's CURRENT policy and its CURRENT enabled rule definitions.
-      They are not immutable historical rule snapshots or balances as of now.
-
-      The current successful attempt is included through ConsumesQuota.
-      A rejected attempt with ConsumesQuota = 0 does not increase usage.
-      Id breaks ties for attempts recorded in the same DATETIME2(3) value.
-    */
-    ;WITH DocumentAudits AS
-    (
-        SELECT
-            A.*,
-            SUM(CONVERT(BIGINT, CASE WHEN A.ConsumesQuota = 1 THEN 1 ELSE 0 END))
-                OVER
-                (
-                    PARTITION BY A.DocumentReferenceId
-                    ORDER BY A.CreatedDate, A.Id
-                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                ) AS LifetimeUsedAccessCount
-        FROM dbo.t_DocumentAccessAudit AS A
-        WHERE A.DocumentReferenceId = @P__DocumentReferenceId
-    )
-    SELECT
-        DAA.Id,
-        DAA.DocumentReferenceId,
-        DAA.CorrelationId,
-        DAA.PresentedTokenHash,
-        DAA.OutcomeCode,
-        DAA.ConsumesQuota,
-        DAA.DeniedByRuleId,
-        CASE WHEN DAA.DeniedByRuleId IS NULL THEN NULL
-             ELSE CONCAT(DeniedPolicy.PolicyName, N' : ', DeniedRule.RuleName)
-        END AS DeniedByRuleName,
-        DAA.IpAddress,
-        DAA.UserAgent,
-        DAA.CreatedDate,
-        DAA.CreatedBy,
-
-        R.AccessPolicyId AS QuotaAccessPolicyId,
-        CurrentPolicy.PolicyName AS QuotaAccessPolicyName,
-        R.Id AS QuotaRuleId,
-        R.RuleName AS QuotaRuleName,
-        R.WindowSeconds AS QuotaWindowSeconds,
-        R.MaximumAccessCount AS QuotaMaximumAccessCount,
-        CONVERT(BIT, Validity.IsConfigurationValid) AS QuotaIsConfigurationValid,
-        Usage.UsedAccessCount AS QuotaUsedAccessCount,
-        CASE
-            WHEN Usage.UsedAccessCount IS NULL THEN CONVERT(BIGINT, NULL)
-            WHEN Usage.UsedAccessCount >= R.MaximumAccessCount THEN CONVERT(BIGINT, 0)
-            ELSE CONVERT(BIGINT, R.MaximumAccessCount) - Usage.UsedAccessCount
-        END AS QuotaRemainingAccessCount
-    FROM DocumentAudits AS DAA
-    LEFT JOIN dbo.t_AccessPolicyRule AS DeniedRule
-        ON DeniedRule.Id = DAA.DeniedByRuleId
-    LEFT JOIN dbo.t_AccessPolicy AS DeniedPolicy
-        ON DeniedPolicy.Id = DeniedRule.AccessPolicyId
-    LEFT JOIN dbo.t_DocumentReference AS DR
-        ON DR.Id = DAA.DocumentReferenceId
-    LEFT JOIN dbo.t_AccessPolicy AS CurrentPolicy
-        ON CurrentPolicy.Id = DR.AccessPolicyId
-    LEFT JOIN dbo.t_AccessPolicyRule AS R
-        ON R.AccessPolicyId = DR.AccessPolicyId
-       AND R.IsEnabled = 1
-    CROSS APPLY
-    (
-        VALUES
-        (
-            CASE
-                WHEN R.Id IS NULL THEN NULL
-                WHEN R.MaximumAccessCount > 0
-                 AND (R.WindowSeconds IS NULL OR R.WindowSeconds > 0) THEN 1
-                ELSE 0
-            END
-        )
-    ) AS Validity(IsConfigurationValid)
-    OUTER APPLY
-    (
-        SELECT COUNT_BIG(*) AS RollingUsedAccessCount
-        FROM dbo.t_DocumentAccessAudit AS A
-        WHERE Validity.IsConfigurationValid = 1
-          AND R.WindowSeconds > 0
-          AND A.DocumentReferenceId = DAA.DocumentReferenceId
-          AND A.ConsumesQuota = 1
-          -- Same exclusive lower boundary as usp_GetDocumentCuk.
-          AND A.CreatedDate > DATEADD
-          (
-              SECOND,
-              CASE WHEN R.WindowSeconds > 0 THEN -R.WindowSeconds ELSE NULL END,
-              DAA.CreatedDate
-          )
-          AND
-          (
-              A.CreatedDate < DAA.CreatedDate
-              OR (A.CreatedDate = DAA.CreatedDate AND A.Id <= DAA.Id)
-          )
-    ) AS RollingUsage
-    CROSS APPLY
-    (
-        VALUES
-        (
-            CASE
-                WHEN Validity.IsConfigurationValid = 1 THEN
-                    CASE WHEN R.WindowSeconds IS NULL THEN DAA.LifetimeUsedAccessCount
-                         ELSE RollingUsage.RollingUsedAccessCount END
-                ELSE CONVERT(BIGINT, NULL)
-            END
-        )
-    ) AS Usage(UsedAccessCount)
-    ORDER BY
-        DAA.CreatedDate DESC,
-        DAA.Id DESC,
-        CASE WHEN R.WindowSeconds IS NULL THEN 0 ELSE 1 END,
-        R.WindowSeconds,
-        R.Id;
-END;
-GO
-```
+This handoff does not change document-access authorization, quota consumption, or the outcome codes. It adds read-only history views and presentation of backend-provided balances.
