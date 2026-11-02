@@ -1,35 +1,55 @@
-Access-policy audit endpoint
+# Shared access-policy and config audit retrieval
+
 These are integration files for the code supplied in the conversation, not a
 replacement application or a change already applied to your repository.
 Keep your existing namespaces and add the corresponding model/DTO imports.
-Shared types
-File	Use
-CSharp/Model.cs	Add the shared flat ChangeAudit SQL-row model to Model.cs.
-CSharp/DTOs.cs	Add ChangeAuditDto, ChangeAuditEntityDto, and ChangeAuditFieldDto to DTOs.cs.
-CSharp/ChangeAuditMapper.cs	Add the shared mapper.
-CSharp/Request.cs	Replace the existing GetAccessPolicyAuditRequest class.
-CSharp/Response.cs	Replace the existing GetAccessPolicyAuditResponse class.
-CSharp/BAL.GetAccessPolicyAudit.cs.txt	Replace the member inside your existing BAL class; do not add the snippet as a standalone .cs file.
-Sql/usp_GetAccessPolicyAudit.sql	Deploy the new getter and its supporting index.
 
+## Shared types
 
-There is no need to introduce AccessPolicyAudit, AccessPolicyAuditDto,
-AccessPolicyDbRowDto, or AccessPolicyAuditMapper for this feature.
-The shared ChangeAudit model matches the SQL aliases; the shared DTOs match
+| File | Use |
+| --- | --- |
+| `CSharp/Model.cs` | Add the shared flat `ChangeAudit` SQL-row model to `Model.cs`. |
+| `CSharp/DTOs.cs` | Add `ChangeAuditDto`, `ChangeAuditEntityDto`, and `ChangeAuditFieldDto` to `DTOs.cs`. |
+| `CSharp/ChangeAuditMapper.cs` | Add the shared mapper. |
+| `CSharp/Request.cs` | Replace `GetAccessPolicyAuditRequest` and add `GetConfigAuditRequest`. |
+| `CSharp/Response.cs` | Replace `GetAccessPolicyAuditResponse` and add `GetConfigAuditResponse`; both lists use `ChangeAuditDto`. |
+| `CSharp/BAL.AuditMethods.cs.txt` | Replace the existing policy method, add the config method and the shared private query helper inside your existing BAL class. |
+| `CSharp/Controller.GetConfigAudit.cs.txt` | Add the config action inside the existing controller. |
+| `Sql/usp_GetChangeAudit.sql` | Deploy the one shared getter and its supporting index. |
+
+There is no need to introduce `AccessPolicyAudit`, `AccessPolicyAuditDto`,
+`AccessPolicyDbRowDto`, or `AccessPolicyAuditMapper` for this feature.
+The shared `ChangeAudit` model matches the SQL aliases; the shared DTOs match
 the API's nested response. The types are intentionally distinct because SQL
 returns flat rows and the frontend needs nested records and field changes.
 
 If a BAL interface declares this member, update it to:
+
+```csharp
 Task<List<ChangeAuditDto>> GetAccessPolicyAudit(GetAccessPolicyAuditRequest request);
-Controller
-Your supplied GetAccessPolicyAudit controller action can stay unchanged.
-Its existing assignment remains correct:
+Task<List<ChangeAuditDto>> GetConfigAudit(GetConfigAuditRequest request);
+```
+
+## Controller
+
+Your supplied `GetAccessPolicyAudit` controller action can stay unchanged.
+Add the config action from the supplied snippet. Both use the same shared DTOs:
+
+```csharp
 response.AccessPolicyAudits = await _bal.GetAccessPolicyAudit(request);
+response.ConfigAudits = await _bal.GetConfigAudit(request);
+```
+
 Retain your existing request validation, authentication, permissions, logging,
 BaseRequest/BaseResponse classes and return-code dictionary. The BAL method
 also validates the added policy and paging parameters.
-Request
-Keep your existing BaseReq content and add these optional filters:
+
+## Request
+
+Keep your existing `BaseReq` content and use these endpoint-specific filters.
+POST to your existing controller's `GetAccessPolicyAudit` route:
+
+```json
 {
   "baseReq": {
     "correlationId": "your-existing-correlation-id"
@@ -38,42 +58,71 @@ Keep your existing BaseReq content and add these optional filters:
   "pageNumber": 1,
   "pageSize": 20
 }
-Omit accessPolicyId, or send null, to include every policy and its rules.
+```
+
+Omit `accessPolicyId`, or send `null`, to include every policy and its rules.
+POST to the new `GetConfigAudit` route:
+
+```json
+{
+  "baseReq": {
+    "correlationId": "your-existing-correlation-id"
+  },
+  "settingName": "DOCUMENT_EXPIRY_IN_DAYS",
+  "pageNumber": 1,
+  "pageSize": 20
+}
+```
+
+Omit `settingName`, or send `null`, to include all config history. Empty,
+whitespace-only and longer-than-255-character setting names are rejected.
+The API does not accept a scope parameter: each BAL method chooses its own
+fixed scope, and both call the same private query helper and stored procedure.
+
 PageSize counts entire saves (ChangeSetId), not individual fields. The maximum
 is 100 saves; the default is 20. PageNumber defaults to 1. Pages beyond the end
 return an empty list. This keeps the response's existing list contract and
 does not introduce an output count parameter or require QueryMultiple support
 in your custom DAL. A full page does not guarantee another page exists.
 New activity can shift page-number boundaries; refresh the list to see it.
-Response and display
-The controller keeps BaseResp, Req, and AccessPolicyAudits. Each element
-in AccessPolicyAudits represents one save and contains:
+
+## Response and display
+
+The policy response keeps `BaseResp`, `Req`, and `AccessPolicyAudits`; the config
+response uses `BaseResp`, `Req`, and `ConfigAudits`. Each element in either list
+represents one save and contains:
+
 - who saved it and the UTC date;
-- the affected policy/rule records in entities;
+- the affected policy/rule records in `entities`;
 - each record's readable action and historical name;
 - each changed field's label, raw values, and display values.
+
 Render the summary and local date, then each entity's label and a table:
-FieldLabel | OldDisplayValue | NewDisplayValue.
+`FieldLabel | OldDisplayValue | NewDisplayValue`.
 ASP.NET's default camelCase JSON conventions are assumed in the sample.
 Your configured serializer may use PascalCase instead; no serializer change
 is required for these classes.
 
 Formatting is deterministic:
+
 - Rule WindowSeconds: exact days/hours/minutes/seconds; NULL means Document lifetime.
 - IsEnabled on policies/rules: Enabled / Disabled.
 - A missing side of an INSERT or DELETE: Not applicable.
 - Other NULL values: Not provided; empty strings: Empty.
-- Config SettingValue remains text. A value of 3600 is not automatically
-  interpreted as a duration; a value of 1 is not automatically a boolean.
+- Config SettingValue remains text. A value of `3600` is not automatically
+  interpreted as a duration; a value of `1` is not automatically a boolean.
 - Unrecognized entity/field values are preserved. The database's friendly
   field label is used, with FieldName as a fallback.
+
 DateTime2 in the existing audit writer stores UTC without a timezone marker.
 The mapper annotates that clock value as UTC and exposes DateTimeOffset,
 without interpreting it as local server time. The frontend can convert it
 to the viewer's timezone. Raw OldValue/NewValue always remain available.
-Database prerequisites and historical policy filtering
+
+## Database prerequisites and historical policy filtering
+
 Deploy the previously supplied audit schema and audited save procedures first.
-The existing detail table's actual name is dbo.t_ChangeAuditDetail (singular).
+The existing detail table's actual name is `dbo.t_ChangeAuditDetail` (singular).
 This getter adds no audit tables or columns, and issues no transaction-control
 statements. Your DAL retains its transaction ownership.
 
@@ -89,21 +138,47 @@ was ever recorded, the old data cannot reliably identify its parent policy.
 Such history remains available in the unfiltered endpoint but cannot be
 reliably included by a specific policy filter. This is an existing-data
 limitation; the getter does not invent a historical association or name.
-Later config endpoint
-Reuse the same model, DTOs, and mapper. Its domain-specific request and response
-envelope may differ, but its list can be:
-public List<ChangeAuditDto> ConfigAudits { get; set; } = [];
-Return the same 13 SQL columns from the future config procedure, filtering
-EntityName = 'Config', and call:
-IEnumerable<ChangeAudit> rows = /* query your config audit procedure */;
-return ChangeAuditMapper.ToDtos(rows);
-Do not create separate config audit models/DTOs/mappers. The existing Config
-writer uses the unchanged SettingName as EntityKey. Config-specific value
-formatting can be added centrally to this mapper when its setting semantics
-are known.
-Verification
+
+## One stored procedure for both endpoints
+
+`dbo.usp_GetChangeAudit` has four inputs:
+
+| Parameter | Meaning |
+| --- | --- |
+| `@P__Scope` | Required: `AccessPolicy` or `Config`. Chosen by the BAL, not the API caller. |
+| `@P__EntityKey` | Optional policy ID as text, or config SettingName. NULL includes the whole scope. |
+| `@P__PageNumber` | Default 1. |
+| `@P__PageSize` | Default 20; from 1 to 100 whole saves. |
+
+```sql
+EXEC dbo.usp_GetChangeAudit
+    @P__Scope = N'AccessPolicy', @P__EntityKey = N'12',
+    @P__PageNumber = 1, @P__PageSize = 20;
+
+EXEC dbo.usp_GetChangeAudit
+    @P__Scope = N'Config', @P__EntityKey = N'DOCUMENT_EXPIRY_IN_DAYS',
+    @P__PageNumber = 1, @P__PageSize = 20;
+```
+
+The access-policy scope includes `AccessPolicy` and `AccessPolicyRule`; config
+scope includes only `Config`. Both return the same 13 columns, and both BAL
+methods use `ExecuteQueryAsync<ChangeAudit>` and `ChangeAuditMapper.ToDtos`.
+The retrieval query is static SQL and uses the same existing two audit tables.
+
+Deploy the new shared getter before applying the new BAL methods. The script
+does not drop an existing `usp_GetAccessPolicyAudit`; the updated BAL no longer
+calls it. No changes to the audited save procedures are required.
+
+The shared model, DTOs and mapper are unchanged. The endpoint request/response
+envelopes remain separate to retain useful names and their distinct filters.
+The existing Config writer uses the unchanged SettingName as EntityKey.
+Config-specific value formatting can be added centrally to the shared mapper
+when the meaning of each setting is known.
+
+## Verification
+
 No .NET SDK or SQL Server engine was available in the authoring environment.
-Static source/SQL alias checks and 11 relational checks against a SQLite
+Static source/SQL alias checks and 17 relational checks against a SQLite
 adaptation of the getter were run. The latter check filtering and complete-save
 paging, but do not verify SQL Server syntax or engine-specific behavior.
 C# compilation, mapper runtime checks and SQL Server execution have not been
@@ -111,15 +186,25 @@ performed. The actual DapperDal implementation and full project
 namespaces were not supplied, so integration must be built in your project.
 
 The mapper checks have no external NuGet dependencies. On a machine with .NET 8:
+
+```bash
 dotnet run --project Tests/MapperChecks.csproj
+```
+
 The tests cover grouping, ordering, time windows, NULLs, creation, status,
 config reuse, exact text preservation, UTC handling and JSON serialization.
-Run Tests/SqlChecks.sql in a development database after deploying the three
+Run `Tests/SqlChecks.sql` in a development database after deploying the three
 SQL scripts (schema, save procedures, getter). It checks whole-save paging,
 rule-name-only saves, NULL transitions, policy filtering, deleted-rule history,
-and empty pages. Its fixture rows are rolled back.
-Complete integration code
-Sql/usp_GetAccessPolicyAudit.sql
+config filtering, scope separation and empty pages. Its fixture rows are rolled back.
+
+
+# Complete integration code
+
+
+## Sql/usp_GetChangeAudit.sql
+
+```sql
 USE [Alterna_AccountStatementManagement];
 GO
 SET ANSI_NULLS ON;
@@ -128,20 +213,34 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 -- SQL Server 2016 compatible, including installations before SP1.
-IF OBJECT_ID(N'dbo.usp_GetAccessPolicyAudit', N'P') IS NULL
-    EXEC(N'CREATE PROCEDURE dbo.usp_GetAccessPolicyAudit AS BEGIN SET NOCOUNT ON; END;');
+IF OBJECT_ID(N'dbo.usp_GetChangeAudit', N'P') IS NULL
+    EXEC(N'CREATE PROCEDURE dbo.usp_GetChangeAudit AS BEGIN SET NOCOUNT ON; END;');
 GO
 
-ALTER PROCEDURE dbo.usp_GetAccessPolicyAudit
-    @P__AccessPolicyId BIGINT = NULL,
+ALTER PROCEDURE dbo.usp_GetChangeAudit
+    @P__Scope NVARCHAR(20),
+    @P__EntityKey NVARCHAR(255) = NULL,
     @P__PageNumber INT = 1,
     @P__PageSize INT = 20
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    IF @P__AccessPolicyId IS NOT NULL AND @P__AccessPolicyId <= 0
-        THROW 50001, 'AccessPolicyId must be greater than zero.', 1;
+    IF @P__Scope IS NULL OR @P__Scope NOT IN (N'AccessPolicy', N'Config')
+        THROW 50001, 'Scope must be AccessPolicy or Config.', 1;
+
+    DECLARE @PolicyId BIGINT = NULL;
+
+    IF @P__Scope = N'AccessPolicy' AND @P__EntityKey IS NOT NULL
+    BEGIN
+        SET @PolicyId = TRY_CONVERT(BIGINT, @P__EntityKey);
+        IF @PolicyId IS NULL OR @PolicyId <= 0
+            THROW 50004, 'The access policy key must be a positive BIGINT.', 1;
+    END;
+
+    IF @P__Scope = N'Config' AND @P__EntityKey IS NOT NULL
+        AND NULLIF(LTRIM(RTRIM(@P__EntityKey)), N'') IS NULL
+        THROW 50005, 'The config setting name must not be empty.', 1;
 
     IF @P__PageNumber IS NULL OR @P__PageNumber < 1
         THROW 50002, 'PageNumber must be greater than zero.', 1;
@@ -190,17 +289,27 @@ BEGIN
         LEFT JOIN dbo.t_AccessPolicyRule AS R
             ON A.EntityName = N'AccessPolicyRule'
            AND R.Id = TRY_CONVERT(BIGINT, A.EntityKey)
-        WHERE A.EntityName IN (N'AccessPolicy', N'AccessPolicyRule')
-          AND
-          (
-              @P__AccessPolicyId IS NULL
-              OR
-              CASE WHEN A.EntityName = N'AccessPolicy'
-                   THEN TRY_CONVERT(BIGINT, A.EntityKey)
-                   ELSE COALESCE(HistoricalParent.AccessPolicyId,
-                                 SameSaveParent.AccessPolicyId, R.AccessPolicyId)
-              END = @P__AccessPolicyId
-          )
+        WHERE
+        (
+            @P__Scope = N'Config'
+            AND A.EntityName = N'Config'
+            AND (@P__EntityKey IS NULL OR A.EntityKey = @P__EntityKey)
+        )
+        OR
+        (
+            @P__Scope = N'AccessPolicy'
+            AND A.EntityName IN (N'AccessPolicy', N'AccessPolicyRule')
+            AND
+            (
+                @PolicyId IS NULL
+                OR
+                CASE WHEN A.EntityName = N'AccessPolicy'
+                     THEN TRY_CONVERT(BIGINT, A.EntityKey)
+                     ELSE COALESCE(HistoricalParent.AccessPolicyId,
+                                   SameSaveParent.AccessPolicyId, R.AccessPolicyId)
+                END = @PolicyId
+            )
+        )
     ),
     ChangeSetPage AS
     (
@@ -252,7 +361,12 @@ IF NOT EXISTS
     CREATE INDEX IX_t_ChangeAudit_ChangeSetId
         ON dbo.t_ChangeAudit (ChangeSetId);
 GO
-CSharp/Request.cs
+```
+
+
+## CSharp/Request.cs
+
+```csharp
 using System.ComponentModel.DataAnnotations;
 
 // Replace the existing class; keep the namespace containing BaseRequest.
@@ -272,7 +386,28 @@ public class GetAccessPolicyAuditRequest
     [Range(1, 100)]
     public int PageSize { get; set; } = 20;
 }
-CSharp/Response.cs
+
+public class GetConfigAuditRequest
+{
+    [Required]
+    public required BaseRequest BaseReq { get; set; }
+
+    // Omit or send null to retrieve all config history.
+    [StringLength(255, MinimumLength = 1)]
+    public string? SettingName { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int PageNumber { get; set; } = 1;
+
+    [Range(1, 100)]
+    public int PageSize { get; set; } = 20;
+}
+```
+
+
+## CSharp/Response.cs
+
+```csharp
 using System.Collections.Generic;
 
 // Replace the existing class; retain your application's namespace/usings.
@@ -284,11 +419,23 @@ public class GetAccessPolicyAuditResponse
     // The existing JSON property name is retained; the model is now shared.
     public List<ChangeAuditDto> AccessPolicyAudits { get; set; } = [];
 }
-CSharp/Model.cs
+
+public class GetConfigAuditResponse
+{
+    public BaseResponse BaseResp { get; set; } = new();
+    public required GetConfigAuditRequest Req { get; set; }
+    public List<ChangeAuditDto> ConfigAudits { get; set; } = [];
+}
+```
+
+
+## CSharp/Model.cs
+
+```csharp
 using System;
 
 // Shared, flat database row. Add to your existing Model.cs namespace.
-// Both access-policy and future config procedures can return this shape.
+// Both endpoint scopes use this shape from dbo.usp_GetChangeAudit.
 public class ChangeAudit
 {
     public long ChangeAuditId { get; set; }
@@ -305,7 +452,12 @@ public class ChangeAudit
     public string? OldValue { get; set; }
     public string? NewValue { get; set; }
 }
-CSharp/DTOs.cs
+```
+
+
+## CSharp/DTOs.cs
+
+```csharp
 using System;
 using System.Collections.Generic;
 
@@ -341,10 +493,16 @@ public class ChangeAuditFieldDto
     public string OldDisplayValue { get; set; } = string.Empty;
     public string NewDisplayValue { get; set; } = string.Empty;
 }
-CSharp/BAL.GetAccessPolicyAudit.cs.txt
-// Replace the method inside your EXISTING BAL class.
-// Add using System.Data; using Dapper; and the namespaces of the shared types.
-// This is a member snippet, not a standalone C# source file.
+```
+
+
+## CSharp/BAL.AuditMethods.cs.txt
+
+```csharp
+// Paste these members inside your EXISTING BAL class. Replace its old
+// GetAccessPolicyAudit method. This is not a standalone C# source file.
+// Add using System.Data; using System.Globalization; using Dapper;
+// and the namespaces containing the request, model and DTO classes.
 
 public async Task<List<ChangeAuditDto>> GetAccessPolicyAudit(
     GetAccessPolicyAuditRequest request)
@@ -352,29 +510,127 @@ public async Task<List<ChangeAuditDto>> GetAccessPolicyAudit(
     if (request.AccessPolicyId is <= 0)
         throw new SGBLBadRequestException("AccessPolicyId must be greater than zero.");
 
-    if (request.PageNumber < 1)
+    return await QueryChangeAuditAsync(
+        "AccessPolicy",
+        request.AccessPolicyId?.ToString(CultureInfo.InvariantCulture),
+        request.PageNumber,
+        request.PageSize);
+}
+
+public async Task<List<ChangeAuditDto>> GetConfigAudit(
+    GetConfigAuditRequest request)
+{
+    if (request.SettingName is not null
+        && (string.IsNullOrWhiteSpace(request.SettingName) || request.SettingName.Length > 255))
+        throw new SGBLBadRequestException("SettingName must contain 1 to 255 characters.");
+
+    return await QueryChangeAuditAsync(
+        "Config",
+        request.SettingName,
+        request.PageNumber,
+        request.PageSize);
+}
+
+private async Task<List<ChangeAuditDto>> QueryChangeAuditAsync(
+    string scope, string? entityKey, int pageNumber, int pageSize)
+{
+    if (pageNumber < 1)
         throw new SGBLBadRequestException("PageNumber must be greater than zero.");
 
-    if (request.PageSize is < 1 or > 100)
+    if (pageSize is < 1 or > 100)
         throw new SGBLBadRequestException("PageSize must be between 1 and 100.");
 
+    // Scope is chosen by the endpoint's BAL method, not by the API caller.
     DynamicParameters parameters = new();
-    parameters.Add("@P__AccessPolicyId", request.AccessPolicyId, DbType.Int64);
-    parameters.Add("@P__PageNumber", request.PageNumber, DbType.Int32);
-    parameters.Add("@P__PageSize", request.PageSize, DbType.Int32);
+    parameters.Add("@P__Scope", scope, DbType.String, size: 20);
+    parameters.Add("@P__EntityKey", entityKey, DbType.String, size: 255);
+    parameters.Add("@P__PageNumber", pageNumber, DbType.Int32);
+    parameters.Add("@P__PageSize", pageSize, DbType.Int32);
 
-    // Retains the DAL/transaction ownership pattern supplied in your code.
+    // Retains your existing DAL connection/transaction ownership pattern.
     DapperDal dal = new DapperDal(_globalSettings.ConnString);
 
     IEnumerable<ChangeAudit> rows = await dal.ExecuteQueryAsync<ChangeAudit>(
-        "dbo.usp_GetAccessPolicyAudit",
+        "dbo.usp_GetChangeAudit",
         parameters,
         CommandType.StoredProcedure,
         DapperDal.CommandDirection.Select);
 
     return ChangeAuditMapper.ToDtos(rows);
 }
-CSharp/ChangeAuditMapper.cs
+```
+
+
+## CSharp/Controller.GetConfigAudit.cs.txt
+
+```csharp
+// Add this action inside your EXISTING AccountStatementManagementController.
+// Keep the existing GetAccessPolicyAudit action. This is a member snippet.
+
+[HttpPost]
+[Route("GetConfigAudit")]
+public async Task<GetConfigAuditResponse> GetConfigAudit(GetConfigAuditRequest request)
+{
+    GetConfigAuditResponse response = new()
+    {
+        Req = request,
+        BaseResp = new()
+        {
+            CorrelationId = request.BaseReq.CorrelationId,
+            ReturnCode = _responseCodesDictionary["200"].Content,
+            ReturnDescription = _responseCodesDictionary["200"].Description
+        }
+    };
+
+    CorrelationInfo correlationInfo = new()
+    {
+        CorrelationId = request.BaseReq.CorrelationId,
+        RDirection = RequestDirection.Request,
+        RequestURL = "GetConfigAudit",
+        UserName = _globalSettings.AppUsername
+    };
+
+    try
+    {
+        correlationInfo.Reserved = "GetConfigAudit has been called with the following request";
+        LogInfoJson(request, correlationInfo);
+
+        response.ConfigAudits = await _bal.GetConfigAudit(request);
+
+        correlationInfo.RDirection = RequestDirection.Response;
+        correlationInfo.Reserved = "GetConfigAudit replied with the following response";
+        LogInfoJson(response, correlationInfo);
+        return response;
+    }
+    catch (SGBLBadRequestException ex)
+    {
+        response.BaseResp.ReturnCode = _responseCodesDictionary["400"].Content;
+        response.BaseResp.ReturnDescription =
+            _responseCodesDictionary["400"].Description.Replace("{0}", ex.Message);
+
+        correlationInfo.RDirection = RequestDirection.Response;
+        correlationInfo.Reserved = ex.Message;
+        LogErrorJson(response, correlationInfo, ex);
+        return response;
+    }
+    catch (Exception ex)
+    {
+        response.BaseResp.ReturnCode = _responseCodesDictionary["500"].Content;
+        response.BaseResp.ReturnDescription =
+            _responseCodesDictionary["500"].Description.Replace("{0}", ex.Message);
+
+        correlationInfo.RDirection = RequestDirection.Response;
+        correlationInfo.Reserved = ex.Message;
+        LogErrorJson(response, correlationInfo, ex);
+        return response;
+    }
+}
+```
+
+
+## CSharp/ChangeAuditMapper.cs
+
+```csharp
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -545,7 +801,12 @@ public static class ChangeAuditMapper
             parts.Add($"{value.ToString(CultureInfo.InvariantCulture)} {unit}{(value == 1 ? "" : "s")}");
     }
 }
-example-audit-data.json
+```
+
+
+## example-audit-data.json
+
+```json
 {
   "accessPolicyAudits": [
     {
@@ -587,3 +848,42 @@ example-audit-data.json
     }
   ]
 }
+```
+
+
+## example-config-audit-data.json
+
+```json
+{
+  "configAudits": [
+    {
+      "changeSetId": "80b19188-187f-472b-8948-dd411f2febda",
+      "changedDate": "2026-11-02T08:30:00+00:00",
+      "changedBy": "Pierre Abou Serhal",
+      "summary": "Pierre Abou Serhal updated configuration setting \"Document expiry in days\".",
+      "entities": [
+        {
+          "changeAuditId": 1043,
+          "entityName": "Config",
+          "entityKey": "DOCUMENT_EXPIRY_IN_DAYS",
+          "entityLabel": "Document expiry in days",
+          "entityTypeLabel": "Configuration setting",
+          "action": "UPDATE",
+          "actionLabel": "Updated",
+          "changes": [
+            {
+              "fieldName": "SettingValue",
+              "fieldLabel": "Setting value",
+              "valueType": "text",
+              "oldValue": "30",
+              "newValue": "60",
+              "oldDisplayValue": "30",
+              "newDisplayValue": "60"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
