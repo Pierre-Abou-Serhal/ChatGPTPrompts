@@ -1,110 +1,589 @@
-I want to create the endpoint that will get me the access Policy Audit 
+Access-policy audit endpoint
+These are integration files for the code supplied in the conversation, not a
+replacement application or a change already applied to your repository.
+Keep your existing namespaces and add the corresponding model/DTO imports.
+Shared types
+File	Use
+CSharp/Model.cs	Add the shared flat ChangeAudit SQL-row model to Model.cs.
+CSharp/DTOs.cs	Add ChangeAuditDto, ChangeAuditEntityDto, and ChangeAuditFieldDto to DTOs.cs.
+CSharp/ChangeAuditMapper.cs	Add the shared mapper.
+CSharp/Request.cs	Replace the existing GetAccessPolicyAuditRequest class.
+CSharp/Response.cs	Replace the existing GetAccessPolicyAuditResponse class.
+CSharp/BAL.GetAccessPolicyAudit.cs.txt	Replace the member inside your existing BAL class; do not add the snippet as a standalone .cs file.
+Sql/usp_GetAccessPolicyAudit.sql	Deploy the new getter and its supporting index.
 
-I want to update my c# project and to create the necessary Get Stored proedure
-This is my c# code
 
-AccountStatementManagementController.cs
+There is no need to introduce AccessPolicyAudit, AccessPolicyAuditDto,
+AccessPolicyDbRowDto, or AccessPolicyAuditMapper for this feature.
+The shared ChangeAudit model matches the SQL aliases; the shared DTOs match
+the API's nested response. The types are intentionally distinct because SQL
+returns flat rows and the frontend needs nested records and field changes.
 
-    [HttpPost]
-    [Route("GetAccessPolicyAudit")]
-    public async Task<GetAccessPolicyAuditResponse> GetAccessPolicyAudit(GetAccessPolicyAuditRequest request)
-    {
-      GetAccessPolicyAuditResponse response = new GetAccessPolicyAuditResponse()
-      {
-        Req = request,
-        BaseResp = new()
-        {
-          CorrelationId = request.BaseReq.CorrelationId,
-          ReturnCode = _responseCodesDictionary["200"].Content,
-          ReturnDescription = _responseCodesDictionary["200"].Description
-        }
-      };
+If a BAL interface declares this member, update it to:
+Task<List<ChangeAuditDto>> GetAccessPolicyAudit(GetAccessPolicyAuditRequest request);
+Controller
+Your supplied GetAccessPolicyAudit controller action can stay unchanged.
+Its existing assignment remains correct:
+response.AccessPolicyAudits = await _bal.GetAccessPolicyAudit(request);
+Retain your existing request validation, authentication, permissions, logging,
+BaseRequest/BaseResponse classes and return-code dictionary. The BAL method
+also validates the added policy and paging parameters.
+Request
+Keep your existing BaseReq content and add these optional filters:
+{
+  "baseReq": {
+    "correlationId": "your-existing-correlation-id"
+  },
+  "accessPolicyId": 12,
+  "pageNumber": 1,
+  "pageSize": 20
+}
+Omit accessPolicyId, or send null, to include every policy and its rules.
+PageSize counts entire saves (ChangeSetId), not individual fields. The maximum
+is 100 saves; the default is 20. PageNumber defaults to 1. Pages beyond the end
+return an empty list. This keeps the response's existing list contract and
+does not introduce an output count parameter or require QueryMultiple support
+in your custom DAL. A full page does not guarantee another page exists.
+New activity can shift page-number boundaries; refresh the list to see it.
+Response and display
+The controller keeps BaseResp, Req, and AccessPolicyAudits. Each element
+in AccessPolicyAudits represents one save and contains:
+- who saved it and the UTC date;
+- the affected policy/rule records in entities;
+- each record's readable action and historical name;
+- each changed field's label, raw values, and display values.
+Render the summary and local date, then each entity's label and a table:
+FieldLabel | OldDisplayValue | NewDisplayValue.
+ASP.NET's default camelCase JSON conventions are assumed in the sample.
+Your configured serializer may use PascalCase instead; no serializer change
+is required for these classes.
 
-      CorrelationInfo correlationInfo = new()
-      {
-        CorrelationId = request.BaseReq.CorrelationId,
-        RDirection = RequestDirection.Request,
-        RequestURL = "GetAccessPolicyAudit",
-        UserName = _globalSettings.AppUsername
-      };
+Formatting is deterministic:
+- Rule WindowSeconds: exact days/hours/minutes/seconds; NULL means Document lifetime.
+- IsEnabled on policies/rules: Enabled / Disabled.
+- A missing side of an INSERT or DELETE: Not applicable.
+- Other NULL values: Not provided; empty strings: Empty.
+- Config SettingValue remains text. A value of 3600 is not automatically
+  interpreted as a duration; a value of 1 is not automatically a boolean.
+- Unrecognized entity/field values are preserved. The database's friendly
+  field label is used, with FieldName as a fallback.
+DateTime2 in the existing audit writer stores UTC without a timezone marker.
+The mapper annotates that clock value as UTC and exposes DateTimeOffset,
+without interpreting it as local server time. The frontend can convert it
+to the viewer's timezone. Raw OldValue/NewValue always remain available.
+Database prerequisites and historical policy filtering
+Deploy the previously supplied audit schema and audited save procedures first.
+The existing detail table's actual name is dbo.t_ChangeAuditDetail (singular).
+This getter adds no audit tables or columns, and issues no transaction-control
+statements. Your DAL retains its transaction ownership.
 
-      try
-      {
-        correlationInfo.Reserved = "GetAccessPolicyAudit has been called with the following request";
-        LogInfoJson(request, correlationInfo);
+The previous save procedure writes AccessPolicyId as an initial rule detail.
+The getter uses that persisted relationship (as of the audit entry) to include
+rule-only changes and to retain filtering after a rule is deleted. If the
+relationship is missing, it tries a policy header from the same save, then the
+current rule row. The supplied writer saves one policy per ChangeSetId.
 
-        response.AccessPolicyAudits = await _bal.GetAccessPolicyAudit(request);
+For a rule that existed before auditing began, the current row may be the
+only available parent link. If that row is later deleted and no parent link
+was ever recorded, the old data cannot reliably identify its parent policy.
+Such history remains available in the unfiltered endpoint but cannot be
+reliably included by a specific policy filter. This is an existing-data
+limitation; the getter does not invent a historical association or name.
+Later config endpoint
+Reuse the same model, DTOs, and mapper. Its domain-specific request and response
+envelope may differ, but its list can be:
+public List<ChangeAuditDto> ConfigAudits { get; set; } = [];
+Return the same 13 SQL columns from the future config procedure, filtering
+EntityName = 'Config', and call:
+IEnumerable<ChangeAudit> rows = /* query your config audit procedure */;
+return ChangeAuditMapper.ToDtos(rows);
+Do not create separate config audit models/DTOs/mappers. The existing Config
+writer uses the unchanged SettingName as EntityKey. Config-specific value
+formatting can be added centrally to this mapper when its setting semantics
+are known.
+Verification
+No .NET SDK or SQL Server engine was available in the authoring environment.
+Static source/SQL alias checks and 11 relational checks against a SQLite
+adaptation of the getter were run. The latter check filtering and complete-save
+paging, but do not verify SQL Server syntax or engine-specific behavior.
+C# compilation, mapper runtime checks and SQL Server execution have not been
+performed. The actual DapperDal implementation and full project
+namespaces were not supplied, so integration must be built in your project.
 
-        correlationInfo.RDirection = RequestDirection.Response;
+The mapper checks have no external NuGet dependencies. On a machine with .NET 8:
+dotnet run --project Tests/MapperChecks.csproj
+The tests cover grouping, ordering, time windows, NULLs, creation, status,
+config reuse, exact text preservation, UTC handling and JSON serialization.
+Run Tests/SqlChecks.sql in a development database after deploying the three
+SQL scripts (schema, save procedures, getter). It checks whole-save paging,
+rule-name-only saves, NULL transitions, policy filtering, deleted-rule history,
+and empty pages. Its fixture rows are rolled back.
+Complete integration code
+Sql/usp_GetAccessPolicyAudit.sql
+USE [Alterna_AccountStatementManagement];
+GO
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
 
-        correlationInfo.Reserved = "GetAccessPolicyAudit replied with the following response";
-        LogInfoJson(response, correlationInfo);
+-- SQL Server 2016 compatible, including installations before SP1.
+IF OBJECT_ID(N'dbo.usp_GetAccessPolicyAudit', N'P') IS NULL
+    EXEC(N'CREATE PROCEDURE dbo.usp_GetAccessPolicyAudit AS BEGIN SET NOCOUNT ON; END;');
+GO
 
-        return response;
-      }
-      catch (SGBLBadRequestException ex)
-      {
-        StringBuilder sb = new(_responseCodesDictionary["400"].Description);
+ALTER PROCEDURE dbo.usp_GetAccessPolicyAudit
+    @P__AccessPolicyId BIGINT = NULL,
+    @P__PageNumber INT = 1,
+    @P__PageSize INT = 20
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-        sb.Replace("{0}", ex.Message);
+    IF @P__AccessPolicyId IS NOT NULL AND @P__AccessPolicyId <= 0
+        THROW 50001, 'AccessPolicyId must be greater than zero.', 1;
 
-        response.BaseResp.CorrelationId = request.BaseReq.CorrelationId;
-        response.BaseResp.ReturnCode = _responseCodesDictionary["400"].Content;
-        response.BaseResp.ReturnDescription = sb.ToString();
-        correlationInfo.RDirection = RequestDirection.Response;
+    IF @P__PageNumber IS NULL OR @P__PageNumber < 1
+        THROW 50002, 'PageNumber must be greater than zero.', 1;
 
-        correlationInfo.Reserved = ex.Message;
-        LogErrorJson(response, correlationInfo, ex);
+    IF @P__PageSize IS NULL OR @P__PageSize < 1 OR @P__PageSize > 100
+        THROW 50003, 'PageSize must be between 1 and 100.', 1;
 
-        return response;
-      }
-      catch (Exception ex)
-      {
-        StringBuilder sb = new(_responseCodesDictionary["500"].Description);
+    DECLARE @Offset BIGINT = (CONVERT(BIGINT, @P__PageNumber) - 1) * @P__PageSize;
 
-        sb.Replace("{0}", ex.Message);
+    ;WITH ScopedAudit AS
+    (
+        SELECT A.*
+        FROM dbo.t_ChangeAudit AS A
+        -- A rule's persisted parent relationship takes precedence over its
+        -- current row. This retains history after a rule is deleted.
+        OUTER APPLY
+        (
+            SELECT TOP (1)
+                TRY_CONVERT(BIGINT,
+                    CASE WHEN H.Action = 'DELETE' THEN D.OldValue
+                         ELSE D.NewValue END) AS AccessPolicyId
+            FROM dbo.t_ChangeAudit AS H
+            INNER JOIN dbo.t_ChangeAuditDetail AS D
+                ON D.ChangeAuditId = H.Id
+               AND D.FieldName = N'AccessPolicyId'
+            WHERE A.EntityName = N'AccessPolicyRule'
+              AND H.EntityName = N'AccessPolicyRule'
+              AND H.EntityKey = A.EntityKey
+              AND
+              (
+                  H.ChangedDate < A.ChangedDate
+                  OR (H.ChangedDate = A.ChangedDate AND H.Id <= A.Id)
+              )
+            ORDER BY H.ChangedDate DESC, H.Id DESC
+        ) AS HistoricalParent
+        OUTER APPLY
+        (
+            SELECT TOP (1)
+                TRY_CONVERT(BIGINT, P.EntityKey) AS AccessPolicyId
+            FROM dbo.t_ChangeAudit AS P
+            WHERE A.EntityName = N'AccessPolicyRule'
+              AND P.ChangeSetId = A.ChangeSetId
+              AND P.EntityName = N'AccessPolicy'
+            ORDER BY P.Id DESC
+        ) AS SameSaveParent
+        LEFT JOIN dbo.t_AccessPolicyRule AS R
+            ON A.EntityName = N'AccessPolicyRule'
+           AND R.Id = TRY_CONVERT(BIGINT, A.EntityKey)
+        WHERE A.EntityName IN (N'AccessPolicy', N'AccessPolicyRule')
+          AND
+          (
+              @P__AccessPolicyId IS NULL
+              OR
+              CASE WHEN A.EntityName = N'AccessPolicy'
+                   THEN TRY_CONVERT(BIGINT, A.EntityKey)
+                   ELSE COALESCE(HistoricalParent.AccessPolicyId,
+                                 SameSaveParent.AccessPolicyId, R.AccessPolicyId)
+              END = @P__AccessPolicyId
+          )
+    ),
+    ChangeSetPage AS
+    (
+        -- Page complete saves BEFORE joining their individual field changes.
+        SELECT
+            ChangeSetId,
+            MAX(ChangedDate) AS SaveChangedDate,
+            MAX(Id) AS LastAuditId
+        FROM ScopedAudit
+        GROUP BY ChangeSetId
+        ORDER BY MAX(ChangedDate) DESC, MAX(Id) DESC
+        OFFSET @Offset ROWS FETCH NEXT @P__PageSize ROWS ONLY
+    )
+    SELECT
+        A.Id AS ChangeAuditId,
+        A.ChangeSetId,
+        A.EntityName,
+        A.EntityKey,
+        A.EntityDisplayName,
+        A.Action,
+        A.ChangedBy,
+        A.ChangedDate,
+        D.Id AS ChangeAuditDetailId,
+        D.FieldName,
+        D.FieldDisplayName,
+        D.OldValue,
+        D.NewValue
+    FROM ChangeSetPage AS P
+    INNER JOIN ScopedAudit AS A
+        ON A.ChangeSetId = P.ChangeSetId
+    INNER JOIN dbo.t_ChangeAuditDetail AS D
+        ON D.ChangeAuditId = A.Id
+    ORDER BY
+        P.SaveChangedDate DESC,
+        P.LastAuditId DESC,
+        CASE WHEN A.EntityName = N'AccessPolicy' THEN 0 ELSE 1 END,
+        A.Id,
+        D.Id;
+END;
+GO
 
-        response.BaseResp.CorrelationId = request.BaseReq.CorrelationId;
-        response.BaseResp.ReturnCode = _responseCodesDictionary["500"].Content;
-        response.BaseResp.ReturnDescription = sb.ToString();
+-- Helpful for finding all entity headers belonging to one save.
+IF NOT EXISTS
+(
+    SELECT 1 FROM sys.indexes
+    WHERE object_id = OBJECT_ID(N'dbo.t_ChangeAudit')
+      AND name = N'IX_t_ChangeAudit_ChangeSetId'
+)
+    CREATE INDEX IX_t_ChangeAudit_ChangeSetId
+        ON dbo.t_ChangeAudit (ChangeSetId);
+GO
+CSharp/Request.cs
+using System.ComponentModel.DataAnnotations;
 
-        correlationInfo.RDirection = RequestDirection.Response;
-
-        correlationInfo.Reserved = ex.Message;
-        LogErrorJson(response, correlationInfo, ex);
-
-        return response;
-      }
-    }
-
-Request.cs
+// Replace the existing class; keep the namespace containing BaseRequest.
 public class GetAccessPolicyAuditRequest
 {
-  [Required]
-  public required BaseRequest BaseReq { get; set; }
-}
+    [Required]
+    public required BaseRequest BaseReq { get; set; }
 
-Response.cs
+    // Omit or send null to retrieve history for all policies and their rules.
+    [Range(typeof(long), "1", "9223372036854775807")]
+    public long? AccessPolicyId { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int PageNumber { get; set; } = 1;
+
+    // Counts whole saves (ChangeSetId), not fields or individual rules.
+    [Range(1, 100)]
+    public int PageSize { get; set; } = 20;
+}
+CSharp/Response.cs
+using System.Collections.Generic;
+
+// Replace the existing class; retain your application's namespace/usings.
 public class GetAccessPolicyAuditResponse
 {
-  public BaseResponse BaseResp { get; set; } = new();
-  public required GetAccessPolicyAuditRequest Req { get; set; }
-  public List<AccessPolicyAuditDto> AccessPolicyAudits { get; set; } = [];
+    public BaseResponse BaseResp { get; set; } = new();
+    public required GetAccessPolicyAuditRequest Req { get; set; }
+
+    // The existing JSON property name is retained; the model is now shared.
+    public List<ChangeAuditDto> AccessPolicyAudits { get; set; } = [];
+}
+CSharp/Model.cs
+using System;
+
+// Shared, flat database row. Add to your existing Model.cs namespace.
+// Both access-policy and future config procedures can return this shape.
+public class ChangeAudit
+{
+    public long ChangeAuditId { get; set; }
+    public Guid ChangeSetId { get; set; }
+    public string EntityName { get; set; } = string.Empty;
+    public string EntityKey { get; set; } = string.Empty;
+    public string EntityDisplayName { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty;
+    public string ChangedBy { get; set; } = string.Empty;
+    public DateTime ChangedDate { get; set; }
+    public long ChangeAuditDetailId { get; set; }
+    public string FieldName { get; set; } = string.Empty;
+    public string FieldDisplayName { get; set; } = string.Empty;
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+}
+CSharp/DTOs.cs
+using System;
+using System.Collections.Generic;
+
+// Shared frontend DTOs. Add these classes to your existing DTOs.cs namespace.
+public class ChangeAuditDto
+{
+    public Guid ChangeSetId { get; set; }
+    public DateTimeOffset ChangedDate { get; set; }
+    public string ChangedBy { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public List<ChangeAuditEntityDto> Entities { get; set; } = [];
 }
 
-Class AccessPolicyAuditDto needs to be created in DTOs.cs
-    
-BAL.cs
-  public async Task<List<AccessPolicyAuditDto>> GetAccessPolicyAudit(GetAccessPolicyAuditRequest request)
-  {
+public class ChangeAuditEntityDto
+{
+    public long ChangeAuditId { get; set; }
+    public string EntityName { get; set; } = string.Empty;
+    public string EntityKey { get; set; } = string.Empty;
+    public string EntityLabel { get; set; } = string.Empty;
+    public string EntityTypeLabel { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty;
+    public string ActionLabel { get; set; } = string.Empty;
+    public List<ChangeAuditFieldDto> Changes { get; set; } = [];
+}
+
+public class ChangeAuditFieldDto
+{
+    public string FieldName { get; set; } = string.Empty;
+    public string FieldLabel { get; set; } = string.Empty;
+    public string ValueType { get; set; } = string.Empty;
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
+    public string OldDisplayValue { get; set; } = string.Empty;
+    public string NewDisplayValue { get; set; } = string.Empty;
+}
+CSharp/BAL.GetAccessPolicyAudit.cs.txt
+// Replace the method inside your EXISTING BAL class.
+// Add using System.Data; using Dapper; and the namespaces of the shared types.
+// This is a member snippet, not a standalone C# source file.
+
+public async Task<List<ChangeAuditDto>> GetAccessPolicyAudit(
+    GetAccessPolicyAuditRequest request)
+{
+    if (request.AccessPolicyId is <= 0)
+        throw new SGBLBadRequestException("AccessPolicyId must be greater than zero.");
+
+    if (request.PageNumber < 1)
+        throw new SGBLBadRequestException("PageNumber must be greater than zero.");
+
+    if (request.PageSize is < 1 or > 100)
+        throw new SGBLBadRequestException("PageSize must be between 1 and 100.");
+
+    DynamicParameters parameters = new();
+    parameters.Add("@P__AccessPolicyId", request.AccessPolicyId, DbType.Int64);
+    parameters.Add("@P__PageNumber", request.PageNumber, DbType.Int32);
+    parameters.Add("@P__PageSize", request.PageSize, DbType.Int32);
+
+    // Retains the DAL/transaction ownership pattern supplied in your code.
     DapperDal dal = new DapperDal(_globalSettings.ConnString);
 
-    IEnumerable<AccessPolicyAudit> res = await dal.ExecuteQueryAsync<AccessPolicyDbRowDto>("usp_GetAccessPolicyAudit", null,
-      CommandType.StoredProcedure, DapperDal.CommandDirection.Select);
+    IEnumerable<ChangeAudit> rows = await dal.ExecuteQueryAsync<ChangeAudit>(
+        "dbo.usp_GetAccessPolicyAudit",
+        parameters,
+        CommandType.StoredProcedure,
+        DapperDal.CommandDirection.Select);
 
-    return AccessPolicyAuditMapper.ToModels(res);
-  }
+    return ChangeAuditMapper.ToDtos(rows);
+}
+CSharp/ChangeAuditMapper.cs
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 
-class AccessPolicyAudit needs to be created inModel.cs
+// Add your existing model/DTO namespaces if they differ from this file's.
+public static class ChangeAuditMapper
+{
+    public static List<ChangeAuditDto> ToDtos(IEnumerable<ChangeAudit> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
 
-We also need to create a AccessPolicyAuditMapper that will convert the Sql results into a nice Json object that the front end can use in order to display for the user the audit changes
+        return rows
+            .GroupBy(row => row.ChangeSetId)
+            .OrderByDescending(save => save.Max(row => row.ChangedDate))
+            .ThenByDescending(save => save.Max(row => row.ChangeAuditId))
+            .Select(save =>
+            {
+                ChangeAudit first = save.OrderBy(row => row.ChangeAuditId).First();
+
+                List<ChangeAuditEntityDto> entities = save
+                    .GroupBy(row => row.ChangeAuditId)
+                    .OrderBy(entity => EntityOrder(entity.First().EntityName))
+                    .ThenBy(entity => entity.Key)
+                    .Select(entity =>
+                    {
+                        ChangeAudit header = entity.First();
+
+                        return new ChangeAuditEntityDto
+                        {
+                            ChangeAuditId = header.ChangeAuditId,
+                            EntityName = header.EntityName,
+                            EntityKey = header.EntityKey,
+                            // Uses the historical label, not today's live name.
+                            EntityLabel = header.EntityDisplayName,
+                            EntityTypeLabel = EntityLabel(header.EntityName),
+                            Action = header.Action,
+                            ActionLabel = ActionLabel(header.Action),
+                            Changes = entity
+                                .OrderBy(field => field.ChangeAuditDetailId)
+                                .Select(field => new ChangeAuditFieldDto
+                                {
+                                    FieldName = field.FieldName,
+                                    FieldLabel = FieldLabel(field),
+                                    ValueType = ValueType(field),
+                                    OldValue = field.OldValue,
+                                    NewValue = field.NewValue,
+                                    OldDisplayValue = DisplayValue(field, field.OldValue, isOld: true),
+                                    NewDisplayValue = DisplayValue(field, field.NewValue, isOld: false)
+                                }).ToList()
+                        };
+                    }).ToList();
+
+                return new ChangeAuditDto
+                {
+                    ChangeSetId = save.Key,
+                    // SQL DATETIME2 has no timezone. Our audit writer stores UTC.
+                    ChangedDate = new DateTimeOffset(DateTime.SpecifyKind(
+                        save.Max(row => row.ChangedDate), DateTimeKind.Utc)),
+                    ChangedBy = first.ChangedBy,
+                    Summary = BuildSummary(first.ChangedBy, entities),
+                    Entities = entities
+                };
+            }).ToList();
+    }
+
+    private static string BuildSummary(string user, List<ChangeAuditEntityDto> entities)
+    {
+        if (entities.Count == 1)
+        {
+            ChangeAuditEntityDto entity = entities[0];
+            return $"{user} {entity.ActionLabel.ToLowerInvariant()} {entity.EntityTypeLabel.ToLowerInvariant()} \"{entity.EntityLabel}\".";
+        }
+
+        return $"{user} saved changes to {entities.Count} items.";
+    }
+
+    private static int EntityOrder(string entityName) => entityName switch
+    {
+        "AccessPolicy" => 0,
+        "AccessPolicyRule" => 1,
+        "Config" => 2,
+        _ => 3
+    };
+
+    private static string EntityLabel(string entityName) => entityName switch
+    {
+        "AccessPolicy" => "Access policy",
+        "AccessPolicyRule" => "Access rule",
+        "Config" => "Configuration setting",
+        _ => "Item"
+    };
+
+    private static string ActionLabel(string action) => action switch
+    {
+        "INSERT" => "Created",
+        "UPDATE" => "Updated",
+        "DELETE" => "Deleted",
+        _ => "Changed"
+    };
+
+    private static string FieldLabel(ChangeAudit row) => (row.EntityName, row.FieldName) switch
+    {
+        ("AccessPolicyRule", "WindowSeconds") => "Time window",
+        _ => string.IsNullOrWhiteSpace(row.FieldDisplayName)
+            ? row.FieldName : row.FieldDisplayName
+    };
+
+    private static string ValueType(ChangeAudit row) => (row.EntityName, row.FieldName) switch
+    {
+        ("AccessPolicy", "IsEnabled") or ("AccessPolicyRule", "IsEnabled") => "boolean",
+        ("AccessPolicyRule", "WindowSeconds") => "duration",
+        ("AccessPolicyRule", "MaximumAccessCount") => "integer",
+        ("AccessPolicyRule", "AccessPolicyId") => "identifier",
+        _ => "text"
+    };
+
+    private static string DisplayValue(ChangeAudit row, string? value, bool isOld)
+    {
+        // Missing sides of creation/deletion are not real NULL field values.
+        if ((isOld && row.Action == "INSERT") || (!isOld && row.Action == "DELETE"))
+            return "Not applicable";
+
+        if (value is null)
+            return row.EntityName == "AccessPolicyRule" && row.FieldName == "WindowSeconds"
+                ? "Document lifetime" : "Not provided";
+
+        if (value.Length == 0)
+            return "Empty";
+
+        if (string.IsNullOrWhiteSpace(value))
+            return $"Whitespace ({value.Length} characters)";
+
+        if (ValueType(row) == "boolean")
+        {
+            if (value == "1" || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+                return "Enabled";
+            if (value == "0" || string.Equals(value, "false", StringComparison.OrdinalIgnoreCase))
+                return "Disabled";
+        }
+
+        if (ValueType(row) == "duration" && int.TryParse(
+                value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int seconds)
+            && seconds > 0)
+            return FormatDuration(seconds);
+
+        // Unknown fields and config setting values retain their exact text.
+        // Never interpret a Config.SettingValue as seconds or a boolean merely
+        // because its content happens to look like one.
+        return value;
+    }
+
+    private static string FormatDuration(int seconds)
+    {
+        List<string> parts = [];
+        AddDurationPart(parts, seconds / 86400, "day");
+        seconds %= 86400;
+        AddDurationPart(parts, seconds / 3600, "hour");
+        seconds %= 3600;
+        AddDurationPart(parts, seconds / 60, "minute");
+        AddDurationPart(parts, seconds % 60, "second");
+        return string.Join(" ", parts);
+    }
+
+    private static void AddDurationPart(List<string> parts, int value, string unit)
+    {
+        if (value > 0)
+            parts.Add($"{value.ToString(CultureInfo.InvariantCulture)} {unit}{(value == 1 ? "" : "s")}");
+    }
+}
+example-audit-data.json
+{
+  "accessPolicyAudits": [
+    {
+      "changeSetId": "b3834a53-394c-4670-9c0f-814f95469761",
+      "changedDate": "2026-11-02T08:30:00+00:00",
+      "changedBy": "Pierre Abou Serhal",
+      "summary": "Pierre Abou Serhal updated access rule \"Daily access limit\".",
+      "entities": [
+        {
+          "changeAuditId": 1042,
+          "entityName": "AccessPolicyRule",
+          "entityKey": "12",
+          "entityLabel": "Daily access limit",
+          "entityTypeLabel": "Access rule",
+          "action": "UPDATE",
+          "actionLabel": "Updated",
+          "changes": [
+            {
+              "fieldName": "RuleName",
+              "fieldLabel": "Rule name",
+              "valueType": "text",
+              "oldValue": "Hourly access limit",
+              "newValue": "Daily access limit",
+              "oldDisplayValue": "Hourly access limit",
+              "newDisplayValue": "Daily access limit"
+            },
+            {
+              "fieldName": "WindowSeconds",
+              "fieldLabel": "Time window",
+              "valueType": "duration",
+              "oldValue": "3600",
+              "newValue": "86400",
+              "oldDisplayValue": "1 hour",
+              "newDisplayValue": "1 day"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
