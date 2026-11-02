@@ -1,14 +1,188 @@
-git ls-files --modified -z |
-while IFS= read -r -d '' file; do
-    [ -f "$file" ] && [ ! -L "$file" ] || continue
+USE [Alterna_AccountStatementManagement]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_UpdateAccessPolicy]    Script Date: 11/2/2026 10:44:10 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_UpdateAccessPolicy]
+	@P__AccessPolicyRules dbo.TVP_t_AccessPolicyRule READONLY,
+	@P__PolicyId BIGINT,
+	@P__PolicyCode NVARCHAR(255),
+	@P__PolicyName NVARCHAR(255),
+	@P__IsEnabled BIT,
+	@P__User NVARCHAR(255),
+	@P__Error NVARCHAR(4000) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+	SET XACT_ABORT ON;
 
-    indexed=$(git rev-parse --verify ":$file") || continue
-    current=$(git hash-object --path="$file" -- "$file") || continue
+    SET @P__Error = NULL;
+	
+	IF EXISTS (SELECT 1 FROM @P__AccessPolicyRules WHERE MaximumAccessCount <= 0 OR (WindowSeconds IS NOT NULL AND WindowSeconds <= 0))
+	BEGIN
+		SET @P__Error = 'The document access policy contains an invalid rule.';
+		RETURN;
+	END
 
-    if [ "$indexed" = "$current" ]; then
-        git -c core.fileMode=false --literal-pathspecs add -- "$file" || break
-        printf 'Refreshed: %s\n' "$file"
-    fi
-done
 
-git status --short
+	-- Insert new policy + rules
+	IF @P__PolicyId = -1
+	BEGIN
+		INSERT INTO t_AccessPolicy
+		(
+			[PolicyCode],
+			[PolicyName],
+			[IsEnabled],
+			[CreatedBy],
+			[LastModifiedBy]
+		)
+		VALUES
+		(
+			@P__PolicyCode,
+			@P__PolicyName,
+			@P__IsEnabled,
+			@P__User,
+			@P__User
+		);
+
+		SET @P__PolicyId = SCOPE_IDENTITY();
+
+		INSERT INTO t_AccessPolicyRule
+		(
+			[AccessPolicyId],
+			[RuleName],
+			[WindowSeconds],
+			[MaximumAccessCount],
+			[IsEnabled],
+			[CreatedBy],
+			[LastModifiedBy]
+		)
+		SELECT
+			@P__PolicyId,
+			[RuleName],
+			[WindowSeconds],
+			[MaximumAccessCount],
+			[IsEnabled],
+			@P__User,
+			@P__User
+		FROM @P__AccessPolicyRules;
+	END
+
+	-- Update existing policy + rules
+	ELSE
+	BEGIN
+
+		IF NOT EXISTS(SELECT 1 FROM t_AccessPolicy WHERE Id = @P__PolicyId)
+		BEGIN
+			SET @P__Error = 'The document access policy is not found.';
+			RETURN;
+		END
+
+		UPDATE t_AccessPolicy SET
+			[PolicyCode] = @P__PolicyCode,
+			[PolicyName] = @P__PolicyName,
+			[IsEnabled] = @P__IsEnabled,
+			[LastModifiedBy] = @P__User,
+			[LastModifiedDate] = GETDATE()
+		WHERE Id = @P__PolicyId;
+
+		MERGE INTO t_AccessPolicyRule AS Target
+		USING @P__AccessPolicyRules AS Source
+		ON Target.Id = Source.Id AND Target.AccessPolicyId = @P__PolicyId
+		WHEN MATCHED THEN 
+			UPDATE SET 
+				Target.[RuleName] = Source.RuleName,
+				Target.[WindowSeconds] = Source.WindowSeconds,
+				Target.[MaximumAccessCount] = Source.MaximumAccessCount,
+				Target.[IsEnabled] = Source.IsEnabled,
+				Target.[LastModifiedBy] = @P__User,
+				Target.[LastModifiedDate] = GETDATE()
+		WHEN NOT MATCHED THEN
+			INSERT 
+			(
+				[AccessPolicyId],
+				[RuleName],
+				[WindowSeconds],
+				[MaximumAccessCount],
+				[IsEnabled],
+				[CreatedBy],
+				[LastModifiedBy]
+			)
+			VALUES
+			(
+				@P__PolicyId,
+				Source.RuleName,
+				Source.WindowSeconds,
+				Source.MaximumAccessCount,
+				Source.IsEnabled,
+				@P__User,
+				@P__User
+			);
+	END
+
+	SELECT 
+		AP.[Id] AS AccessPolicyId,
+		AP.[PolicyCode] AS AccessPolicyCode,
+		AP.[PolicyName] AS AccessPolicyName,
+		AP.[IsEnabled] AS IsAccessPolicyEnabled,
+		AP.[CreatedDate] AS AccessPolicyCreatedDate,
+		AP.[CreatedBy] AS AccessPolicyCreatedBy,
+		AP.[LastModifiedDate] AS AccessPolicyLastModifiedDate,
+		AP.[LastModifiedBy] AS AccessPolicyLastModifiedBy,
+		APR.[Id] AS AccessPolicyRuleId,
+		APR.[AccessPolicyId] AS AccessPolicyRuleAccessPolicyId,
+		APR.[RuleName] AS AccessPolicyRuleName,
+		APR.[WindowSeconds] AS AccessPolicyRuleWindowSeconds,
+		APR.[MaximumAccessCount] AS AccessPolicyRuleMaximumAccessCount,
+		APR.[IsEnabled] AS IsAccessPolicyRuleEnabled,
+		APR.[CreatedDate] AS AccessPolicyRuleCreatedDate,
+		APR.[CreatedBy] AS AccessPolicyRuleCreatedBy,
+		APR.[LastModifiedDate] AS AccessPolicyRuleLastModifiedDate,
+		APR.[LastModifiedBy] AS AccessPolicyRuleLastModifiedBy
+	FROM [dbo].[t_AccessPolicy] AS AP
+	JOIN [dbo].[t_AccessPolicyRule] AS APR ON AP.Id = APR.AccessPolicyId
+	WHERE AP.Id = @P__PolicyId;
+
+END
+
+
+USE [Alterna_AccountStatementManagement]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_UpdateConfig]    Script Date: 11/2/2026 10:44:44 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_UpdateConfig]
+	@P__SettingName NVARCHAR(255),
+	@P__SettingValue NVARCHAR(255),
+	@P__SettingDescription NVARCHAR(255),
+	@P__User NVARCHAR(255),
+	@P__Error NVARCHAR(4000) OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+	SET XACT_ABORT ON;
+
+    SET @P__Error = NULL;
+	
+	IF NOT EXISTS (SELECT 1 FROM t_Config WHERE SettingName = @P__SettingName)
+	BEGIN
+		SET @P__Error = 'Config not found';
+		RETURN;
+	END
+
+	UPDATE t_Config SET
+		SettingValue = @P__SettingValue,
+		SettingDescription = @P__SettingDescription,
+		LastModifiedBy = @P__User,
+		LastModifiedDate = GETDATE()
+	WHERE SettingName = @P__SettingName;
+
+	SELECT * 
+	FROM t_Config
+	WHERE SettingName = @P__SettingName;
+
+END
