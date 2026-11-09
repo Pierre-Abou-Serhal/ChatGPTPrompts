@@ -1,434 +1,274 @@
-private void UpdateSalDomDatabase(
-    List<SalDomClient> salDomClients,
-    SendEmailAttachmentForValidationRequest request,
-    Model.File fileConfig,
-    ExchangeApiAttachmentInfo attachmentInfo)
-{
-    // Step 0: Query Dictionary
-    List<Dictionary> dictionaryList = QueryDictionary(salDomClients.Select(i => i.AlternativeAccount).ToList(), fileConfig.Id);
 
-    // Step 1: Get All Alternative Accounts That are in Dictionary And salDomClients
-    List<Dictionary> t24AccountsForMatchingAltAccsInBoth = dictionaryList
-        .Where(i => salDomClients.Any(y => y.AlternativeAccount.Equals(i.AlternativeAccountId)))
-        .ToList();
-
-    var dictionaryMappingsByAlternativeId = t24AccountsForMatchingAltAccsInBoth
-        .ToLookup(mapping => mapping.AlternativeAccountId);
-
-    // Step 2: Remove alternativeAccountsInBoth From salDomClients
-    List<SalDomClient> salDomClientDivided = salDomClients.Where(i => !t24AccountsForMatchingAltAccsInBoth.Any(y => y.AlternativeAccountId.Equals(i.AlternativeAccount))).ToList();
-
-    // Step 3: Group Received Accounts into T24 Format + T24 Accounts Found In Dictionary
-    List<String> accountsWithT24Formats = salDomClientDivided.Where(i => Utilities.ValidateT24AccountNumber(i.AlternativeAccount)).Select(i => i.AlternativeAccount).ToList();
-
-    // Step 4: Group Received Accounts into Non T24 Format
-    List<String> alternativeIdsToLookup = salDomClientDivided.Where(i => !Utilities.ValidateT24AccountNumber(i.AlternativeAccount)).Select(i => i.AlternativeAccount).ToList();
-
-    // Get Current Product Code For The T24 Format Accounts
-    GetCustomerByAccountIdListReq? getCustomerByAccountIdListReq;
-    GetCustomerByAccountIdListRes? getCustomerByAccountIdListRes = null;
-
-    if (accountsWithT24Formats.Count > 0)
+  [HttpPost]
+  [Route("GetDocumentAccessAudit")]
+  public async Task<GetDocumentAccessAuditResponse> GetDocumentAccessAudit(GetDocumentAccessAuditRequest request)
+  {
+    GetDocumentAccessAuditResponse response = new GetDocumentAccessAuditResponse()
     {
-        getCustomerByAccountIdListReq = new()
-        {
-            BaseReq = new()
-            {
-                CorrelationId = request.BaseReq.CorrelationId,
-                UserName = request.BaseReq.UserData.UserName
-            },
-            ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-            AccountIdList = String.Join(',', accountsWithT24Formats)
-        };
-
-        getCustomerByAccountIdListRes =
-            Post<GetCustomerByAccountIdListRes>(
-                getCustomerByAccountIdListReq,
-                $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomerByAccountIdList");
-    }
-
-    if (getCustomerByAccountIdListRes is not null && Int32.Parse(getCustomerByAccountIdListRes.WebResp.ReturnCode.Code) != 200)
-    {
-        throw new Exception(getCustomerByAccountIdListRes.WebResp.ReturnCode.Message);
-    }
-
-    IEnumerable<CustomerInfo> LookupDictionaryAccounts(List<String> accountIds)
-    {
-        GetCustomerByAccountIdListReq lookupRequest = new()
-        {
-            BaseReq = new()
-            {
-                CorrelationId = request.BaseReq.CorrelationId,
-                UserName = request.BaseReq.UserData.UserName
-            },
-            ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-            AccountIdList = String.Join(',', accountIds)
-        };
-
-        GetCustomerByAccountIdListRes lookupResponse = Post<GetCustomerByAccountIdListRes>(
-            lookupRequest,
-            $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomerByAccountIdList")
-            ?? throw new Exception("No response from Data Gateway for the dictionary account lookup.");
-
-        if (Int32.Parse(lookupResponse.WebResp.ReturnCode.Code) != 200)
-        {
-            throw new Exception(lookupResponse.WebResp.ReturnCode.Message);
-        }
-
-        return lookupResponse.CustomersList ?? [];
-    }
-
-    List<String> dictionaryAccountIds = t24AccountsForMatchingAltAccsInBoth
-        .Select(mapping => mapping.T24AccountId)
-        .Where(accountId => !String.IsNullOrWhiteSpace(accountId))
-        .Distinct()
-        .ToList();
-
-    List<CustomerInfo> dictionaryCustomers = [];
-    if (dictionaryAccountIds.Count > 0)
-    {
-        dictionaryCustomers.AddRange(LookupDictionaryAccounts(dictionaryAccountIds));
-
-        // Resend the same dictionary account IDs so Gateway can resolve LEAP replacements.
-        List<String> missingDictionaryAccountIds = dictionaryAccountIds
-            .Except(dictionaryCustomers.Select(customer => customer.InputedId))
-            .ToList();
-
-        if (missingDictionaryAccountIds.Count > 0)
-        {
-            dictionaryCustomers.AddRange(LookupDictionaryAccounts(missingDictionaryAccountIds));
-        }
-    }
-
-    var dictionaryCustomersByInput = dictionaryCustomers.ToLookup(customer => customer.InputedId);
-
-    // Look up alternative IDs for accounts without a dictionary entry.
-    GetCustomersByAlternativeIdsReq? getCustomersByAlternativeIdsReq;
-    GetCustomersByAlternativeIdsRes? getCustomersByAlternativeIdsRes = null;
-
-    GetCustomerByAccountIdListReq? getCustomersByNotFoundAlternativeIdsReq;
-    GetCustomerByAccountIdListRes? getCustomersByNotFoundAlternativeIdsRes = null;
-
-    if (alternativeIdsToLookup.Count > 0)
-    {
-        getCustomersByAlternativeIdsReq = new()
-        {
-            BaseReq = new()
-            {
-                CorrelationId = request.BaseReq.CorrelationId,
-                UserName = request.BaseReq.UserData.UserName
-            },
-            ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-            AltIds = String.Join(',', alternativeIdsToLookup)
-        };
-
-        getCustomersByAlternativeIdsRes =
-            Post<GetCustomersByAlternativeIdsRes>(
-                getCustomersByAlternativeIdsReq,
-                $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomersByAlternativeIds");
-
-        if (getCustomersByAlternativeIdsRes is null)
-        {
-            throw new Exception("No response from Data Gateway for the alternative account lookup.");
-        }
-
-        if (Int32.Parse(getCustomersByAlternativeIdsRes.WebResp.ReturnCode.Code) != 200)
-        {
-            throw new Exception(getCustomersByAlternativeIdsRes.WebResp.ReturnCode.Message);
-        }
-
-        // Retry unmatched 14-digit IDs that start with 1 as zero-padded account IDs.
-        List<String> paddedAlternativeIds = alternativeIdsToLookup
-            .Except(getCustomersByAlternativeIdsRes.CustomersList?.Select(i => i.InputedId) ?? [])
-            .Where(i => i.Length == 14 && i.StartsWith("1"))
-            .Select(i => i.PadLeft(15, '0'))
-            .ToList();
-
-        if (paddedAlternativeIds.Count > 0)
-        {
-            getCustomersByNotFoundAlternativeIdsReq = new()
-            {
-                BaseReq = new()
-                {
-                    CorrelationId = request.BaseReq.CorrelationId,
-                    UserName = request.BaseReq.UserData.UserName
-                },
-                ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-                AccountIdList = String.Join(',', paddedAlternativeIds)
-            };
-
-            getCustomersByNotFoundAlternativeIdsRes =
-                Post<GetCustomerByAccountIdListRes>(
-                    getCustomersByNotFoundAlternativeIdsReq,
-                    $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomerByAccountIdList");
-
-            if (getCustomersByNotFoundAlternativeIdsRes is not null && Int32.Parse(getCustomersByNotFoundAlternativeIdsRes.WebResp.ReturnCode.Code) != 200)
-            {
-                throw new Exception(getCustomersByNotFoundAlternativeIdsRes.WebResp.ReturnCode.Message);
-            }
-        }
-    }
-
-    // Get The File Config Currency For Further Checking
-    Currency fileCurrency;
-
-    if (Int32.TryParse(fileConfig.CurrencyCode, out Int32 parsedCurrencyCode))
-    {
-        fileCurrency = (Currency)parsedCurrencyCode;
-    }
-    else
-    {
-        throw new Exception("Invalid Currency Code For File Configuration");
-    }
-
-    // Group invalid accounts that have different Product Code on T24
-    List<SalDomClient> salDomClientsWithDifferentProductCode = []; // Updated From t24 From a reason and not reflected yet in Dictionary
-    List<CustomerInfo> customerInfoList = []; // Used To Access The Product Code For Found T24 Accounts
-
-    foreach (CustomerInfo customerInfo in getCustomerByAccountIdListRes?.CustomersList ?? [])
-    {
-        if (!customerInfo.IsProductCodeMatching)
-        {
-            salDomClientsWithDifferentProductCode.Add(
-                salDomClients.First(i => i.AlternativeAccount.Equals(customerInfo.InputedId)));
-        }
-        customerInfoList.Add(customerInfo);
-    }
-
-    foreach (CustomerInfo customerInfo in getCustomersByAlternativeIdsRes?.CustomersList ?? [])
-    {
-        if (!customerInfo.IsProductCodeMatching)
-        {
-            salDomClientsWithDifferentProductCode.Add(
-                salDomClients.First(i => i.AlternativeAccount.Equals(customerInfo.InputedId)));
-        }
-        customerInfoList.Add(customerInfo);
-    }
-
-    foreach (CustomerInfo customerInfo in getCustomersByNotFoundAlternativeIdsRes?.CustomersList ?? [])
-    {
-        if (!customerInfo.IsProductCodeMatching)
-        {
-            // Remove the zero that has been added at the beginning before sending the request
-            salDomClientsWithDifferentProductCode.Add(
-                salDomClients.First(i => i.AlternativeAccount.Equals(customerInfo.InputedId.Substring(1))));
-        }
-        customerInfoList.Add(customerInfo);
-    }
-
-    foreach (CustomerInfo customerInfo in dictionaryCustomers)
-    {
-        if (!customerInfo.IsProductCodeMatching)
-        {
-            List<Dictionary> dictList = dictionaryList.Where(i => i.T24AccountId.Equals(customerInfo.InputedId)).ToList();
-
-            foreach (Dictionary dict in dictList)
-            {
-                SalDomClient salDomClient = new()
-                {
-                    AlternativeAccount = dict.AlternativeAccountId
-                };
-
-                salDomClientsWithDifferentProductCode.Add(salDomClient);
-            }
-        }
-        customerInfoList.Add(customerInfo);
-    }
-
-    // Extracting Customer Ids From T24 Accounts
-    List<String> customerIdList = [];
-
-    foreach (CustomerInfo customerInfo in customerInfoList)
-    {
-        if (Utilities.ValidateT24AccountNumber(customerInfo.T24AccountId))
-        {
-            customerIdList.Add(customerInfo.T24AccountId.Substring(2, 7));
-        }
-    }
-
-    GetAccountsByCustomerIdListReq getAccountsByCustomerIdListReq = new()
-    {
-        BaseReq = new()
-        {
-            CorrelationId = request.BaseReq.CorrelationId,
-            UserName = request.BaseReq.UserData.UserName
-        },
-        ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-        IdsList = String.Join(',', customerIdList),
-        CurrencyCode = fileConfig.CurrencyCode
+      Req = request,
+      BaseResp = new()
+      {
+        CorrelationId = request.BaseReq.CorrelationId,
+        ReturnCode = _responseCodesDictionary["200"].Content,
+        ReturnDescription = _responseCodesDictionary["200"].Description
+      }
     };
 
-    GetAccountsByCustomerIdListRes getAccountsByCustomerIdListRes =
-        Post<GetAccountsByCustomerIdListRes>(
-            getAccountsByCustomerIdListReq,
-            $"{_globalSettings.DataGateWayUrl}/api/Customer/GetAccountsByCustomerIdList");
-
-    if (getAccountsByCustomerIdListRes is not null && Int32.Parse(getAccountsByCustomerIdListRes.WebResp.ReturnCode.Code) != 200)
+    CorrelationInfo correlationInfo = new()
     {
-        throw new Exception(getAccountsByCustomerIdListRes.WebResp.ReturnCode.Message);
-    }
+      CorrelationId = request.BaseReq.CorrelationId,
+      RDirection = RequestDirection.Request,
+      RequestURL = "GetDocumentAccessAudit",
+      UserName = _globalSettings.AppUsername
+    };
 
-    if (fileConfig.HasMultipleSrcAccounts)
+    try
     {
-        // Validating parsed debit accounts with configured debit accounts
-        List<String?> uniqueSourceAcc = salDomClients.Select(i => i.SourceAccountNumber).Distinct().ToList();
+      correlationInfo.Reserved = "GetDocumentAccessAudit has been called with the following request";
+      LogInfoJson(request, correlationInfo);
 
-        if (uniqueSourceAcc.Contains(null) || uniqueSourceAcc.Contains(String.Empty))
-        {
-            throw new Exception("Empty Debit Account Number detected.");
-        }
+      response.DocumentAccessAuditList = await _bal.GetDocumentAccessAudit(request);
 
-        List<String> configuredSourceAcc = fileConfig.FileSrcAccounts!.Select(i => i.AccNumber).ToList();
-        List<String?> invalidSourceAcc = uniqueSourceAcc.Except(configuredSourceAcc).ToList();
+      correlationInfo.RDirection = RequestDirection.Response;
 
-        if (invalidSourceAcc.Any())
-        {
-            String invalidAcc = String.Join(",", invalidSourceAcc);
-            throw new Exception($"The following debit accounts: {invalidAcc} are not in the file configuration.");
-        }
+      correlationInfo.Reserved = "GetDocumentAccessAudit replied with the following response";
+      LogInfoJson(response, correlationInfo);
+
+      return response;
     }
-
-    // Add New File Import Content Records In The Database
-    List<FileImportContent> fileImportContents = [];
-
-    // Add New File Import Record In The Database
-    Int64 createdFileImportId = AddFileImport(new()
-        {
-            Id = -1,
-            FileId = fileConfig.Id,
-            StatusCode = ((Int32)FileStatus.RECEIVED).ToString(),
-        },
-        attachmentInfo.AttachmentId,
-        request.BaseReq.UserData.UserName
-    );
-
-    if (createdFileImportId <= 0)
+    catch (SGBLBadRequestException ex)
     {
-        throw new Exception("Could Not Create File Import");
-    }
+      StringBuilder sb = new(_responseCodesDictionary["400"].Description);
 
-    foreach (SalDomClient salDomClient in salDomClients)
+      sb.Replace("{0}", ex.Message);
+
+      response.BaseResp.CorrelationId = request.BaseReq.CorrelationId;
+      response.BaseResp.ReturnCode = _responseCodesDictionary["400"].Content;
+      response.BaseResp.ReturnDescription = sb.ToString();
+      correlationInfo.RDirection = RequestDirection.Response;
+
+      correlationInfo.Reserved = ex.Message;
+      LogErrorJson(response, correlationInfo, ex);
+
+      return response;
+    }
+    catch (Exception ex)
     {
-        String? mappedAccountId = dictionaryMappingsByAlternativeId[salDomClient.AlternativeAccount]
-            .FirstOrDefault()?.T24AccountId;
+      StringBuilder sb = new(_responseCodesDictionary["500"].Description);
 
-        Boolean hasDictionaryMapping = !String.IsNullOrWhiteSpace(mappedAccountId);
-        CustomerInfo? dictionaryCustomer = hasDictionaryMapping
-            ? dictionaryCustomersByInput[mappedAccountId!].FirstOrDefault()
-            : null;
+      response.BaseResp.CorrelationId = request.BaseReq.CorrelationId;
+      response.BaseResp.ReturnCode = _responseCodesDictionary["500"].Content;
+      response.BaseResp.ReturnDescription = sb.ToString();
 
-        String t24Account = dictionaryCustomer?.T24AccountId ?? String.Empty;
+      correlationInfo.RDirection = RequestDirection.Response;
 
-        if (!hasDictionaryMapping)
-        {
-            if (Utilities.ValidateT24AccountNumber(salDomClient.AlternativeAccount))
-            {
-                t24Account = getCustomerByAccountIdListRes?.CustomersList.Where(i => i.InputedId.Equals(salDomClient.AlternativeAccount)).Select(i => i.T24AccountId).FirstOrDefault() ?? String.Empty;
-            }
-            else
-            {
-                t24Account = getCustomersByAlternativeIdsRes?.CustomersList.Where(i => i.InputedId.Equals(salDomClient.AlternativeAccount)).Select(i => i.T24AccountId).FirstOrDefault() ?? String.Empty;
+      correlationInfo.Reserved = ex.Message;
+      LogErrorJson(response, correlationInfo, ex);
 
-                if (String.IsNullOrWhiteSpace(t24Account))
-                {
-                    // Remove the zero that has been added at the beginning before sending the request
-                    t24Account = getCustomersByNotFoundAlternativeIdsRes?.CustomersList.Where(i => i.InputedId.Substring(1).Equals(salDomClient.AlternativeAccount)).Select(i => i.T24AccountId).FirstOrDefault() ?? String.Empty;
-                }
-            }
-        }
-
-        FileImportContent fileImportContent = new()
-        {
-            Id = -1,
-            AltAccNbr = salDomClient.AlternativeAccount,
-            Amount = Convert.ToDecimal(salDomClient.Amount),
-            AccNbr = t24Account,
-            Other = salDomClient.Other,
-            FileImportId = createdFileImportId,
-            ProductCode = customerInfoList.FirstOrDefault(i => i.T24AccountId.Equals(t24Account))?.ProductCode ?? String.Empty,
-            CustomerName = customerInfoList.FirstOrDefault(i => i.T24AccountId.Equals(t24Account))?.FullName ?? String.Empty,
-            SourceAccountNumber = salDomClient.SourceAccountNumber ?? fileConfig.SourceAccountNumber
-        };
-
-        Boolean isAccountUnresolved = String.IsNullOrWhiteSpace(t24Account);
-        Boolean isDictT24AccountNotActive = hasDictionaryMapping && isAccountUnresolved;
-        Boolean isAltAccNotFoundInDictionary = isAccountUnresolved && !isDictT24AccountNotActive;
-
-        Boolean isAltAccProductCodeInvalid =
-            salDomClientsWithDifferentProductCode.Any(i => i.AlternativeAccount.Equals(salDomClient.AlternativeAccount));
-
-        Boolean isT24AccountCurrencyInvalid =
-            !String.IsNullOrWhiteSpace(fileImportContent.AccNbr) && !fileImportContent.AccNbr.Substring(fileImportContent.AccNbr.Length - 3).Equals(((Int32)fileCurrency).ToString());
-
-        String validationRejectReason = String.Empty;
-
-        if (isAltAccNotFoundInDictionary)
-        {
-            validationRejectReason += "Account Not Found In Dictionary\n";
-        }
-        else if (isDictT24AccountNotActive)
-        {
-            validationRejectReason += "Invalid Dictionary Account\n";
-        }
-        else if (isT24AccountCurrencyInvalid)
-        {
-            validationRejectReason += "Account Currency Is Invalid\n";
-        }
-        else if (isAltAccProductCodeInvalid)
-        {
-            validationRejectReason += "Account Product Is Incorrect\n";
-        }
-
-        fileImportContent.ValidationRejectReason = validationRejectReason;
-
-        if (isAltAccNotFoundInDictionary || isDictT24AccountNotActive)
-        {
-            fileImportContent.StatusId = (Int32)FileImportContentStatus.MANUAL_INTERVENTION_NEEDED;
-        }
-        else if (isT24AccountCurrencyInvalid)
-        {
-            fileImportContent.StatusId = (Int32)FileImportContentStatus.INCORRECT_CURRENCY;
-        }
-        else if (isAltAccProductCodeInvalid)
-        {
-            fileImportContent.StatusId = (Int32)FileImportContentStatus.INCORRECT_PRODUCT_CODE_NO_CURRENT_ACCOUNTS_AVAILABLE;
-
-            if (getAccountsByCustomerIdListRes is not null)
-            {
-                if (Utilities.ValidateT24AccountNumber(fileImportContent.AccNbr))
-                {
-                    String extractedCustomerId = fileImportContent.AccNbr.Substring(2, 7);
-
-                    List<CustomerInfo> customerInfos =
-                        getAccountsByCustomerIdListRes.CustomersList
-                            .Where(i =>
-                                i.AccountsCount > 1 // If it's equal to one => only the i.T24AccountId was found
-                                && i.InputedId.Equals(extractedCustomerId)
-                                && i.IsProductCodeMatching
-                                && i.IsCurrencyCodeMatching!.Value.Equals(true))
-                            .ToList();
-
-                    if (customerInfos.Count > 0)
-                    {
-                        fileImportContent.StatusId = (Int32)FileImportContentStatus.INCORRECT_PRODUCT_CODE_CURRENT_ACCOUNTS_AVAILABLE;
-                    }
-                }
-            }
-        }
-        else
-        {
-            if (fileImportContent.AltAccNbr.Equals(fileImportContent.AccNbr))
-            {
-                fileImportContent.StatusId = (Int32)FileImportContentStatus.ACCOUNT_NUMBER_CORRECT_ACCOUNTS_MATCH;
-            }
-            else
-            {
-                fileImportContent.StatusId = (Int32)FileImportContentStatus.ACCOUNT_NUMBER_CORRECT_ACCOUNTS_DOES_NOT_MATCH;
-            }
-        }
-
-        fileImportContents.Add(fileImportContent);
+      return response;
     }
+  }
 
-    AddFileImportContentBulk(fileImportContents, request.BaseReq.UserData.UserName);
+public class GetDocumentAccessAuditRequest
+{
+  [Required]
+  public required BaseRequest BaseReq { get; set; }
+
+  [Required]
+  public required Int64 DocumentReferenceId { get; set; }
 }
+
+public class GetDocumentAccessAuditResponse
+{
+  public BaseResponse BaseResp { get; set; } = new();
+  public required GetDocumentAccessAuditRequest Req { get; set; }
+  public List<DocumentAccessAudit> DocumentAccessAuditList { get; set; } = [];
+}
+
+
+public class DocumentAccessAudit
+{
+  public Int64 Id { get; set; }
+  public Int64? DocumentReferenceId { get; set; }
+  public String CorrelationId { get; set; } = String.Empty;
+  public String PresentedTokenHash { get; set; } = String.Empty;
+  public String OutcomeCode { get; set; } = String.Empty;
+  public Boolean ConsumesQuota { get; set; }
+  public Int64? DeniedByRuleId { get; set; }
+  public String? DeniedByRuleName { get; set; }
+  public String? IpAddress { get; set; }
+  public String? UserAgent { get; set; }
+  public DateTime? CreatedDate { get; set; }
+  public String? CreatedBy { get; set; }
+
+  public String QuotaCalculationBasis { get; set; } = "CurrentPolicyRules";
+  public List<DocumentAccessRuleBalance> RemainingScansByRule { get; set; } = [];
+}
+
+public class DocumentAccessRuleBalance
+{
+  public long AccessPolicyId { get; set; }
+  public string AccessPolicyName { get; set; } = string.Empty;
+  public long RuleId { get; set; }
+  public string RuleName { get; set; } = string.Empty;
+  public int? WindowSeconds { get; set; }
+  public int MaximumAccessCount { get; set; }
+  public long? UsedAccessCount { get; set; }
+  public long? RemainingAccessCount { get; set; }
+  public bool IsConfigurationValid { get; set; }
+  public bool? IsLimitReached => RemainingAccessCount.HasValue
+    ? RemainingAccessCount.Value == 0 : null;
+}
+
+  public async Task<List<DocumentAccessAudit>> GetDocumentAccessAudit(
+    GetDocumentAccessAuditRequest request)
+  {
+    DapperDal dal = new DapperDal(_globalSettings.ConnString);
+    DynamicParameters parameters = new();
+    parameters.Add("P__DocumentReferenceId", request.DocumentReferenceId, DbType.Int64);
+
+    IEnumerable<DocumentAccessAuditDbRow> rows =
+      await dal.ExecuteQueryAsync<DocumentAccessAuditDbRow>(
+        "dbo.usp_GetDocumentAccessAudit",
+        parameters,
+        CommandType.StoredProcedure,
+        DapperDal.CommandDirection.Select);
+
+    return DocumentAccessAuditMapper.ToModels(rows);
+  }
+
+public class DocumentAccessAuditDbRow : DocumentAccessAudit
+{
+  public long? QuotaAccessPolicyId { get; set; }
+  public string? QuotaAccessPolicyName { get; set; }
+  public long? QuotaRuleId { get; set; }
+  public string? QuotaRuleName { get; set; }
+  public int? QuotaWindowSeconds { get; set; }
+  public int? QuotaMaximumAccessCount { get; set; }
+  public bool? QuotaIsConfigurationValid { get; set; }
+  public long? QuotaUsedAccessCount { get; set; }
+  public long? QuotaRemainingAccessCount { get; set; }
+}
+
+
+USE [Alterna_AccountStatementManagement]
+GO
+/****** Object:  StoredProcedure [dbo].[usp_GetDocumentAccessAudit]    Script Date: 11/9/2026 2:40:11 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[usp_GetDocumentAccessAudit]
+    @P__DocumentReferenceId BIGINT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    ;WITH DocumentAudits AS
+    (
+        SELECT
+            A.*,
+            SUM(CONVERT(BIGINT, CASE WHEN A.ConsumesQuota = 1 THEN 1 ELSE 0 END))
+                OVER
+                (
+                    PARTITION BY A.DocumentReferenceId
+                    ORDER BY A.CreatedDate, A.Id
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                ) AS LifetimeUsedAccessCount
+        FROM dbo.t_DocumentAccessAudit AS A
+        WHERE A.DocumentReferenceId = @P__DocumentReferenceId
+    )
+    SELECT
+        DAA.Id,
+        DAA.DocumentReferenceId,
+        DAA.CorrelationId,
+        DAA.PresentedTokenHash,
+        DAA.OutcomeCode,
+        DAA.ConsumesQuota,
+        DAA.DeniedByRuleId,
+        CASE WHEN DAA.DeniedByRuleId IS NULL THEN NULL
+             ELSE CONCAT(DeniedPolicy.PolicyName, N' : ', DeniedRule.RuleName)
+        END AS DeniedByRuleName,
+        DAA.IpAddress,
+        DAA.UserAgent,
+        DAA.CreatedDate,
+        DAA.CreatedBy,
+
+        R.AccessPolicyId AS QuotaAccessPolicyId,
+        CurrentPolicy.PolicyName AS QuotaAccessPolicyName,
+        R.Id AS QuotaRuleId,
+        R.RuleName AS QuotaRuleName,
+        R.WindowSeconds AS QuotaWindowSeconds,
+        R.MaximumAccessCount AS QuotaMaximumAccessCount,
+        CONVERT(BIT, Validity.IsConfigurationValid) AS QuotaIsConfigurationValid,
+        Usage.UsedAccessCount AS QuotaUsedAccessCount,
+        CASE
+            WHEN Usage.UsedAccessCount IS NULL THEN CONVERT(BIGINT, NULL)
+            WHEN Usage.UsedAccessCount >= R.MaximumAccessCount THEN CONVERT(BIGINT, 0)
+            ELSE CONVERT(BIGINT, R.MaximumAccessCount) - Usage.UsedAccessCount
+        END AS QuotaRemainingAccessCount
+    FROM DocumentAudits AS DAA
+    LEFT JOIN dbo.t_AccessPolicyRule AS DeniedRule
+        ON DeniedRule.Id = DAA.DeniedByRuleId
+    LEFT JOIN dbo.t_AccessPolicy AS DeniedPolicy
+        ON DeniedPolicy.Id = DeniedRule.AccessPolicyId
+    LEFT JOIN dbo.t_DocumentReference AS DR
+        ON DR.Id = DAA.DocumentReferenceId
+    LEFT JOIN dbo.t_AccessPolicy AS CurrentPolicy
+        ON CurrentPolicy.Id = DR.AccessPolicyId
+    LEFT JOIN dbo.t_AccessPolicyRule AS R
+        ON R.AccessPolicyId = DR.AccessPolicyId
+       AND R.IsEnabled = 1
+    CROSS APPLY
+    (
+        VALUES
+        (
+            CASE
+                WHEN R.Id IS NULL THEN NULL
+                WHEN R.MaximumAccessCount > 0
+                 AND (R.WindowSeconds IS NULL OR R.WindowSeconds > 0) THEN 1
+                ELSE 0
+            END
+        )
+    ) AS Validity(IsConfigurationValid)
+    OUTER APPLY
+    (
+        SELECT COUNT_BIG(*) AS RollingUsedAccessCount
+        FROM dbo.t_DocumentAccessAudit AS A
+        WHERE Validity.IsConfigurationValid = 1
+          AND R.WindowSeconds > 0
+          AND A.DocumentReferenceId = DAA.DocumentReferenceId
+          AND A.ConsumesQuota = 1
+          -- Same exclusive lower boundary as usp_GetDocumentCuk.
+          AND A.CreatedDate > DATEADD
+          (
+              SECOND,
+              CASE WHEN R.WindowSeconds > 0 THEN -R.WindowSeconds ELSE NULL END,
+              DAA.CreatedDate
+          )
+          AND
+          (
+              A.CreatedDate < DAA.CreatedDate
+              OR (A.CreatedDate = DAA.CreatedDate AND A.Id <= DAA.Id)
+          )
+    ) AS RollingUsage
+    CROSS APPLY
+    (
+        VALUES
+        (
+            CASE
+                WHEN Validity.IsConfigurationValid = 1 THEN
+                    CASE WHEN R.WindowSeconds IS NULL THEN DAA.LifetimeUsedAccessCount
+                         ELSE RollingUsage.RollingUsedAccessCount END
+                ELSE CONVERT(BIGINT, NULL)
+            END
+        )
+    ) AS Usage(UsedAccessCount)
+    ORDER BY
+        DAA.CreatedDate DESC,
+        DAA.Id DESC,
+        CASE WHEN R.WindowSeconds IS NULL THEN 0 ELSE 1 END,
+        R.WindowSeconds,
+        R.Id;
+END;
+
