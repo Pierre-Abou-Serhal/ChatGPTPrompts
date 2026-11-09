@@ -1,232 +1,148 @@
 private void UpdateSalDomDatabase(
-            List<SalDomClient> salDomClients,
-            SendEmailAttachmentForValidationRequest request,
-            Model.File fileConfig,
-            ExchangeApiAttachmentInfo attachmentInfo)
+    List<SalDomClient> salDomClients,
+    SendEmailAttachmentForValidationRequest request,
+    Model.File fileConfig,
+    ExchangeApiAttachmentInfo attachmentInfo)
+{
+    // Step 0: Query Dictionary
+    List<Dictionary> dictionaryList = QueryDictionary(salDomClients.Select(i => i.AlternativeAccount).ToList(), fileConfig.Id);
+
+    // Step 1: Get All Alternative Accounts That are in Dictionary And salDomClients
+    List<Dictionary> t24AccountsForMatchingAltAccsInBoth = dictionaryList
+        .Where(i => salDomClients.Any(y => y.AlternativeAccount.Equals(i.AlternativeAccountId)))
+        .ToList();
+
+    var dictionaryMappingsByAlternativeId = t24AccountsForMatchingAltAccsInBoth
+        .ToLookup(mapping => mapping.AlternativeAccountId);
+
+    // Step 2: Remove alternativeAccountsInBoth From salDomClients
+    List<SalDomClient> salDomClientDivided = salDomClients.Where(i => !t24AccountsForMatchingAltAccsInBoth.Any(y => y.AlternativeAccountId.Equals(i.AlternativeAccount))).ToList();
+
+    // Step 3: Group Received Accounts into T24 Format + T24 Accounts Found In Dictionary
+    List<String> accountsWithT24Formats = salDomClientDivided.Where(i => Utilities.ValidateT24AccountNumber(i.AlternativeAccount)).Select(i => i.AlternativeAccount).ToList();
+
+    // Step 4: Group Received Accounts into Non T24 Format
+    List<String> alternativeIdsToLookup = salDomClientDivided.Where(i => !Utilities.ValidateT24AccountNumber(i.AlternativeAccount)).Select(i => i.AlternativeAccount).ToList();
+
+    // Get Current Product Code For The T24 Format Accounts
+    GetCustomerByAccountIdListReq? getCustomerByAccountIdListReq;
+    GetCustomerByAccountIdListRes? getCustomerByAccountIdListRes = null;
+
+    if (accountsWithT24Formats.Count > 0)
+    {
+        getCustomerByAccountIdListReq = new()
         {
-            // Step 0: Query Dictionary
-            List<Dictionary> dictionaryList = QueryDictionary(salDomClients.Select(i => i.AlternativeAccount).ToList(), fileConfig.Id);
-
-            // Step 1: Get All Alternative Accounts That are in Dictionary And salDomClients
-            List<Dictionary> t24AccountsForMatchingAltAccsInBoth = dictionaryList
-                .Where(i => salDomClients.Any(y => y.AlternativeAccount.Equals(i.AlternativeAccountId)))
-                .ToList();
-
-            // Step 2: Remove alternativeAccountsInBoth From salDomClients
-            List<SalDomClient> salDomClientDivided = salDomClients.Where(i => !t24AccountsForMatchingAltAccsInBoth.Any(y => y.AlternativeAccountId.Equals(i.AlternativeAccount))).ToList();
-
-            // Step 3: Group Received Accounts into T24 Format + T24 Accounts Found In Dictionary
-            List<String> accountsWithT24Formats = salDomClientDivided.Where(i => Utilities.ValidateT24AccountNumber(i.AlternativeAccount)).Select(i => i.AlternativeAccount).ToList();
-
-            // Step 4: Group Received Accounts into Non T24 Format
-            List<String> accountsWithNonT24Formats = salDomClientDivided.Where(i => !Utilities.ValidateT24AccountNumber(i.AlternativeAccount)).Select(i => i.AlternativeAccount).ToList();
-
-            // Get Current Product Code For The T24 Format Accounts
-            GetCustomerByAccountIdListReq? getCustomerByAccountIdListReq;
-            GetCustomerByAccountIdListRes? getCustomerByAccountIdListRes = null;
-
-            if (accountsWithT24Formats.Count > 0)
+            BaseReq = new()
             {
-                getCustomerByAccountIdListReq = new()
-                {
-                    BaseReq = new()
-                    {
-                        CorrelationId = request.BaseReq.CorrelationId,
-                        UserName = request.BaseReq.UserData.UserName
-                    },
-                    ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-                    AccountIdList = String.Join(',', accountsWithT24Formats)
-                };
+                CorrelationId = request.BaseReq.CorrelationId,
+                UserName = request.BaseReq.UserData.UserName
+            },
+            ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
+            AccountIdList = String.Join(',', accountsWithT24Formats)
+        };
 
-                getCustomerByAccountIdListRes =
-                    Post<GetCustomerByAccountIdListRes>(
-                        getCustomerByAccountIdListReq,
-                        $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomerByAccountIdList");
-            }
+        getCustomerByAccountIdListRes =
+            Post<GetCustomerByAccountIdListRes>(
+                getCustomerByAccountIdListReq,
+                $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomerByAccountIdList");
+    }
 
-            if (getCustomerByAccountIdListRes is not null && Int32.Parse(getCustomerByAccountIdListRes.WebResp.ReturnCode.Code) != 200)
+    if (getCustomerByAccountIdListRes is not null && Int32.Parse(getCustomerByAccountIdListRes.WebResp.ReturnCode.Code) != 200)
+    {
+        throw new Exception(getCustomerByAccountIdListRes.WebResp.ReturnCode.Message);
+    }
+
+    // Get Current Product Code For The T24 Format Accounts
+    GetCustomerByAccountIdListReq? getCustomerByAccountIdListDictReq;
+    GetCustomerByAccountIdListRes? getCustomerByAccountIdListDictRes = null;
+
+    if (t24AccountsForMatchingAltAccsInBoth.Count > 0)
+    {
+        getCustomerByAccountIdListDictReq = new GetCustomerByAccountIdListReq()
+        {
+            BaseReq = new()
             {
-                throw new Exception(getCustomerByAccountIdListRes.WebResp.ReturnCode.Message);
-            }
+                CorrelationId = request.BaseReq.CorrelationId,
+                UserName = request.BaseReq.UserData.UserName
+            },
+            ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
+            AccountIdList = String.Join(',', t24AccountsForMatchingAltAccsInBoth.Select(i => i.T24AccountId).ToList())
+        };
 
-            // Get Current Product Code For The T24 Format Accounts
-            GetCustomerByAccountIdListReq? getCustomerByAccountIdListDictReq;
-            GetCustomerByAccountIdListRes? getCustomerByAccountIdListDictRes = null;
+        getCustomerByAccountIdListDictRes =
+            Post<GetCustomerByAccountIdListRes>(
+                getCustomerByAccountIdListDictReq,
+                $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomerByAccountIdList");
+    }
 
-            if (t24AccountsForMatchingAltAccsInBoth.Count > 0)
+    if (getCustomerByAccountIdListDictRes is not null && Int32.Parse(getCustomerByAccountIdListDictRes.WebResp.ReturnCode.Code) != 200)
+    {
+        throw new Exception(getCustomerByAccountIdListDictRes.WebResp.ReturnCode.Message);
+    }
+
+    if (t24AccountsForMatchingAltAccsInBoth.Count > 0 && getCustomerByAccountIdListDictRes is null)
+    {
+        throw new Exception("No response from Data Gateway for the dictionary account lookup.");
+    }
+
+    var dictionaryCustomersByInput = (getCustomerByAccountIdListDictRes?.CustomersList ?? [])
+        .ToLookup(customer => customer.InputedId);
+
+    // Retry missing dictionary accounts using the original alternative IDs from the file.
+    alternativeIdsToLookup = alternativeIdsToLookup
+        .Concat(dictionaryMappingsByAlternativeId
+            .Select(mappings => mappings.First())
+            .Where(mapping => !String.IsNullOrWhiteSpace(mapping.T24AccountId)
+                && !dictionaryCustomersByInput.Contains(mapping.T24AccountId))
+            .Select(mapping => mapping.AlternativeAccountId))
+        .Distinct()
+        .ToList();
+
+    // Look up alternative IDs and any replacements Gateway can resolve.
+    GetCustomersByAlternativeIdsReq? getCustomersByAlternativeIdsReq;
+    GetCustomersByAlternativeIdsRes? getCustomersByAlternativeIdsRes = null;
+
+    GetCustomerByAccountIdListReq? getCustomersByNotFoundAlternativeIdsReq;
+    GetCustomerByAccountIdListRes? getCustomersByNotFoundAlternativeIdsRes = null;
+
+    if (alternativeIdsToLookup.Count > 0)
+    {
+        getCustomersByAlternativeIdsReq = new()
+        {
+            BaseReq = new()
             {
-                getCustomerByAccountIdListDictReq = new GetCustomerByAccountIdListReq()
-                {
-                    BaseReq = new()
-                    {
-                        CorrelationId = request.BaseReq.CorrelationId,
-                        UserName = request.BaseReq.UserData.UserName
-                    },
-                    ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-                    AccountIdList = String.Join(',', t24AccountsForMatchingAltAccsInBoth.Select(i => i.T24AccountId).ToList())
-                };
+                CorrelationId = request.BaseReq.CorrelationId,
+                UserName = request.BaseReq.UserData.UserName
+            },
+            ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
+            AltIds = String.Join(',', alternativeIdsToLookup)
+        };
 
-                getCustomerByAccountIdListDictRes =
-                    Post<GetCustomerByAccountIdListRes>(
-                        getCustomerByAccountIdListDictReq,
-                        $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomerByAccountIdList");
-            }
+        getCustomersByAlternativeIdsRes =
+            Post<GetCustomersByAlternativeIdsRes>(
+                getCustomersByAlternativeIdsReq,
+                $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomersByAlternativeIds");
 
-            if (getCustomerByAccountIdListDictRes is not null && Int32.Parse(getCustomerByAccountIdListDictRes.WebResp.ReturnCode.Code) != 200)
-            {
-                throw new Exception(getCustomerByAccountIdListDictRes.WebResp.ReturnCode.Message);
-            }
+        if (getCustomersByAlternativeIdsRes is null)
+        {
+            throw new Exception("No response from Data Gateway for the alternative account lookup.");
+        }
 
-            // Get Current Product Code For The Non T24 Format Accounts
-            GetCustomersByAlternativeIdsReq? getCustomersByAlternativeIdsReq;
-            GetCustomersByAlternativeIdsRes? getCustomersByAlternativeIdsRes = null;
+        if (Int32.Parse(getCustomersByAlternativeIdsRes.WebResp.ReturnCode.Code) != 200)
+        {
+            throw new Exception(getCustomersByAlternativeIdsRes.WebResp.ReturnCode.Message);
+        }
 
-            GetCustomerByAccountIdListReq? getCustomersByNotFoundAlternativeIdsReq;
-            GetCustomerByAccountIdListRes? getCustomersByNotFoundAlternativeIdsRes = null;
+        // Retry unmatched 14-digit IDs that start with 1 as zero-padded account IDs.
+        List<String> paddedAlternativeIds = alternativeIdsToLookup
+            .Except(getCustomersByAlternativeIdsRes.CustomersList?.Select(i => i.InputedId) ?? [])
+            .Where(i => i.Length == 14 && i.StartsWith("1"))
+            .Select(i => i.PadLeft(15, '0'))
+            .ToList();
 
-            if (accountsWithNonT24Formats.Count > 0)
-            {
-                getCustomersByAlternativeIdsReq = new()
-                {
-                    BaseReq = new()
-                    {
-                        CorrelationId = request.BaseReq.CorrelationId,
-                        UserName = request.BaseReq.UserData.UserName
-                    },
-                    ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-                    AltIds = String.Join(',', accountsWithNonT24Formats)
-                };
-
-                getCustomersByAlternativeIdsRes =
-                    Post<GetCustomersByAlternativeIdsRes>(
-                        getCustomersByAlternativeIdsReq,
-                        $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomersByAlternativeIds");
-
-                // For all alternative accounts that do not have a matching T24 account BUT have a length = 14 and begins with "1", add a zero at the beginning and try to call
-                // GetCustomersByAlternativeIds API again
-                List<String> accountsWithNonT24FormatsNotFound = accountsWithNonT24Formats
-                    .Except(getCustomersByAlternativeIdsRes?.CustomersList.Select(i => i.InputedId) ?? [])
-                    .Where(i => i.Length == 14 && i.StartsWith("1"))
-                    .Select(i => i.PadLeft(15, '0'))
-                    .ToList();
-
-                if (accountsWithNonT24FormatsNotFound.Count > 0)
-                {
-                    getCustomersByNotFoundAlternativeIdsReq = new()
-                    {
-                        BaseReq = new()
-                        {
-                            CorrelationId = request.BaseReq.CorrelationId,
-                            UserName = request.BaseReq.UserData.UserName
-                        },
-                        ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-                        AccountIdList = String.Join(',', accountsWithNonT24FormatsNotFound)
-                    };
-
-                    getCustomersByNotFoundAlternativeIdsRes =
-                        Post<GetCustomerByAccountIdListRes>(
-                            getCustomersByNotFoundAlternativeIdsReq,
-                            $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomerByAccountIdList");
-
-                    if (getCustomersByNotFoundAlternativeIdsRes is not null && Int32.Parse(getCustomersByNotFoundAlternativeIdsRes.WebResp.ReturnCode.Code) != 200)
-                    {
-                        throw new Exception(getCustomersByNotFoundAlternativeIdsRes.WebResp.ReturnCode.Message);
-                    }
-                }
-            }
-
-            if (getCustomersByAlternativeIdsRes is not null && Int32.Parse(getCustomersByAlternativeIdsRes.WebResp.ReturnCode.Code) != 200)
-            {
-                throw new Exception(getCustomersByAlternativeIdsRes.WebResp.ReturnCode.Message);
-            }
-
-            // Get The File Config Currency For Further Checking
-            Currency fileCurrency;
-
-            if (Int32.TryParse(fileConfig.CurrencyCode, out Int32 parsedCurrencyCode))
-            {
-                fileCurrency = (Currency)parsedCurrencyCode;
-            }
-            else
-            {
-                throw new Exception("Invalid Currency Code For File Configuration");
-            }
-
-            // Group invalid accounts that have different Product Code on T24
-            List<SalDomClient> salDomClientsWithDifferentProductCode = []; // Updated From t24 From a reason and not reflected yet in Dictionary
-            List<CustomerInfo> customerInfoList = []; // Used To Access The Product Code For Found T24 Accounts
-            List<Dictionary> dictionaryWithInactiveAccounts = [];
-
-            foreach (CustomerInfo customerInfo in getCustomerByAccountIdListRes?.CustomersList ?? [])
-            {
-                if (!customerInfo.IsProductCodeMatching)
-                {
-                    salDomClientsWithDifferentProductCode.Add(
-                        salDomClients.First(i => i.AlternativeAccount.Equals(customerInfo.InputedId)));
-                }
-                customerInfoList.Add(customerInfo);
-            }
-
-            foreach (CustomerInfo customerInfo in getCustomersByAlternativeIdsRes?.CustomersList ?? [])
-            {
-                if (!customerInfo.IsProductCodeMatching)
-                {
-                    salDomClientsWithDifferentProductCode.Add(
-                        salDomClients.First(i => i.AlternativeAccount.Equals(customerInfo.InputedId)));
-                }
-                customerInfoList.Add(customerInfo);
-            }
-
-            foreach (CustomerInfo customerInfo in getCustomersByNotFoundAlternativeIdsRes?.CustomersList ?? [])
-            {
-                if (!customerInfo.IsProductCodeMatching)
-                {
-                    // Remove the zero that has been added at the beginning before sending the request
-                    salDomClientsWithDifferentProductCode.Add(
-                        salDomClients.First(i => i.AlternativeAccount.Equals(customerInfo.InputedId.Substring(1))));
-                }
-                customerInfoList.Add(customerInfo);
-            }
-
-            foreach (CustomerInfo customerInfo in getCustomerByAccountIdListDictRes?.CustomersList ?? [])
-            {
-                if (!customerInfo.IsProductCodeMatching)
-                {
-                    List<Dictionary> dictList = dictionaryList.Where(i => i.T24AccountId.Equals(customerInfo.InputedId)).ToList();
-
-                    foreach (Dictionary dict in dictList)
-                    {
-                        SalDomClient salDomClient = new()
-                        {
-                            AlternativeAccount = dict.AlternativeAccountId
-                        };
-
-                        salDomClientsWithDifferentProductCode.Add(salDomClient);
-                    }
-                }
-                customerInfoList.Add(customerInfo);
-            }
-
-            foreach (Dictionary dict in t24AccountsForMatchingAltAccsInBoth)
-            {
-                if (getCustomerByAccountIdListDictRes != null && !getCustomerByAccountIdListDictRes.CustomersList.Any(i => i.T24AccountId.Equals(dict.T24AccountId)))
-                {
-                    dictionaryWithInactiveAccounts.Add(dict);
-                }
-            }
-
-            // Extracting Customer Ids From T24 Accounts
-            List<String> customerIdList = [];
-
-            foreach (CustomerInfo customerInfo in customerInfoList)
-            {
-                if (Utilities.ValidateT24AccountNumber(customerInfo.T24AccountId))
-                {
-                    customerIdList.Add(customerInfo.T24AccountId.Substring(2, 7));
-                }
-            }
-
-            GetAccountsByCustomerIdListReq getAccountsByCustomerIdListReq = new()
+        if (paddedAlternativeIds.Count > 0)
+        {
+            getCustomersByNotFoundAlternativeIdsReq = new()
             {
                 BaseReq = new()
                 {
@@ -234,179 +150,282 @@ private void UpdateSalDomDatabase(
                     UserName = request.BaseReq.UserData.UserName
                 },
                 ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
-                IdsList = String.Join(',', customerIdList),
-                CurrencyCode = fileConfig.CurrencyCode
+                AccountIdList = String.Join(',', paddedAlternativeIds)
             };
 
-            GetAccountsByCustomerIdListRes getAccountsByCustomerIdListRes =
-                Post<GetAccountsByCustomerIdListRes>(
-                    getAccountsByCustomerIdListReq,
-                    $"{_globalSettings.DataGateWayUrl}/api/Customer/GetAccountsByCustomerIdList");
+            getCustomersByNotFoundAlternativeIdsRes =
+                Post<GetCustomerByAccountIdListRes>(
+                    getCustomersByNotFoundAlternativeIdsReq,
+                    $"{_globalSettings.DataGateWayUrl}/api/Customer/GetCustomerByAccountIdList");
 
-            if (getAccountsByCustomerIdListRes is not null && Int32.Parse(getAccountsByCustomerIdListRes.WebResp.ReturnCode.Code) != 200)
+            if (getCustomersByNotFoundAlternativeIdsRes is not null && Int32.Parse(getCustomersByNotFoundAlternativeIdsRes.WebResp.ReturnCode.Code) != 200)
             {
-                throw new Exception(getAccountsByCustomerIdListRes.WebResp.ReturnCode.Message);
+                throw new Exception(getCustomersByNotFoundAlternativeIdsRes.WebResp.ReturnCode.Message);
             }
+        }
+    }
 
-            if (fileConfig.HasMultipleSrcAccounts)
+    // Get The File Config Currency For Further Checking
+    Currency fileCurrency;
+
+    if (Int32.TryParse(fileConfig.CurrencyCode, out Int32 parsedCurrencyCode))
+    {
+        fileCurrency = (Currency)parsedCurrencyCode;
+    }
+    else
+    {
+        throw new Exception("Invalid Currency Code For File Configuration");
+    }
+
+    // Group invalid accounts that have different Product Code on T24
+    List<SalDomClient> salDomClientsWithDifferentProductCode = []; // Updated From t24 From a reason and not reflected yet in Dictionary
+    List<CustomerInfo> customerInfoList = []; // Used To Access The Product Code For Found T24 Accounts
+
+    foreach (CustomerInfo customerInfo in getCustomerByAccountIdListRes?.CustomersList ?? [])
+    {
+        if (!customerInfo.IsProductCodeMatching)
+        {
+            salDomClientsWithDifferentProductCode.Add(
+                salDomClients.First(i => i.AlternativeAccount.Equals(customerInfo.InputedId)));
+        }
+        customerInfoList.Add(customerInfo);
+    }
+
+    foreach (CustomerInfo customerInfo in getCustomersByAlternativeIdsRes?.CustomersList ?? [])
+    {
+        if (!customerInfo.IsProductCodeMatching)
+        {
+            salDomClientsWithDifferentProductCode.Add(
+                salDomClients.First(i => i.AlternativeAccount.Equals(customerInfo.InputedId)));
+        }
+        customerInfoList.Add(customerInfo);
+    }
+
+    foreach (CustomerInfo customerInfo in getCustomersByNotFoundAlternativeIdsRes?.CustomersList ?? [])
+    {
+        if (!customerInfo.IsProductCodeMatching)
+        {
+            // Remove the zero that has been added at the beginning before sending the request
+            salDomClientsWithDifferentProductCode.Add(
+                salDomClients.First(i => i.AlternativeAccount.Equals(customerInfo.InputedId.Substring(1))));
+        }
+        customerInfoList.Add(customerInfo);
+    }
+
+    foreach (CustomerInfo customerInfo in getCustomerByAccountIdListDictRes?.CustomersList ?? [])
+    {
+        if (!customerInfo.IsProductCodeMatching)
+        {
+            List<Dictionary> dictList = dictionaryList.Where(i => i.T24AccountId.Equals(customerInfo.InputedId)).ToList();
+
+            foreach (Dictionary dict in dictList)
             {
-                // Validating parsed debit accounts with configured debit accounts
-                List<String?> uniqueSourceAcc = salDomClients.Select(i => i.SourceAccountNumber).Distinct().ToList();
-
-                if (uniqueSourceAcc.Contains(null) || uniqueSourceAcc.Contains(String.Empty))
+                SalDomClient salDomClient = new()
                 {
-                    throw new Exception("Empty Debit Account Number detected.");
-                }
-
-                List<String> configuredSourceAcc = fileConfig.FileSrcAccounts!.Select(i => i.AccNumber).ToList();
-                List<String?> invalidSourceAcc = uniqueSourceAcc.Except(configuredSourceAcc).ToList();
-
-                if (invalidSourceAcc.Any())
-                {
-                    String invalidAcc = String.Join(",", invalidSourceAcc);
-                    throw new Exception($"The following debit accounts: {invalidAcc} are not in the file configuration.");
-                }
-            }
-
-            // Add New File Import Content Records In The Database
-            List<FileImportContent> fileImportContents = [];
-
-            // Add New File Import Record In The Database
-            Int64 createdFileImportId = AddFileImport(new()
-                {
-                    Id = -1,
-                    FileId = fileConfig.Id,
-                    StatusCode = ((Int32)FileStatus.RECEIVED).ToString(),
-                },
-                attachmentInfo.AttachmentId,
-                request.BaseReq.UserData.UserName
-            );
-
-            if (createdFileImportId <= 0)
-            {
-                throw new Exception("Could Not Create File Import");
-            }
-
-            foreach (SalDomClient salDomClient in salDomClients)
-            {
-                String t24Account = String.Empty;
-
-                t24Account =
-                    dictionaryList.FirstOrDefault(i => i.AlternativeAccountId.Equals(salDomClient.AlternativeAccount))
-                        ?.T24AccountId ?? String.Empty;
-
-                // Alternative Account Was Not Found In Dictionary
-                if (String.IsNullOrWhiteSpace(t24Account))
-                {
-                    // Search In Accounts
-                    if (Utilities.ValidateT24AccountNumber(salDomClient.AlternativeAccount))
-                    {
-                        t24Account = getCustomerByAccountIdListRes?.CustomersList.Where(i => i.InputedId.Equals(salDomClient.AlternativeAccount)).Select(i => i.T24AccountId).FirstOrDefault() ?? String.Empty;
-                    }
-                    else
-                    {
-                        t24Account = getCustomersByAlternativeIdsRes?.CustomersList.Where(i => i.InputedId.Equals(salDomClient.AlternativeAccount)).Select(i => i.T24AccountId).FirstOrDefault() ?? String.Empty;
-
-                        if (String.IsNullOrWhiteSpace(t24Account))
-                        {
-                            // Remove the zero that has been added at the beginning before sending the request
-                            t24Account = getCustomersByNotFoundAlternativeIdsRes?.CustomersList.Where(i => i.InputedId.Substring(1).Equals(salDomClient.AlternativeAccount)).Select(i => i.T24AccountId).FirstOrDefault() ?? String.Empty;
-                        }
-                    }
-                }
-
-                FileImportContent fileImportContent = new()
-                {
-                    Id = -1,
-                    AltAccNbr = salDomClient.AlternativeAccount,
-                    Amount = Convert.ToDecimal(salDomClient.Amount),
-                    AccNbr = t24Account,
-                    Other = salDomClient.Other,
-                    FileImportId = createdFileImportId,
-                    ProductCode = customerInfoList.FirstOrDefault(i => i.T24AccountId.Equals(t24Account))?.ProductCode ?? String.Empty,
-                    CustomerName = customerInfoList.FirstOrDefault(i => i.T24AccountId.Equals(t24Account))?.FullName ?? String.Empty,
-                    SourceAccountNumber = salDomClient.SourceAccountNumber ?? fileConfig.SourceAccountNumber
+                    AlternativeAccount = dict.AlternativeAccountId
                 };
 
-                Boolean isAltAccNotFoundInDictionary = String.IsNullOrWhiteSpace(t24Account);
-
-                Boolean isDictT24AccountNotActive = !isAltAccNotFoundInDictionary && dictionaryWithInactiveAccounts.Any(i => i.T24AccountId.Equals(t24Account));
-
-                Boolean isAltAccProductCodeInvalid =
-                    salDomClientsWithDifferentProductCode.Any(i => i.AlternativeAccount.Equals(salDomClient.AlternativeAccount));
-
-                Boolean isT24AccountCurrencyInvalid =
-                    !String.IsNullOrWhiteSpace(fileImportContent.AccNbr) && !fileImportContent.AccNbr.Substring(fileImportContent.AccNbr.Length - 3).Equals(((Int32)fileCurrency).ToString());
-
-                String validationRejectReason = String.Empty;
-
-                if (isAltAccNotFoundInDictionary)
-                {
-                    validationRejectReason += "Account Not Found In Dictionary\n";
-                }
-                else if (isDictT24AccountNotActive)
-                {
-                    validationRejectReason += "Invalid Dictionary Account\n";
-                }
-                else if (isT24AccountCurrencyInvalid)
-                {
-                    validationRejectReason += "Account Currency Is Invalid\n";
-                }
-                else if (isAltAccProductCodeInvalid)
-                {
-                    validationRejectReason += "Account Product Is Incorrect\n";
-                }
-
-                fileImportContent.ValidationRejectReason = validationRejectReason;
-
-                if (isAltAccNotFoundInDictionary || isDictT24AccountNotActive)
-                {
-                    fileImportContent.StatusId = (Int32)FileImportContentStatus.MANUAL_INTERVENTION_NEEDED;
-                }
-                else if (isT24AccountCurrencyInvalid)
-                {
-                    fileImportContent.StatusId = (Int32)FileImportContentStatus.INCORRECT_CURRENCY;
-                }
-                else if (isAltAccProductCodeInvalid)
-                {
-                    fileImportContent.StatusId = (Int32)FileImportContentStatus.INCORRECT_PRODUCT_CODE_NO_CURRENT_ACCOUNTS_AVAILABLE;
-
-                    if (getAccountsByCustomerIdListRes is not null)
-                    {
-                        if (Utilities.ValidateT24AccountNumber(fileImportContent.AccNbr))
-                        {
-                            String extractedCustomerId = fileImportContent.AccNbr.Substring(2, 7);
-
-                            List<CustomerInfo> customerInfos =
-                                getAccountsByCustomerIdListRes.CustomersList
-                                    .Where(i =>
-                                        i.AccountsCount > 1 // If it's equal to one => only the i.T24AccountId was found
-                                        && i.InputedId.Equals(extractedCustomerId)
-                                        && i.IsProductCodeMatching
-                                        && i.IsCurrencyCodeMatching!.Value.Equals(true))
-                                    .ToList();
-
-                            if (customerInfos.Count > 0)
-                            {
-                                fileImportContent.StatusId = (Int32)FileImportContentStatus.INCORRECT_PRODUCT_CODE_CURRENT_ACCOUNTS_AVAILABLE;
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    if (fileImportContent.AltAccNbr.Equals(fileImportContent.AccNbr))
-                    {
-                        fileImportContent.StatusId = (Int32)FileImportContentStatus.ACCOUNT_NUMBER_CORRECT_ACCOUNTS_MATCH;
-                    }
-                    else
-                    {
-                        fileImportContent.StatusId = (Int32)FileImportContentStatus.ACCOUNT_NUMBER_CORRECT_ACCOUNTS_DOES_NOT_MATCH;
-                    }
-                }
-
-                fileImportContents.Add(fileImportContent);
+                salDomClientsWithDifferentProductCode.Add(salDomClient);
             }
-
-            AddFileImportContentBulk(fileImportContents, request.BaseReq.UserData.UserName);
         }
+        customerInfoList.Add(customerInfo);
+    }
+
+    // Extracting Customer Ids From T24 Accounts
+    List<String> customerIdList = [];
+
+    foreach (CustomerInfo customerInfo in customerInfoList)
+    {
+        if (Utilities.ValidateT24AccountNumber(customerInfo.T24AccountId))
+        {
+            customerIdList.Add(customerInfo.T24AccountId.Substring(2, 7));
+        }
+    }
+
+    GetAccountsByCustomerIdListReq getAccountsByCustomerIdListReq = new()
+    {
+        BaseReq = new()
+        {
+            CorrelationId = request.BaseReq.CorrelationId,
+            UserName = request.BaseReq.UserData.UserName
+        },
+        ProductCodesList = fileConfig.FileProducts!.Select(fp => fp.Code).ToList(),
+        IdsList = String.Join(',', customerIdList),
+        CurrencyCode = fileConfig.CurrencyCode
+    };
+
+    GetAccountsByCustomerIdListRes getAccountsByCustomerIdListRes =
+        Post<GetAccountsByCustomerIdListRes>(
+            getAccountsByCustomerIdListReq,
+            $"{_globalSettings.DataGateWayUrl}/api/Customer/GetAccountsByCustomerIdList");
+
+    if (getAccountsByCustomerIdListRes is not null && Int32.Parse(getAccountsByCustomerIdListRes.WebResp.ReturnCode.Code) != 200)
+    {
+        throw new Exception(getAccountsByCustomerIdListRes.WebResp.ReturnCode.Message);
+    }
+
+    if (fileConfig.HasMultipleSrcAccounts)
+    {
+        // Validating parsed debit accounts with configured debit accounts
+        List<String?> uniqueSourceAcc = salDomClients.Select(i => i.SourceAccountNumber).Distinct().ToList();
+
+        if (uniqueSourceAcc.Contains(null) || uniqueSourceAcc.Contains(String.Empty))
+        {
+            throw new Exception("Empty Debit Account Number detected.");
+        }
+
+        List<String> configuredSourceAcc = fileConfig.FileSrcAccounts!.Select(i => i.AccNumber).ToList();
+        List<String?> invalidSourceAcc = uniqueSourceAcc.Except(configuredSourceAcc).ToList();
+
+        if (invalidSourceAcc.Any())
+        {
+            String invalidAcc = String.Join(",", invalidSourceAcc);
+            throw new Exception($"The following debit accounts: {invalidAcc} are not in the file configuration.");
+        }
+    }
+
+    // Add New File Import Content Records In The Database
+    List<FileImportContent> fileImportContents = [];
+
+    // Add New File Import Record In The Database
+    Int64 createdFileImportId = AddFileImport(new()
+        {
+            Id = -1,
+            FileId = fileConfig.Id,
+            StatusCode = ((Int32)FileStatus.RECEIVED).ToString(),
+        },
+        attachmentInfo.AttachmentId,
+        request.BaseReq.UserData.UserName
+    );
+
+    if (createdFileImportId <= 0)
+    {
+        throw new Exception("Could Not Create File Import");
+    }
+
+    foreach (SalDomClient salDomClient in salDomClients)
+    {
+        String? mappedAccountId = dictionaryMappingsByAlternativeId[salDomClient.AlternativeAccount]
+            .FirstOrDefault()?.T24AccountId;
+
+        Boolean hasDictionaryMapping = !String.IsNullOrWhiteSpace(mappedAccountId);
+        CustomerInfo? dictionaryCustomer = hasDictionaryMapping
+            ? dictionaryCustomersByInput[mappedAccountId!].FirstOrDefault()
+            : null;
+
+        Boolean retryOriginalAccount = hasDictionaryMapping && dictionaryCustomer is null;
+        String t24Account = dictionaryCustomer?.T24AccountId ?? String.Empty;
+
+        if (!hasDictionaryMapping || retryOriginalAccount)
+        {
+            if (!retryOriginalAccount && Utilities.ValidateT24AccountNumber(salDomClient.AlternativeAccount))
+            {
+                t24Account = getCustomerByAccountIdListRes?.CustomersList.Where(i => i.InputedId.Equals(salDomClient.AlternativeAccount)).Select(i => i.T24AccountId).FirstOrDefault() ?? String.Empty;
+            }
+            else
+            {
+                t24Account = getCustomersByAlternativeIdsRes?.CustomersList.Where(i => i.InputedId.Equals(salDomClient.AlternativeAccount)).Select(i => i.T24AccountId).FirstOrDefault() ?? String.Empty;
+
+                if (String.IsNullOrWhiteSpace(t24Account))
+                {
+                    // Remove the zero that has been added at the beginning before sending the request
+                    t24Account = getCustomersByNotFoundAlternativeIdsRes?.CustomersList.Where(i => i.InputedId.Substring(1).Equals(salDomClient.AlternativeAccount)).Select(i => i.T24AccountId).FirstOrDefault() ?? String.Empty;
+                }
+            }
+        }
+
+        FileImportContent fileImportContent = new()
+        {
+            Id = -1,
+            AltAccNbr = salDomClient.AlternativeAccount,
+            Amount = Convert.ToDecimal(salDomClient.Amount),
+            AccNbr = t24Account,
+            Other = salDomClient.Other,
+            FileImportId = createdFileImportId,
+            ProductCode = customerInfoList.FirstOrDefault(i => i.T24AccountId.Equals(t24Account))?.ProductCode ?? String.Empty,
+            CustomerName = customerInfoList.FirstOrDefault(i => i.T24AccountId.Equals(t24Account))?.FullName ?? String.Empty,
+            SourceAccountNumber = salDomClient.SourceAccountNumber ?? fileConfig.SourceAccountNumber
+        };
+
+        Boolean isAccountUnresolved = String.IsNullOrWhiteSpace(t24Account);
+        Boolean isDictT24AccountNotActive = retryOriginalAccount && isAccountUnresolved;
+        Boolean isAltAccNotFoundInDictionary = isAccountUnresolved && !isDictT24AccountNotActive;
+
+        Boolean isAltAccProductCodeInvalid =
+            salDomClientsWithDifferentProductCode.Any(i => i.AlternativeAccount.Equals(salDomClient.AlternativeAccount));
+
+        Boolean isT24AccountCurrencyInvalid =
+            !String.IsNullOrWhiteSpace(fileImportContent.AccNbr) && !fileImportContent.AccNbr.Substring(fileImportContent.AccNbr.Length - 3).Equals(((Int32)fileCurrency).ToString());
+
+        String validationRejectReason = String.Empty;
+
+        if (isAltAccNotFoundInDictionary)
+        {
+            validationRejectReason += "Account Not Found In Dictionary\n";
+        }
+        else if (isDictT24AccountNotActive)
+        {
+            validationRejectReason += "Invalid Dictionary Account\n";
+        }
+        else if (isT24AccountCurrencyInvalid)
+        {
+            validationRejectReason += "Account Currency Is Invalid\n";
+        }
+        else if (isAltAccProductCodeInvalid)
+        {
+            validationRejectReason += "Account Product Is Incorrect\n";
+        }
+
+        fileImportContent.ValidationRejectReason = validationRejectReason;
+
+        if (isAltAccNotFoundInDictionary || isDictT24AccountNotActive)
+        {
+            fileImportContent.StatusId = (Int32)FileImportContentStatus.MANUAL_INTERVENTION_NEEDED;
+        }
+        else if (isT24AccountCurrencyInvalid)
+        {
+            fileImportContent.StatusId = (Int32)FileImportContentStatus.INCORRECT_CURRENCY;
+        }
+        else if (isAltAccProductCodeInvalid)
+        {
+            fileImportContent.StatusId = (Int32)FileImportContentStatus.INCORRECT_PRODUCT_CODE_NO_CURRENT_ACCOUNTS_AVAILABLE;
+
+            if (getAccountsByCustomerIdListRes is not null)
+            {
+                if (Utilities.ValidateT24AccountNumber(fileImportContent.AccNbr))
+                {
+                    String extractedCustomerId = fileImportContent.AccNbr.Substring(2, 7);
+
+                    List<CustomerInfo> customerInfos =
+                        getAccountsByCustomerIdListRes.CustomersList
+                            .Where(i =>
+                                i.AccountsCount > 1 // If it's equal to one => only the i.T24AccountId was found
+                                && i.InputedId.Equals(extractedCustomerId)
+                                && i.IsProductCodeMatching
+                                && i.IsCurrencyCodeMatching!.Value.Equals(true))
+                            .ToList();
+
+                    if (customerInfos.Count > 0)
+                    {
+                        fileImportContent.StatusId = (Int32)FileImportContentStatus.INCORRECT_PRODUCT_CODE_CURRENT_ACCOUNTS_AVAILABLE;
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (fileImportContent.AltAccNbr.Equals(fileImportContent.AccNbr))
+            {
+                fileImportContent.StatusId = (Int32)FileImportContentStatus.ACCOUNT_NUMBER_CORRECT_ACCOUNTS_MATCH;
+            }
+            else
+            {
+                fileImportContent.StatusId = (Int32)FileImportContentStatus.ACCOUNT_NUMBER_CORRECT_ACCOUNTS_DOES_NOT_MATCH;
+            }
+        }
+
+        fileImportContents.Add(fileImportContent);
+    }
+
+    AddFileImportContentBulk(fileImportContents, request.BaseReq.UserData.UserName);
+}
