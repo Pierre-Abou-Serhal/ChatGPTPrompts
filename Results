@@ -1,109 +1,198 @@
-# Frontend update: remaining scans per document
-
-**Alterna Account Statement Management · 9 November 2026**
-
-`POST GetDocumentAccessAudit` now returns **one set of current scan balances per document**. Show it once in the file details, above or beside the audit history. This note supersedes the per-attempt balance instructions and examples in `Frontend_Audit_Features_Handoff.md`.
-
-## What to change
-
-| Area | Previous behavior | Updated behavior |
-| --- | --- | --- |
-| Balance array | `documentAccessAuditList[i].remainingScansByRule` | `response.remainingScansByRule` |
-| Calculation basis | `documentAccessAuditList[i].quotaCalculationBasis` | `response.quotaCalculationBasis` (currently `CurrentPolicyRules`) |
-| Meaning | Reconstructed balance after that attempt | Balance when the endpoint is called, using the file’s currently assigned policy and enabled rules |
-| UI placement | Inside each audit entry | One section per file, independent of the history table |
-
-The route, request (including `documentReferenceId`), `baseResp`, `req`, and audit fields such as `outcomeCode` and `createdDate` stay the same. The `DocumentAccessRuleBalance` item type stays the same. No changes are needed for `GetAccessPolicyAudit` or `GetConfigAudit`.
-
-## Update the TypeScript contract
-
-Remove `remainingScansByRule` and `quotaCalculationBasis` from `DocumentAccessAudit`. Add them to `GetDocumentAccessAuditResponse`:
-
-```ts
-export interface GetDocumentAccessAuditResponse {
-  baseResp: BaseResponse;
-  req: GetDocumentAccessAuditRequest;
-  documentAccessAuditList: DocumentAccessAudit[];
-  quotaCalculationBasis: string; // Current value: "CurrentPolicyRules"
-  remainingScansByRule: DocumentAccessRuleBalance[];
-}
-```
-
-After the existing `baseResp` success check, bind the quota section to `response.remainingScansByRule` and the history table to `response.documentAccessAuditList`. Remove any code that reads balances from the first, last, or selected audit row. Field names below assume the existing camelCase JSON convention.
-
-## Example response
-
-This excerpt omits the unchanged `baseResp` and `req` fields. The example shows one recorded access and two current rule balances for document `1042`.
-
-```json
-{
-  "documentAccessAuditList": [
-    {
-      "id": 501,
-      "documentReferenceId": 1042,
-      "correlationId": "6b8d5d19-e4df-4c55-8e92-cbfbe4c16bd8",
-      "presentedTokenHash": "example-hash",
-      "outcomeCode": "ACCESS_GRANTED",
-      "consumesQuota": true,
-      "deniedByRuleId": null,
-      "deniedByRuleName": null,
-      "ipAddress": null,
-      "userAgent": null,
-      "createdDate": "2026-11-09T10:15:00",
-      "createdBy": null
-    }
-  ],
-  "quotaCalculationBasis": "CurrentPolicyRules",
-  "remainingScansByRule": [
-    {
-      "accessPolicyId": 5,
-      "accessPolicyName": "Statement access",
-      "ruleId": 12,
-      "ruleName": "Lifetime limit",
-      "windowSeconds": null,
-      "maximumAccessCount": 10,
-      "usedAccessCount": 1,
-      "remainingAccessCount": 9,
-      "isConfigurationValid": true,
-      "isLimitReached": false
-    },
-    {
-      "accessPolicyId": 5,
-      "accessPolicyName": "Statement access",
-      "ruleId": 13,
-      "ruleName": "24-hour limit",
-      "windowSeconds": 86400,
-      "maximumAccessCount": 3,
-      "usedAccessCount": 1,
-      "remainingAccessCount": 2,
-      "isConfigurationValid": true,
-      "isLimitReached": false
-    }
-  ]
-}
-```
-
-## Display and refresh
-
-Use a heading such as **Remaining scans by rule**. In the example, show **Lifetime limit: 9 of 10 remaining** and **24-hour limit: 2 of 3 remaining**. Read the counts from the API. Each rule applies to the same document, so keep the counts separate.
-
-| Response state | What to show |
-| --- | --- |
-| `windowSeconds: null` | A lifetime rule for the document link. |
-| `windowSeconds: 86400` | A rolling 24-hour rule. Capacity returns as scans leave the window; there is no midnight reset. |
-| `remainingAccessCount: 0` | **0 remaining** or **Limit reached**. |
-| `remainingAccessCount: null` or `isConfigurationValid: false` | **Unavailable**; do not display it as zero. |
-| `remainingScansByRule: []` on a successful response | **No enabled scan rules** for the file. |
-| `documentAccessAuditList: []` | **No scan history** in the table. Still render any rule balances returned by the API. |
-
-Only attempts with `consumesQuota: true` reduce quota. Refresh by requesting the endpoint again; a rolling balance can increase even when no new audit row appears. A positive balance does not override other access checks such as link expiration or revocation.
-
-## Acceptance checklist
-
-- [ ] A file with several audit entries displays the balance section once, with no remaining-balance column on individual audit rows.
-- [ ] A new file with valid enabled rules displays its full allowance even with an empty history table.
-- [ ] A depleted rule shows **0 remaining**; an invalid rule shows **Unavailable**.
-- [ ] A successful response with no rules shows the quota empty state and still displays any audit history.
-- [ ] Refresh after a consuming scan leaves a rolling window: the rolling balance increases, while lifetime usage stays the same.
-
-Coordinate rollout with the updated API. If the frontend must run temporarily against the older API, treat a missing top-level `remainingScansByRule` as **Unavailable**; reserve **No enabled scan rules** for a returned empty array.
+<?xml version='1.0' encoding='utf-8'?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.13">
+    <CstmrCdtTrfInitn>
+        <GrpHdr>
+            <MsgId>MIXED-DEMO-5</MsgId>
+            <CreDtTm>2026-11-08T12:00:00Z</CreDtTm>
+            <NbOfTxs>7</NbOfTxs>
+            <InitgPty>
+                <Nm>Synthetic Demo Institution</Nm>
+            </InitgPty>
+        </GrpHdr>
+        <PmtInf>
+            <PmtInfId>GROUP-1</PmtInfId>
+            <PmtMtd>TRF</PmtMtd>
+            <ReqdExctnDt>
+                <Dt>2026-11-09</Dt>
+            </ReqdExctnDt>
+            <Dbtr>
+                <Nm>Synthetic Debtor 1</Nm>
+            </Dbtr>
+            <DbtrAcct>
+                <Id>
+                    <IBAN>LB63001900000000000000000000</IBAN>
+                </Id>
+            </DbtrAcct>
+            <DbtrAgt>
+                <FinInstnId>
+                    <BICFI>AAAALBBB</BICFI>
+                </FinInstnId>
+            </DbtrAgt>
+            <CdtTrfTxInf>
+                <PmtId>
+                    <InstrId>I-1-1</InstrId>
+                    <EndToEndId>E2E-1-1</EndToEndId>
+                </PmtId>
+                <Amt>
+                    <InstdAmt Ccy="USD">14.00</InstdAmt>
+                </Amt>
+                <Cdtr>
+                    <Nm>Synthetic Beneficiary 1-1</Nm>
+                </Cdtr>
+                <CdtrAcct>
+                    <Id>
+                        <IBAN>LB63001900000000000000000000</IBAN>
+                    </Id>
+                </CdtrAcct>
+                <RmtInf>
+                    <Ustrd>Synthetic invoice 1-1</Ustrd>
+                </RmtInf>
+            </CdtTrfTxInf>
+            <CdtTrfTxInf>
+                <PmtId>
+                    <InstrId>I-1-2</InstrId>
+                    <EndToEndId>E2E-1-2</EndToEndId>
+                </PmtId>
+                <Amt>
+                    <InstdAmt Ccy="EUR">10000.00</InstdAmt>
+                </Amt>
+                <Cdtr>
+                    <Nm>Synthetic Beneficiary 1-2</Nm>
+                </Cdtr>
+                <CdtrAcct>
+                    <Id>
+                        <IBAN>LB10002011111111111111111111</IBAN>
+                    </Id>
+                </CdtrAcct>
+                <RmtInf>
+                    <Ustrd>Synthetic invoice 1-2</Ustrd>
+                </RmtInf>
+            </CdtTrfTxInf>
+            <CdtTrfTxInf>
+                <PmtId>
+                    <InstrId>I-1-3</InstrId>
+                    <EndToEndId>E2E-1-3</EndToEndId>
+                </PmtId>
+                <Amt>
+                    <InstdAmt Ccy="USD">5.00</InstdAmt>
+                </Amt>
+                <Cdtr>
+                    <Nm>Synthetic Beneficiary 1-3</Nm>
+                </Cdtr>
+                <CdtrAcct>
+                    <Id>
+                        <Othr>
+                            <Id>12345678</Id>
+                        </Othr>
+                    </Id>
+                </CdtrAcct>
+                <RmtInf>
+                    <Ustrd>Synthetic invoice 1-3</Ustrd>
+                </RmtInf>
+            </CdtTrfTxInf>
+            <CdtTrfTxInf>
+                <PmtId>
+                    <InstrId>I-1-4</InstrId>
+                    <EndToEndId>E2E-1-4</EndToEndId>
+                </PmtId>
+                <Amt>
+                    <EqvtAmt>
+                        <Amt Ccy="USD">30.00</Amt>
+                        <CcyOfTrf>EUR</CcyOfTrf>
+                    </EqvtAmt>
+                </Amt>
+                <Cdtr>
+                    <Nm>Synthetic Beneficiary 1-4</Nm>
+                </Cdtr>
+                <CdtrAcct>
+                    <Id>
+                        <IBAN>LB10002011111111111111111111</IBAN>
+                    </Id>
+                </CdtrAcct>
+                <RmtInf>
+                    <Ustrd>Synthetic invoice 1-4</Ustrd>
+                </RmtInf>
+            </CdtTrfTxInf>
+        </PmtInf>
+        <PmtInf>
+            <PmtInfId>GROUP-2</PmtInfId>
+            <PmtMtd>TRF</PmtMtd>
+            <ReqdExctnDt>
+                <Dt>2026-11-09</Dt>
+            </ReqdExctnDt>
+            <Dbtr>
+                <Nm>Synthetic Debtor 2</Nm>
+            </Dbtr>
+            <DbtrAcct>
+                <Id>
+                    <IBAN>LB63001900000000000000000000</IBAN>
+                </Id>
+            </DbtrAcct>
+            <DbtrAgt>
+                <FinInstnId>
+                    <BICFI>AAAALBBB</BICFI>
+                </FinInstnId>
+            </DbtrAgt>
+            <CdtTrfTxInf>
+                <PmtId>
+                    <InstrId>I-2-1</InstrId>
+                    <EndToEndId>E2E-2-1</EndToEndId>
+                </PmtId>
+                <Amt>
+                    <InstdAmt Ccy="EUR">9999.99</InstdAmt>
+                </Amt>
+                <Cdtr>
+                    <Nm>Synthetic Beneficiary 2-1</Nm>
+                </Cdtr>
+                <CdtrAcct>
+                    <Id>
+                        <IBAN>LB10002011111111111111111111</IBAN>
+                    </Id>
+                </CdtrAcct>
+                <RmtInf>
+                    <Ustrd>Synthetic invoice 2-1</Ustrd>
+                </RmtInf>
+            </CdtTrfTxInf>
+            <CdtTrfTxInf>
+                <PmtId>
+                    <InstrId>I-2-2</InstrId>
+                    <EndToEndId>E2E-2-2</EndToEndId>
+                </PmtId>
+                <Amt>
+                    <InstdAmt Ccy="GBP">20.00</InstdAmt>
+                </Amt>
+                <Cdtr>
+                    <Nm>Synthetic Beneficiary 2-2</Nm>
+                </Cdtr>
+                <CdtrAcct>
+                    <Id>
+                        <IBAN>DE89370400440532013000</IBAN>
+                    </Id>
+                </CdtrAcct>
+                <RmtInf>
+                    <Ustrd>Synthetic invoice 2-2</Ustrd>
+                </RmtInf>
+            </CdtTrfTxInf>
+            <CdtTrfTxInf>
+                <PmtId>
+                    <InstrId>I-2-3</InstrId>
+                    <EndToEndId>E2E-2-3</EndToEndId>
+                </PmtId>
+                <Amt>
+                    <InstdAmt Ccy="JPY">30.00</InstdAmt>
+                </Amt>
+                <Cdtr>
+                    <Nm>Synthetic Beneficiary 2-3</Nm>
+                </Cdtr>
+                <CdtrAcct>
+                    <Id>
+                        <IBAN>LB10002011111111111111111111</IBAN>
+                    </Id>
+                </CdtrAcct>
+                <RmtInf>
+                    <Ustrd>Synthetic invoice 2-3</Ustrd>
+                </RmtInf>
+            </CdtTrfTxInf>
+        </PmtInf>
+    </CstmrCdtTrfInitn>
+</Document>
