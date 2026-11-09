@@ -1,40 +1,58 @@
-# Document access audit: one set of scan balances per file
+# Frontend update: remaining scans per document
 
-`POST GetDocumentAccessAudit` still accepts the same request and returns the audit history for its `DocumentReferenceId`. The response now has `RemainingScansByRule` and `QuotaCalculationBasis` beside `DocumentAccessAuditList`. Individual audit entries no longer carry quota properties.
+**Alterna Account Statement Management · 9 November 2026**
 
-## Apply the replacements
+`POST GetDocumentAccessAudit` now returns **one set of current scan balances per document**. Show it once in the file details, above or beside the audit history. This note supersedes the per-attempt balance instructions and examples in `Frontend_Audit_Features_Handoff.md`.
 
-1. Apply `Sql/usp_GetDocumentAccessAudit.sql` to `Alterna_AccountStatementManagement`.
-2. In `CSharp/Model.cs`, replace the matching declarations and add `DocumentAccessAuditResult`. Replace the existing mapper and `GetDocumentAccessAuditResponse` with the supplied versions. Keep your project namespaces and other declarations.
-3. Paste `BAL.GetDocumentAccessAudit.cs.txt` into your existing BAL class in place of the old method. If you have a BAL interface, change the return type there to `Task<DocumentAccessAuditResult>` as well.
-4. In the controller's `try` block, replace the old `response.DocumentAccessAuditList = await ...` assignment with `Controller.GetDocumentAccessAudit.cs.txt`. The request, route, logging, and error handling stay the same.
+## What to change
 
-Deploy the stored procedure and API together. The procedure returns a single result set with an internal `RowType` discriminator, so `DapperDal.ExecuteQueryAsync` can still be used. The mapper puts audit and quota rows into separate lists and does not expose the discriminator to clients.
+| Area | Previous behavior | Updated behavior |
+| --- | --- | --- |
+| Balance array | `documentAccessAuditList[i].remainingScansByRule` | `response.remainingScansByRule` |
+| Calculation basis | `documentAccessAuditList[i].quotaCalculationBasis` | `response.quotaCalculationBasis` (currently `CurrentPolicyRules`) |
+| Meaning | Reconstructed balance after that attempt | Balance when the endpoint is called, using the file’s currently assigned policy and enabled rules |
+| UI placement | Inside each audit entry | One section per file, independent of the history table |
 
-## What the quota means
+The route, request (including `documentReferenceId`), `baseResp`, `req`, and audit fields such as `outcomeCode` and `createdDate` stay the same. The `DocumentAccessRuleBalance` item type stays the same. No changes are needed for `GetAccessPolicyAudit` or `GetConfigAudit`.
 
-The database captures its current time once per call, using the same clock and precision as `usp_GetDocumentCuk`. For each enabled rule of the file's currently assigned policy:
+## Update the TypeScript contract
 
-| Rule | Which attempts count |
-| --- | --- |
-| Lifetime (`windowSeconds: null`) | Attempts for this document with `ConsumesQuota = 1` and a timestamp at or before the calculation time. |
-| Rolling (`windowSeconds > 0`) | The same attempts, further limited to timestamps strictly after the start of the rolling window. |
+Remove `remainingScansByRule` and `quotaCalculationBasis` from `DocumentAccessAudit`. Add them to `GetDocumentAccessAuditResponse`:
 
-Remaining is `max(0, maximumAccessCount - usedAccessCount)`. A rolling balance can recover even when no new attempt is logged. A document with no attempts starts at its full allowance for each valid rule. If there are no enabled rules or no assigned policy, the balance list is empty; existing audit history can still be shown. An invalid rule has `isConfigurationValid: false` and null used/remaining counts. If the database has a null maximum for a rule, the response uses `0` for the non-nullable maximum and marks the rule invalid.
+```ts
+export interface GetDocumentAccessAuditResponse {
+  baseResp: BaseResponse;
+  req: GetDocumentAccessAuditRequest;
+  documentAccessAuditList: DocumentAccessAudit[];
+  quotaCalculationBasis: string; // Current value: "CurrentPolicyRules"
+  remainingScansByRule: DocumentAccessRuleBalance[];
+}
+```
 
-These are quota balances. Whether a scan is allowed still depends on the authorization procedure, which can also reject revoked or expired links, disabled policies, and invalid configuration.
+After the existing `baseResp` success check, bind the quota section to `response.remainingScansByRule` and the history table to `response.documentAccessAuditList`. Remove any code that reads balances from the first, last, or selected audit row. Field names below assume the existing camelCase JSON convention.
 
-## Frontend contract change
+## Example response
 
-Read `response.remainingScansByRule` once and display it in the file's details above or beside the access history. Render `response.documentAccessAuditList` as the history table. Remove `remainingScansByRule` and `quotaCalculationBasis` from the frontend audit row type and put them on the response type. The item types and HTTP route are unchanged.
-
-Use a label such as **Remaining scans by rule**. Show `0` for a depleted rule, **Unavailable** for a null balance, and **No enabled rules** for an empty list. Keep each rule separate; the rules apply to the same scans, so their allowances should not be added together.
-
-Example response data for a file that has not been scanned yet (envelope fields omitted):
+This excerpt omits the unchanged `baseResp` and `req` fields. The example shows one recorded access and two current rule balances for document `1042`.
 
 ```json
 {
-  "documentAccessAuditList": [],
+  "documentAccessAuditList": [
+    {
+      "id": 501,
+      "documentReferenceId": 1042,
+      "correlationId": "6b8d5d19-e4df-4c55-8e92-cbfbe4c16bd8",
+      "presentedTokenHash": "example-hash",
+      "outcomeCode": "ACCESS_GRANTED",
+      "consumesQuota": true,
+      "deniedByRuleId": null,
+      "deniedByRuleName": null,
+      "ipAddress": null,
+      "userAgent": null,
+      "createdDate": "2026-11-09T10:15:00",
+      "createdBy": null
+    }
+  ],
   "quotaCalculationBasis": "CurrentPolicyRules",
   "remainingScansByRule": [
     {
@@ -44,8 +62,8 @@ Example response data for a file that has not been scanned yet (envelope fields 
       "ruleName": "Lifetime limit",
       "windowSeconds": null,
       "maximumAccessCount": 10,
-      "usedAccessCount": 0,
-      "remainingAccessCount": 10,
+      "usedAccessCount": 1,
+      "remainingAccessCount": 9,
       "isConfigurationValid": true,
       "isLimitReached": false
     },
@@ -56,8 +74,8 @@ Example response data for a file that has not been scanned yet (envelope fields 
       "ruleName": "24-hour limit",
       "windowSeconds": 86400,
       "maximumAccessCount": 3,
-      "usedAccessCount": 0,
-      "remainingAccessCount": 3,
+      "usedAccessCount": 1,
+      "remainingAccessCount": 2,
       "isConfigurationValid": true,
       "isLimitReached": false
     }
@@ -65,321 +83,27 @@ Example response data for a file that has not been scanned yet (envelope fields 
 }
 ```
 
-## Verify in your test environment
+## Display and refresh
 
-- Request a new file with a policy and no scan history. Expect an empty history and the full allowance for each valid enabled rule.
-- Record one consuming and one non-consuming attempt. Expect both in the history, but only the consuming attempt to reduce the balance of applicable rules.
-- Request the same file after a consuming attempt ages out of a rolling window. Expect the rolling allowance to recover and the lifetime usage to stay the same.
-- Verify the depleted rule returns `0` and `isLimitReached: true`, and each attempt appears once even with multiple rules.
+Use a heading such as **Remaining scans by rule**. In the example, show **Lifetime limit: 9 of 10 remaining** and **24-hour limit: 2 of 3 remaining**. Read the counts from the API. Each rule applies to the same document, so keep the counts separate.
 
+| Response state | What to show |
+| --- | --- |
+| `windowSeconds: null` | A lifetime rule for the document link. |
+| `windowSeconds: 86400` | A rolling 24-hour rule. Capacity returns as scans leave the window; there is no midnight reset. |
+| `remainingAccessCount: 0` | **0 remaining** or **Limit reached**. |
+| `remainingAccessCount: null` or `isConfigurationValid: false` | **Unavailable**; do not display it as zero. |
+| `remainingScansByRule: []` on a successful response | **No enabled scan rules** for the file. |
+| `documentAccessAuditList: []` | **No scan history** in the table. Still render any rule balances returned by the API. |
 
+Only attempts with `consumesQuota: true` reduce quota. Refresh by requesting the endpoint again; a rolling balance can increase even when no new audit row appears. A positive balance does not override other access checks such as link expiration or revocation.
 
-USE [Alterna_AccountStatementManagement];
-GO
-SET ANSI_NULLS ON;
-GO
-SET QUOTED_IDENTIFIER ON;
-GO
+## Acceptance checklist
 
-ALTER PROCEDURE dbo.usp_GetDocumentAccessAudit
-    @P__DocumentReferenceId BIGINT
-AS
-BEGIN
-    SET NOCOUNT ON;
+- [ ] A file with several audit entries displays the balance section once, with no remaining-balance column on individual audit rows.
+- [ ] A new file with valid enabled rules displays its full allowance even with an empty history table.
+- [ ] A depleted rule shows **0 remaining**; an invalid rule shows **Unavailable**.
+- [ ] A successful response with no rules shows the quota empty state and still displays any audit history.
+- [ ] Refresh after a consuming scan leaves a rolling window: the rolling balance increases, while lifetime usage stays the same.
 
-    -- Use the same clock and precision as dbo.usp_GetDocumentCuk.
-    DECLARE @CurrentDate DATETIME2(3) = GETDATE();
-
-    ;WITH ConfiguredRules AS
-    (
-        SELECT
-            DR.Id AS DocumentReferenceId,
-            P.Id AS QuotaAccessPolicyId,
-            P.PolicyName AS QuotaAccessPolicyName,
-            R.Id AS QuotaRuleId,
-            R.RuleName AS QuotaRuleName,
-            R.WindowSeconds AS QuotaWindowSeconds,
-            COALESCE(R.MaximumAccessCount, 0) AS QuotaMaximumAccessCount,
-            CAST(CASE WHEN R.MaximumAccessCount > 0
-                       AND (R.WindowSeconds IS NULL OR R.WindowSeconds > 0)
-                      THEN 1 ELSE 0 END AS BIT) AS QuotaIsConfigurationValid
-        FROM dbo.t_DocumentReference AS DR
-        INNER JOIN dbo.t_AccessPolicy AS P ON P.Id = DR.AccessPolicyId
-        INNER JOIN dbo.t_AccessPolicyRule AS R
-            ON R.AccessPolicyId = P.Id
-           AND R.IsEnabled = 1
-        WHERE DR.Id = @P__DocumentReferenceId
-    ), RuleUsage AS
-    (
-        SELECT R.*,
-            CASE WHEN R.QuotaIsConfigurationValid = 1 THEN
-            (
-                SELECT COUNT_BIG(*)
-                FROM dbo.t_DocumentAccessAudit AS A
-                WHERE A.DocumentReferenceId = R.DocumentReferenceId
-                  AND A.ConsumesQuota = 1
-                  AND A.CreatedDate <= @CurrentDate
-                  AND
-                  (
-                      R.QuotaWindowSeconds IS NULL
-                      OR A.CreatedDate > DATEADD
-                      (
-                          SECOND,
-                          -CASE WHEN R.QuotaWindowSeconds > 0 THEN R.QuotaWindowSeconds END,
-                          @CurrentDate
-                      )
-                  )
-            ) END AS QuotaUsedAccessCount
-        FROM ConfiguredRules AS R
-    ), ResultRows AS
-    (
-        -- One row per recorded attempt. Do not join it to current rules.
-        SELECT
-            'Audit' AS RowType,
-            DAA.Id,
-            DAA.DocumentReferenceId,
-            DAA.CorrelationId,
-            DAA.PresentedTokenHash,
-            DAA.OutcomeCode,
-            DAA.ConsumesQuota,
-            DAA.DeniedByRuleId,
-            CASE WHEN DAA.DeniedByRuleId IS NULL THEN NULL
-                 ELSE CONCAT(DeniedPolicy.PolicyName, N' : ', DeniedRule.RuleName)
-            END AS DeniedByRuleName,
-            DAA.IpAddress,
-            DAA.UserAgent,
-            DAA.CreatedDate,
-            DAA.CreatedBy,
-            CAST(NULL AS BIGINT) AS QuotaAccessPolicyId,
-            CAST(NULL AS NVARCHAR(1)) AS QuotaAccessPolicyName,
-            CAST(NULL AS BIGINT) AS QuotaRuleId,
-            CAST(NULL AS NVARCHAR(1)) AS QuotaRuleName,
-            CAST(NULL AS INT) AS QuotaWindowSeconds,
-            CAST(NULL AS INT) AS QuotaMaximumAccessCount,
-            CAST(NULL AS BIT) AS QuotaIsConfigurationValid,
-            CAST(NULL AS BIGINT) AS QuotaUsedAccessCount,
-            CAST(NULL AS BIGINT) AS QuotaRemainingAccessCount
-        FROM dbo.t_DocumentAccessAudit AS DAA
-        LEFT JOIN dbo.t_AccessPolicyRule AS DeniedRule
-            ON DeniedRule.Id = DAA.DeniedByRuleId
-        LEFT JOIN dbo.t_AccessPolicy AS DeniedPolicy
-            ON DeniedPolicy.Id = DeniedRule.AccessPolicyId
-        WHERE DAA.DocumentReferenceId = @P__DocumentReferenceId
-
-        UNION ALL
-
-        -- One row per enabled rule, even if the document has no attempts.
-        SELECT
-            'Quota',
-            CAST(NULL AS BIGINT) AS Id,
-            Q.DocumentReferenceId,
-            CAST(NULL AS NVARCHAR(1)) AS CorrelationId,
-            CAST(NULL AS NVARCHAR(1)) AS PresentedTokenHash,
-            CAST(NULL AS NVARCHAR(1)) AS OutcomeCode,
-            CAST(NULL AS BIT) AS ConsumesQuota,
-            CAST(NULL AS BIGINT) AS DeniedByRuleId,
-            CAST(NULL AS NVARCHAR(1)) AS DeniedByRuleName,
-            CAST(NULL AS NVARCHAR(1)) AS IpAddress,
-            CAST(NULL AS NVARCHAR(1)) AS UserAgent,
-            CAST(NULL AS DATETIME2(3)) AS CreatedDate,
-            CAST(NULL AS NVARCHAR(1)) AS CreatedBy,
-            Q.QuotaAccessPolicyId,
-            Q.QuotaAccessPolicyName,
-            Q.QuotaRuleId,
-            Q.QuotaRuleName,
-            Q.QuotaWindowSeconds,
-            Q.QuotaMaximumAccessCount,
-            Q.QuotaIsConfigurationValid,
-            Q.QuotaUsedAccessCount,
-            CASE
-                WHEN Q.QuotaUsedAccessCount IS NULL THEN CAST(NULL AS BIGINT)
-                WHEN Q.QuotaUsedAccessCount >= Q.QuotaMaximumAccessCount THEN CAST(0 AS BIGINT)
-                ELSE CAST(Q.QuotaMaximumAccessCount AS BIGINT) - Q.QuotaUsedAccessCount
-            END AS QuotaRemainingAccessCount
-        FROM RuleUsage AS Q
-    )
-    SELECT *
-    FROM ResultRows
-    ORDER BY
-        RowType,
-        CreatedDate DESC,
-        Id DESC,
-        CASE WHEN QuotaWindowSeconds IS NULL THEN 0 ELSE 1 END,
-        QuotaWindowSeconds,
-        QuotaRuleId;
-END;
-GO
-
-
-
-using System;
-using System.Collections.Generic;
-
-// Replace these declarations in their existing project namespace.
-public class DocumentAccessAudit
-{
-    public long Id { get; set; }
-    public long? DocumentReferenceId { get; set; }
-    public string CorrelationId { get; set; } = string.Empty;
-    public string PresentedTokenHash { get; set; } = string.Empty;
-    public string OutcomeCode { get; set; } = string.Empty;
-    public bool ConsumesQuota { get; set; }
-    public long? DeniedByRuleId { get; set; }
-    public string? DeniedByRuleName { get; set; }
-    public string? IpAddress { get; set; }
-    public string? UserAgent { get; set; }
-    public DateTime? CreatedDate { get; set; }
-    public string? CreatedBy { get; set; }
-}
-
-public class DocumentAccessRuleBalance
-{
-    public long AccessPolicyId { get; set; }
-    public string AccessPolicyName { get; set; } = string.Empty;
-    public long RuleId { get; set; }
-    public string RuleName { get; set; } = string.Empty;
-    public int? WindowSeconds { get; set; }
-    public int MaximumAccessCount { get; set; }
-    public long? UsedAccessCount { get; set; }
-    public long? RemainingAccessCount { get; set; }
-    public bool IsConfigurationValid { get; set; }
-    public bool? IsLimitReached => RemainingAccessCount.HasValue
-        ? RemainingAccessCount.Value == 0 : null;
-}
-
-// Internal BAL result. The controller copies both lists into the response.
-public class DocumentAccessAuditResult
-{
-    public List<DocumentAccessAudit> DocumentAccessAuditList { get; } = [];
-    public List<DocumentAccessRuleBalance> RemainingScansByRule { get; } = [];
-}
-
-// Flat Dapper row. RowType identifies which group of columns is populated.
-public class DocumentAccessAuditDbRow : DocumentAccessAudit
-{
-    public string RowType { get; set; } = string.Empty;
-    public long? QuotaAccessPolicyId { get; set; }
-    public string? QuotaAccessPolicyName { get; set; }
-    public long? QuotaRuleId { get; set; }
-    public string? QuotaRuleName { get; set; }
-    public int? QuotaWindowSeconds { get; set; }
-    public int? QuotaMaximumAccessCount { get; set; }
-    public bool? QuotaIsConfigurationValid { get; set; }
-    public long? QuotaUsedAccessCount { get; set; }
-    public long? QuotaRemainingAccessCount { get; set; }
-}
-
-
-
-using System;
-using System.Collections.Generic;
-
-public static class DocumentAccessAuditMapper
-{
-    public static DocumentAccessAuditResult ToResult(IEnumerable<DocumentAccessAuditDbRow> rows)
-    {
-        ArgumentNullException.ThrowIfNull(rows);
-        DocumentAccessAuditResult result = new();
-
-        // Preserve SQL order independently within each list.
-        foreach (DocumentAccessAuditDbRow row in rows)
-        {
-            switch (row.RowType)
-            {
-                case "Audit":
-                    result.DocumentAccessAuditList.Add(new DocumentAccessAudit
-                    {
-                        Id = row.Id,
-                        DocumentReferenceId = row.DocumentReferenceId,
-                        CorrelationId = row.CorrelationId,
-                        PresentedTokenHash = row.PresentedTokenHash,
-                        OutcomeCode = row.OutcomeCode,
-                        ConsumesQuota = row.ConsumesQuota,
-                        DeniedByRuleId = row.DeniedByRuleId,
-                        DeniedByRuleName = row.DeniedByRuleName,
-                        IpAddress = row.IpAddress,
-                        UserAgent = row.UserAgent,
-                        CreatedDate = row.CreatedDate,
-                        CreatedBy = row.CreatedBy
-                    });
-                    break;
-
-                case "Quota":
-                    result.RemainingScansByRule.Add(new DocumentAccessRuleBalance
-                    {
-                        AccessPolicyId = row.QuotaAccessPolicyId
-                            ?? throw new InvalidOperationException("A quota row is missing its policy ID."),
-                        AccessPolicyName = row.QuotaAccessPolicyName ?? string.Empty,
-                        RuleId = row.QuotaRuleId
-                            ?? throw new InvalidOperationException("A quota row is missing its rule ID."),
-                        RuleName = row.QuotaRuleName ?? string.Empty,
-                        WindowSeconds = row.QuotaWindowSeconds,
-                        MaximumAccessCount = row.QuotaMaximumAccessCount
-                            ?? throw new InvalidOperationException("A quota row is missing its maximum count."),
-                        UsedAccessCount = row.QuotaUsedAccessCount,
-                        RemainingAccessCount = row.QuotaRemainingAccessCount,
-                        IsConfigurationValid = row.QuotaIsConfigurationValid == true
-                    });
-                    break;
-
-                default:
-                    throw new InvalidOperationException("Unexpected document access audit row type. Check the deployed stored procedure version.");
-            }
-        }
-
-        return result;
-    }
-}
-
-
-
-
-
-
-// Replace the existing assignment to response.DocumentAccessAuditList inside the try block.
-DocumentAccessAuditResult result = await _bal.GetDocumentAccessAudit(request);
-response.DocumentAccessAuditList = result.DocumentAccessAuditList;
-response.RemainingScansByRule = result.RemainingScansByRule;
-
-
-
-
-
-
-// Replace this method inside your existing BAL class. Keep the current namespaces.
-// The method uses System.Data and Dapper. Update its BAL interface signature too, if present.
-
-public async Task<DocumentAccessAuditResult> GetDocumentAccessAudit(
-    GetDocumentAccessAuditRequest request)
-{
-    DapperDal dal = new DapperDal(_globalSettings.ConnString);
-    DynamicParameters parameters = new();
-    parameters.Add("P__DocumentReferenceId", request.DocumentReferenceId, DbType.Int64);
-
-    IEnumerable<DocumentAccessAuditDbRow> rows =
-        await dal.ExecuteQueryAsync<DocumentAccessAuditDbRow>(
-            "dbo.usp_GetDocumentAccessAudit",
-            parameters,
-            CommandType.StoredProcedure,
-            DapperDal.CommandDirection.Select);
-
-    return DocumentAccessAuditMapper.ToResult(rows);
-}
-
-
-
-
-
-
-using System.Collections.Generic;
-
-// Replace the existing response in its current namespace.
-public class GetDocumentAccessAuditResponse
-{
-    public BaseResponse BaseResp { get; set; } = new();
-    public required GetDocumentAccessAuditRequest Req { get; set; }
-    public List<DocumentAccessAudit> DocumentAccessAuditList { get; set; } = [];
-    public string QuotaCalculationBasis { get; set; } = "CurrentPolicyRules";
-    public List<DocumentAccessRuleBalance> RemainingScansByRule { get; set; } = [];
-}
-
+Coordinate rollout with the updated API. If the frontend must run temporarily against the older API, treat a missing top-level `remainingScansByRule` as **Unavailable**; reserve **No enabled scan rules** for a returned empty array.
