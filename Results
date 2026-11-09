@@ -1,1 +1,273 @@
-https://github.com/Pierre-Abou-Serhal/PaymentManagementDemo/tree/main/backend/Iso20022
+private async Task ProcessAttachmentValidationAsync(SendEmailAttachmentForValidationRequest request)
+        {
+            try
+            {
+                // Get the Attachment bytes from Exchange
+                ExchangeApiAttachmentInfo? attachmentInfo = GetEmailAttachmentByEmailUniqueId(new()
+                {
+                    AttachmentId = request.AttachmentId,
+                    BaseReq = request.BaseReq,
+                    EmailUniqueId = request.EmailUniqueId
+                });
+
+                if (attachmentInfo is null)
+                {
+                    throw new Exception("Error Getting Email Attachment By Email Unique Id From Exchange");
+                }
+
+                // Getting the DataExport File Info Configuration
+                Model.File? fileConfig = GetFileConfigurationById(request.FileId);
+
+                if (!fileConfig!.FileTypeCode.Equals(((Int32)FileType.TEXT).ToString()))
+                {
+                    if (fileConfig?.FileColumns == null || fileConfig.FileColumns.All(i => i.FileColumnValidations == null || i.FileColumnValidations.Count == 0))
+                    {
+                        List<String> errorList = ["The Selected File Type is Missing Column Configurations!"];
+
+                        // Changing the status of the Attachment
+                        UpdateAttachmentStatusRequest updateAttachmentStatusDataExportFailRequest = new()
+                        {
+                            BaseReq = request.BaseReq,
+                            Id = request.Id,
+                            StatusCode = $"{(Int32)AttachmentStatus.VALIDATION_REJECTED}"
+                        };
+
+                        UpdateAttachmentStatusResponse updateAttachmentStatusDataExportFailResponse =
+                            UpdateAttachmentStatus(updateAttachmentStatusDataExportFailRequest);
+
+                        if (updateAttachmentStatusDataExportFailResponse.Attachment.Id <= 0)
+                        {
+                            errorList.Add("Error Updating Attachment Status");
+                        }
+
+                        SignalRUpdateAttachmentStatusResult signalRDataExportContent = new()
+                        {
+                            id = updateAttachmentStatusDataExportFailResponse.Attachment.Id > 0
+                                ? updateAttachmentStatusDataExportFailResponse.Attachment.Id
+                                : request.Id,
+                            statusValue = updateAttachmentStatusDataExportFailResponse.Attachment.Id > 0
+                                ? updateAttachmentStatusDataExportFailResponse.Attachment.StatusValue
+                                : String.Empty,
+                            errorList = errorList
+                        };
+
+                        String signalRDataExportContentString = JsonSerializer.Serialize(signalRDataExportContent);
+
+                        CallSignalR(
+                            groupName: _globalSettings.SignalRConfig.SignalRGroupName,
+                            content: signalRDataExportContentString,
+                            method: SignalRMethod.UPDATE_ATTACHMENT_STATUS.ToString());
+
+                        return;
+                    }
+                }
+
+                // Call the DataExport API to validate file
+                String dataExportValidateFileUrl = $"{_globalSettings.DataExportUrl}ValidateFile";
+
+                CustomModels.FileInfo dataExportFileInfo = fileConfig.ToFileInfoDto();
+
+                dataExportFileInfo.FileBinary = attachmentInfo.ContentBytes;
+
+                String fileCode = _globalSettings.GenerateT24FileCode;
+
+                // If File is text, read the first line to know if it is COOP text or a normal T24 COMMON.S file
+                if (dataExportFileInfo.FileType.Equals(FileType.TEXT))
+                {
+                    Byte[] fileBytes = Utilities.HexStringToByteArray(dataExportFileInfo.FileBinary);
+
+                    using MemoryStream memoryStream = new MemoryStream(fileBytes);
+
+                    using StreamReader reader = new StreamReader(memoryStream, dataExportFileInfo.Encoding.GetEncoding());
+
+                    String? header = await reader.ReadLineAsync(); // header
+                    String? firstLine = await reader.ReadLineAsync(); // First record
+
+                    if (String.IsNullOrEmpty(firstLine))
+                    {
+                        firstLine = header;
+                    }
+
+                    if (!String.IsNullOrWhiteSpace(firstLine) && firstLine.Length > 520)
+                    {
+                        fileCode = _globalSettings.CoopFileCode;
+                    }
+
+                    reader.Close();
+                    memoryStream.Close();
+                }
+
+                DataExportValidateFileRequest dataExportValidateFileRequest = new()
+                {
+                    CorrelationId = request.BaseReq.CorrelationId,
+                    FileInfo = dataExportFileInfo,
+                    FileCode = fileCode,
+                    FieldNames = [
+                        nameof(GenerateT24FieldNames.EMPLOYEE_SGBL_ACCOUNT_NUMBER),
+                        nameof(GenerateT24FieldNames.TRANSFER_AMOUNT),
+                        nameof(GenerateT24FieldNames.BENEFICIARY_SGBL_ACCOUNT_NUMBER),
+                        nameof(GenerateT24FieldNames.BENEFICIARY_NAME),
+                    ]
+                };
+
+                DataExportValidateFileResponse responseData =
+                    await PostAsync<DataExportValidateFileResponse>(dataExportValidateFileRequest,
+                        dataExportValidateFileUrl);
+
+                if (responseData is not { WebResp.StatusCode: HttpStatusCode.OK })
+                {
+                    // Changing the status of the Attachment
+                    UpdateAttachmentStatusRequest updateAttachmentStatusDataExportFailRequest = new()
+                    {
+                        BaseReq = request.BaseReq,
+                        Id = request.Id,
+                        StatusCode = $"{(Int32)AttachmentStatus.VALIDATION_REJECTED}"
+                    };
+
+                    UpdateAttachmentStatusResponse updateAttachmentStatusDataExportFailResponse =
+                        UpdateAttachmentStatus(updateAttachmentStatusDataExportFailRequest);
+
+                    if (updateAttachmentStatusDataExportFailResponse.Attachment.Id <= 0)
+                    {
+                        responseData.WebResp.Errors.Add("Error Updating Attachment Status");
+                    }
+
+                    SignalRUpdateAttachmentStatusResult signalRDataExportContent = new()
+                    {
+                        id = updateAttachmentStatusDataExportFailResponse.Attachment.Id > 0
+                            ? updateAttachmentStatusDataExportFailResponse.Attachment.Id
+                            : request.Id,
+                        statusValue = updateAttachmentStatusDataExportFailResponse.Attachment.Id > 0
+                            ? updateAttachmentStatusDataExportFailResponse.Attachment.StatusValue
+                            : String.Empty,
+                        errorList = responseData.WebResp.StatusCode == HttpStatusCode.InternalServerError
+                            ? new List<String>
+                            {
+                                $"An Internal Server Error Occured In DataExport Service. CorrelationId: {request.BaseReq.CorrelationId}"
+                            }
+                            : responseData.WebResp.Errors
+                    };
+
+                    String signalRDataExportContentString = JsonSerializer.Serialize(signalRDataExportContent);
+
+                    CallSignalR(
+                        groupName: _globalSettings.SignalRConfig.SignalRGroupName,
+                        content: signalRDataExportContentString,
+                        method: SignalRMethod.UPDATE_ATTACHMENT_STATUS.ToString());
+
+                    return;
+                }
+
+                // If Everything is OK, Begin SalDomBusinessValidation API
+                try
+                {
+                    // This check should pass, if not, all file will be rejected
+                    List<SalDomClient> salDomClients = GetSalDomClientsFromParsedData(responseData.ParsedDataList, fileConfig!, fileCode);
+                    UpdateSalDomDatabase(salDomClients, request, fileConfig, attachmentInfo);
+                }
+                catch (Exception ex)
+                {
+                    List<String> businessRulesErrorList = ex.Message.Split(',').ToList();
+
+                    // Changing the status of the Attachment
+                    UpdateAttachmentStatusRequest updateAttachmentStatusDataExportFailRequest = new()
+                    {
+                        BaseReq = request.BaseReq,
+                        Id = request.Id,
+                        StatusCode = $"{(Int32)AttachmentStatus.VALIDATION_REJECTED}"
+                    };
+
+                    UpdateAttachmentStatusResponse updateAttachmentStatusDataExportFailResponse =
+                        UpdateAttachmentStatus(updateAttachmentStatusDataExportFailRequest);
+
+                    if (updateAttachmentStatusDataExportFailResponse.Attachment.Id <= 0)
+                    {
+                        businessRulesErrorList.Add("Error Updating Attachment Status");
+                    }
+
+                    SignalRUpdateAttachmentStatusResult signalRDataExportContent = new()
+                    {
+                        id = updateAttachmentStatusDataExportFailResponse.Attachment.Id > 0
+                            ? updateAttachmentStatusDataExportFailResponse.Attachment.Id
+                            : request.Id,
+                        statusValue = updateAttachmentStatusDataExportFailResponse.Attachment.Id > 0
+                            ? updateAttachmentStatusDataExportFailResponse.Attachment.StatusValue
+                            : String.Empty,
+                        errorList = businessRulesErrorList
+                    };
+
+                    String signalRDataExportContentString = JsonSerializer.Serialize(signalRDataExportContent);
+
+                    CallSignalR(
+                        groupName: _globalSettings.SignalRConfig.SignalRGroupName,
+                        content: signalRDataExportContentString,
+                        method: SignalRMethod.UPDATE_ATTACHMENT_STATUS.ToString());
+
+                    return;
+                }
+
+                // Changing the status of the Attachment
+                UpdateAttachmentStatusRequest updateAttachmentStatusSuccessRequest = new()
+                {
+                    BaseReq = request.BaseReq,
+                    Id = request.Id,
+                    StatusCode = $"{(Int32)AttachmentStatus.VALIDATION_ACCEPTED}"
+                };
+
+                UpdateAttachmentStatusResponse updateAttachmentStatusSuccessResponse =
+                    UpdateAttachmentStatus(updateAttachmentStatusSuccessRequest);
+
+                SignalRUpdateAttachmentStatusResult signalRSuccessContent = new()
+                {
+                    id = updateAttachmentStatusSuccessResponse.Attachment.Id > 0
+                        ? updateAttachmentStatusSuccessResponse.Attachment.Id
+                        : request.Id,
+                    statusValue = updateAttachmentStatusSuccessResponse.Attachment.Id > 0
+                        ? updateAttachmentStatusSuccessResponse.Attachment.StatusValue
+                        : String.Empty,
+                    errorList = updateAttachmentStatusSuccessResponse.Attachment.Id > 0
+                        ? new List<string> { }
+                        : new List<string> { "Error Updating Attachment Status" }
+                };
+
+                String signalRContentSuccessString = JsonSerializer.Serialize(signalRSuccessContent);
+
+                CallSignalR(
+                    groupName: _globalSettings.SignalRConfig.SignalRGroupName,
+                    content: signalRContentSuccessString,
+                    method: SignalRMethod.UPDATE_ATTACHMENT_STATUS.ToString());
+            }
+            catch (Exception ex)
+            {
+                // Changing the status of the Attachment
+                UpdateAttachmentStatusRequest updateAttachmentStatusSuccessRequest = new()
+                {
+                    BaseReq = request.BaseReq,
+                    Id = request.Id,
+                    StatusCode = $"{(Int32)AttachmentStatus.VALIDATION_REJECTED}"
+                };
+
+                UpdateAttachmentStatusResponse updateAttachmentStatusSuccessResponse =
+                    UpdateAttachmentStatus(updateAttachmentStatusSuccessRequest);
+
+                var signalRErrorContent = new
+                {
+                    id = updateAttachmentStatusSuccessResponse.Attachment.Id > 0
+                        ? updateAttachmentStatusSuccessResponse.Attachment.Id
+                        : request.Id,
+                    statusValue = updateAttachmentStatusSuccessResponse.Attachment.Id > 0
+                        ? updateAttachmentStatusSuccessResponse.Attachment.StatusValue
+                        : String.Empty,
+                    errorList = updateAttachmentStatusSuccessResponse.Attachment.Id > 0
+                        ? new List<string> { ex.Message }
+                        : new List<string> { ex.Message, "Error Updating Attachment Status" }
+                };
+
+                String signalRContentErrorString = JsonSerializer.Serialize(signalRErrorContent);
+
+                CallSignalR(
+                    groupName: _globalSettings.SignalRConfig.SignalRGroupName,
+                    content: signalRContentErrorString,
+                    method: SignalRMethod.UPDATE_ATTACHMENT_STATUS.ToString());
+            }
+        }
