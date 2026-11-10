@@ -1,198 +1,107 @@
-<?xml version='1.0' encoding='utf-8'?>
-<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.13">
-    <CstmrCdtTrfInitn>
-        <GrpHdr>
-            <MsgId>MIXED-DEMO-5</MsgId>
-            <CreDtTm>2026-11-08T12:00:00Z</CreDtTm>
-            <NbOfTxs>7</NbOfTxs>
-            <InitgPty>
-                <Nm>Synthetic Demo Institution</Nm>
-            </InitgPty>
-        </GrpHdr>
-        <PmtInf>
-            <PmtInfId>GROUP-1</PmtInfId>
-            <PmtMtd>TRF</PmtMtd>
-            <ReqdExctnDt>
-                <Dt>2026-11-09</Dt>
-            </ReqdExctnDt>
-            <Dbtr>
-                <Nm>Synthetic Debtor 1</Nm>
-            </Dbtr>
-            <DbtrAcct>
-                <Id>
-                    <IBAN>LB63001900000000000000000000</IBAN>
-                </Id>
-            </DbtrAcct>
-            <DbtrAgt>
-                <FinInstnId>
-                    <BICFI>AAAALBBB</BICFI>
-                </FinInstnId>
-            </DbtrAgt>
-            <CdtTrfTxInf>
-                <PmtId>
-                    <InstrId>I-1-1</InstrId>
-                    <EndToEndId>E2E-1-1</EndToEndId>
-                </PmtId>
-                <Amt>
-                    <InstdAmt Ccy="USD">14.00</InstdAmt>
-                </Amt>
-                <Cdtr>
-                    <Nm>Synthetic Beneficiary 1-1</Nm>
-                </Cdtr>
-                <CdtrAcct>
-                    <Id>
-                        <IBAN>LB63001900000000000000000000</IBAN>
-                    </Id>
-                </CdtrAcct>
-                <RmtInf>
-                    <Ustrd>Synthetic invoice 1-1</Ustrd>
-                </RmtInf>
-            </CdtTrfTxInf>
-            <CdtTrfTxInf>
-                <PmtId>
-                    <InstrId>I-1-2</InstrId>
-                    <EndToEndId>E2E-1-2</EndToEndId>
-                </PmtId>
-                <Amt>
-                    <InstdAmt Ccy="EUR">10000.00</InstdAmt>
-                </Amt>
-                <Cdtr>
-                    <Nm>Synthetic Beneficiary 1-2</Nm>
-                </Cdtr>
-                <CdtrAcct>
-                    <Id>
-                        <IBAN>LB10002011111111111111111111</IBAN>
-                    </Id>
-                </CdtrAcct>
-                <RmtInf>
-                    <Ustrd>Synthetic invoice 1-2</Ustrd>
-                </RmtInf>
-            </CdtTrfTxInf>
-            <CdtTrfTxInf>
-                <PmtId>
-                    <InstrId>I-1-3</InstrId>
-                    <EndToEndId>E2E-1-3</EndToEndId>
-                </PmtId>
-                <Amt>
-                    <InstdAmt Ccy="USD">5.00</InstdAmt>
-                </Amt>
-                <Cdtr>
-                    <Nm>Synthetic Beneficiary 1-3</Nm>
-                </Cdtr>
-                <CdtrAcct>
-                    <Id>
-                        <Othr>
-                            <Id>12345678</Id>
-                        </Othr>
-                    </Id>
-                </CdtrAcct>
-                <RmtInf>
-                    <Ustrd>Synthetic invoice 1-3</Ustrd>
-                </RmtInf>
-            </CdtTrfTxInf>
-            <CdtTrfTxInf>
-                <PmtId>
-                    <InstrId>I-1-4</InstrId>
-                    <EndToEndId>E2E-1-4</EndToEndId>
-                </PmtId>
-                <Amt>
-                    <EqvtAmt>
-                        <Amt Ccy="USD">30.00</Amt>
-                        <CcyOfTrf>EUR</CcyOfTrf>
-                    </EqvtAmt>
-                </Amt>
-                <Cdtr>
-                    <Nm>Synthetic Beneficiary 1-4</Nm>
-                </Cdtr>
-                <CdtrAcct>
-                    <Id>
-                        <IBAN>LB10002011111111111111111111</IBAN>
-                    </Id>
-                </CdtrAcct>
-                <RmtInf>
-                    <Ustrd>Synthetic invoice 1-4</Ustrd>
-                </RmtInf>
-            </CdtTrfTxInf>
-        </PmtInf>
-        <PmtInf>
-            <PmtInfId>GROUP-2</PmtInfId>
-            <PmtMtd>TRF</PmtMtd>
-            <ReqdExctnDt>
-                <Dt>2026-11-09</Dt>
-            </ReqdExctnDt>
-            <Dbtr>
-                <Nm>Synthetic Debtor 2</Nm>
-            </Dbtr>
-            <DbtrAcct>
-                <Id>
-                    <IBAN>LB63001900000000000000000000</IBAN>
-                </Id>
-            </DbtrAcct>
-            <DbtrAgt>
-                <FinInstnId>
-                    <BICFI>AAAALBBB</BICFI>
-                </FinInstnId>
-            </DbtrAgt>
-            <CdtTrfTxInf>
-                <PmtId>
-                    <InstrId>I-2-1</InstrId>
-                    <EndToEndId>E2E-2-1</EndToEndId>
-                </PmtId>
-                <Amt>
-                    <InstdAmt Ccy="EUR">9999.99</InstdAmt>
-                </Amt>
-                <Cdtr>
-                    <Nm>Synthetic Beneficiary 2-1</Nm>
-                </Cdtr>
-                <CdtrAcct>
-                    <Id>
-                        <IBAN>LB10002011111111111111111111</IBAN>
-                    </Id>
-                </CdtrAcct>
-                <RmtInf>
-                    <Ustrd>Synthetic invoice 2-1</Ustrd>
-                </RmtInf>
-            </CdtTrfTxInf>
-            <CdtTrfTxInf>
-                <PmtId>
-                    <InstrId>I-2-2</InstrId>
-                    <EndToEndId>E2E-2-2</EndToEndId>
-                </PmtId>
-                <Amt>
-                    <InstdAmt Ccy="GBP">20.00</InstdAmt>
-                </Amt>
-                <Cdtr>
-                    <Nm>Synthetic Beneficiary 2-2</Nm>
-                </Cdtr>
-                <CdtrAcct>
-                    <Id>
-                        <IBAN>DE89370400440532013000</IBAN>
-                    </Id>
-                </CdtrAcct>
-                <RmtInf>
-                    <Ustrd>Synthetic invoice 2-2</Ustrd>
-                </RmtInf>
-            </CdtTrfTxInf>
-            <CdtTrfTxInf>
-                <PmtId>
-                    <InstrId>I-2-3</InstrId>
-                    <EndToEndId>E2E-2-3</EndToEndId>
-                </PmtId>
-                <Amt>
-                    <InstdAmt Ccy="JPY">30.00</InstdAmt>
-                </Amt>
-                <Cdtr>
-                    <Nm>Synthetic Beneficiary 2-3</Nm>
-                </Cdtr>
-                <CdtrAcct>
-                    <Id>
-                        <IBAN>LB10002011111111111111111111</IBAN>
-                    </Id>
-                </CdtrAcct>
-                <RmtInf>
-                    <Ustrd>Synthetic invoice 2-3</Ustrd>
-                </RmtInf>
-            </CdtTrfTxInf>
-        </PmtInf>
-    </CstmrCdtTrfInitn>
-</Document>
+EmployeeFullName,ID,TotalHours,DayIn,TimeIn,DayOut,TimeOut,ReaderIn,Hours,LateIn,LateOut,Remark,TypeIn,JobLocation,ReaderOut,TypeOut
+PIERRE ABOU SERHAL,03288,821:57,07/01/2026,08:17,07/01/2026,15:56,Bloc 4 RDC,7:38,08:17,15:56,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,08/01/2026,08:33,08/01/2026,15:47,Bloc 4 RDC,7:14,08:33,15:47,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,09/01/2026,09:44,09/01/2026,16:03,Bloc 4 RDC,6:19,09:44,16:03,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,12/01/2026,09:30,12/01/2026,16:56,Bloc 4 RDC,7:25,09:30,16:56,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,13/01/2026,09:58,13/01/2026,20:15,Bloc 4 RDC,10:17,09:58,20:15,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,14/01/2026,09:27,14/01/2026,16:55,Bloc 4 RDC,7:27,09:27,16:55,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,15/01/2026,09:34,15/01/2026,16:31,Bloc 4 RDC,6:56,09:34,16:31,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,16/01/2026,09:27,16/01/2026,20:34,Bloc 4 RDC,11:07,09:27,20:34,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,19/01/2026,08:53,19/01/2026,18:35,Bloc 4 RDC,9:41,08:53,18:35,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,20/01/2026,09:15,20/01/2026,16:12,Bloc 4 RDC,6:56,09:15,16:12,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,21/01/2026,08:45,21/01/2026,20:10,Bloc 4 RDC,11:25,08:45,20:10,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,22/01/2026,09:02,22/01/2026,18:00,Bloc 4 RDC,8:58,09:02,18:00,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,23/01/2026,09:34,23/01/2026,18:27,Bloc 4 RDC,8:53,09:34,18:27,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,26/01/2026,09:13,26/01/2026,16:19,Bloc 4 RDC,7:06,09:13,16:19,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,27/01/2026,09:15,27/01/2026,16:16,Bloc 4 RDC,7:01,09:15,16:16,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,28/01/2026,09:30,28/01/2026,19:10,Bloc 4 RDC,9:40,09:30,19:10,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,29/01/2026,09:45,29/01/2026,17:57,Bloc 4 RDC,8:11,09:45,17:57,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,30/01/2026,09:00,30/01/2026,15:54,Bloc 4 RDC,6:54,09:00,15:54,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,02/02/2026,09:31,02/02/2026,16:44,Bloc 4 RDC,7:12,09:31,16:44,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,03/02/2026,10:01,03/02/2026,16:12,Bloc 4 RDC,6:10,10:01,16:12,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,04/02/2026,09:51,04/02/2026,20:44,Bloc 4 RDC,10:53,09:51,20:44,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,05/02/2026,09:59,05/02/2026,16:11,Bloc 4 RDC,6:11,09:59,16:11,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,06/02/2026,09:32,06/02/2026,15:59,Bloc 4 RDC,6:27,09:32,15:59,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,10/02/2026,09:41,10/02/2026,17:15,Bloc 4 RDC,7:33,09:41,17:15,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,11/02/2026,09:23,11/02/2026,16:37,Bloc 4 RDC,7:14,09:23,16:37,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,12/02/2026,09:33,12/02/2026,17:50,Bloc 4 RDC,8:16,09:33,17:50,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,13/02/2026,08:34,13/02/2026,12:48,Bloc 4 RDC,4:13,08:34,12:48,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,16/02/2026,10:01,16/02/2026,17:08,Bloc 4 RDC,7:06,10:01,17:08,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,17/02/2026,08:37,17/02/2026,17:43,Bloc 4 RDC,9:06,08:37,17:43,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,18/02/2026,08:17,18/02/2026,14:53,Bloc 4 RDC,6:35,08:17,14:53,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,19/02/2026,08:29,19/02/2026,17:04,Bloc 4 RDC,8:35,08:29,17:04,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,23/02/2026,09:05,23/02/2026,17:32,Bloc 4 RDC,8:26,09:05,17:32,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,24/02/2026,09:26,24/02/2026,16:51,Bloc 4 RDC,7:25,09:26,16:51,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,25/02/2026,08:49,25/02/2026,15:22,Bloc 4 RDC,6:33,08:49,15:22,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,26/02/2026,09:09,26/02/2026,17:16,Bloc 4 RDC,8:06,09:09,17:16,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,27/02/2026,08:56,27/02/2026,17:27,Bloc 4 RDC,8:30,08:56,17:27,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,02/03/2026,09:16,02/03/2026,15:32,Bloc 4 RDC,6:16,09:16,15:32,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,03/03/2026,09:34,03/03/2026,18:25,Bloc 4 RDC,8:51,09:34,18:25,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,04/03/2026,09:21,04/03/2026,19:27,Bloc 4 RDC,10:06,09:21,19:27,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,05/03/2026,08:31,05/03/2026,15:02,Bloc 4 RDC,6:31,08:31,15:02,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,06/03/2026,09:25,06/03/2026,15:51,Bloc 4 RDC,6:26,09:25,15:51,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,09/03/2026,09:29,09/03/2026,17:57,Bloc 4 RDC,8:27,09:29,17:57,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,10/03/2026,08:51,10/03/2026,16:08,Bloc 4 RDC,7:17,08:51,16:08,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,11/03/2026,09:17,11/03/2026,17:30,Bloc 4 RDC,8:12,09:17,17:30,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,12/03/2026,09:22,12/03/2026,16:40,Bloc 4 RDC,7:18,09:22,16:40,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,13/03/2026,08:42,13/03/2026,18:02,Bloc 4 RDC,9:20,08:42,18:02,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,16/03/2026,09:09,16/03/2026,16:52,Bloc 4 RDC,7:43,09:09,16:52,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,17/03/2026,08:46,17/03/2026,17:13,Bloc 4 RDC,8:27,08:46,17:13,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,18/03/2026,08:57,18/03/2026,17:06,Bloc 4 RDC,8:09,08:57,17:06,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,19/03/2026,08:41,19/03/2026,17:34,Bloc 4 RDC,8:52,08:41,17:34,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,21/03/2026,02:46,21/03/2026,09:09,Roumieh RDC,6:23,02:46,09:09,,IN,,Bloc 3 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,26/03/2026,09:46,26/03/2026,16:57,Bloc 4 RDC,7:11,09:46,16:57,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,27/03/2026,08:21,27/03/2026,17:22,Bloc 4 RDC,9:00,08:21,17:22,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,30/03/2026,09:40,30/03/2026,17:16,Bloc 4 RDC,7:36,09:40,17:16,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,31/03/2026,09:25,31/03/2026,17:26,Bloc 4 RDC,8:00,09:25,17:26,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,01/04/2026,09:45,01/04/2026,17:53,Bloc 4 RDC,8:08,09:45,17:53,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,02/04/2026,09:15,02/04/2026,16:57,Bloc 4 RDC,7:42,09:15,16:57,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,07/04/2026,09:43,07/04/2026,16:56,Bloc 4 RDC,7:12,09:43,16:56,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,14/04/2026,09:45,14/04/2026,17:04,Bloc 4 RDC,7:18,09:45,17:04,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,15/04/2026,09:27,15/04/2026,17:53,Bloc 4 RDC,8:26,09:27,17:53,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,16/04/2026,09:47,16/04/2026,17:47,Bloc 4 RDC,7:59,09:47,17:47,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,17/04/2026,09:39,17/04/2026,17:23,Bloc 4 RDC,7:44,09:39,17:23,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,20/04/2026,09:24,20/04/2026,16:48,Bloc 4 RDC,7:23,09:24,16:48,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,21/04/2026,09:44,21/04/2026,18:47,Bloc 4 RDC,9:03,09:44,18:47,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,22/04/2026,08:33,22/04/2026,17:38,Bloc 4 RDC,9:04,08:33,17:38,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,23/04/2026,08:56,23/04/2026,15:52,Bloc 4 RDC,6:56,08:56,15:52,,IN,,Roumieh RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,24/04/2026,09:31,24/04/2026,15:19,Bloc 4 RDC,5:48,09:31,15:19,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,27/04/2026,09:44,27/04/2026,17:19,Bloc 4 RDC,7:35,09:44,17:19,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,28/04/2026,08:39,28/04/2026,16:11,Bloc 4 RDC,7:32,08:39,16:11,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,29/04/2026,08:49,29/04/2026,16:58,Bloc 4 RDC,8:08,08:49,16:58,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,30/04/2026,08:40,30/04/2026,16:59,Bloc 4 RDC,8:18,08:40,16:59,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,04/05/2026,09:12,04/05/2026,19:48,Bloc 4 RDC,10:35,09:12,19:48,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,05/05/2026,09:23,05/05/2026,16:29,Bloc 4 RDC,7:05,09:23,16:29,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,06/05/2026,08:15,06/05/2026,16:19,Bloc 4 RDC,8:03,08:15,16:19,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,07/05/2026,08:22,07/05/2026,15:51,Bloc 4 RDC,7:29,08:22,15:51,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,08/05/2026,08:31,08/05/2026,16:54,Bloc 4 RDC,8:23,08:31,16:54,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,11/05/2026,09:31,11/05/2026,16:52,Bloc 4 RDC,7:20,09:31,16:52,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,12/05/2026,09:10,12/05/2026,15:58,Bloc 4 RDC,6:47,09:10,15:58,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,13/05/2026,09:28,13/05/2026,18:45,Bloc 4 RDC,9:17,09:28,18:45,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,14/05/2026,09:50,14/05/2026,16:06,Bloc 4 RDC,6:15,09:50,16:06,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,15/05/2026,09:30,15/05/2026,15:40,Bloc 4 RDC,6:09,09:30,15:40,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,18/05/2026,09:51,18/05/2026,17:04,Bloc 4 RDC,7:13,09:51,17:04,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,19/05/2026,09:43,19/05/2026,17:14,Bloc 4 RDC,7:30,09:43,17:14,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,20/05/2026,09:49,20/05/2026,19:37,Bloc 4 RDC,9:48,09:49,19:37,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,21/05/2026,09:39,21/05/2026,17:20,Bloc 4 RDC,7:41,09:39,17:20,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,22/05/2026,08:07,22/05/2026,16:00,Bloc 4 RDC,7:52,08:07,16:00,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,01/06/2026,09:15,01/06/2026,15:40,Bloc 4 RDC,6:24,09:15,15:40,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,02/06/2026,09:39,02/06/2026,19:23,Bloc 4 RDC,9:43,09:39,19:23,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,03/06/2026,09:00,03/06/2026,16:02,Bloc 4 RDC,7:01,09:00,16:02,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,04/06/2026,09:58,04/06/2026,18:13,Bloc 4 RDC,8:14,09:58,18:13,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,05/06/2026,09:59,05/06/2026,15:33,Bloc 4 RDC,5:33,09:59,15:33,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,08/06/2026,09:20,08/06/2026,17:49,Bloc 4 RDC,8:29,09:20,17:49,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,09/06/2026,09:49,09/06/2026,15:50,Bloc 4 RDC,6:01,09:49,15:50,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,10/06/2026,09:01,10/06/2026,15:43,Bloc 4 RDC,6:41,09:01,15:43,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,11/06/2026,08:57,11/06/2026,16:11,Bloc 4 RDC,7:13,08:57,16:11,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,12/06/2026,09:51,12/06/2026,15:50,Bloc 4 RDC,5:58,09:51,15:50,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,15/06/2026,09:39,15/06/2026,16:10,Bloc 4 RDC,6:30,09:39,16:10,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,17/06/2026,10:02,17/06/2026,17:40,Bloc 4 RDC,7:37,10:02,17:40,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,18/06/2026,11:04,18/06/2026,16:17,Bloc 4 RDC,5:13,11:04,16:17,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,19/06/2026,03:45,19/06/2026,14:26,Bloc 3 RDC,10:41,03:45,14:26,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,22/06/2026,08:28,22/06/2026,17:01,Bloc 4 RDC,8:33,08:28,17:01,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,23/06/2026,08:58,23/06/2026,16:04,Bloc 4 RDC,7:05,08:58,16:04,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,24/06/2026,09:29,24/06/2026,17:00,Bloc 4 RDC,7:31,09:29,17:00,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,25/06/2026,08:57,25/06/2026,16:09,Bloc 4 RDC,7:11,08:57,16:09,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,29/06/2026,09:46,29/06/2026,16:07,Bloc 4 RDC,6:21,09:46,16:07,,IN,,Bloc 4 RDC,OUT
+PIERRE ABOU SERHAL,03288,821:57,30/06/2026,08:07,30/06/2026,15:44,Bloc 4 RDC,7:37,08:07,15:44,,IN,,Bloc 4 RDC,OUT
