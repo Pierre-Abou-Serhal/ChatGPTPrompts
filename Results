@@ -1,43 +1,6 @@
-{
-  "PostTransferReq": {
-    "payment_transfer": {
-      "transfer_reference": "992fce47-c2d9-4888-85f2-98991360ef32",
-      "payment_type": "P2P",
-      "amount": "777",
-      "currency": "USD",
-      "sender_account_uri": "raw:011276734001840",
-      "sender": {
-        "first_name": "patricia",
-        "last_name": "khadra",
-        "account_type": "01",
-        "address": {
-          "line1": "baladiyeh  n 118",
-          "city": "bsalim",
-          "postal_code": "00000",
-          "country": "LBN"
-        }
-      },
-      "funding_source": "DEBIT",
-      "transaction_purpose": "",
-      "recipient_account_uri": "pan:************0000",
-      "recipient": {
-        "first_name": "Testing-MS-FN",
-        "last_name": "Testing-MS-LN",
-        "account_type": "03",
-        "address": { "country": "LBN", "postal_code": "00000" }
-      },
-      "channel": "MOBILE",
-      "participant": {
-        "merchant_category_code": "6536",
-        "interchange_rate_designator": "MS",
-        "card_acceptor_id": "00000000000SGBL"
-      }
-    }
-  }
-}
-
-{    "PostTransferReq": {      "payment_transfer": {        "transfer_reference": "cd8d11d4-57d4-4f76-bcd7-9f9c395e1003",        "payment_type": "P2P",        "amount": "888",        "currency": "USD",        "sender_account_uri": "raw:011276734001840",        "sender": {          "first_name": "patricia",          "last_name": "khadra",          "account_type": "01",          "address": {            "line1": "baladiyeh  n 118",            "city": "bsalim",            "postal_code": "00000",            "country": "LBN"          }        },        "funding_source": "DEBIT",        "transaction_purpose": "",        "recipient_account_uri": "pan:************0039",        "recipient": {          "first_name": "Testing-MS-FN",          "last_name": "Testing-MS-LN",          "account_type": "03",          "address": {            "country": "LBN",            "postal_code": "00000"          }        },        "channel": "MOBILE",        "participant": {          "merchant_category_code": "6536",          "interchange_rate_designator": "MS",          "card_acceptor_id": "00000000000SGBL"        }      }    }  }
-
-{    "PostTransferReq": {      "payment_transfer": {        "transfer_reference": "dedd2be2-8eec-4824-8fd4-93552a0b596d",        "payment_type": "P2P",        "amount": "999",        "currency": "USD",        "sender_account_uri": "raw:011260165002840",        "sender": {          "first_name": "PIERRE",          "last_name": "ABOU SERHAL",          "account_type": "01",          "address": {            "line1": "Rue 12 A  30",            "city": "LB",            "postal_code": "00000",            "country": "LBN"          }        },        "funding_source": "DEBIT",        "transaction_purpose": "",        "recipient_account_uri": "pan:************0042",        "recipient": {          "first_name": "Testing-MS-FN",          "last_name": "Testing-MS-LN",          "account_type": "03",          "address": {            "country": "BEL",            "postal_code": "00000"          }        },        "channel": "MOBILE",        "participant": {          "merchant_category_code": "6537",          "interchange_rate_designator": "MS",          "card_acceptor_id": "00000000000SGBL"        }      }    }  }
-
-{    "PostTransferReq": {      "payment_transfer": {        "transfer_reference": "f704f8a4-6620-43b5-bc9e-6db85207026a",        "payment_type": "P2P",        "amount": "999",        "currency": "USD",        "sender_account_uri": "raw:011260165002840",        "sender": {          "first_name": "PIERRE",          "last_name": "ABOU SERHAL",          "account_type": "01",          "address": {            "line1": "Rue 12 A  30",            "city": "LB",            "postal_code": "00000",            "country": "LBN"          }        },        "funding_source": "DEBIT",        "transaction_purpose": "",        "recipient_account_uri": "pan:************0005",        "recipient": {          "first_name": "Testing-MS-FN",          "last_name": "Testing-MS-LN",          "account_type": "03",          "address": {            "country": "CYP",            "postal_code": "00000"          }        },        "channel": "MOBILE",        "participant": {          "merchant_category_code": "6537",          "interchange_rate_designator": "MS",          "card_acceptor_id": "00000000000SGBL"        }      }    }  }
+| Transfer reference | Amount | Currency | Recipient account URI | Merchant category code |
+|---|---:|:---:|---|:---:|
+| 992fce47-c2d9-4888-85f2-98991360ef32 | 777 | USD | `pan:************0000` | 6536 |
+| cd8d11d4-57d4-4f76-bcd7-9f9c395e1003 | 888 | USD | `pan:************0039` | 6536 |
+| dedd2be2-8eec-4824-8fd4-93552a0b596d | 999 | USD | `pan:************0042` | 6537 |
+| f704f8a4-6620-43b5-bc9e-6db85207026a | 999 | USD | `pan:************0005` | 6537 |
