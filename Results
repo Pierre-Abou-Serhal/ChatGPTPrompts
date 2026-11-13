@@ -1,16 +1,194 @@
-| Transfer reference | Amount | Currency | Recipient account URI | Merchant category code |
-|---|---:|:---:|---|:---:|
-| 4eb03ccfc906473dba84de7a15872ef7 | 500 | USD | `pan:************7723` | 6536 |
-| 3bd9e111e19e45669e5ba13b0712ad10 | 1000 | USD | `pan:************5829` | 6536 |
-| dec7cf5e59d04c0aa18f438f2a3b87eb | 43500 | USD | `pan:************3682` | 6536 |
-| ae5a1de5ad424de0a92c49bb6312f2b7 | 43500 | USD | `pan:************3682` | 6536 |
-| fbe19aed62654667a3562b55b61e6e03 | 43500 | USD | `pan:************3682` | 6536 |
-| 96fc679345f74d549411e479897d8331 | 43500 | USD | `pan:************3682` | 6536 |
-| a46a162b3232410488f9b0111907d348 | 6000 | USD | `pan:************6999` | 6536 |
-| f30c041f736141dcb246ffa98aa1dc75 | 6000 | USD | `pan:************6999` | 6536 |
-| 121a609e61cc46bfb70ad448997087f1 | 6000 | USD | `pan:************6999` | 6536 |
-| f60b4d7af6b14496a4061669a2fb6581 | 6500 | USD | `pan:************6999` | 6536 |
-| a1ff9f04f8184cd7a8e8821f6bce410d | 6500 | USD | `pan:************6999` | 6536 |
-| 48c48a424a874ba18fdfb3d51fa30784 | 10200 | USD | `pan:************7289` | 6536 |
-| a7e417ae07154c899e6f2f8e07f3a208 | 10300 | USD | `pan:************7289` | 6536 |
-| 56f5ccd9c452440991e2ae2cb1fe3e0c | 500 | USD | `pan:************7723` | 6536 |
+// Decompiled with JetBrains decompiler
+// Type: DAL.DapperDal
+// Assembly: DAL, Version=1.0.1.0, Culture=neutral, PublicKeyToken=null
+// MVID: 1087FDDC-B1D2-49C9-8DF5-DCAC75857D3B
+// Assembly location: C:\Users\pabouserhal\.nuget\packages\dal\1.0.1\lib\net8.0\DAL.dll
+
+using Dapper;
+using Microsoft.Data.SqlClient;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Common;
+using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
+
+#nullable enable
+namespace DAL;
+
+public class DapperDal(string dbConnString)
+{
+  public async Task<IEnumerable<T>> ExecuteQueryAsync<T>(
+    string command,
+    DynamicParameters? dynamicParams,
+    CommandType cmdType,
+    DapperDal.CommandDirection cmdDirection)
+  {
+    await using (SqlConnection dbConnection = new SqlConnection(dbConnString))
+    {
+      if (cmdDirection == DapperDal.CommandDirection.Select)
+      {
+        if (dbConnection.State != ConnectionState.Open)
+          dbConnection.Open();
+        SqlConnection cnn = dbConnection;
+        string sql = command;
+        DynamicParameters dynamicParameters = dynamicParams;
+        CommandType? nullable = new CommandType?(cmdType);
+        int? commandTimeout = new int?();
+        CommandType? commandType = nullable;
+        return await cnn.QueryAsync<T>(sql, (object) dynamicParameters, commandTimeout: commandTimeout, commandType: commandType);
+      }
+      if (dbConnection.State != ConnectionState.Open)
+        dbConnection.Open();
+      await using (DbTransaction transaction1 = await dbConnection.BeginTransactionAsync())
+      {
+        object obj;
+        int num;
+        try
+        {
+          SqlConnection cnn = dbConnection;
+          string sql = command;
+          DynamicParameters dynamicParameters = dynamicParams;
+          CommandType? nullable = new CommandType?(cmdType);
+          DbTransaction transaction2 = transaction1;
+          int? commandTimeout = new int?();
+          CommandType? commandType = nullable;
+          IEnumerable<T> result = await cnn.QueryAsync<T>(sql, (object) dynamicParameters, (IDbTransaction) transaction2, commandTimeout, commandType);
+          await transaction1.CommitAsync();
+          return result;
+        }
+        catch (object ex)
+        {
+          obj = ex;
+          num = 1;
+        }
+        if (num == 1)
+        {
+          await transaction1.RollbackAsync();
+          if (!(obj is Exception source))
+            throw obj;
+          ExceptionDispatchInfo.Capture(source).Throw();
+        }
+        obj = (object) null;
+      }
+    }
+    transaction1 = (DbTransaction) null;
+    IEnumerable<T> objs;
+    return objs;
+  }
+
+  public async Task ExecuteQueryAsync(
+    string command,
+    DynamicParameters? dynamicParams,
+    CommandType cmdType)
+  {
+    SqlConnection dbConnection = new SqlConnection(dbConnString);
+    object obj1 = (object) null;
+    int num1 = 0;
+    DbTransaction transaction;
+    try
+    {
+      if (dbConnection.State != ConnectionState.Open)
+        dbConnection.Open();
+      transaction = await dbConnection.BeginTransactionAsync();
+      object obj2 = (object) null;
+      int num2 = 0;
+      try
+      {
+        try
+        {
+          SqlConnection cnn = dbConnection;
+          string sql = command;
+          DynamicParameters dynamicParameters = dynamicParams;
+          CommandType? nullable = new CommandType?(cmdType);
+          DbTransaction transaction1 = transaction;
+          int? commandTimeout = new int?();
+          CommandType? commandType = nullable;
+          int num = await cnn.ExecuteAsync(sql, (object) dynamicParameters, (IDbTransaction) transaction1, commandTimeout, commandType);
+          await transaction.CommitAsync();
+        }
+        catch (object ex)
+        {
+          await transaction.RollbackAsync();
+          throw;
+        }
+        num2 = 1;
+      }
+      catch (object ex)
+      {
+        obj2 = ex;
+      }
+      if (transaction != null)
+        await transaction.DisposeAsync();
+      object obj = obj2;
+      if (obj != null)
+      {
+        if (!(obj is Exception source))
+          throw obj;
+        ExceptionDispatchInfo.Capture(source).Throw();
+      }
+      if (num2 != 1)
+        obj2 = (object) null;
+      else
+        num1 = 1;
+    }
+    catch (object ex)
+    {
+      obj1 = ex;
+    }
+    if (dbConnection != null)
+      await dbConnection.DisposeAsync();
+    object obj3 = obj1;
+    if (obj3 != null)
+    {
+      if (!(obj3 is Exception source))
+        throw obj3;
+      ExceptionDispatchInfo.Capture(source).Throw();
+    }
+    if (num1 == 1)
+    {
+      dbConnection = (SqlConnection) null;
+      transaction = (DbTransaction) null;
+    }
+    else
+    {
+      obj1 = (object) null;
+      dbConnection = (SqlConnection) null;
+      transaction = (DbTransaction) null;
+      dbConnection = (SqlConnection) null;
+      transaction = (DbTransaction) null;
+    }
+  }
+
+  public async Task<T> QueryMultipleAsync<T>(
+    string command,
+    DynamicParameters parameters,
+    CommandType commandType,
+    Func<SqlMapper.GridReader, Task<T>> mapFunction)
+  {
+    using (IDbConnection db = (IDbConnection) new SqlConnection(dbConnString))
+    {
+      if (db.State != ConnectionState.Open)
+        db.Open();
+      IDbConnection cnn = db;
+      string sql = command;
+      DynamicParameters dynamicParameters = parameters;
+      CommandType? nullable = new CommandType?(commandType);
+      int? commandTimeout = new int?();
+      CommandType? commandType1 = nullable;
+      await using (SqlMapper.GridReader multi = await cnn.QueryMultipleAsync(sql, (object) dynamicParameters, commandTimeout: commandTimeout, commandType: commandType1))
+        return await mapFunction(multi);
+      T obj = default (T);
+    }
+    multi = (SqlMapper.GridReader) null;
+    T obj1;
+    return obj1;
+  }
+
+  public enum CommandDirection
+  {
+    Update,
+    Delete,
+    Select,
+  }
+}
