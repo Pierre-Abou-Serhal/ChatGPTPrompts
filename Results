@@ -1,132 +1,79 @@
-An unhandled exception occurred while processing the request.
-MissingMethodException: Method not found: 'Void System.Text.Json.Serialization.Metadata.JsonObjectInfoValues`1.set_ObjectCreator(System.Func`1<!0>)'.
-Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIOptionsJsonContext.Create_ConfigObject(JsonSerializerOptions options)
+USE [Alterna_PaymentManagement]
+GO
+SET IDENTITY_INSERT [dbo].[t_Lookup] ON 
 
-Stack Query Cookies Headers Routing
-MissingMethodException: Method not found: 'Void System.Text.Json.Serialization.Metadata.JsonObjectInfoValues`1.set_ObjectCreator(System.Func`1<!0>)'.
-Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIOptionsJsonContext.Create_ConfigObject(JsonSerializerOptions options)
-Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIOptionsJsonContext.global::System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver.GetTypeInfo(Type type, JsonSerializerOptions options)
-System.Text.Json.JsonSerializerOptions.GetTypeInfoNoCaching(Type type)
-System.Text.Json.JsonSerializerOptions+CachingContext.CreateCacheEntry(Type type, CachingContext context)
-System.Text.Json.JsonSerializerOptions+CachingContext+CacheEntry.GetResult()
-System.Text.Json.JsonSerializerOptions+CachingContext.GetOrAddTypeInfo(Type type, bool fallBackToNearestAncestorType)
-System.Text.Json.JsonSerializerOptions.GetTypeInfoInternal(Type type, bool ensureConfigured, Nullable<bool> ensureNotNull, bool resolveIfMutable, bool fallBackToNearestAncestorType)
-System.Text.Json.JsonSerializerOptions.GetTypeInfo(Type type)
-Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIOptionsJsonContext.get_ConfigObject()
-Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.GetIndexArguments()
-Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.RespondWithFile(HttpResponse response, string fileName)
-Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
-Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
-Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
-Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
-
-Show raw exception details
-System.MissingMethodException: Method not found: 'Void System.Text.Json.Serialization.Metadata.JsonObjectInfoValues`1.set_ObjectCreator(System.Func`1<!0>)'.
-   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIOptionsJsonContext.Create_ConfigObject(JsonSerializerOptions options)
-   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIOptionsJsonContext.global::System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver.GetTypeInfo(Type type, JsonSerializerOptions options)
-   at System.Text.Json.JsonSerializerOptions.GetTypeInfoNoCaching(Type type)
-   at System.Text.Json.JsonSerializerOptions.CachingContext.CreateCacheEntry(Type type, CachingContext context)
---- End of stack trace from previous location ---
-   at System.Text.Json.JsonSerializerOptions.CachingContext.CacheEntry.GetResult()
-   at System.Text.Json.JsonSerializerOptions.CachingContext.GetOrAddTypeInfo(Type type, Boolean fallBackToNearestAncestorType)
-   at System.Text.Json.JsonSerializerOptions.GetTypeInfoInternal(Type type, Boolean ensureConfigured, Nullable`1 ensureNotNull, Boolean resolveIfMutable, Boolean fallBackToNearestAncestorType)
-   at System.Text.Json.JsonSerializerOptions.GetTypeInfo(Type type)
-   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIOptionsJsonContext.get_ConfigObject()
-   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.GetIndexArguments()
-   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.RespondWithFile(HttpResponse response, String fileName)
-   at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
-   at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
-   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
-   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
-
-And this is the program.cs
-
-using BAL;
-using Common;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using Serilog;
-
-// Detect if the app is running as a Windows service
-var isWindowsService = !Environment.UserInteractive;
-
-if (isWindowsService)
-{
-    var pathToContentRoot = AppContext.BaseDirectory;
-    Directory.SetCurrentDirectory(pathToContentRoot);
-}
-
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-
-builder.Host.UseWindowsService();
-
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    .AddEnvironmentVariables();
-
-#region Serilog Configuration
-// Creating The Serilog Logger
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .CreateLogger();
-
-builder.Host.UseSerilog();
-#endregion
-
-builder.Services.Configure<GlobalSettings>(builder.Configuration.GetSection("GlobalSettings") ?? throw new ArgumentNullException(nameof(GlobalSettings)));
-builder.Services.Configure<PaymentManagementResponseCodes>(builder.Configuration.GetSection("ResponseCodes") ?? throw new ArgumentNullException(nameof(PaymentManagementResponseCodes)));
-
-builder.Services.AddScoped(resolver =>
-{
-    IOptionsMonitor<GlobalSettings> optionsMonitor = resolver.GetRequiredService<IOptionsMonitor<GlobalSettings>>();
-    return optionsMonitor.CurrentValue;
-});
-
-builder.Services.AddScoped(resolver =>
-{
-    IOptionsMonitor<PaymentManagementResponseCodes> optionsMonitor = resolver.GetRequiredService<IOptionsMonitor<PaymentManagementResponseCodes>>();
-    return optionsMonitor.CurrentValue;
-});
-
-builder.Services.AddControllers();
-
-builder.Services.AddHttpClient("GeneralHttpClient", options =>
-{
-    options.Timeout = TimeSpan.FromMinutes(15);
-});
-
-//disabled data annotations validation by default
-builder.Services.Configure<ApiBehaviorOptions>(options =>
-{
-  options.SuppressModelStateInvalidFilter = true; // --> TODO: Handle deserialization failures
-});
-
-
-builder.Services.AddScoped<Bal>();
-
-// builder.Services.AddHostedService<BackgroundTaskService>(); --> TODO: Workers for polling and pushing files
-
-builder.Services.AddEndpointsApiExplorer();
-
-//add swagger
-builder.Services.AddSwaggerGen();
-
-WebApplication app = builder.Build();
-
-app.UseSwagger();
-app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/Alterna Payment Management/swagger.json", "V1");
-    }
-);
-
-app.UseCors(corsOptions => corsOptions
-    .AllowAnyOrigin()
-    .AllowAnyHeader()
-    .AllowAnyMethod());
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (1, N't_Batch_Categories.Category', N'LOCAL', N'Local', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (2, N't_Batch_Categories.Category', N'ACH', N'ACH / BDL Clear', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (3, N't_Batch_Categories.Category', N'RTGS', N'RTGS', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (4, N't_Batch_Categories.Category', N'SWIFT', N'SWIFT', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (5, N't_Batch_Categories.Category', N'INVALID', N'Invalid', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (6, N't_File_Receipts.ChannelCode', N'Poll', N'Folder polling', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (7, N't_File_Receipts.ChannelCode', N'Upload', N'Manual upload', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (8, N't_File_Receipts.StatusCode', N'Received', N'Received', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (9, N't_File_Receipts.StatusCode', N'Claimed', N'Claimed', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (10, N't_File_Receipts.StatusCode', N'Validating', N'Validating', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (11, N't_File_Receipts.StatusCode', N'Imported', N'Imported', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (12, N't_File_Receipts.StatusCode', N'ImportFailed', N'Import failed', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (13, N't_File_Receipts.StatusCode', N'Duplicate', N'Duplicate', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (14, N't_File_Receipts.LocationStateCode', N'Inbound', N'Inbound', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (15, N't_File_Receipts.LocationStateCode', N'Claimed', N'Claimed', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (16, N't_File_Receipts.LocationStateCode', N'ArchivePending', N'Archive move pending', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (17, N't_File_Receipts.LocationStateCode', N'Archived', N'Archived', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (18, N't_File_Receipts.LocationStateCode', N'ErrorMovePending', N'Error move pending', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (19, N't_File_Receipts.LocationStateCode', N'Error', N'Moved to ERROR', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (20, N't_Iso_Definitions.Family', N'pain.001', N'Customer credit transfer initiation', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (21, N't_Iso_Definitions.Family', N'pain.002', N'Customer payment status report', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (22, N't_Outgoing_Documents.Kind', N'Pain002', N'pain.002 payment status report', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (23, N't_Outgoing_Documents.Kind', N'ImportErrorJson', N'Import error report (JSON)', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (24, N't_Outgoing_Documents.PublicationState', N'Pending', N'Pending publication', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (25, N't_Outgoing_Documents.PublicationState', N'Publishing', N'Publishing', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (26, N't_Outgoing_Documents.PublicationState', N'PublishedToOut', N'Published to OUT', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (27, N't_Outgoing_Documents.PublicationState', N'Failed', N'Publication failed', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (28, N't_Outgoing_Documents.PublicationState', N'SupersededUnpublished', N'Superseded before publication', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (29, N't_Payment_Batches.State', N'Editable', N'Editable', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (30, N't_Payment_Batches.State', N'Finalizing', N'Finalizing', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (31, N't_Payment_Batches.State', N'Finalized', N'Finalized', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (32, N't_Transfers.Decision', N'Pending', N'Pending decision', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (33, N't_Transfers.Decision', N'Approved', N'Approved', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (34, N't_Transfers.Decision', N'Rejected', N'Rejected', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (35, N't_Transfers.DecisionSource', N'System', N'System decision', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+INSERT [dbo].[t_Lookup] ([Id], [TableName], [Code], [Description], [IsActive], [CreatedBy], [CreatedDate], [LastModifiedBy], [LastModifiedDate]) VALUES (36, N't_Transfers.DecisionSource', N'Operator', N'Operator decision', 1, N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime), N'AlternaSystem', CAST(N'2026-11-11T11:43:49.287' AS DateTime))
+GO
+SET IDENTITY_INSERT [dbo].[t_Lookup] OFF
+GO
