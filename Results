@@ -1,6 +1,7 @@
-| Transfer reference | Amount | Currency | Recipient account URI | Merchant category code |
-|---|---:|:---:|---|:---:|
-| 992fce47-c2d9-4888-85f2-98991360ef32 | 777 | USD | `pan:************0000` | 6536 |
-| cd8d11d4-57d4-4f76-bcd7-9f9c395e1003 | 888 | USD | `pan:************0039` | 6536 |
-| dedd2be2-8eec-4824-8fd4-93552a0b596d | 999 | USD | `pan:************0042` | 6537 |
-| f704f8a4-6620-43b5-bc9e-6db85207026a | 999 | USD | `pan:************0005` | 6537 |
+Original
+<con:wsdl ref="Alterna.business.svc/evs.Alterna/evs.Alterna.RoadTax/wsdl/evs.ttvmaServices"/>
+
+Migrated
+<con:wsdl ref="roadtax/evs.Alterna/evs.Alterna.RoadTax/wsdl/evs.ttvmaServices"/>
+
+and changes in xquery references as well need to check for two precedent folders
