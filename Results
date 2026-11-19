@@ -1,3 +1,26 @@
-gpg --armor --trust-model always --recipient <FPR> --output 1_ALFA-V6.xml.asc --encrypt 1_ALFA-V6.xml
-
-gpg --list-packets 1_ALFA-V6.xml.asc
+Area	Man-days
+Analysis and design: FSD study, data model, API contracts, Q&A with the business	8 – 12
+Database: tables, migrations, TVPs, stored procedures with @P__Error, seed data	15 – 20
+Backend	
+• File intake: folder polling, ACK/SUCCESS/ERROR folders, checksum and MsgId duplicates, file type detection, upload endpoint	8 – 10
+• PGP decryption and encryption, key configuration	3 – 5
+• ISO 20022: XSD validation and reading across all pain.001 versions	10 – 15
+• FSD validation rules and routing (INTERNAL, CLEAR, RTGS, CBPR)	8 – 10
+• Possible duplicates (detect, release, reject)	3 – 5
+• Workflow: category processing, four-eyes approval, manual SAL/TSAL creation, rejects	10 – 14
+• pain.002 (RJCT, ACSP, final), publication to OUT, returned pain.002	6 – 8
+• Excel workbooks (password protected)	4 – 6
+• Emails: templates, queue, retry, scheduled jobs	5 – 7
+• Configuration APIs, health checks, lookups, audit	6 – 8
+Frontend	
+• Dashboard and file list	5 – 7
+• File details: categories, transfers, dialogs, workbook preview, four-eyes, export	12 – 16
+• Email log	2 – 3
+• Configuration screens: institutions, application settings, reject reasons	8 – 10
+• Shared models, services, routing	3 – 4
+Unit tests	8 – 12
+Integration / end-to-end testing and bug fixing	12 – 18
+Deployment, documentation, UAT support	8 – 12
+Subtotal	144 – 202
+Meetings, code reviews, coordination (10–15%)	14 – 30
+Total	≈ 160 – 230 man-days
