@@ -1,11 +1,3 @@
-gpg --default-preference-list "AES256 AES192 AES SHA512 SHA384 SHA256 SHA224 ZLIB BZIP2 ZIP Uncompressed" --quick-generate-key "SGBL (PAIN exchange)" rsa4096 sign 3y
+gpg --armor --trust-model always --recipient <FPR> --output 1_ALFA-V6.xml.asc --encrypt 1_ALFA-V6.xml
 
-gpg --list-keys "SGBL (PAIN exchange)"
-
-gpg --quick-add-key <FPR> rsa4096 encr 3y
-
-gpg --armor --export <FPR> | Out-File -Encoding ascii SGBL_PUBLIC.asc
-
-gpg --armor --export-secret-keys <FPR> | Out-File -Encoding ascii SGBL_PRIVATE.asc
-
-gpg --list-packets SGBL_PUBLIC.asc | Select-String "features|pref-aead"
+gpg --list-packets 1_ALFA-V6.xml.asc
