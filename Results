@@ -1,1 +1,11 @@
-gpg --armor --trust-model always --recipient 3E31EFB385CACA951BD1C19E503C223D8E549333 --output pain001.xml.asc --encrypt pain001.xml
+File could not be processed
+A file received from ALFA could not be processed and was moved to the ERROR folder. The file is attached when it could be read.
+File	1_ALFA-V5.xml.asc
+Received	2026-11-19 09:24
+Error	DecryptionFailed
+
+•	The file could not be decrypted: The message uses AEAD encryption (packet tag 20), which the referenced BouncyCastle version cannot decrypt. Ask the sender for non-AEAD, MDC-protected output. See https://github.com/mattosaurus/PgpCore/issues/219.
+
+
+This is the command that I used
+gpg --armor --trust-model always --recipient 3E31EFB385CACA951BD1C19E503C223D8E549333 --output 1_ALFA-V4.xml.asc --encrypt 1_ALFA-V4.xml
