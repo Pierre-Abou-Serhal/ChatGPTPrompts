@@ -1,9 +1,1 @@
-  "NLogSettings": {
-    "Is_DB_Log": "true",
-    "Is_DB_Log_Info": "true",
-    "NLog_Location": "C:\\logs\\PaymentManagementBackend.txt",
-    "NLog_MaxArchiveDays": "75",
-    "NLog_LogLevel": "info",
-    "LoggingApi": "http://10.0.40.41:8043/api/Logger/LogData",
-    "Caller_App": "PaymentManagementBackend"
-  }
+https://qr-uat.sgbl.com/document#ZT0LisJcrYOFRhjvpCsE83AjdbBKuwYp7KQtGnqrguk
